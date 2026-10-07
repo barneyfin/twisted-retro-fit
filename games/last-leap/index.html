@@ -127,220 +127,99 @@ const LEVELS = [
     road(-0.70, 'bus', 3)] },
 ];
 
-/* ---------- Sprite helpers ----------
-   Sprites are drawn below as flat shapes ("masks"). shade() then gives every shape its three tones with
-   the light from the top left, so one mask can be turned or mirrored and still be lit the right way. */
-const MATERIALS = {
-  '=': { ramp: 'LMD' },             // chrome: the frog
-  '@': { ramp: 'aAQ', own: true },  // aqua details (eyes, back stripe), shaded on their own edges
-  '%': { ramp: 'rRX' },             // red: most traffic
-  '&': { ramp: 'hHE' },             // heat: the rest of the traffic
-  '$': { ramp: 'yYO' },             // amber: logs
-  '~': { ramp: 'AQQ' },             // dark aqua: turtle shells and lily pads
-  ':': { ramp: 'MDD' },             // slate: trailers, hulls, the engine's boiler
-};
-function shade(rows) {
-  const h = rows.length;
-  const w = rows[0].length;
-  rows.forEach((r) => { if (r.length !== w) console.warn('Last Leap: a sprite row is ' + r.length + ' wide, not ' + w + ': ' + r); });
-  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? '.' : rows[y][x]);
-  return rows.map((row, y) => row.split('').map((ch, x) => {
-    const m = MATERIALS[ch];
-    if (!m) return ch;
-    const open = (c) => (m.own ? c !== ch : c === '.');
-    const lit = (open(at(x, y - 1)) ? 1 : 0) + (open(at(x - 1, y)) ? 1 : 0) - (open(at(x, y + 1)) ? 1 : 0) - (open(at(x + 1, y)) ? 1 : 0);
-    return m.ramp[lit > 0 ? 0 : lit < 0 ? 2 : 1];
-  }).join(''));
+/* ---------- Art ----------
+   Every sprite is a few shapes in its own box (game pixels), drawn by the kit at the screen's real
+   resolution: flat colour in hard bands, light from above, an ink outline round the outside. A ramp name
+   ('red', 'heat', 'amber', 'aqua', 'chrome') as a fill gives light, base and dark bands; a token
+   ('sun-100', 'ink') gives one flat colour. Traffic faces right; mirror: true makes the copy that faces
+   left, and turn: 1-3 turns the frog, with the light still from above. */
+const SLATE = ['chrome-300', 0.3, 'chrome-400'];          // trailers, hulls, the engine's boiler
+const lamp = (x, y) => ({ circle: [x, y, 0.6], fill: 'sun-100' });
+const glass = (x, y, w, h, r) => [{ rect: [x, y, w, h], r: r, fill: 'ink' }, { circle: [x + w * 0.35, y + h * 0.3, 0.45], fill: 'chrome-300' }];
+const both = (list, w) => list.concat(list.map((s) => {      // a shape and its copy on the other side of the box (left to right)
+  const o = Object.assign({}, s);
+  if (s.line) o.line = s.line.map((v, i) => (i % 2 ? v : w - v));
+  if (s.poly) o.poly = s.poly.map((v, i) => (i % 2 ? v : w - v));
+  if (s.circle) o.circle = [w - s.circle[0], s.circle[1], s.circle[2]];
+  if (s.rect) o.rect = [w - s.rect[0] - s.rect[2], s.rect[1], s.rect[2], s.rect[3]];
+  return o;
+}));
+
+/* The frog, facing up: sitting, then mid-leap. A chrome body, aqua eyes and an aqua stripe down its back. */
+function frogFrame(leap) {
+  const legs = leap
+    ? [{ line: [3.2, 3.2, 1.2, 1.8, 0.6, 0.4], width: 1.1, fill: 'chrome' }, { line: [4, 8.8, 1.8, 10.2, 0.6, 11.6], width: 1.2, fill: 'chrome' }]
+    : [{ line: [3.2, 3.8, 1.2, 3.4, 0.6, 4.8], width: 1.1, fill: 'chrome' }, { poly: [3.6, 7, 0.4, 8.4, 0.4, 10.8, 1.6, 11.6, 2.8, 10.2, 4.2, 9.6], fill: 'chrome', band: [0.3, 0.75] }];
+  return [
+    ...both(legs, 12),
+    { ellipse: [6, leap ? 6.2 : 6.6, leap ? 3.1 : 3.6, leap ? 4.4 : 4.2], fill: 'chrome', band: [0.3, 0.72] },
+    { ellipse: [6, 2.7, 4.4, 1.9], fill: 'chrome', band: [0.4, 0.8] },
+    { rect: [5.2, 5.6, 1.6, 3.2], r: 0.8, fill: 'aqua' },
+    { circle: [2.9, 1.3, 1.15], fill: 'aqua', band: [0.4, 0.8] },
+    { circle: [9.1, 1.3, 1.15], fill: 'aqua', band: [0.4, 0.8] },
+  ];
 }
-const mirror = (rows) => rows.map((r) => r.split('').reverse().join(''));
-const turn = (rows) => rows[0].split('').map((_, x) => rows.map((r) => r[x]).reverse().join(''));   // a quarter turn clockwise
-const paint = (rows, material) => rows.map((r) => r.split('B').join(material));                      // B = the body colour
-const join = (...parts) => parts[0].map((_, y) => parts.map((p) => p[y]).join(''));                  // side by side
-const rep = (s, n) => s.repeat(n);
+const FROG = { size: [12, 12], frames: [frogFrame(false), frogFrame(true)] };
 
-// One white glint on the frog: the first mid-tone pixel from the top left.
-function glint(rows) {
-  let done = false;
-  return rows.map((r) => {
-    if (done || r.indexOf('M') < 0) return r;
-    done = true;
-    return r.replace('M', 'W');
-  });
-}
-
-/* The frog, facing up: sitting, then mid-leap. The other three directions are turned copies. */
-const FROG_SIT = [
-  '..@@....@@..',
-  '..@@====@@..',
-  '.==========.',
-  '==.======.==',
-  '=..======..=',
-  '...======...',
-  '...==@@==...',
-  '.====@@====.',
-  '===.====.===',
-  '==..====..==',
-  '==...==...==',
-  '.=........=.',
-];
-const FROG_LEAP = [
-  '=.@@....@@.=',
-  '=.@@====@@.=',
-  '.==========.',
-  '..========..',
-  '...======...',
-  '...======...',
-  '...==@@==...',
-  '...==@@==...',
-  '..========..',
-  '.==.====.==.',
-  '==...==...==',
-  '=..........=',
-];
-function frogSprite(turns) {
-  let sit = FROG_SIT;
-  let leap = FROG_LEAP;
-  for (let i = 0; i < turns; i++) { sit = turn(sit); leap = turn(leap); }
-  return { frames: [glint(shade(sit)), glint(shade(leap))] };
-}
-
-/* Traffic, seen from above and facing right. B is the body colour; k is glass and tyres; S is a headlight. */
-const CAR = [
-  '..BBBBBBBBBBBBBBB...',
-  '.BBBBBBBBBBBBBBBBBS.',
-  'BBBBkkBBBBBBkkkBBBBB',
-  'BBBkkkBBBBBBkkkkBBBB',
-  'BBBkkkBBBBBBkMkkBBBB',
-  'BBBkkkBBBBBBkkkkBBBB',
-  'BBBkkkBBBBBBkkkkBBBB',
-  'BBBkkkBBBBBBkkkkBBBB',
-  'BBBBkkBBBBBBkkkBBBBB',
-  '.BBBBBBBBBBBBBBBBBS.',
-  '..BBBBBBBBBBBBBBB...',
-];
-const TAXI = CAR.map((r, y) => (y >= 4 && y <= 6 ? r.slice(0, 8) + ['yy', 'YY', 'OO'][y - 4] + r.slice(10) : r));   // a roof light
-const COUPE = [
-  '..BBBBBBBBBBBBB...',
-  '.BBBBBBBBBBBBBBBS.',
-  'BBBkkBBBBBkkkBBBBB',
-  'BBkkkBBBBBkkkkBBBB',
-  'BBkkkBBBBBkMkkBBBB',
-  'BBkkkBBBBBkkkkBBBB',
-  'BBBkkBBBBBkkkBBBBB',
-  '.BBBBBBBBBBBBBBBS.',
-  '..BBBBBBBBBBBBB...',
-];
-const BUS_SIDE = rep('B', 31) + 'kkkBB';
-const BUS_ROOF = (inside, glass) => 'BBB' + rep('k' + rep(inside, 4) + 'kBBB', 3) + 'B' + glass + 'BB';   // three skylights
-const BUS = [
-  '.' + rep('B', 34) + '.',
-  rep('B', 35) + 'S',
-  BUS_SIDE,
-  BUS_SIDE,
-  BUS_ROOF('k', 'kkk'),
-  BUS_ROOF('D', 'kMk'),
-  BUS_ROOF('D', 'kkk'),
-  BUS_ROOF('k', 'kkk'),
-  BUS_SIDE,
-  BUS_SIDE,
-  rep('B', 35) + 'S',
-  '.' + rep('B', 34) + '.',
-];
-const TRAILER = rep(':', 9) + 'M' + rep(':', 9) + 'M' + rep(':', 10);   // a slate container with two ribs
-const LORRY_CAB = (hitch, glass) => TRAILER + hitch + 'BBBBBB' + glass + 'BBB';
-const LORRY = [
-  rep(':', 30) + '...' + rep('B', 10) + '.',
-  TRAILER + '..' + rep('B', 11) + 'S',
-  LORRY_CAB('..', 'kkk'),
-  LORRY_CAB('..', 'kkk'),
-  LORRY_CAB('..', 'kkk'),
-  LORRY_CAB('DD', 'kMk'),
-  LORRY_CAB('DD', 'kkk'),
-  LORRY_CAB('..', 'kkk'),
-  LORRY_CAB('..', 'kkk'),
-  LORRY_CAB('..', 'kkk'),
-  TRAILER + '..' + rep('B', 11) + 'S',
-  rep(':', 30) + '...' + rep('B', 10) + '.',
-];
-const TRACTOR = [
-  '.kDkDkDk..........',
-  '.kkkkkkk....kkk...',
-  '.BBBBBBBBB..kDk...',
-  'BBBBBBBBBBBBBBBBB.',
-  'BBkkkkBBBBBBBBBBBS',
-  'BBkDDkBBBBBBBBBBBB',
-  'BBkDDkBBBBBBBBBBBB',
-  'BBkkkkBBBBBBBBBBBS',
-  'BBBBBBBBBBBBBBBBB.',
-  '.BBBBBBBBB..kDk...',
-  '.kkkkkkk....kkk...',
-  '.kDkDkDk..........',
-];
-const BIKE = [
-  '.....BB.....',
-  '....BBBB..B.',
-  'kkkBBBLBBkkS',
-  'kkkBBBBBBkkS',
-  '....BBBB..B.',
-  '.....BB.....',
-];
-const TRAM_ROOF = (inside) => 'BBBB' + rep('k' + rep(inside, 6) + 'kBBBB', 7);
-const TRAM = [                  // the same from both ends, so it needs no mirrored copy
-  '.' + rep('B', 86) + '.',
-  'S' + rep('B', 86) + 'S',
-  rep('B', 88),
-  TRAM_ROOF('k'),
-  TRAM_ROOF('D'),
-  TRAM_ROOF('D'),
-  TRAM_ROOF('D'),
-  TRAM_ROOF('D'),
-  TRAM_ROOF('k'),
-  rep('B', 88),
-  'S' + rep('B', 86) + 'S',
-  '.' + rep('B', 86) + '.',
-];
-const LOCO_MID = (hatch, stack, lamp) => 'BBB' + hatch + 'BBB' + rep(':', 18) + stack + '::' + 'BBB' + lamp;
-const LOCO = [                  // a steam engine: red cab, slate boiler, a glowing smokestack, a lamp in front
-  '.' + rep('B', 10) + rep('.', 29),
-  rep('B', 11) + rep('.', 24) + 'BBB..',
-  rep('B', 11) + rep(':', 24) + 'BBB..',
-  rep('B', 11) + rep(':', 24) + 'BBBB.',
-  LOCO_MID('kkkkk', 'kkkk', 'B.'),
-  LOCO_MID('kDDDk', 'kHHk', 'BS'),
-  LOCO_MID('kDDDk', 'kHHk', 'BS'),
-  LOCO_MID('kkkkk', 'kkkk', 'B.'),
-  rep('B', 11) + rep(':', 24) + 'BBBB.',
-  rep('B', 11) + rep(':', 24) + 'BBB..',
-  rep('B', 11) + rep('.', 24) + 'BBB..',
-  '.' + rep('B', 10) + rep('.', 29),
-];
-const WAGON_SIDE = rep('&&&&&&&E', 4);
-const WAGON = [
-  rep('.', 34),
-  rep('&', 32) + '..',
-  WAGON_SIDE + '..',
-  WAGON_SIDE + '..',
-  WAGON_SIDE + '..',
-  WAGON_SIDE + 'kk',
-  WAGON_SIDE + 'kk',
-  WAGON_SIDE + '..',
-  WAGON_SIDE + '..',
-  WAGON_SIDE + '..',
-  rep('&', 32) + '..',
-  rep('.', 34),
-];
-
-/* name: the mask and how big it is (filled in by buildSprites). Each becomes two sprites, nameR and nameL. */
+/* Traffic, seen from above and facing right: a body, glass, headlights at the front. w and h are the
+   sizes the rules use for each vehicle's hit box. */
 const VEHICLES = {
-  car: { mask: paint(CAR, '%') },
-  taxi: { mask: paint(TAXI, '&') },
-  coupe: { mask: paint(COUPE, '&') },
-  bus: { mask: paint(BUS, '&') },
-  lorry: { mask: paint(LORRY, '%') },
-  tractor: { mask: paint(TRACTOR, '&') },
-  bike: { mask: paint(BIKE, '%') },
-  tram: { mask: paint(TRAM, '%') },
-  train: { mask: paint(join(WAGON, WAGON, WAGON, LOCO), '%') },
+  car: { w: 20, h: 11, shapes: [
+    { rect: [0.3, 0.3, 19.4, 10.4], r: 3, fill: 'red', band: [0.3, 0.72] },
+    ...glass(3.2, 2.4, 2.8, 6.2, 1.2), ...glass(12.2, 2.2, 3.8, 6.6, 1.4),
+    lamp(18.6, 1.7), lamp(18.6, 9.3)] },
+  taxi: { w: 20, h: 11, shapes: [
+    { rect: [0.3, 0.3, 19.4, 10.4], r: 3, fill: 'heat', band: [0.3, 0.72] },
+    ...glass(3.2, 2.4, 2.8, 6.2, 1.2), ...glass(12.2, 2.2, 3.8, 6.6, 1.4),
+    { rect: [7.8, 3.6, 2.4, 3.8], r: 0.7, fill: 'amber', band: [0.35, 0.7] },
+    lamp(18.6, 1.7), lamp(18.6, 9.3)] },
+  coupe: { w: 18, h: 9, shapes: [
+    { rect: [0.3, 0.3, 17.4, 8.4], r: 2.6, fill: 'heat', band: [0.3, 0.72] },
+    ...glass(2.4, 1.8, 2.4, 5.4, 1), ...glass(10.4, 1.8, 3.4, 5.4, 1.2),
+    lamp(16.6, 1.5), lamp(16.6, 7.5)] },
+  bus: { w: 36, h: 12, shapes: [
+    { rect: [0.3, 0.3, 35.4, 11.4], r: 1.6, fill: 'heat', band: [0.26, 0.76] },
+    ...[0, 1, 2].flatMap((i) => [{ rect: [3.5 + i * 8, 4.2, 5, 3.6], r: 0.8, fill: 'ink' }, { rect: [4.5 + i * 8, 5.2, 3, 1.6], r: 0.5, fill: 'chrome-400' }]),
+    ...glass(31.4, 1.8, 3, 8.4, 1),
+    lamp(35.1, 1.5), lamp(35.1, 10.5)] },
+  lorry: { w: 44, h: 12, shapes: [
+    { rect: [0, 0.2, 30, 11.6], r: 0.8, fill: SLATE },
+    { line: [9.5, 0.8, 9.5, 11.2], width: 0.8, fill: 'chrome-200' },
+    { line: [19.5, 0.8, 19.5, 11.2], width: 0.8, fill: 'chrome-200' },
+    { rect: [29.6, 5, 3.4, 2], r: 0.5, fill: 'chrome-400' },
+    { rect: [32.6, 0.4, 11, 11.2], r: 1.8, fill: 'red', band: [0.28, 0.74] },
+    ...glass(38.6, 2.2, 3, 7.6, 1),
+    lamp(43.1, 1.6), lamp(43.1, 10.4)] },
+  tractor: { w: 18, h: 12, shapes: [
+    { rect: [1, 0, 7, 2.6], r: 0.9, fill: 'ink' }, { rect: [1, 9.4, 7, 2.6], r: 0.9, fill: 'ink' },          // big back wheels
+    { rect: [12, 0.8, 3, 2.6], r: 0.8, fill: 'ink' }, { rect: [12, 8.6, 3, 2.6], r: 0.8, fill: 'ink' },     // small front ones
+    ...[2.4, 4.4, 6.4].flatMap((x) => [{ rect: [x - 0.4, 0.5, 0.8, 1.4], r: 0.3, fill: 'chrome-400' }, { rect: [x - 0.4, 10.1, 0.8, 1.4], r: 0.3, fill: 'chrome-400' }]),
+    { rect: [0, 2.4, 17.2, 7.2], r: 1.8, fill: 'heat', band: [0.3, 0.72] },
+    { rect: [2, 3.8, 4, 4.4], r: 0.8, fill: 'ink' }, { rect: [3, 4.8, 2, 2.4], r: 0.4, fill: 'chrome-400' },
+    lamp(17.2, 4.4), lamp(17.2, 7.6)] },
+  bike: { w: 12, h: 6, shapes: [
+    { rect: [0, 1.9, 3.2, 2.2], r: 1, fill: 'ink' }, { rect: [8.8, 2, 2.4, 2], r: 1, fill: 'ink' },
+    { line: [10, 0.8, 10, 5.2], width: 0.8, fill: 'red' },
+    { ellipse: [5.6, 3, 3.2, 2.8], fill: 'red', band: [0.3, 0.7] },
+    { circle: [5.2, 3, 1.4], fill: 'chrome', dir: 'diag' },
+    lamp(11.4, 3)] },
+  tram: { w: 88, h: 12, shapes: [
+    { rect: [0.3, 0.3, 87.4, 11.4], r: 2.2, fill: 'red', band: [0.24, 0.78] },
+    ...[0, 1, 2, 3, 4, 5, 6].flatMap((i) => [{ rect: [4 + i * 12, 3, 8, 6], r: 1, fill: 'ink' }, { rect: [5 + i * 12, 4, 6, 4], r: 0.6, fill: 'chrome-400' }]),
+    lamp(0.9, 1.7), lamp(0.9, 10.3), lamp(87.1, 1.7), lamp(87.1, 10.3)] },
+  train: { w: 142, h: 12, shapes: [
+    ...[0, 1, 2].flatMap((i) => [
+      { rect: [i * 34, 1, 32, 10], r: 1, fill: 'heat', band: [0.26, 0.76] },
+      ...[7.5, 15.5, 23.5].map((x) => ({ line: [i * 34 + x, 2, i * 34 + x, 10], width: 0.8, fill: 'heat-dark' })),
+      { rect: [i * 34 + 31.5, 5, 3, 2], r: 0.4, fill: 'ink' },
+    ]),
+    { rect: [113, 2, 24, 8], r: 1, fill: SLATE },
+    { rect: [102, 0, 11, 12], r: 1.6, fill: 'red', band: [0.26, 0.76] },
+    { rect: [105, 4, 5, 4], r: 0.8, fill: 'ink' }, { rect: [106, 5, 3, 2], r: 0.4, fill: 'chrome-400' },
+    { rect: [136.6, 1, 3.4, 10], r: 1, fill: 'red', band: [0.26, 0.76] },
+    { rect: [138.6, 3, 2.8, 6], r: 1, fill: 'red', band: [0.3, 0.7] },
+    { circle: [132.5, 6, 2], fill: 'ink' }, { circle: [132.5, 6, 1.1], fill: 'heat-light' },
+    { circle: [141.2, 6, 0.75], fill: 'sun-100' }] },
 };
 
 /* Things to ride on the water. w is the width the frog can stand on; dy is where the sprite sits in its lane.
@@ -356,180 +235,95 @@ const PLATFORMS = {
   pad: { w: 32, n: 2, every: 1, dive: { cycle: 400, warn: 60, under: 80, rise: 30 } },
 };
 
-function logRows(w) {
-  const rows = [];
-  for (let y = 0; y < 10; y++) {
-    let s = '';
-    for (let x = 0; x < w; x++) {
-      if ((y === 0 || y === 9) && (x === 0 || x === w - 1)) s += '.';                       // rounded corners
-      else if (x === w - 4 && y > 1 && y < 8) s += 'O';                                      // the sawn end
-      else if ((y === 3 || y === 6) && x > 2 && x < w - 6 && (x * 7 + y * 3) % 11 < 4) s += 'O';   // bark
-      else s += '$';
-    }
-    rows.push(s);
+// A floating log: amber, with streaks of bark along it and a pale sawn end.
+function logArt(w) {
+  const bark = [];
+  for (const [y, from] of [[3, 4], [6.2, 10]]) {
+    for (let x = from; x < w - 12; x += 13) bark.push({ rect: [x, y, 7, 0.9], r: 0.45, fill: 'amber-dark' });
   }
-  return shade(rows);
+  return { size: [w, 10], shapes: [
+    { rect: [0, 0, w, 10], r: 3, fill: 'amber', band: [0.3, 0.72] },
+    ...bark,
+    { ellipse: [w - 3.4, 5, 2, 4.1], fill: 'amber-light' },
+    { ellipse: [w - 3.4, 5, 1.1, 2.4], stroke: 0.6, fill: 'amber-dark' },
+  ] };
 }
 
 // A canal barge, bow to the right: a slate hull around a plank deck.
-function bargeRows(w) {
-  const bow = [6, 4, 2, 1, 0, 0, 0, 0, 1, 2, 4, 6];
-  const stern = [2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2];
-  const rows = [];
-  for (let y = 0; y < 12; y++) {
-    let s = '';
-    for (let x = 0; x < w; x++) {
-      if (x < stern[y] || x >= w - bow[y]) s += '.';
-      else if (y >= 2 && y <= 9 && x >= stern[y] + 2 && x < w - bow[y] - 3) s += x % 8 === 5 ? 'Y' : 'O';
-      else s += ':';
-    }
-    rows.push(s);
-  }
-  return rows;
+function bargeArt(w, mirror) {
+  const planks = [];
+  for (let x = 5; x < w - 9; x += 8) planks.push({ line: [x + 0.5, 2.6, x + 0.5, 9.4], width: 0.8, fill: 'amber' });
+  return { size: [w, 12], mirror: mirror, shapes: [
+    { poly: [2, 0, w - 6, 0, w - 3, 1.2, w - 1, 3, w, 5, w, 7, w - 1, 9, w - 3, 10.8, w - 6, 12, 2, 12, 0.6, 11, 0, 9, 0, 3, 0.6, 1], fill: SLATE },
+    { rect: [3.5, 2, w - 13, 8], r: 1, fill: 'amber-dark' },
+    ...planks,
+  ] };
 }
 
-const TURTLE = [
-  '..DD.....DD...',
-  '..DD~~~~~DD...',
-  '..~~~~~~~~~...',
-  '.~~~~~~~~~~~..',
-  '.~~~A~~A~~~~DD',
-  '.~~~~~~~~~~~DM',
-  '.~~~~~~~~~~~DM',
-  '.~~~A~~A~~~~DD',
-  '.~~~~~~~~~~~..',
-  '..~~~~~~~~~...',
-  '..DD~~~~~DD...',
-  '..DD.....DD...',
-];
-const TURTLE_PADDLE = TURTLE.map((r, y) => (y === 0 || y === 11 ? '.DD.....DD....' : r));   // flippers swept back
-const PAD = [
-  '...~~~~~~~~...',
-  '.~~~~~~~~~~~~.',
-  '~~~~~~~~~~~~~~',
-  '~~~~~~~~~~~~~.',
-  '~~~~~~~~~~~...',
-  '~~~~~~~~~.....',
-  '~~~~~~~~~~~...',
-  '~~~~~~~~~~~~~.',
-  '~~~~~~~~~~~~~~',
-  '~~~~~~~~~~~~~~',
-  '.~~~~~~~~~~~~.',
-  '...~~~~~~~~...',
-];
+// A turtle, facing right: a dark aqua shell, flippers that paddle, a grey head.
+function turtleArt(mirror) {
+  const shell = [
+    { rect: [11.4, 4, 2.6, 4], r: 1.2, fill: 'chrome', dir: 'diag' },
+    { ellipse: [6.6, 6, 5.6, 4.9], fill: ['aqua', 0.3, 'aqua-dark'] },
+    ...[[4.6, 4.3], [7.6, 4.3], [4.6, 7.7], [7.6, 7.7]].map((p) => ({ circle: [p[0], p[1], 0.65], fill: 'aqua' })),
+  ];
+  const flippers = (back) => [[2, 0], [9, 0], [2, 9.8], [9, 9.8]].map((p) => ({ rect: [p[0] - (back ? 1 : 0), p[1], 2.2, 2.2], r: 0.9, fill: 'chrome-400' }));
+  return { size: [14, 12], mirror: mirror, frames: [[...flippers(false), ...shell], [...flippers(true), ...shell]] };
+}
 
 function buildSprites() {
   const s = {
-    frogU: frogSprite(0),
-    frogR: frogSprite(1),
-    frogD: frogSprite(2),
-    frogL: frogSprite(3),
-    logS: logRows(PLATFORMS.logS.w - 2),
-    logM: logRows(PLATFORMS.logM.w - 2),
-    logL: logRows(PLATFORMS.logL.w - 2),
-    bargeSR: shade(bargeRows(PLATFORMS.bargeS.w - 2)),
-    bargeSL: shade(mirror(bargeRows(PLATFORMS.bargeS.w - 2))),
-    bargeLR: shade(bargeRows(PLATFORMS.bargeL.w - 2)),
-    bargeLL: shade(mirror(bargeRows(PLATFORMS.bargeL.w - 2))),
-    turtleR: { frames: [shade(TURTLE), shade(TURTLE_PADDLE)] },
-    turtleL: { frames: [shade(mirror(TURTLE)), shade(mirror(TURTLE_PADDLE))] },
-    pad: shade(PAD),
-    low: { outline: false, map: [                 // a turtle or pad going under: the warning
-      '..............',
-      '....444444....',
-      '..44......44..',
-      '.4...QQQQ...4.',
-      '.4..QQQQQQ..4.',
-      '.4..QQQQQQ..4.',
-      '.4..QQQQQQ..4.',
-      '.4..QQQQQQ..4.',
-      '.4...QQQQ...4.',
-      '..44......44..',
-      '....444444....',
-      '..............',
+    frogU: FROG,
+    frogR: Object.assign({ turn: 1 }, FROG),
+    frogD: Object.assign({ turn: 2 }, FROG),
+    frogL: Object.assign({ turn: 3 }, FROG),
+    logS: logArt(PLATFORMS.logS.w - 2),
+    logM: logArt(PLATFORMS.logM.w - 2),
+    logL: logArt(PLATFORMS.logL.w - 2),
+    bargeSR: bargeArt(PLATFORMS.bargeS.w - 2, false),
+    bargeSL: bargeArt(PLATFORMS.bargeS.w - 2, true),
+    bargeLR: bargeArt(PLATFORMS.bargeL.w - 2, false),
+    bargeLL: bargeArt(PLATFORMS.bargeL.w - 2, true),
+    turtleR: turtleArt(false),
+    turtleL: turtleArt(true),
+    pad: { size: [14, 12], shapes: [                    // a lily pad, with its notch
+      { path: 'M7 6 L12.36 2.14 A7 6 0 1 0 13.18 3.18 Z', fill: ['aqua', 0.3, 'aqua-dark'] },
+      ...[[1.6, 4.4], [3.2, 10.4], [9.6, 10.6], [12.8, 7.6]].map((p) => ({ line: [7, 6, p[0], p[1]], width: 0.45, fill: 'aqua-dark' })),
     ] },
-    ripple: { outline: false, frames: [[           // nothing to stand on
-      '..............',
-      '..............',
-      '....444444....',
-      '...4......4...',
-      '..4........4..',
-      '..4........4..',
-      '..4........4..',
-      '..4........4..',
-      '...4......4...',
-      '....444444....',
-      '..............',
-      '..............',
-    ], [
-      '....44..44....',
-      '..4........4..',
-      '..............',
-      '.4..........4.',
-      '..............',
-      '4............4',
-      '4............4',
-      '..............',
-      '.4..........4.',
-      '..............',
-      '..4........4..',
-      '....44..44....',
-    ]] },
-    firefly: { frames: [[                          // a bonus that visits an empty bay
-      '.S....S.',
-      '.yS..Sy.',
-      '..yYYy..',
-      '..YYYY..',
-      '..YSSY..',
-      '..YYYO..',
-      '...OO...',
-      '........',
-    ], [
-      '........',
-      '........',
-      'SyyYYyyS',
-      '.SYYYYS.',
-      '..YSSY..',
-      '..YYYO..',
-      '...OO...',
-      '........',
-    ]] },
-    snapper: [                                     // a danger that visits an empty bay
-      '.rRRRRRRRRX.',
-      'rRRkRRRRkRRX',
-      'rRRRRRRRRRRX',
-      'rRRRRRRRRRRX',
-      '.RWRWRWRWRX.',
-      '.RkkkkkkkkX.',
-      '.RWRWRWRWRX.',
-      '..RRRRRRRX..',
-      '...XXXXXX...',
-    ],
-    snapEyes: { outline: false, map: [             // ...which shows its eyes first
-      '..rR....rR..',
-      '..RX....RX..',
+    low: { size: [14, 12], outline: false, shapes: [   // a turtle or pad going under: the warning
+      { ellipse: [7, 6, 6, 4.8], stroke: 0.9, fill: 'sky-4' },
+      { ellipse: [7, 6, 3, 2.6], fill: 'aqua-dark' },
     ] },
-    splat: [                                       // where the frog was hit
-      '............',
-      '..D......D..',
-      '.DDD....DDD.',
-      '..DDDDDDDD..',
-      '...DRDDRD...',
-      '...DDDDDD...',
-      '...DRDDRD...',
-      '..DDDDDDDD..',
-      '.DDD....DDD.',
-      '..D......D..',
-      '............',
-      '............',
-    ],
+    ripple: { size: [14, 12], outline: false, frames: [   // nothing to stand on
+      [{ ellipse: [7, 6, 5, 3.8], stroke: 0.9, fill: 'sky-4' }],
+      [{ ellipse: [7, 6, 6.4, 5.2], stroke: 0.7, fill: 'sky-4', alpha: 0.7 }],
+    ] },
+    firefly: { size: [8, 8], frames: [0, 1].map((f) => [   // a bonus that visits an empty bay
+      { ellipse: [f ? 1.6 : 2.2, f ? 2.8 : 1.8, 1.5, 0.75, f ? 0 : -35], fill: 'sun-100', alpha: 0.85, outline: false },
+      { ellipse: [f ? 6.4 : 5.8, f ? 2.8 : 1.8, 1.5, 0.75, f ? 0 : 35], fill: 'sun-100', alpha: 0.85, outline: false },
+      { ellipse: [4, 4.4, 1.8, 2.3], fill: 'amber', band: [0.35, 0.75] },
+      { circle: [4, 5.3, 1], fill: 'sun-100' },
+    ]) },
+    snapper: { size: [12, 9], shapes: [                // a danger that visits an empty bay
+      { rect: [0.5, 0.2, 11, 8.4], r: 3, fill: 'red', band: [0.3, 0.75] },
+      { rect: [1.6, 4.1, 8.8, 2.5], r: 0.8, fill: 'ink' },
+      ...[2.4, 4.4, 6.4, 8.4].map((x) => ({ poly: [x, 4.1, x + 1.2, 4.1, x + 0.6, 5.1], fill: 'chrome-100' })),
+      ...[3.4, 5.4, 7.4].map((x) => ({ poly: [x, 6.6, x + 1.2, 6.6, x + 0.6, 5.6], fill: 'chrome-100' })),
+      { circle: [3.4, 1.9, 0.8], fill: 'ink' }, { circle: [8.6, 1.9, 0.8], fill: 'ink' },
+    ] },
+    snapEyes: { size: [12, 2], shapes: [               // ...which shows its eyes first
+      { ellipse: [3, 1.2, 1.3, 0.9], fill: 'red', band: [0.4, 0.8] },
+      { ellipse: [9, 1.2, 1.3, 0.9], fill: 'red', band: [0.4, 0.8] },
+    ] },
+    splat: { size: [12, 12], shapes: [                 // where the frog was hit
+      { poly: (() => { const p = []; for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8 + 0.2, r = i % 2 ? 3.4 : 5.6; p.push(6 + Math.cos(a) * r, 6 + Math.sin(a) * r); } return p; })(), fill: 'chrome-400' },
+      ...[[4.6, 4.6], [7.4, 4.6], [4.6, 7.4], [7.4, 7.4]].map((p) => ({ circle: [p[0], p[1], 0.7], fill: 'red' })),
+    ] },
   };
   for (const name in VEHICLES) {
     const v = VEHICLES[name];
-    v.w = v.mask[0].length;
-    v.h = v.mask.length;
-    s[name + 'R'] = shade(v.mask);
-    s[name + 'L'] = shade(mirror(v.mask));
+    s[name + 'R'] = { size: [v.w, v.h], shapes: v.shapes };
+    s[name + 'L'] = { size: [v.w, v.h], shapes: v.shapes, mirror: true };
   }
   return s;
 }
@@ -850,12 +644,11 @@ function drawGoal(rk, g, y) {
     rk.rect(0, y, 320, 1, 'chrome-400');
     rk.rect(0, y + 15, 320, 1, 'chrome-400');
   } else {                                  // a hedge
-    for (const d of g.rows[GOAL_ROW].decor) rk.rect(d.x, y + d.o, 2, 1, d.k ? 'sky-3' : 'hill-near');
+    for (const d of g.rows[GOAL_ROW].decor) rk.shape({ rect: [d.x, y + d.o, 2, 1], r: 0.5, fill: d.k ? 'sky-3' : 'hill-near' });
     rk.rect(0, y + 15, 320, 1, 'hill-near');
   }
   for (const h of g.homes) {
-    rk.rect(h.x - 1, y, 34, CELL, 'ink');
-    rk.rect(h.x, y + 1, 32, 15, 'sky-3');
+    rk.shape([{ rect: [h.x - 1, y, 34, CELL + 0.5], r: 3, fill: 'ink' }, { rect: [h.x, y + 1, 32, 15], r: 2.4, fill: 'sky-3' }]);
     rk.draw('pad', h.cx - 7, y + 2);
     if (h.filled) rk.draw('frogD', h.cx - 6, y + 2);
   }
@@ -878,31 +671,27 @@ function drawSafe(rk, g, row, y) {
     for (let x = 15; x < 320; x += CELL) rk.rect(x, y + 1, 1, 14, 'hill-near');
     for (let x = 39; x < 320; x += 80) {
       rk.rect(x, y + 6, 1, 5, 'chrome-300');
-      rk.rect(x - 1, y + 5, 3, 1, 'amber-light');
+      rk.shape({ rect: [x - 1, y + 4.6, 3, 1.4], r: 0.7, fill: 'amber-light' });
     }
     return;
   }
   for (const d of row.decor) {              // verge: grass tufts and a few flowers
-    if (d.k === 2) { rk.px(d.x, y + d.o, 'sun-100'); rk.px(d.x, y + d.o + 1, 'hill-near'); continue; }
-    const tuft = d.k ? 'sky-3' : 'hill-near';
-    rk.px(d.x, y + d.o + 1, tuft);
-    rk.px(d.x + 1, y + d.o, tuft);
-    rk.px(d.x + 2, y + d.o + 1, tuft);
+    if (d.k === 2) { rk.circle(d.x + 0.5, y + d.o + 1.4, 0.45, 'hill-near'); rk.circle(d.x + 0.5, y + d.o + 0.5, 0.7, 'sun-100'); continue; }
+    rk.shape({ line: [d.x + 0.2, y + d.o + 0.5, d.x + 0.9, y + d.o + 2, d.x + 1.5, y + d.o + 0.1, d.x + 2.1, y + d.o + 2, d.x + 2.8, y + d.o + 0.5], width: 0.6, fill: d.k ? 'sky-3' : 'hill-near' });
   }
 }
 
 function drawRoad(rk, g, row, y, above) {
   if (g.urban) {                            // tarmac with dashed lane marks between lanes
     rk.rect(0, y, 320, CELL, 'sky-1');
-    if (above === 'road') for (let x = 5; x < 320; x += CELL) rk.rect(x, y, 6, 1, 'chrome-400');
+    if (above === 'road') for (let x = 5; x < 320; x += CELL) rk.shape({ rect: [x, y, 6, 1], r: 0.5, fill: 'chrome-400' });
     return;
   }
   rk.rect(0, y, 320, CELL, 'sky-0');        // a dirt lane: wheel ruts and pebbles
   for (let x = 2; x < 320; x += 22) {
-    rk.rect(x, y + 4, 10, 1, 'sky-1');
-    rk.rect(x + 9, y + 11, 10, 1, 'sky-1');
+    rk.shape([{ rect: [x, y + 4, 10, 1], r: 0.5, fill: 'sky-1' }, { rect: [x + 9, y + 11, 10, 1], r: 0.5, fill: 'sky-1' }]);
   }
-  for (const d of row.decor) rk.px(d.x, y + d.o, 'sky-2');
+  for (const d of row.decor) rk.circle(d.x + 0.5, y + d.o + 0.5, 0.55, 'sky-2');
 }
 
 function drawWater(rk, g, row, y, above, below) {
@@ -910,7 +699,7 @@ function drawWater(rk, g, row, y, above, below) {
   const drift = rk.time * 6 * (row.v < 0 ? -1 : 1);
   for (const d of row.decor) {
     const x = (((d.x + drift) % 336) + 336) % 336 - 8;
-    rk.rect(x, y + d.o, d.k ? 5 : 3, 1, d.k ? 'sky-2' : 'sky-4');
+    rk.shape({ rect: [x, y + d.o, d.k ? 5 : 3, 1], r: 0.5, fill: d.k ? 'sky-2' : 'sky-4' });
   }
   const edge = g.urban ? 'chrome-400' : 'hill-near';      // a stone edge in town, a muddy bank in the country
   if (above !== 'water' && above !== 'goal') rk.rect(0, y, 320, 1, edge);
@@ -921,13 +710,12 @@ function drawRail(rk, g, row, y) {
   const tr = row.train;
   const live = tr.state !== 'idle';
   rk.rect(0, y, 320, CELL, g.urban ? 'sky-0' : 'ink');
-  if (!g.urban) for (let x = 2; x < 320; x += 8) rk.rect(x, y + 3, 3, 10, 'amber-dark');     // sleepers
+  if (!g.urban) for (let x = 2; x < 320; x += 8) rk.shape({ rect: [x, y + 3, 3, 10], r: 0.6, fill: 'amber-dark' });     // sleepers
   rk.rect(0, y + 4, 320, 1, live ? 'red' : 'chrome-300');          // the rails turn red while a train is due
   rk.rect(0, y + 11, 320, 1, live ? 'red' : 'chrome-300');
   const lit = tr.state === 'warn' && tr.t % 24 < 12;               // warning lamps: about two blinks a second
   for (const x of [2, 315]) {
-    rk.rect(x - 1, y + 5, 5, 6, 'ink');
-    rk.rect(x, y + 6, 3, 4, lit ? 'red-light' : 'red-dark');
+    rk.shape([{ rect: [x - 1, y + 5, 5, 6], r: 1.2, fill: 'ink' }, { circle: [x + 1.5, y + 8, 1.6], fill: lit ? 'red-light' : 'red-dark' }]);
     if (lit) rk.glow(x + 1.5, y + 8, 9, 'red', 0.5);
   }
 }
@@ -1078,7 +866,7 @@ RetroKit.game({
       rk.glow(f.x + 8, f.y + 8, 11, 'aqua', 0.28);
       rk.draw('frog' + f.dir, f.x + 2, f.y + 2, f.hop > 0 ? 1 : 0);
     }
-    for (const pt of g.parts) rk.rect(pt.x, pt.y, 1, 1, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+    for (const pt of g.parts) rk.circle(pt.x + 0.5, pt.y + 0.5, 0.6, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
   },
 
   // The title screen: the kit's sunset, with the frog and a car waiting along the bottom, clear of the logo.

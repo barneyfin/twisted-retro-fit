@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2.0.0-beta.2';
+  const VERSION = '2.0.0-beta.3';
   const W = 320;
   const H = 180;
   const STEP = 1 / 60;
@@ -218,7 +218,10 @@
      light / base / dark bands, top to bottom), or explicit bands ['sun-100', 0.2, 'amber', 0.6, 'heat'].
      band: false (ramp as its base tone only) or [lightEnd, darkStart]. dir: 'down' (default), 'diag' or
      'right', or degrees: which way the bands run. alpha: 0 to 1. stroke: 0.8 draws only the shape's edge,
-     that wide (rings, arcs). outline: false leaves the shape out of the ink outline (glows, flames). */
+     that wide (rings, arcs). outline: false leaves the shape out of the ink outline (glows, flames).
+     erase: true cuts the shape out of everything drawn before it in the same sprite (holes, hollow walls).
+     A sprite definition may add mirror: true (faces the other way) and turn: 1, 2 or 3 (quarter turns
+     clockwise); the light still comes from above. */
   const OUTLINE = 0.6;               // ink outline width, world pixels
   const BAND = [0.3, 0.7];           // a ramp's light band ends, and its dark band starts, at these fractions
   const DIRS = { down: 0, diag: 45, right: 90 };
@@ -284,7 +287,10 @@
       g.width = s.width || 1;
       g.ext = fromPoints(p, g.width / 2);
     } else if (s.path) {
-      try { g.path = new Path2D(s.path); } catch (e) { warn('a path it cannot read'); }
+      try {
+        g.path = new Path2D(s.path);
+        if (s.matrix) { const moved = new Path2D(); moved.addPath(g.path, s.matrix); g.path = moved; }
+      } catch (e) { warn('a path it cannot read'); }
       const b = s.box || box;
       g.ext = fromPoints([b[0], b[1], b[0] + b[2], b[1], b[0], b[1] + b[3], b[0] + b[2], b[1] + b[3]], 0);
     } else {
@@ -321,6 +327,15 @@
   /* Paint one shape's colour (no outline) into g, which is in world units. */
   function paintGeom(g, colourOf, geom, k, flashColour) {
     const s = geom.s;
+    if (s.erase) {                       // cut a hole through what is already drawn
+      g.save();
+      g.globalCompositeOperation = 'destination-out';
+      g.fillStyle = g.strokeStyle = '#000';
+      if (geom.kind === 'stroke') { g.lineWidth = geom.width; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke(geom.path); }
+      else g.fill(geom.path);
+      g.restore();
+      return;
+    }
     const alpha = s.alpha == null ? 1 : s.alpha;
     g.globalAlpha = alpha;
     const bands = flashColour ? [[flashColour, 0, 1]] : bandsOf(s.fill, s.band);
@@ -363,12 +378,37 @@
       g.fillStyle = C.ink; g.strokeStyle = C.ink;
       g.lineJoin = 'round'; g.lineCap = 'round';
       for (const geom of geoms) {
-        if (geom.s.outline === false) continue;
+        if (geom.s.outline === false || geom.s.erase) continue;
         if (geom.kind === 'stroke') { g.lineWidth = geom.width + o * 2; g.stroke(geom.path); }
         else { g.lineWidth = o * 2; g.fill(geom.path); g.stroke(geom.path); }
       }
     }
     for (const geom of geoms) paintGeom(g, colourOf, geom, k, flash ? 'chrome-100' : null);
+  }
+
+  /* A copy of a shape, mirrored (left to right) and/or turned by quarter turns clockwise inside a w x h
+     box. Coordinates move, so the bands stay lit from above whichever way the sprite faces. */
+  function placeShape(s, w, h, mirror, turns) {
+    let bw = w, bh = h;
+    let pt = (x, y) => [x, y];
+    let m = new DOMMatrix();
+    if (mirror) { const w0 = bw; pt = ((f) => (x, y) => { const p = f(x, y); return [w0 - p[0], p[1]]; })(pt); m = new DOMMatrix([-1, 0, 0, 1, w0, 0]).multiply(m); }
+    for (let i = 0; i < turns; i++) {
+      const bhNow = bh;
+      pt = ((f) => (x, y) => { const p = f(x, y); return [bhNow - p[1], p[0]]; })(pt);
+      m = new DOMMatrix([0, 1, -1, 0, bhNow, 0]).multiply(m);
+      const t = bw; bw = bh; bh = t;
+    }
+    const o = Object.assign({}, s);
+    const pts = (list) => { const out = []; for (let i = 0; i + 1 < list.length; i += 2) out.push(...pt(list[i], list[i + 1])); return out; };
+    const box = (b) => { const a = pt(b[0], b[1]), c = pt(b[0] + b[2], b[1] + b[3]); return [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.abs(c[0] - a[0]), Math.abs(c[1] - a[1])]; };
+    if (s.poly) o.poly = pts(s.poly);
+    else if (s.line) o.line = pts(s.line);
+    else if (s.rect) o.rect = box(s.rect);
+    else if (s.circle) o.circle = [...pt(s.circle[0], s.circle[1]), s.circle[2]];
+    else if (s.ellipse) o.ellipse = [...pt(s.ellipse[0], s.ellipse[1]), s.ellipse[2], s.ellipse[3], (mirror ? -(s.ellipse[4] || 0) : (s.ellipse[4] || 0)) + turns * 90];
+    else if (s.path) { o.matrix = m; if (s.box) o.box = box(s.box); }
+    return o;
   }
 
   function makeShapeSprite(C, def, name) {
@@ -389,8 +429,12 @@
       warn('no size: add size: [w, h], the box rk.draw places at x, y');
       size = [8, 8];
     }
+    const turns = ((def.turn || 0) % 4 + 4) % 4;
+    const mirror = !!def.mirror;
+    const placed = (s) => (turns || mirror ? placeShape(s, size[0], size[1], mirror, turns) : s);
+    if (turns % 2) size = [size[1], size[0]];
     const box = [0, 0, size[0], size[1]];
-    const frames = lists.map((list) => (list || []).map((s) => shapeGeom(s, box, warn)).filter(Boolean));
+    const frames = lists.map((list) => (list || []).map((s) => shapeGeom(placed(s), box, warn)).filter(Boolean));
     const o = def.outline === false ? 0 : typeof def.outline === 'number' ? def.outline : OUTLINE;
     return {
       name: name, kind: 'shape', w: size[0], h: size[1], o: o, pad: o, frames: frames,

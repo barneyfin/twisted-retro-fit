@@ -151,19 +151,19 @@ const MAZES = [
   ],
 ];
 
-/* How each maze looks. wall = the three tones of its walls (sprite legend letters: light edge, body, dark
-   edge). sky = the floor, as bands from the top down, always dark so the gremlins stand out. dust = specks
-   of scenery on the floor. marks = an extra pattern inside the walls. hollow = draw only the walls' edges. */
+/* How each maze looks. wall = the three tones of its walls (light edge, body, dark edge). sky = the floor,
+   as bands from the top down, always dark so the gremlins stand out. dust = specks of scenery on the floor.
+   mark = a detail on some wall tiles (marks says which). hollow = draw only the walls' edges, as tubes. */
 const THEMES = [
-  { name: 'NEON GROVE', wall: '432', sky: [[0, 'ink'], [62, 'hill-near'], [124, 'sky-0']], dust: ['sky-2', 'sky-3'],
-    mark: '4', marks: (x, y) => (x * 7 + y * 13) % 19 === 0 },                    // leaves in the hedges
-  { name: 'STEEL CITY', wall: 'MDk', sky: [[0, 'sky-0'], [56, 'sky-1'], [118, 'sky-0']], dust: ['sky-2'],
-    mark: 'M', marks: (x, y) => x % 10 === 4 && y % 10 === 4 },                   // one rivet a tile
-  { name: 'EMBER FORGE', wall: 'HEX', sky: [[0, 'ink'], [90, 'sky-0']], dust: ['heat-dark', 'red-dark'],
-    mark: 'X', marks: (x, y) => (x + (y % 10 < 5 ? 0 : 3)) % 6 === 0 },           // brick joints
-  { name: 'STAR DOCK', wall: 'LMM', hollow: true, space: true, dust: [] },         // neon tubes over open space
-  { name: 'ROSE PALACE', wall: '543', sky: [[0, 'sky-0'], [70, 'hill-near'], [130, 'ink']], dust: ['sky-3', 'sky-2'],
-    mark: '3', marks: (x, y) => (x + y) % 8 === 0 },                              // inlaid stripes
+  { name: 'NEON GROVE', wall: ['sky-4', 'sky-3', 'sky-2'], sky: [[0, 'ink'], [62, 'hill-near'], [124, 'sky-0']], dust: ['sky-2', 'sky-3'],
+    mark: 'leaf', marks: (c, r) => (c * 7 + r * 13) % 5 === 0 },                   // leaves in the hedges
+  { name: 'STEEL CITY', wall: ['chrome-300', 'chrome-400', 'ink'], sky: [[0, 'sky-0'], [56, 'sky-1'], [118, 'sky-0']], dust: ['sky-2'],
+    mark: 'rivet', marks: () => true },                                             // one rivet a tile
+  { name: 'EMBER FORGE', wall: ['heat', 'heat-dark', 'red-dark'], sky: [[0, 'ink'], [90, 'sky-0']], dust: ['heat-dark', 'red-dark'],
+    mark: 'joint', marks: (c, r) => (c + r) % 2 === 0 },                            // brick joints
+  { name: 'STAR DOCK', wall: ['chrome-200', 'chrome-300', 'chrome-300'], hollow: true, space: true, dust: [] },   // neon tubes over open space
+  { name: 'ROSE PALACE', wall: ['sky-5', 'sky-4', 'sky-3'], sky: [[0, 'sky-0'], [70, 'hill-near'], [130, 'ink']], dust: ['sky-3', 'sky-2'],
+    mark: 'stripe', marks: (c, r) => (c + r) % 3 === 0 },                           // inlaid stripes
 ];
 
 /* The gremlins. Each hunts in its own way (see target, further down) and has its own corner to drift to. */
@@ -205,257 +205,108 @@ function tuning(level, advanced) {
   };
 }
 
-/* ---------- Sprite helpers ----------
-   Sprites are drawn below as flat shapes ("masks"). shade() then gives every shape its three tones with
-   the light from the top left, so one mask can be turned or mirrored and still be lit the right way. */
-const MATERIALS = {
-  '=': { ramp: 'LMD' },             // chrome: the chomper
-  '@': { ramp: 'aAQ', own: true },  // aqua: its eye, shaded on its own edges
-  '%': { ramp: 'rRX' },             // red
-  '^': { ramp: 'SrR' },             // pink
-  '&': { ramp: 'hHE' },             // orange
-  '*': { ramp: 'RXX' },             // crimson
-  '~': { ramp: 'AQQ' },             // dark aqua: a gremlin you can eat
-};
-function shade(rows) {
-  const h = rows.length;
-  const w = rows[0].length;
-  rows.forEach((r) => { if (r.length !== w) console.warn('Chrome Chomp: a sprite row is ' + r.length + ' wide, not ' + w + ': ' + r); });
-  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? '.' : rows[y][x]);
-  return rows.map((row, y) => row.split('').map((ch, x) => {
-    const m = MATERIALS[ch];
-    if (!m) return ch;
-    const open = (c) => (m.own ? c !== ch : c === '.');
-    const lit = (open(at(x, y - 1)) ? 1 : 0) + (open(at(x - 1, y)) ? 1 : 0) - (open(at(x, y + 1)) ? 1 : 0) - (open(at(x + 1, y)) ? 1 : 0);
-    return m.ramp[lit > 0 ? 0 : lit < 0 ? 2 : 1];
-  }).join(''));
-}
-const mirror = (rows) => rows.map((r) => r.split('').reverse().join(''));
-const turn = (rows) => rows[0].split('').map((_, x) => rows.map((r) => r[x]).reverse().join(''));   // a quarter turn clockwise
+/* ---------- Art ----------
+   Every sprite is a few shapes in its own box (game pixels), drawn by the kit at the screen's real
+   resolution: flat colour in hard bands, light from above, an ink outline round the outside. A ramp name
+   ('red', 'heat', 'amber', 'aqua', 'chrome') as a fill gives light, base and dark bands; a token
+   ('sun-100', 'ink') gives one flat colour; a list gives bands of your own. mirror: true and turn: 1-3
+   make the chomper face each way, with the light still from above. */
 
-// One white glint on the chomper: the first mid-tone pixel from the top left.
-function glint(rows) {
-  let done = false;
-  return rows.map((r) => {
-    if (done || r.indexOf('M') < 0) return r;
-    done = true;
-    return r.replace('M', 'W');
-  });
+/* The chomper, facing right: a chrome robot head with an aqua visor and a jaw at the front that opens
+   and shuts (shut, half open, wide open). */
+function chompFrame(open) {
+  const head = [
+    { rect: [0.4, 0.4, 11.2, 11.2], r: 3.4, fill: 'chrome', band: [0.36, 0.74] },
+    { rect: [5.2, 2.2, 4.2, 2.3], r: 1.1, fill: 'aqua', band: [0.4, 0.8] },
+  ];
+  if (!open) return [...head, { line: [6.4, 7.4, 11.4, 7.4], width: 0.7, fill: 'ink' }];
+  const h = open === 1 ? 2.6 : 4.6;                     // how far the jaw has dropped
+  const top = 7.4 - h / 2;
+  const teeth = [];
+  for (const x of [7.2, 9.2, 11]) {
+    teeth.push({ poly: [x - 0.6, top, x + 0.6, top, x, top + 1], fill: 'chrome-100' });
+    if (open === 2) teeth.push({ poly: [x - 1.6, top + h, x - 0.4, top + h, x - 1, top + h - 1], fill: 'chrome-100' });
+  }
+  return [...head, { rect: [5.6, top, 6.4, h], r: Math.min(1.2, h / 2), fill: 'ink' }, ...teeth];
 }
+const CHOMP = { size: [12, 12], frames: [chompFrame(0), chompFrame(1), chompFrame(2)] };
 
-/* The chomper, facing right: mouth shut, half open, wide open. */
-const CHOMP = [
-  [
-    '..========..',
-    '.=====@@===.',
-    '======@@====',
-    '============',
-    '============',
-    '============',
-    '======kkkkkk',
-    '============',
-    '============',
-    '============',
-    '.==========.',
-    '..========..',
-  ], [
-    '..========..',
-    '.=====@@===.',
-    '======@@====',
-    '============',
-    '==========..',
-    '========....',
-    '========....',
-    '==========..',
-    '============',
-    '============',
-    '.==========.',
-    '..========..',
-  ], [
-    '..========..',
-    '.=====@@===.',
-    '======@@====',
-    '=========...',
-    '=======.....',
-    '=====.......',
-    '=====.......',
-    '=======.....',
-    '=========...',
-    '============',
-    '.==========.',
-    '..========..',
+/* The gremlins: a body in rows 0-9, then feet in rows 10-11 that swap to make them scuttle. Their eyes
+   are drawn on top while the game runs, so that they can look where they are going. */
+function foeSprite(body, feet, tone) {
+  const a = [[1, 2.6], [4.7, 2.6], [8.4, 2.6]].map((f) => ({ rect: [f[0], 9.6, f[1], 2.2], r: 1, fill: tone }));
+  const b = [[2.4, 2.6], [7, 2.6]].map((f) => ({ rect: [f[0], 9.8, f[1], 2], r: 1, fill: tone }));
+  return { size: [12, 12], frames: [[...(feet === 'swap' ? b : a), ...body], [...(feet === 'swap' ? a : b), ...body]] };
+}
+const IMP = [                   // red, with two short horns
+  { poly: [0.2, 0, 2.8, 2.4, 1, 3.4], fill: 'red-light' },
+  { poly: [11.8, 0, 9.2, 2.4, 11, 3.4], fill: 'red-light' },
+  { rect: [0, 2, 12, 8], r: 3, fill: 'red', band: [0.3, 0.74] },
+];
+const BUG = [                   // pink, with two feelers
+  { line: [3.6, 2.6, 2.4, 0.6], width: 0.8, fill: 'red-light' }, { circle: [2.3, 0.6, 0.7], fill: 'sun-100' },
+  { line: [8.4, 2.6, 9.6, 0.6], width: 0.8, fill: 'red-light' }, { circle: [9.7, 0.6, 0.7], fill: 'sun-100' },
+  { rect: [0, 2.2, 12, 7.8], r: 3.8, fill: ['sun-100', 0.26, 'red-light', 0.74, 'red'] },
+];
+const CYCLOPS = [               // orange, a tall dome
+  { path: 'M0 10 L0 5 C0 1.6 2.6 0 6 0 C9.4 0 12 1.6 12 5 L12 10 Z', fill: 'heat', band: [0.3, 0.74] },
+];
+const SPIKE = [                 // crimson, spikes along its back
+  { poly: [0.6, 3.4, 1.4, 0, 3, 3], fill: 'red' },
+  { poly: [4.4, 3, 6, -0.2, 7.6, 3], fill: 'red' },
+  { poly: [9, 3, 10.6, 0, 11.4, 3.4], fill: 'red' },
+  { rect: [0, 2.6, 12, 7.4], r: 2.2, fill: ['red', 0.3, 'red-dark'] },
+];
+const SCARED = [                // any gremlin while a power orb lasts: dark aqua, wide-eyed, a bead of sweat
+  { path: 'M0 10 L0 5.4 C0 2.6 2.6 1 6 1 C9.4 1 12 2.6 12 5.4 L12 10 Z', fill: ['aqua', 0.3, 'aqua-dark'] },
+  { circle: [3.6, 5, 1.4], fill: 'chrome-100' }, { circle: [8.4, 5, 1.4], fill: 'chrome-100' },
+  { circle: [3.6, 5.7, 0.55], fill: 'ink' }, { circle: [8.4, 5.7, 0.55], fill: 'ink' },
+  { circle: [6, 8, 0.85], fill: 'ink' },
+  { path: 'M10.6 0.6 C11.4 1.8 11.8 2.4 11.8 2.9 A1.2 1.2 0 0 1 9.4 2.9 C9.4 2.4 9.8 1.8 10.6 0.6 Z', fill: 'aqua-light' },
+];
+
+/* The capsules (Advanced), each a mark of its own, 8 x 8. */
+const CAPS = {
+  capLaser: [{ poly: [5.2, 0, 1.2, 4.6, 3.8, 4.6, 2.4, 8, 6.8, 3.2, 4.2, 3.2, 5.8, 0], fill: 'amber', band: [0.35, 0.72] }],
+  capTurbo: [{ line: [0.9, 0.8, 3.6, 4, 0.9, 7.2], width: 1.4, fill: 'amber' }, { line: [4.3, 0.8, 7, 4, 4.3, 7.2], width: 1.4, fill: 'amber' }],
+  capFreeze: [
+    { line: [4, 0.4, 4, 7.6], width: 1.1, fill: 'aqua' }, { line: [0.6, 2.1, 7.4, 5.9], width: 1.1, fill: 'aqua' },
+    { line: [0.6, 5.9, 7.4, 2.1], width: 1.1, fill: 'aqua' }, { circle: [4, 4, 1.1], fill: 'chrome-100' },
   ],
-];
-const chompFacing = (change) => ({ frames: CHOMP.map((mask) => glint(shade(change(mask)))) });
-
-/* The gremlins: ten rows of body, then two rows of feet that swap to make them scuttle. Their eyes are
-   drawn on top while the game runs, so that they can look where they are going. */
-function foeSprite(body, feetA, feetB) {
-  return { frames: [shade(body.concat(feetA)), shade(body.concat(feetB))] };
-}
-const IMP = [
-  '%..........%',
-  '%%........%%',
-  '.%%%%%%%%%%.',
-  '%%%%%%%%%%%%',
-  '%%%%%%%%%%%%',
-  '%%%%%%%%%%%%',
-  '%%%%%%%%%%%%',
-  '%%%%%%%%%%%%',
-  '%%%%%%%%%%%%',
-  '.%%%%%%%%%%.',
-];
-const BUG = [
-  '..^......^..',
-  '...^....^...',
-  '..^^^^^^^^..',
-  '.^^^^^^^^^^.',
-  '^^^^^^^^^^^^',
-  '^^^^^^^^^^^^',
-  '^^^^^^^^^^^^',
-  '^^^^^^^^^^^^',
-  '^^^^^^^^^^^^',
-  '.^^^^^^^^^^.',
-];
-const CYCLOPS = [
-  '....&&&&....',
-  '..&&&&&&&&..',
-  '.&&&&&&&&&&.',
-  '.&&&&&&&&&&.',
-  '&&&&&&&&&&&&',
-  '&&&&&&&&&&&&',
-  '&&&&&&&&&&&&',
-  '&&&&&&&&&&&&',
-  '.&&&&&&&&&&.',
-  '.&&&&&&&&&&.',
-];
-const SPIKE = [
-  '.*...**...*.',
-  '.**.****.**.',
-  '.**********.',
-  '************',
-  '************',
-  '************',
-  '************',
-  '************',
-  '************',
-  '.**********.',
-];
-const SCARED = [                // any gremlin while a power orb lasts: wide eyes and a wobbly mouth
-  '............',
-  '..~~~~~~~~..',
-  '.~~~~~~~~~~.',
-  '~~~~~~~~~~~~',
-  '~~WW~~~~WW~~',
-  '~~WW~~~~WW~~',
-  '~~~~~~~~~~~~',
-  '~~a~~aa~~a~~',
-  '~a~aa~~aa~a~',
-  '~~~~~~~~~~~~',
-];
+  capMagnet: [
+    { path: 'M1.4 6.4 L1.4 3.6 A2.6 2.6 0 0 1 6.6 3.6 L6.6 6.4', stroke: 2, fill: 'amber' },
+    { rect: [0.4, 5.6, 2, 2.2], r: 0.5, fill: 'chrome-200' }, { rect: [5.6, 5.6, 2, 2.2], r: 0.5, fill: 'chrome-200' },
+  ],
+  capBomb: [
+    { line: [5.4, 2.2, 6.6, 0.9], width: 0.6, fill: 'chrome-400' }, { circle: [7.2, 0.7, 0.7], fill: 'sun-100' },
+    { circle: [3.8, 4.6, 3.2], fill: 'heat', band: [0.3, 0.72] }, { circle: [2.6, 3.5, 0.7], fill: 'chrome-100' },
+  ],
+  capShield: [{ path: 'M1 0.8 L7 0.8 L7 3.6 C7 5.8 5.2 7.2 4 7.8 C2.8 7.2 1 5.8 1 3.6 Z', fill: 'aqua', band: [0.3, 0.72] },
+    { circle: [2.8, 2.4, 0.6], fill: 'chrome-100' }],
+};
 
 function buildSprites() {
-  return {
-    chompR: chompFacing((m) => m),
-    chompL: chompFacing(mirror),
-    chompD: chompFacing(turn),
-    chompU: chompFacing((m) => turn(turn(turn(m)))),
-    imp: foeSprite(IMP, ['.%%..%%..%%.', '.%%......%%.'], ['.%%..%%..%%.', '.....%%.....']),
-    bug: foeSprite(BUG, ['..^^.^^.^^..', '..^..^^..^..'], ['..^^.^^.^^..', '...^.^^.^...']),
-    cyclops: foeSprite(CYCLOPS, ['.&&.&&&&.&&.', '&&...&&...&&'], ['.&&.&&&&.&&.', '.&&..&&..&&.']),
-    spike: foeSprite(SPIKE, ['.***.**.***.', '..*..**..*..'], ['.***.**.***.', '.*...**...*.']),
-    scared: foeSprite(SCARED, ['.~~.~~~~.~~.', '.~~..~~..~~.'], ['.~~.~~~~.~~.', '..~..~~..~..']),
-    eyes: [                     // a pair of eyes: on a gremlin, or on their own, heading home after being caught
-      '.WW....WW.',
-      'WWWW..WWWW',
-      'WWWW..WWWW',
-      '.WW....WW.',
-    ],
-    eyeOne: [
-      '.WWWW.',
-      'WWWWWW',
-      'WWWWWW',
-      'WWWWWW',
-      '.WWWW.',
-    ],
-    orb: [                      // the power orb
-      '.yYYY.',
-      'yYSYYO',
-      'YYYYYO',
-      'YYYYYO',
-      'YYYYOO',
-      '.OOOO.',
-    ],
-    gem: [                      // the bonus
-      '..yyyy..',
-      '.ySYYYO.',
-      'yYSYYYYO',
-      'YYYYYYOO',
-      '.YYYYOO.',
-      '..YYOO..',
-      '...OO...',
-    ],
-    capLaser: [                 // a bolt of lightning
-      '....yy..',
-      '...yY...',
-      '..yYY...',
-      '.yYYYYY.',
-      '...YYO..',
-      '...YO...',
-      '..YO....',
-      '..O.....',
-    ],
-    capTurbo: [                 // fast-forward arrows
-      'y...y...',
-      'Yy..Yy..',
-      '.Yy..Yy.',
-      '..YY..YY',
-      '..YO..YO',
-      '.YO..YO.',
-      'YO..YO..',
-      'O...O...',
-    ],
-    capFreeze: [                // a snowflake
-      '...aa...',
-      'a..aa..a',
-      '.a.aa.a.',
-      'aaaWWaaa',
-      'aaaWWaaa',
-      '.a.aa.a.',
-      'a..aa..a',
-      '...aa...',
-    ],
-    capMagnet: [                // a horseshoe magnet with chrome tips
-      '.yYYYYO.',
-      'yYYYYYYO',
-      'YYO..YYO',
-      'YYO..YYO',
-      'YYO..YYO',
-      'YYO..YYO',
-      'WWL..WWL',
-      'WWL..WWL',
-    ],
-    capBomb: [                  // a round bomb with a lit fuse
-      '.....yS.',
-      '....y...',
-      '..hHHH..',
-      '.hHHHHE.',
-      'hHWHHHHE',
-      'hHHHHHHE',
-      '.HHHHHE.',
-      '..EEEE..',
-    ],
-    capShield: [                // a shield
-      '.aAAAAQ.',
-      'aAWAAAAQ',
-      'aAAAAAAQ',
-      'aAAAAAAQ',
-      'aAAAAAAQ',
-      '.AAAAAQ.',
-      '..AAAQ..',
-      '...QQ...',
-    ],
+  const s = {
+    chompR: CHOMP,
+    chompL: Object.assign({ mirror: true }, CHOMP),
+    chompD: Object.assign({ turn: 1 }, CHOMP),
+    chompU: Object.assign({ turn: 3 }, CHOMP),
+    imp: foeSprite(IMP, '', 'red-dark'),
+    bug: foeSprite(BUG, 'swap', 'red'),
+    cyclops: foeSprite(CYCLOPS, '', 'heat-dark'),
+    spike: foeSprite(SPIKE, 'swap', 'red-dark'),
+    scared: foeSprite(SCARED, '', 'aqua-dark'),
+    eyes: { size: [10, 4], shapes: [         // a pair of eyes: on a gremlin, or on their own, heading home after being caught
+      { ellipse: [2, 2, 2, 1.9], fill: 'chrome-100' }, { ellipse: [8, 2, 2, 1.9], fill: 'chrome-100' }] },
+    eyeOne: { size: [6, 5], shapes: [{ ellipse: [3, 2.5, 3, 2.5], fill: 'chrome-100' }] },
+    orb: { size: [6, 6], shapes: [         // the power orb
+      { circle: [3, 3, 2.9], fill: 'amber', band: [0.3, 0.72] }, { circle: [2.1, 2, 0.7], fill: 'sun-100' }] },
+    gem: { size: [8, 7], shapes: [         // the bonus
+      { poly: [2, 0, 6, 0, 8, 2.4, 4, 7, 0, 2.4], fill: 'amber', band: [0.34, 0.7] },
+      { poly: [2.4, 0.5, 5.6, 0.5, 4.8, 2.2, 3.2, 2.2], fill: 'sun-100' }] },
   };
+  for (const name in CAPS) s[name] = { size: [8, 8], shapes: CAPS[name] };
+  return s;
 }
 
 /* ---------- Building a maze ---------- */
@@ -500,10 +351,10 @@ function buildMaze(half) {
   return { cells: cells, dots: dots, orbs: orbs, tunnels: tunnels, home: home };
 }
 
-// Draws a maze's walls as one big sprite, 320 x 180, in its theme's colours. Walls are 4 pixels thick and
-// run through the middle of their tiles, which leaves the corridors wide enough for the 12-pixel sprites.
+// Draws a maze's walls as one big sprite, 320 x 180, in its theme's colours: rounded tubes 4 pixels thick
+// that run through the middle of their tiles, which leaves the corridors wide enough for the 12-pixel sprites.
+// Each tube is drawn three times: a dark edge (down and right), a light edge (up and left), then the body.
 function mazeArt(maze, theme) {
-  const solid = new Uint8Array(320 * 180);
   const isWall = (c, r) => {
     if (r < 0 || r >= ROWS) return false;
     if (c >= 0 && c < COLS) return maze.cells[r * WRAP + c] === WALL;
@@ -511,45 +362,41 @@ function mazeArt(maze, theme) {
     const tunnel = (row) => maze.tunnels.indexOf(row) >= 0;
     return (c === -1 || c === COLS) && !tunnel(r) && (tunnel(r - 1) || tunnel(r + 1));
   };
-  const fill = (x, y, w, h) => {
-    for (let j = Math.max(0, y); j < Math.min(180, y + h); j++) {
-      for (let i = Math.max(0, x); i < Math.min(320, x + w); i++) solid[j * 320 + i] = 1;
-    }
-  };
+  const segs = [];              // [x1, y1, x2, y2]: from one wall tile's middle to the next one's
+  const blocks = [];            // where four wall tiles make a solid square
+  const tiles = [];
   for (let r = 0; r < ROWS; r++) {
     for (let c = -1; c <= COLS; c++) {
       if (!isWall(c, r)) continue;
-      const x = OX + c * T;
-      const y = OY + r * T;
-      const up = isWall(c, r - 1);
-      const down = isWall(c, r + 1);
-      const left = isWall(c - 1, r);
-      const right = isWall(c + 1, r);
-      fill(x + 3, y + 3, 4, 4);                                             // the middle of the tile
-      if (up) fill(x + 3, y, 4, 3);                                         // an arm towards each wall next door
-      if (down) fill(x + 3, y + 7, 4, 3);
-      if (left) fill(x, y + 3, 3, 4);
-      if (right) fill(x + 7, y + 3, 3, 4);
-      if (up && left && isWall(c - 1, r - 1)) fill(x, y, 3, 3);             // corners, where walls make a solid block
-      if (up && right && isWall(c + 1, r - 1)) fill(x + 7, y, 3, 3);
-      if (down && left && isWall(c - 1, r + 1)) fill(x, y + 7, 3, 3);
-      if (down && right && isWall(c + 1, r + 1)) fill(x + 7, y + 7, 3, 3);
+      const x = OX + c * T + T / 2;
+      const y = OY + r * T + T / 2;
+      tiles.push([x, y, c, r]);
+      if (isWall(c + 1, r)) segs.push([x, y, x + T, y]);
+      if (isWall(c, r + 1)) segs.push([x, y, x, y + T]);
+      if (!isWall(c + 1, r) && !isWall(c, r + 1) && !isWall(c - 1, r) && !isWall(c, r - 1)) segs.push([x, y, x, y]);
+      if (isWall(c + 1, r) && isWall(c, r + 1) && isWall(c + 1, r + 1)) blocks.push([x, y]);
     }
   }
-  const at = (x, y) => (x < 0 || y < 0 || x >= 320 || y >= 180 ? 1 : solid[y * 320 + x]);
-  const rows = [];
-  for (let y = 0; y < 180; y++) {
-    let s = '';
-    for (let x = 0; x < 320; x++) {
-      if (!solid[y * 320 + x]) s += '.';
-      else if (!at(x, y - 1) || !at(x - 1, y)) s += theme.wall[0];          // lit from the top left
-      else if (!at(x, y + 1) || !at(x + 1, y)) s += theme.wall[2];
-      else if (theme.hollow) s += '.';
-      else s += theme.marks && theme.marks(x - OX, y - OY) ? theme.mark : theme.wall[1];
+  const [light, body, dark] = theme.wall;
+  const shapes = [];
+  const pass = (dx, dy, width, fill, erase) => {
+    for (const b of blocks) shapes.push({ rect: [b[0] - width / 2 + dx, b[1] - width / 2 + dy, T + width, T + width], r: width / 2, fill: fill, erase: erase });
+    for (const sg of segs) shapes.push({ line: [sg[0] + dx, sg[1] + dy, sg[2] + dx + (sg[0] === sg[2] && sg[1] === sg[3] ? 0.01 : 0), sg[3] + dy], width: width, fill: fill, erase: erase });
+  };
+  pass(0.3, 0.3, 3.8, dark);
+  pass(-0.3, -0.3, 3.8, light);
+  if (theme.hollow) pass(0, 0, 2.2, body, true);    // neon tubes: the middle cut away, so the stars show through
+  else pass(0, 0, 3, body);
+  if (theme.marks) {
+    for (const [x, y, c, r] of tiles) {
+      if (!theme.marks(c, r)) continue;
+      if (theme.mark === 'leaf') shapes.push({ ellipse: [x - 0.3, y - 0.2, 0.9, 0.55, -30], fill: light });
+      else if (theme.mark === 'rivet') shapes.push({ circle: [x, y, 0.55], fill: light });
+      else if (theme.mark === 'joint') shapes.push({ line: isWall(c + 1, r) || isWall(c - 1, r) ? [x, y - 1.2, x, y + 1.2] : [x - 1.2, y, x + 1.2, y], width: 0.5, fill: dark });
+      else if (theme.mark === 'stripe') shapes.push({ line: [x - 0.9, y + 0.9, x + 0.9, y - 0.9], width: 0.5, fill: light });
     }
-    rows.push(s);
   }
-  return { map: rows, outline: false };
+  return { size: [320, 180], outline: false, shapes: shapes };
 }
 
 /* ---------- Helpers ---------- */
@@ -990,7 +837,7 @@ function drawFloor(rk, th) {
       rk.rect(0, band[0], 320, next - band[0], band[1]);
     });
   }
-  for (const s of th.specks) rk.px(s.x, s.y, s.colour);
+  for (const s of th.specks) rk.circle(s.x + 0.5, s.y + 0.5, 0.5, s.colour);
 }
 
 function drawEyes(rk, bx, by, dir, oneEye) {
@@ -998,12 +845,12 @@ function drawEyes(rk, bx, by, dir, oneEye) {
   const ey = dir >= 0 ? DY[dir] : 0;
   if (oneEye) {
     rk.draw('eyeOne', bx + 3 + ex, by + 3 + ey);
-    rk.rect(bx + 5 + ex * 2, by + 4 + ey * 2, 2, ey === 0 ? 3 : 2, 'ink');
+    rk.circle(bx + 6 + ex * 2, by + 5.5 + ey * 2, 1.15, 'ink');
     return;
   }
   rk.draw('eyes', bx + 1 + ex, by + 3 + ey);
-  rk.rect(bx + 2 + ex * 2, by + 4 + ey * 2, 2, 2, 'ink');
-  rk.rect(bx + 8 + ex * 2, by + 4 + ey * 2, 2, 2, 'ink');
+  rk.circle(bx + 3 + ex * 2, by + 5 + ey * 2, 1, 'ink');
+  rk.circle(bx + 9 + ex * 2, by + 5 + ey * 2, 1, 'ink');
 }
 
 function drawFoe(rk, g, e) {
@@ -1044,19 +891,19 @@ function drawPlayer(rk, g) {
     if (fading(g.pw.magnet)) {                                        // a slow ring of amber points
       for (let n = 0; n < 12; n++) {
         const ang = n * Math.PI / 6 + g.tick * 0.05;
-        rk.px(x + Math.cos(ang) * MAGNET_REACH, y + Math.sin(ang) * MAGNET_REACH, 'amber');
+        rk.circle(x + Math.cos(ang) * MAGNET_REACH, y + Math.sin(ang) * MAGNET_REACH, 0.7, 'amber');
       }
     }
     rk.draw(name, x - 6, y - 6, frame, { flash: g.phase === 'dying' && g.dieT < 12 });
     if (fading(g.pw.laser)) {                                         // a lit muzzle
-      rk.rect(x + DX[p.face] * 7 - 1, y + DY[p.face] * 7 - 1, 2, 2, 'aqua-light');
+      rk.circle(x + DX[p.face] * 7, y + DY[p.face] * 7, 1.1, 'aqua-light');
       rk.glow(x + DX[p.face] * 7, y + DY[p.face] * 7, 5, 'aqua', 0.6);
     }
     if (fading(g.pw.shield)) {                                        // a ring round the chomper
       rk.glow(x, y, 16, 'aqua', 0.3);
       for (let n = 0; n < 16; n++) {
         const ang = n * Math.PI / 8 + g.tick * 0.08;
-        rk.px(x + Math.cos(ang) * 9, y + Math.sin(ang) * 9, n % 2 ? 'aqua' : 'aqua-light');
+        rk.circle(x + Math.cos(ang) * 9, y + Math.sin(ang) * 9, 0.6, n % 2 ? 'aqua' : 'aqua-light');
       }
     }
   });
@@ -1067,9 +914,9 @@ function drawMaze(rk, g) {
   rk.draw('maze' + g.stage, 0, 0);
   // Level clear: the walls blink pale twice a second
   if (g.phase === 'clear' && g.clearT % 30 < 15) rk.draw('maze' + g.stage, 0, 0, 0, { flash: true, alpha: 0.5 });
-  rk.rect(tx(EXIT.c) - 5, ty(EXIT.r + 1) - 1, 10, 2, 'chrome-300');   // the pen door
+  rk.shape({ rect: [tx(EXIT.c) - 5, ty(EXIT.r + 1) - 1, 10, 2], r: 1, fill: 'chrome-300' });   // the pen door
   for (const i of g.maze.dots) {
-    if (g.dots[i]) rk.rect(OX + (i % WRAP) * T + 4, OY + Math.floor(i / WRAP) * T + 4, 2, 2, 'amber-light');
+    if (g.dots[i]) rk.circle(OX + (i % WRAP) * T + 5, OY + Math.floor(i / WRAP) * T + 5, 1.05, 'amber-light');
   }
   const pulse = Math.sin(g.tick * 0.12) * 2;
   for (const i of g.maze.orbs) {
@@ -1095,23 +942,23 @@ function drawMaze(rk, g) {
 function drawBits(rk, g) {
   for (const b of g.bolts) {
     rk.glow(b.x, b.y, 7, 'aqua', 0.55);
-    rk.rect(b.x - (DX[b.dir] ? 3 : 1), b.y - (DY[b.dir] ? 3 : 1), DX[b.dir] ? 6 : 2, DY[b.dir] ? 6 : 2, 'aqua');
-    rk.rect(b.x - 1 + DX[b.dir] * 2, b.y - 1 + DY[b.dir] * 2, 2, 2, 'chrome-100');
+    rk.shape({ rect: [b.x - (DX[b.dir] ? 3 : 1), b.y - (DY[b.dir] ? 3 : 1), DX[b.dir] ? 6 : 2, DY[b.dir] ? 6 : 2], r: 1, fill: 'aqua' });
+    rk.circle(b.x + DX[b.dir] * 2, b.y + DY[b.dir] * 2, 1, 'chrome-100');
   }
   const at = spot(g.player);
   for (const pl of g.pulls) {   // a magnet's catch, flying in
     const k = pl.t / 8;
-    rk.rect(pl.x + (at[0] - pl.x) * k - 1, pl.y + (at[1] - pl.y) * k - 1, 2, 2, 'amber-light');
+    rk.circle(pl.x + (at[0] - pl.x) * k, pl.y + (at[1] - pl.y) * k, 1.05, 'amber-light');
   }
   if (g.blast) {                // the bomb: a ring of sparks racing outwards
     const r = BLAST_REACH * g.blast.t / 14;
     rk.glow(g.blast.x, g.blast.y, r + 10, 'amber', 0.5 * (1 - g.blast.t / 14));
     for (let n = 0; n < 40; n++) {
       const ang = n * Math.PI / 20;
-      rk.rect(g.blast.x + Math.cos(ang) * r - 1, g.blast.y + Math.sin(ang) * r - 1, 2, 2, n % 2 ? 'amber' : 'sun-100');
+      rk.circle(g.blast.x + Math.cos(ang) * r, g.blast.y + Math.sin(ang) * r, 0.95, n % 2 ? 'amber' : 'sun-100');
     }
   }
-  for (const pt of g.parts) rk.rect(pt.x, pt.y, 1, 1, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+  for (const pt of g.parts) rk.circle(pt.x + 0.5, pt.y + 0.5, 0.6, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
 }
 
 /* ---------- The game ---------- */
@@ -1268,7 +1115,7 @@ RetroKit.game({
   drawTitle(ctx, rk) {
     rk.backdrop.dusk();
     rk.draw('chompR', 20, 153, [0, 1, 2, 1][Math.floor(rk.t * 6) & 3]);
-    for (const x of [40, 49, 58]) rk.rect(x, 158, 2, 2, 'amber-light');     // kept left of the menu on a phone
+    for (const x of [40, 49, 58]) rk.circle(x + 1, 159, 1.05, 'amber-light');     // kept left of the menu on a phone
     rk.draw('imp', 284, 153, Math.floor(rk.t * 4) & 1);
     drawEyes(rk, 284, 153, LEFT, false);
   },

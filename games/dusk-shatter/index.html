@@ -101,17 +101,26 @@ function speedFor(level) {
   return Math.min(2.9, 1.7 * Math.pow(1.08, level - 1));
 }
 
-// The paddle sprite at any width: aqua lights at both ends, a chrome body lit from the top left.
-function paddleRows(w) {
-  const m = w - 8;
-  return [
-    '.aaa' + 'L'.repeat(m) + 'aaa.',
-    'aAAA' + 'WW' + 'L'.repeat(m - 2) + 'AAAQ',
-    'aAAA' + 'L' + 'M'.repeat(m - 1) + 'AAAQ',
-    'AAAQ' + 'M'.repeat(m) + 'AAQQ',
-    'AAQQ' + 'D'.repeat(m) + 'AQQQ',
-    '.QQQ' + 'D'.repeat(m) + 'QQQ.',
-  ];
+// The paddle at any width: a chrome bar with an aqua light down its middle and an aqua cap at each end.
+// Shapes in the paddle's own box (w x 6 game pixels); the kit draws them smooth with an ink outline.
+function paddleArt(w) {
+  return {
+    size: [w, 6],
+    shapes: [
+      { rect: [2, 0.4, w - 4, 5.2], r: 2.6, fill: 'chrome', band: [0.36, 0.7] },
+      { rect: [8, 2.4, w - 16, 1.2], r: 0.6, fill: 'aqua' },
+      { circle: [3, 3, 3], fill: 'aqua', dir: 'diag' },
+      { circle: [w - 3, 3, 3], fill: 'aqua', dir: 'diag' },
+    ],
+  };
+}
+
+// A capsule: an amber tile with its mark in ink.
+function capsuleArt(mark) {
+  return {
+    size: [CAPSULE_W, CAPSULE_H],
+    shapes: [{ rect: [0, 0, CAPSULE_W, CAPSULE_H], r: 2, fill: 'amber', band: [0.28, 0.76] }, ...mark],
+  };
 }
 
 // Plays a sound at most once every few updates, so a burst of hits does not become a buzz.
@@ -255,26 +264,24 @@ function drawRails(rk) {
   rk.rect(W - 6, 0, 1, H, 'ink'); rk.rect(W - 5, 0, 1, H, 'chrome-200'); rk.rect(W - 4, 0, 3, H, 'chrome-300'); rk.rect(W - 1, 0, 1, H, 'chrome-400');
   // top rail
   rk.rect(0, 0, W, 1, 'chrome-200'); rk.rect(0, 1, W, 3, 'chrome-300'); rk.rect(0, 4, W, 1, 'chrome-400'); rk.rect(5, 5, W - 10, 1, 'ink');
-  // rivets
-  for (let y = 16; y < H; y += 20) {
-    rk.px(2, y, 'chrome-100'); rk.px(3, y + 1, 'chrome-400');
-    rk.px(W - 4, y, 'chrome-100'); rk.px(W - 3, y + 1, 'chrome-400');
-  }
-  for (let x = 20; x < W - 10; x += 40) { rk.px(x, 2, 'chrome-100'); rk.px(x + 1, 3, 'chrome-400'); }
+  // rivets: a dark socket with a bright head, lit from the top left
+  const rivet = (x, y) => { rk.circle(x + 1.1, y + 1.1, 0.85, 'chrome-400'); rk.circle(x + 0.8, y + 0.8, 0.6, 'chrome-100'); };
+  for (let y = 16; y < H; y += 20) { rivet(2, y); rivet(W - 4, y); }
+  for (let x = 20; x < W - 10; x += 40) rivet(x, 2);
 }
 
 function drawBrick(rk, br) {
   if (br.flash > 0) {                     // one quick white frame when armour takes a hit
     rk.block(br.x, br.y, br.w, br.h, 'chrome');
-    rk.rect(br.x + 1, br.y + 1, br.w - 2, br.h - 2, 'chrome-100');
+    rk.shape({ rect: [br.x + 0.6, br.y + 0.6, br.w - 1.2, br.h - 1.2], r: 1, fill: 'chrome-100' });
     return;
   }
   rk.block(br.x, br.y, br.w, br.h, br.type.ramp);
   if (br.type.ramp !== 'chrome') return;
-  rk.px(br.x + 2, br.y + 2, 'chrome-100');            // glint
   const damage = br.type.hp - br.hp;                  // cracks show how close it is to breaking
-  if (damage >= 1) { rk.px(br.x + 9, br.y + 2, 'ink'); rk.px(br.x + 10, br.y + 3, 'ink'); rk.px(br.x + 10, br.y + 4, 'ink'); rk.px(br.x + 11, br.y + 5, 'ink'); }
-  if (damage >= 2) { rk.px(br.x + 19, br.y + 2, 'ink'); rk.px(br.x + 18, br.y + 3, 'ink'); rk.px(br.x + 18, br.y + 4, 'ink'); rk.px(br.x + 17, br.y + 5, 'ink'); }
+  const crack = (pts) => rk.shape({ line: pts.map((v, i) => v + (i % 2 ? br.y : br.x)), width: 0.6, fill: 'ink' });
+  if (damage >= 1) crack([9, 1.4, 10.2, 3.2, 10.5, 4.6, 11.6, 6.4]);
+  if (damage >= 2) crack([19.6, 1.4, 18.4, 3.2, 18.2, 4.6, 17.2, 6.4]);
 }
 
 /* ---------- The game ---------- */
@@ -288,42 +295,23 @@ RetroKit.game({
   touch: 'Drag to move · Tap to launch',
 
   sprites: {
-    paddle: paddleRows(PADDLE_W),
-    paddleWide: paddleRows(PADDLE_WIDE),
-    ball: [
-      '.WLL.',
-      'WWLLM',
-      'LLLMM',
-      'LLMMD',
-      '.MMD.',
-    ],
-    capWide: [            // arrows pointing out: a wider paddle
-      '.yyyyyyy.',
-      'yYYYYYYYO',
-      'yYkYYYkYO',
-      'ykkkkkkkO',
-      'yYkYYYkYO',
-      'yYYYYYYYO',
-      '.OOOOOOO.',
-    ],
-    capMulti: [           // three balls
-      '.yyyyyyy.',
-      'yYYYYYYYO',
-      'yYYYkYYYO',
-      'yYYYYYYYO',
-      'yYkYYYkYO',
-      'yYYYYYYYO',
-      '.OOOOOOO.',
-    ],
-    capLife: [            // a plus: one more life
-      '.yyyyyyy.',
-      'yYYYYYYYO',
-      'yYYYkYYYO',
-      'yYYkkkYYO',
-      'yYYYkYYYO',
-      'yYYYYYYYO',
-      '.OOOOOOO.',
-    ],
+    paddle: paddleArt(PADDLE_W),
+    paddleWide: paddleArt(PADDLE_WIDE),
+    ball: { size: [BALL, BALL], shapes: [{ circle: [2.5, 2.5, 2.5], fill: 'chrome', dir: 'diag', band: [0.38, 0.72] }] },
+    capWide: capsuleArt([           // arrows pointing out: a wider paddle
+      { line: [2, 3.5, 7, 3.5], width: 0.8, fill: 'ink' },
+      { line: [3.3, 2.2, 2, 3.5, 3.3, 4.8], width: 0.8, fill: 'ink' },
+      { line: [5.7, 2.2, 7, 3.5, 5.7, 4.8], width: 0.8, fill: 'ink' },
+    ]),
+    capMulti: capsuleArt([          // three balls
+      { circle: [4.5, 2.4, 0.85], fill: 'ink' },
+      { circle: [2.9, 4.6, 0.85], fill: 'ink' },
+      { circle: [6.1, 4.6, 0.85], fill: 'ink' },
+    ]),
+    capLife: capsuleArt([           // a plus: one more life
+      { line: [4.5, 1.6, 4.5, 5.4], width: 0.9, fill: 'ink' },
+      { line: [2.6, 3.5, 6.4, 3.5], width: 0.9, fill: 'ink' },
+    ]),
   },
 
   start(rk) {
@@ -424,7 +412,7 @@ RetroKit.game({
       rk.glow(c.x + CAPSULE_W / 2, c.y + CAPSULE_H / 2, 10, 'amber', 0.35);
       rk.draw(c.cap.sprite, c.x, c.y);
     }
-    for (const pt of g.parts) rk.rect(pt.x, pt.y, 1, 1, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+    for (const pt of g.parts) rk.circle(pt.x + 0.5, pt.y + 0.5, 0.6, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
 
     const p = g.paddle;
     rk.draw(p.w > PADDLE_W ? 'paddleWide' : 'paddle', p.x, PADDLE_Y);
