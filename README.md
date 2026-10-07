@@ -1,10 +1,10 @@
 # Retro Games
 
-Browser arcade games in the spirit of the late 80s and early 90s, all built on **Retro Kit**: one shared look (a 16-bit pixel world inside a modern glass interface), one game shell (title, pause, game over, high scores, settings, phone controls) and one build.
+Browser arcade games in the spirit of the late 80s and early 90s, all built on **Retro Kit**: one shared look (a smooth retro world of banded colour and ink outlines, inside a modern glass interface), one game shell (title, pause, game over, high scores, settings, phone controls) and one build.
 
 ## Play a game
 
-Double-click any file in `dist\`. Each one is a single self-contained file: it works offline and can be copied anywhere.
+Double-click any file in `dist\`. Each one is a single self-contained file: it works offline and can be copied anywhere. (`dist\` is not kept in git: rebuild it any time with the command below.)
 
 ## Make a new game
 
@@ -36,6 +36,7 @@ That rebuilds every game and prints one line per game, such as `Built dist/dusk-
 | `games\<name>\index.html` | A game's source |
 | `games\<name>\music.js` | Optional: a game's soundtrack (an MP3 written out as text), played by the kit |
 | `dist\<name>.html` | The built game |
+| `games\kit-sampler\` | The kit's test page: every drawing part on four scenes, with a frame-rate readout. Open `dist\kit-sampler.html` after changing the kit |
 | `.claude\skills\retro-kit\` | Instructions Claude Code follows for every game |
 | `CLAUDE.md` | Standing rules for Claude Code in this folder |
 

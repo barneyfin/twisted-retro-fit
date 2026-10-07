@@ -15,7 +15,9 @@ nothing else, one line:  window.MY_GAME_MUSIC = "<the MP3 in base64>";  The game
 with the music option (music: { data: window.MY_GAME_MUSIC }) and the kit plays it.
 
 It also warns about anything the Retro Kit rules forbid in a game (hex colours, canvas text, image or
-audio files, its own audio code, internet addresses, extra files).
+audio files, its own audio code, internet addresses, extra files, and the old pixel-map way of drawing:
+sprite legends, pixel-by-pixel drawing, a pixelated look). A sprite still written as rows of letters is
+caught when the game opens: the kit shows an error on screen saying which sprite.
 Standard library only; Python 3.8 or newer.
 """
 import base64
@@ -77,6 +79,10 @@ CHECKS = [
     (re.compile(r"AudioContext|decodeAudioData|createBufferSource"), "its own audio code: use rk.sfx(), and the kit's music option for a soundtrack"),
     (re.compile(r"https?://", re.IGNORECASE), "an internet address: games must work offline"),
     (re.compile(r"<script\b(?![^>]*data-rk-inline)[^>]*\bsrc\s*=|<link\b(?![^>]*data-rk-inline)[^>]*\bhref\s*=", re.IGNORECASE), "an extra file: keep the game's code in index.html (a soundtrack, music.js, is the one exception: mark its tag data-rk-inline)"),
+    # Kit 2.0 draws the world as smooth shapes. These belong to the old pixel-map way of drawing.
+    (re.compile(r"\blegend\s*:|\brk\.legend\b"), "a sprite legend: kit 2.0 sprites are shapes, not rows of letters (reference.md, Sprites)"),
+    (re.compile(r"\b(getImageData|putImageData|createImageData)\s*\("), "pixel-by-pixel drawing: draw shapes instead (sprites, rk.shape)"),
+    (re.compile(r"imageSmoothingEnabled|image-rendering"), "a pixelated look: the world is drawn smooth (design.md)"),
 ]
 
 

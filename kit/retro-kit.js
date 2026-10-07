@@ -1,4 +1,4 @@
-/* Retro Kit 2.0 (beta) — runtime
+/* Retro Kit 2.0 — runtime
    One file, no dependencies. Exposes window.RetroKit. Pair it with retro-kit.css.
    It owns everything every game shares: the canvas (drawn at the screen's real resolution; games work in
    a 320 x 180 world), shape art, the game loop, keyboard and
@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2.0.0-beta.3';
+  const VERSION = '2.0.0';
   const W = 320;
   const H = 180;
   const STEP = 1 / 60;
@@ -96,17 +96,6 @@
     heat: ['heat-light', 'heat', 'heat-dark'],
     chrome: ['chrome-200', 'chrome-300', 'chrome-400']
   };
-  /* Sprite legend: lowercase = light tone, uppercase = base, a separate capital = dark tone. */
-  const LEGEND = {
-    k: 'ink', W: 'chrome-100', L: 'chrome-200', M: 'chrome-300', D: 'chrome-400', S: 'sun-100',
-    a: 'aqua-light', A: 'aqua', Q: 'aqua-dark',
-    r: 'red-light', R: 'red', X: 'red-dark',
-    y: 'amber-light', Y: 'amber', O: 'amber-dark',
-    h: 'heat-light', H: 'heat', E: 'heat-dark',
-    f: 'hill-far', n: 'hill-near',
-    0: 'sky-0', 1: 'sky-1', 2: 'sky-2', 3: 'sky-3', 4: 'sky-4', 5: 'sky-5', 6: 'sky-6'
-  };
-
   function readColours() {
     const cs = getComputedStyle(document.documentElement);
     const C = {};
@@ -122,87 +111,10 @@
   }
 
   /* ---------- Sprites ---------- */
+  /* Kit 1.x sprites were pixel maps (rows of letters). Kit 2.0 draws every sprite as shapes. */
   function makeSprite(C, def, name) {
-    if (!isPixelDef(def)) return makeShapeSprite(C, def, name);
-    let frames;
-    let legend = LEGEND;
-    let outline = true;
-    if (Array.isArray(def)) frames = typeof def[0] === 'string' ? [def] : def;
-    else {
-      frames = def.frames || [def.map];
-      if (def.legend) legend = Object.assign({}, LEGEND, def.legend);
-      if (def.outline === false) outline = false;
-    }
-    const h = frames[0].length;
-    const w = Math.max.apply(null, frames[0].map((r) => r.length));
-    const pad = outline ? 1 : 0;
-    const ink = hexRgb(C.ink);
-    const white = hexRgb(C['chrome-100']);
-    const warned = {};
-    const flashes = [];
-    const canvases = frames.map((rows) => {
-      const c = document.createElement('canvas');
-      c.width = w + pad * 2;
-      c.height = h + pad * 2;
-      const g = c.getContext('2d');
-      rows.forEach((row, y) => {
-        for (let x = 0; x < row.length; x++) {
-          const ch = row[x];
-          if (ch === '.' || ch === ' ') continue;
-          const tok = legend[ch];
-          if (!tok || !C[tok]) {
-            if (!warned[ch]) { console.warn('Retro Kit: sprite "' + name + '" uses "' + ch + '", which is not in the legend.'); warned[ch] = 1; }
-            continue;
-          }
-          g.fillStyle = C[tok];
-          g.fillRect(x + pad, y + pad, 1, 1);
-        }
-      });
-      const cw = c.width;
-      const chh = c.height;
-      const img = g.getImageData(0, 0, cw, chh);
-      const d = img.data;
-      const solid = new Uint8Array(cw * chh);
-      for (let i = 0; i < cw * chh; i++) solid[i] = d[i * 4 + 3] > 0 ? 1 : 0;
-      /* The hit-flash version: the same shape in chrome-100 */
-      const fc = document.createElement('canvas');
-      fc.width = cw; fc.height = chh;
-      const fg = fc.getContext('2d');
-      const fimg = fg.createImageData(cw, chh);
-      const fd = fimg.data;
-      for (let i = 0; i < cw * chh; i++) {
-        if (solid[i]) { fd[i * 4] = white[0]; fd[i * 4 + 1] = white[1]; fd[i * 4 + 2] = white[2]; fd[i * 4 + 3] = 255; }
-      }
-      if (outline) {
-        for (let y = 0; y < chh; y++) {
-          for (let x = 0; x < cw; x++) {
-            const i = y * cw + x;
-            if (solid[i]) continue;
-            if ((x > 0 && solid[i - 1]) || (x < cw - 1 && solid[i + 1]) || (y > 0 && solid[i - cw]) || (y < chh - 1 && solid[i + cw])) {
-              d[i * 4] = fd[i * 4] = ink[0]; d[i * 4 + 1] = fd[i * 4 + 1] = ink[1]; d[i * 4 + 2] = fd[i * 4 + 2] = ink[2]; d[i * 4 + 3] = fd[i * 4 + 3] = 255;
-            }
-          }
-        }
-        g.putImageData(img, 0, 0);
-      }
-      fg.putImageData(fimg, 0, 0);
-      flashes.push(fc);
-      return c;
-    });
-    return { name: name, kind: 'pixel', w: w, h: h, pad: pad, frames: canvases, flashes: flashes, flipped: [], flippedFlash: [] };
-  }
-
-  function flippedFrame(spr, i, flash) {
-    const cache = flash ? spr.flippedFlash : spr.flipped;
-    if (!cache[i]) {
-      const s = (flash ? spr.flashes : spr.frames)[i];
-      const c = document.createElement('canvas');
-      c.width = s.width; c.height = s.height;
-      const g = c.getContext('2d');
-      g.translate(s.width, 0); g.scale(-1, 1); g.drawImage(s, 0, 0);
-      cache[i] = c;
-    }
-    return cache[i];
+    if (isPixelDef(def)) throw new Error('Retro Kit: sprite "' + name + '" is a pixel map (rows of letters). Kit 2.0 draws sprites as shapes: see the skill\'s reference.md, Sprites.');
+    return makeShapeSprite(C, def, name);
   }
 
   /* ---------- Shape art (kit 2.0) ----------
@@ -837,7 +749,7 @@
     dialogLayer.hidden = true;
     const rotateEl = el('div', 'rk-rotate', '<div class="rk-panel">' + ICON.rotate + '<h2 class="rk-heading">Rotate your phone</h2><p class="rk-body"></p></div>');
     rotateEl.querySelector('p').textContent = 'This game plays in landscape.';
-    const errorEl = el('div', 'rk-chip is-compact rk-hint');
+    const errorEl = el('div', 'rk-chip is-compact rk-hint rk-error');
     errorEl.style.cssText = 'position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--red);color:var(--ink);border-color:var(--red);display:none;z-index:5;white-space:normal;max-width:90%';
     root.append(viewport, barSlot, titleScreen, dialogLayer, rotateEl, errorEl);
     document.body.append(root);
@@ -946,16 +858,8 @@
       const flash = !!(opts && opts.flash);
       const flip = !!(opts && opts.flip);
       const alpha = opts && opts.alpha != null ? opts.alpha : null;
-      if (s.kind === 'shape') {
-        const cut = opts && opts.cut && opts.cut.length ? opts.cut : null;
-        blit(cut ? cutImage(s, i, flash, flip, cut, V.k) : shapeImage(s, i, flash, flip, V.k), x, y, alpha);
-        return;
-      }
-      /* A pixel-map sprite from kit 1.x: still drawn (enlarged, blocky) until every game is redrawn as shapes */
-      const img = flip ? flippedFrame(s, i, flash) : (flash ? s.flashes : s.frames)[i];
-      if (alpha != null) ctx.globalAlpha = alpha;
-      ctx.drawImage(img, Math.round(x) - s.pad, Math.round(y) - s.pad);
-      ctx.globalAlpha = 1;
+      const cut = opts && opts.cut && opts.cut.length ? opts.cut : null;
+      blit(cut ? cutImage(s, i, flash, flip, cut, V.k) : shapeImage(s, i, flash, flip, V.k), x, y, alpha);
     }
     function frameAt(nameOrSprite, fps, t) {
       const s = sprite(nameOrSprite);
@@ -1982,7 +1886,7 @@
       rect: rect, px: px, circle: circle, block: block, shape: fillShape,
       glow: glow, popup: popup, banner: banner, shake: shake, after: after,
       rand: rand, randInt: randInt, pick: pick, clamp: clamp, lerp: lerp, hit: hit,
-      ramps: RAMPS, legend: LEGEND
+      ramps: RAMPS
     };
 
     /* ----- Boot ----- */

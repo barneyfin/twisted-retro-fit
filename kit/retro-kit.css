@@ -1,4 +1,4 @@
-/* Retro Kit 2.0 (beta) — stylesheet
+/* Retro Kit 2.0 — stylesheet
    The tokens, fonts and interface classes of the Retro Kit design system, plus the game shell layout.
    Two layers: the World (shape art on the canvas) and the Interface (glass, outside the playfield).
    Games never edit this file. Change the design system first, then this file. */

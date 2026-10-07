@@ -20,19 +20,22 @@ RetroKit.game({
   touch: 'Drag to move · Tap to fire',
 
   sprites: {
-    // One character per game pixel. Legend in the skill's reference. The kit adds the ink outline.
-    player: [
-      '..LL..',
-      '.LWWL.',
-      'LMAAML',
-      'DMMMMD',
-    ],
+    // A few shapes in the sprite's box (world pixels). A ramp name ('chrome', 'aqua', 'red', 'amber', 'heat')
+    // paints light, base and dark bands; a token ('ink', 'sun-100') one flat colour. The kit adds the outline.
+    // Full list of shapes and options: the skill's reference.md, Sprites.
+    player: {
+      size: [12, 8],
+      shapes: [
+        { poly: [6, 0, 12, 7, 12, 8, 0, 8, 0, 7], fill: 'chrome', band: [0.4, 0.75] },
+        { circle: [6, 4.4, 1.6], fill: 'aqua' },
+      ],
+    },
   },
 
   // New game: build and return this game's state. Score and lives are handled by the kit.
   start(rk) {
     rk.hud.set('level', 1);
-    return { x: rk.W / 2 - 3, y: rk.H - 20, level: 1 };
+    return { x: rk.W / 2 - 6, y: rk.H - 20, level: 1 };
   },
 
   // Rules: called 60 times a second during play.
@@ -41,7 +44,7 @@ RetroKit.game({
     if (rk.input.left) g.x -= speed;
     if (rk.input.right) g.x += speed;
     if (rk.input.pointer.down) g.x += rk.input.pointer.dx;   // drag anywhere: touch, or mouse on desktop
-    g.x = rk.clamp(g.x, 0, rk.W - 6);
+    g.x = rk.clamp(g.x, 0, rk.W - 12);
   },
 
   // Picture: called every frame. Draw the backdrop first, then the world.
