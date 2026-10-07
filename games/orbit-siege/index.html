@@ -123,128 +123,167 @@ const POWERS = {
 const UNLOCKS = ['rapid', 'turbo', 'shield', 'spread', 'lance', 'freeze', 'blast', 'rewind'];
 
 /* ---------- Art ----------
-   One character per game pixel; the legend is in the skill's reference. Invaders are drawn in the red
-   letters (r R X) and re-coloured for each zone. */
-const SHIP = [
-  '........W........',
-  '.......LWM.......',
-  '.......LAM.......',
-  '......LaAQM......',
-  '..L...LaAQM...M..',
-  '..L..LLLMMMM..M..',
-  '.LLLLLMMMMMMMMMD.',
-  'LLMMMMMMMMMMMMMDD',
-  'LMDD.DDMMMDD.DDMD',
-];
-
-const INV_ART = {
-  A: [[                         // one big eye
-    '....rr....',
-    '..rrRRRX..',
-    '.rRRSSRRX.',
-    'rRRSkkSRRX',
-    'rRRRSSRRRX',
-    '.RRRRRRXX.',
-    '.R..RX..X.',
-    'R...RX...X',
-  ], [
-    '....rr....',
-    '..rrRRRX..',
-    '.rRRSSRRX.',
-    'rRRSkkSRRX',
-    'rRRRSSRRRX',
-    '.RRRRRRXX.',
-    '.R..RX..X.',
-    '..R.RX.X..',
-  ]],
-  B: [[                         // horns up, legs out
-    'r..........X',
-    '.r..rRRX..X.',
-    '.rRRRRRRRRX.',
-    'rRRSRRRRSRRX',
-    'rRRRRRRRRRRX',
-    '.RRXRRRRXRX.',
-    '.R..X..R..X.',
-    'R..........X',
-  ], [
-    '..r......X..',
-    '.r..rRRX..X.',
-    '.rRRRRRRRRX.',
-    'rRRSRRRRSRRX',
-    'rRRRRRRRRRRX',
-    '.RRXRRRRXRX.',
-    '..R.X..R.X..',
-    '...R....X...',
-  ]],
-  C: [[                         // a wide dome on short legs
-    '...rrrrrr...',
-    '.rrRRRRRRXX.',
-    'rRRRRRRRRRRX',
-    'rRSkRRRRSkRX',
-    'rRRRRRRRRRRX',
-    'RRXRRXXRRXRX',
-    'R..R.XR.X..X',
-    '.R..X..R..X.',
-  ], [
-    '...rrrrrr...',
-    '.rrRRRRRRXX.',
-    'rRRRRRRRRRRX',
-    'rRSkRRRRSkRX',
-    'rRRRRRRRRRRX',
-    'RRXRRXXRRXRX',
-    '.R.R.XR.X.X.',
-    'R...X..R...X',
-  ]],
-  D: [[                         // armoured: chrome plates and a red visor
-    '.LLLLLLLLLM.',
-    'LLWLLMMMMMMD',
-    'LMMMMMMMMMMD',
-    'LMRRSRRSRRMD',
-    'LMMMMMMMMMMD',
-    '.MMDMMMMDMD.',
-    '.M.D....M.D.',
-    'M..D....M..D',
-  ], [
-    '.LLLLLLLLLM.',
-    'LLWLLMMMMMMD',
-    'LMMMMMMMMMMD',
-    'LMRRSRRSRRMD',
-    'LMMMMMMMMMMD',
-    '.MMDMMMMDMD.',
-    '..MD....MD..',
-    '..M......D..',
-  ]],
+   Every character is a few shapes in its own box (game pixels, the same boxes the rules use), drawn by the
+   kit at the screen's real resolution: flat colour in hard bands, light from above, an ink outline round
+   the outside. A ramp name ('red', 'heat', 'amber', 'chrome', 'aqua') as a fill gives light, base and dark
+   bands; a token ('sun-100', 'ink') gives one flat colour. Invaders are drawn once per ramp, so each zone
+   can colour its fleet differently. */
+const SHIP = {
+  size: [SHIP_W, SHIP_H],                                   // 17 x 9
+  shapes: [
+    { rect: [3.4, 7, 2.2, 2], r: 0.7, fill: 'chrome-400' },                         // engines, under the wings
+    { rect: [11.4, 7, 2.2, 2], r: 0.7, fill: 'chrome-400' },
+    { poly: [8.5, 0, 10.5, 4.3, 16.6, 7.2, 17, 8.4, 11.8, 7.9, 8.5, 8.8, 5.2, 7.9, 0, 8.4, 0.4, 7.2, 6.5, 4.3], fill: 'chrome', band: [0.5, 0.82] },
+    { poly: [8.5, 1.4, 9.8, 4.6, 8.5, 6.6, 7.2, 4.6], fill: 'aqua', band: [0.42, 0.78] },   // canopy
+  ],
 };
-const CRACK = [[7, 0], [7, 1], [6, 2], [6, 4], [7, 5]];    // where the armour splits after its first hit
 
-const FLAGSHIP_HALF = [         // the left half; the right half is its mirror image
-  '..............rrrrrr',
-  '...........rrrRRRRRR',
-  '.........rrRRRLLLLLL',
-  '.......rrRRRRLLWWLLM',
-  '....rrrRRRRRRDMMMMMM',
-  '..rrRRRRRRRRRRRRRRRR',
-  '.rRRRYYRRRRkkRRRRYYR',
-  'rRRRRYYRRRRkkRRRRYYR',
-  'rRRRRRRRRRRRRRRRRRRR',
-  '.XRRRRRRRRRRRRRRRRRR',
-  '..XXXRRRXXXXXRRRRXXX',
-  '.....XX.DMMMD..XXX..',
-  '........DMMMD.......',
-  '.........DMD........',
-];
-const FAR_SIDE = { r: 'R', L: 'M', W: 'L' };              // the mirrored half sits away from the light
+// A: one big eye on a dome, three legs that swing in and out.
+function invaderA(ramp) {
+  const legs = (out) => [
+    { line: [2, 5.6, 2 - out, 7.6], width: 1, fill: ramp },
+    { line: [5, 5.8, 5, 7.4], width: 1, fill: ramp },
+    { line: [8, 5.6, 8 + out, 7.6], width: 1, fill: ramp },
+  ];
+  const head = [
+    { path: 'M0.2 6.2 C0.2 2.4 2.4 0.2 5 0.2 C7.6 0.2 9.8 2.4 9.8 6.2 Z', fill: ramp, band: [0.3, 0.74] },
+    { circle: [5, 3.3, 1.9], fill: 'sun-100' },
+    { circle: [5, 3.4, 0.95], fill: 'ink' },
+  ];
+  return { size: [10, 8], frames: [[...legs(1.2), ...head], [...legs(-0.6), ...head]] };
+}
 
-const ICONS = {                 // the mark on each capsule, 7 x 7
-  rapid: ['.......', '.k.k.k.', '.k.k.k.', '.k.k.k.', '.k.k.k.', '.k.k.k.', '.......'],
-  turbo: ['.......', 'k..k...', '.k..k..', '..k..k.', '.k..k..', 'k..k...', '.......'],
-  shield: ['.......', '..kkk..', '.k...k.', 'k.....k', 'k.....k', 'k.....k', '.......'],
-  spread: ['k..k..k', 'k..k..k', '.k.k.k.', '.k.k.k.', '..kkk..', '...k...', '.......'],
-  lance: ['...k...', '..kkk..', '.kkkkk.', '...k...', '...k...', '...k...', '...k...'],
-  freeze: ['...k...', '.k.k.k.', '..kkk..', 'kkk.kkk', '..kkk..', '.k.k.k.', '...k...'],
-  blast: ['..kkk..', '.k...k.', 'k..k..k', 'k.kkk.k', 'k..k..k', '.k...k.', '..kkk..'],
-  rewind: ['...k...', '..k.k..', '.k...k.', '...k...', '..k.k..', '.k...k.', '.......'],
+// B: a horned crab, legs out, then in.
+function invaderB(ramp) {
+  const limbs = (s) => [
+    { line: [2.4, 2.4, 0.6 + s, 0.4], width: 1, fill: ramp + '-light' },                 // horns
+    { line: [9.6, 2.4, 11.4 - s, 0.4], width: 1, fill: ramp + '-light' },
+    { line: [2.2, 5.6, 0.6 + s * 1.4, 7.6], width: 1, fill: ramp },                     // legs
+    { line: [9.8, 5.6, 11.4 - s * 1.4, 7.6], width: 1, fill: ramp },
+    { line: [4.6, 6, 4.2 + s * 0.5, 7.4], width: 0.9, fill: ramp },
+    { line: [7.4, 6, 7.8 - s * 0.5, 7.4], width: 0.9, fill: ramp },
+  ];
+  const body = [
+    { rect: [0.8, 1.6, 10.4, 4.6], r: 2.2, fill: ramp, band: [0.3, 0.7] },
+    { circle: [3.7, 3.7, 0.95], fill: 'sun-100' },
+    { circle: [8.3, 3.7, 0.95], fill: 'sun-100' },
+  ];
+  return { size: [12, 8], frames: [[...limbs(0), ...body], [...limbs(1.1), ...body]] };
+}
+
+// C: a wide dome with two eyes, on stubby feet.
+function invaderC(ramp) {
+  const feet = (s) => [
+    { rect: [1 - s, 5.4, 2, 2.4 - s * 0.4], r: 0.9, fill: ramp + '-dark' },
+    { rect: [5, 5.4, 2, 2.1], r: 0.9, fill: ramp + '-dark' },
+    { rect: [9 + s, 5.4, 2, 2.4 - s * 0.4], r: 0.9, fill: ramp + '-dark' },
+  ];
+  const dome = [
+    { path: 'M0.3 6.2 C0.3 2.2 3 0.2 6 0.2 C9 0.2 11.7 2.2 11.7 6.2 Z', fill: ramp, band: [0.32, 0.76] },
+    { circle: [3.4, 3.5, 1.15], fill: 'sun-100' },
+    { circle: [8.6, 3.5, 1.15], fill: 'sun-100' },
+    { circle: [3.8, 3.6, 0.55], fill: 'ink' },
+    { circle: [9, 3.6, 0.55], fill: 'ink' },
+  ];
+  return { size: [12, 8], frames: [[...feet(0), ...dome], [...feet(0.5), ...dome]] };
+}
+
+// D: armoured. A chrome helmet with a red visor; frames 2 and 3 show the crack from its first hit.
+function invaderD() {
+  const legs = (s) => [
+    { line: [2.2, 5.8, 0.8 + s, 7.6], width: 1, fill: 'chrome-400' },
+    { line: [9.8, 5.8, 11.2 - s, 7.6], width: 1, fill: 'chrome-400' },
+    { line: [4, 6, 4, 7.4], width: 0.9, fill: 'chrome-400' },
+    { line: [8, 6, 8, 7.4], width: 0.9, fill: 'chrome-400' },
+  ];
+  const helmet = [
+    { rect: [0.4, 0.4, 11.2, 5.8], r: 1.8, fill: 'chrome', band: [0.3, 0.72] },
+    { rect: [1.6, 2.6, 8.8, 1.7], r: 0.85, fill: 'red-dark' },
+    { circle: [4.4, 3.45, 0.6], fill: 'sun-100' },
+    { circle: [7.6, 3.45, 0.6], fill: 'sun-100' },
+  ];
+  const crack = [{ line: [7.6, 0.5, 7.2, 1.8, 6.4, 2.8, 6.6, 4.6, 7.5, 6], width: 0.5, fill: 'ink' }];
+  const whole = (s) => [...legs(s), ...helmet];
+  return { size: [12, 8], frames: [whole(0), whole(1), [...whole(0), ...crack], [...whole(1), ...crack]] };
+}
+
+// The flagship: a wide red hull under a chrome dome, amber lights, two dark ports and a gun turret.
+const FLAGSHIP = {
+  size: [40, 14],
+  shapes: [
+    { poly: [17, 10.4, 23, 10.4, 22, 13.6, 18, 13.6], fill: 'chrome', band: [0.3, 0.7] },
+    { path: 'M0.4 7.6 C2 4.6 8 3 20 3 C32 3 38 4.6 39.6 7.6 C38 10 30 11.4 20 11.4 C10 11.4 2 10 0.4 7.6 Z', fill: 'red', band: [0.34, 0.72] },
+    { path: 'M12.4 4.6 C12.4 1.4 15.8 0.2 20 0.2 C24.2 0.2 27.6 1.4 27.6 4.6 Z', fill: 'chrome', band: [0.45, 0.85] },
+    { ellipse: [17.4, 1.9, 2, 0.6, -8], fill: 'chrome-100' },
+    { circle: [5.6, 7.2, 1.05], fill: 'amber-light' }, { circle: [17.6, 7.4, 1.05], fill: 'amber-light' },
+    { circle: [22.4, 7.4, 1.05], fill: 'amber-light' }, { circle: [34.4, 7.2, 1.05], fill: 'amber-light' },
+    { circle: [11.6, 7.4, 1.1], fill: 'ink' }, { circle: [28.4, 7.4, 1.1], fill: 'ink' },
+  ],
 };
+
+// The bonus saucer: an amber dome on a chrome hull; its lights run along the bottom.
+function saucer() {
+  const body = [
+    { path: 'M5 2.4 C5 0.9 6.4 0.1 8 0.1 C9.6 0.1 11 0.9 11 2.4 Z', fill: 'amber', band: [0.4, 0.8] },
+    { path: 'M0.1 3.3 C1 2 4 1.7 8 1.7 C12 1.7 15 2 15.9 3.3 C15 4.6 12 4.9 8 4.9 C4 4.9 1 4.6 0.1 3.3 Z', fill: 'chrome', band: [0.35, 0.68] },
+    { circle: [2.6, 3.3, 0.5], fill: 'ink' }, { circle: [5.6, 3.3, 0.5], fill: 'ink' },
+    { circle: [10.4, 3.3, 0.5], fill: 'ink' }, { circle: [13.4, 3.3, 0.5], fill: 'ink' },
+  ];
+  const lights = (a, b) => [3.8, 8, 12.2].map((x, i) => ({ circle: [x, 5.3, 0.65], fill: i % 2 ? b : a }));
+  return { size: [16, 6], frames: [[...lights('amber-light', 'amber-dark'), ...body], [...lights('amber-dark', 'amber-light'), ...body]] };
+}
+
+// Enemy fire: a bright core with a red edge, so it shows against every sky.
+const BOMB = {
+  size: [3, 6], outline: 0.4,
+  shapes: [{ rect: [0, 0, 3, 6], r: 1.5, fill: 'red', band: [0.3, 0.75] }, { rect: [1, 0.9, 1, 4.2], r: 0.5, fill: 'sun-100' }],
+};
+// The bomb that sways from side to side: a zig-zag bolt.
+function weave() {
+  const bolt = (m) => {
+    const pts = [0.5, 0.5, 1.5, 1.9, 2.5, 3.5, 1.5, 5.1, 0.5, 6.5].map((v, i) => (i % 2 === 0 && m ? 3 - v : v));
+    return [{ line: pts, width: 1.7, fill: 'red' }, { line: pts, width: 0.7, fill: 'sun-100' }];
+  };
+  return { size: [3, 7], outline: 0.4, frames: [bolt(false), bolt(true)] };
+}
+// The flagship's fire.
+const ORB = {
+  size: [5, 5], outline: 0.4,
+  shapes: [{ circle: [2.5, 2.5, 2.4], fill: 'red', band: [0.3, 0.7] }, { circle: [2.1, 2, 1], fill: 'sun-100' }],
+};
+// Your fire: aqua, with a white-hot tip. No outline, so it glows against the dark.
+const SHOT = { size: [2, 6], outline: false, shapes: [{ rect: [0, 0, 2, 6], r: 1, fill: ['chrome-100', 0.2, 'aqua-light', 0.55, 'aqua'] }] };
+const LANCE = { size: [2, 12], outline: false, shapes: [{ rect: [0, 0, 2, 12], r: 1, fill: ['chrome-100', 0.16, 'aqua-light', 0.45, 'aqua', 0.86, 'aqua-dark'] }] };
+const SHELL = { size: [4, 4], outline: false, shapes: [{ circle: [2, 2, 1.95], fill: ['chrome-100', 0.3, 'aqua-light', 0.68, 'aqua'] }] };
+
+// A bunker: a chrome arch. The rules keep it as 2 x 2 pieces (BUNKER_SHAPE); drawBunkers bites out the lost ones.
+const BUNKER = {
+  size: [24, 12],
+  shapes: [{ path: 'M0 12 L0 4.6 Q0 0.2 4.4 0.2 L19.6 0.2 Q24 0.2 24 4.6 L24 12 L18.2 12 C18.2 9.6 17.4 8 15.6 8 L8.4 8 C6.6 8 5.8 9.6 5.8 12 Z', fill: 'chrome', band: [0.3, 0.68] }],
+};
+
+// The mark on each capsule, drawn in ink inside its 9 x 9 box.
+const ICONS = {
+  rapid: [{ line: [2.6, 2.4, 2.6, 6.6] }, { line: [4.5, 2.4, 4.5, 6.6] }, { line: [6.4, 2.4, 6.4, 6.6] }],
+  turbo: [{ line: [2.2, 2.6, 4.1, 4.5, 2.2, 6.4] }, { line: [4.8, 2.6, 6.7, 4.5, 4.8, 6.4] }],
+  shield: [{ path: 'M2.4 6.6 L2.4 4.4 C2.4 3 3.3 2.3 4.5 2.3 C5.7 2.3 6.6 3 6.6 4.4 L6.6 6.6', stroke: 0.8 }],
+  spread: [{ line: [4.5, 6.6, 2.3, 2.4] }, { line: [4.5, 6.6, 4.5, 2.4] }, { line: [4.5, 6.6, 6.7, 2.4] }],
+  lance: [{ line: [4.5, 7, 4.5, 3.2] }, { poly: [4.5, 1.6, 6.3, 3.8, 2.7, 3.8] }],
+  freeze: [{ line: [4.5, 1.9, 4.5, 7.1] }, { line: [2.2, 3.2, 6.8, 5.8] }, { line: [2.2, 5.8, 6.8, 3.2] }],
+  blast: [{ circle: [4.5, 4.5, 2.3], stroke: 0.8 }, { circle: [4.5, 4.5, 0.8] }],
+  rewind: [{ line: [2.5, 4.3, 4.5, 2.3, 6.5, 4.3] }, { line: [2.5, 6.8, 4.5, 4.8, 6.5, 6.8] }],
+};
+
+// An amber capsule with its mark in ink.
+function capsuleArt(icon) {
+  return {
+    size: [9, 9],
+    shapes: [
+      { rect: [0, 0, 9, 9], r: 2.2, fill: 'amber', band: [0.26, 0.78] },
+      ...icon.map((s) => Object.assign({ width: 0.8, fill: 'ink' }, s)),
+    ],
+  };
+}
 
 // A small repeatable random number maker, so scenery and explosions look the same every time.
 function rng(seed) {
@@ -255,164 +294,117 @@ function rng(seed) {
   };
 }
 
-// An amber capsule with its mark in ink.
-function capsuleArt(icon) {
-  const rows = ['.yyyyyyy.'];
-  for (const line of icon) rows.push('y' + line.replace(/\./g, 'Y') + 'O');
-  rows.push('.OOOOOOO.');
-  return rows;
-}
-
-// An explosion in four frames: a bright core, a ring of fire, the ring thinning, then embers.
+// An explosion in four frames: a white-hot flash, a burst of fire, the burst thinning, then embers.
 function boomArt(w, h, seed) {
   const rnd = rng(seed);
-  const cx = (w - 1) / 2;
-  const cy = (h - 1) / 2;
-  const frames = [0.5, 0.8, 1, 1].map((size, f) => {
-    const rows = [];
-    for (let y = 0; y < h; y++) {
-      let row = '';
-      for (let x = 0; x < w; x++) {
-        const d = Math.hypot((x - cx) / (w / 2), (y - cy) / (h / 2)) / size;   // 0 at the centre, 1 at the rim
-        const n = rnd();
-        let ch = '.';
-        if (f === 3) { if (d < 1 && n < 0.1) ch = n < 0.05 ? 'H' : 'E'; }
-        else if (d < 0.4) ch = f === 2 ? (n < 0.5 ? 'Y' : '.') : 'S';
-        else if (d < 0.72) ch = n < 0.75 ? 'y' : 'Y';
-        else if (d < 1) ch = n < 0.3 ? 'H' : n < 0.55 ? 'h' : '.';
-        row += ch;
-      }
-      rows.push(row);
+  const cx = w / 2;
+  const cy = h / 2;
+  const burst = (size, spikes, inner) => {
+    const pts = [];
+    const turn = rnd() * Math.PI;
+    for (let i = 0; i < spikes * 2; i++) {
+      const a = turn + i * Math.PI / spikes;
+      const r = size * (i % 2 ? inner : 0.8 + rnd() * 0.2);
+      pts.push(cx + Math.cos(a) * r * w / 2, cy + Math.sin(a) * r * h / 2);
     }
-    return rows;
-  });
-  return { frames: frames, outline: false };
+    return pts;
+  };
+  const embers = [];
+  for (let i = 0; i < 9; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = 0.45 + rnd() * 0.5;
+    embers.push({ circle: [cx + Math.cos(a) * d * w / 2, cy + Math.sin(a) * d * h / 2, 0.45 + rnd() * 0.35], fill: i % 3 ? 'heat' : 'heat-dark' });
+  }
+  return {
+    size: [w, h], outline: false,
+    frames: [
+      [{ poly: burst(0.55, 7, 0.55), fill: 'amber-light' }, { ellipse: [cx, cy, w * 0.14, h * 0.14], fill: 'sun-100' }],
+      [{ poly: burst(0.98, 9, 0.6), fill: 'heat-light' }, { poly: burst(0.72, 9, 0.6), fill: 'amber' }, { ellipse: [cx, cy, w * 0.18, h * 0.18], fill: 'sun-100' }],
+      [{ poly: burst(1, 10, 0.62), fill: 'heat', alpha: 0.85 }, { poly: burst(0.66, 10, 0.6), fill: 'amber-light', alpha: 0.75 }],
+      embers,
+    ],
+  };
 }
 
 function buildSprites() {
   const s = {
     ship: SHIP,
-    invD: {                     // frames 0 and 1 whole, 2 and 3 cracked
-      frames: INV_ART.D.concat(INV_ART.D.map((rows) => rows.map((row, y) => {
-        for (const c of CRACK) if (c[1] === y) row = row.slice(0, c[0]) + 'k' + row.slice(c[0] + 1);
-        return row;
-      }))),
-    },
-    flagship: FLAGSHIP_HALF.map((row) => row + row.split('').reverse().map((ch) => FAR_SIDE[ch] || ch).join('')),
-    saucer: { frames: [[        // the bonus ship: its lights run along the bottom
-      '.....yyyyyy.....',
-      '...yyYYYYYYOO...',
-      '.LLLLLLMMMMMMDD.',
-      'LLkLLkMMkMMkMMDD',
-      '.LMMMMMMMMMMMDD.',
-      '...YO..YO..YO...',
-    ], [
-      '.....yyyyyy.....',
-      '...yyYYYYYYOO...',
-      '.LLLLLLMMMMMMDD.',
-      'LLkLLkMMkMMkMMDD',
-      '.LMMMMMMMMMMMDD.',
-      '...Oy..Oy..Oy...',
-    ]] },
-    bomb: [                     // enemy fire: a bright core with a red edge, so it shows against every sky
-      '.r.',
-      'rSr',
-      'rSr',
-      'rSr',
-      'RSR',
-      '.R.',
-    ],
-    weave: { frames: [[         // the bomb that sways from side to side
-      'S..',
-      'rS.',
-      '.Sr',
-      '..S',
-      '.Sr',
-      'rS.',
-      'R..',
-    ], [
-      '..S',
-      '.Sr',
-      'rS.',
-      'S..',
-      'rS.',
-      '.Sr',
-      '..R',
-    ]] },
-    orb: [                      // the flagship's fire
-      '.rRR.',
-      'rSSRX',
-      'RSSRX',
-      'RRRXX',
-      '.XXX.',
-    ],
-    shot: { map: ['WW', 'aa', 'AA', 'AA', 'AA', 'QQ'], outline: false },
-    lance: { map: ['WW', 'WW', 'aa', 'aa', 'aa', 'AA', 'AA', 'AA', 'AA', 'AA', 'QQ', 'QQ'], outline: false },
-    shell: { map: ['.WW.', 'WaaA', 'aaAA', '.AA.'], outline: false },
+    invD: invaderD(),           // frames 0 and 1 whole, 2 and 3 cracked
+    flagship: FLAGSHIP,
+    saucer: saucer(),
+    bomb: BOMB,
+    weave: weave(),
+    orb: ORB,
+    shot: SHOT,
+    lance: LANCE,
+    shell: SHELL,
+    bunker: BUNKER,
     pop: boomArt(12, 9, 5),
     boom: boomArt(22, 14, 9),
   };
-  for (const art of ['A', 'B', 'C']) {
-    s['inv' + art + '_red'] = { frames: INV_ART[art] };
-    for (const ramp of ['heat', 'amber']) {
-      s['inv' + art + '_' + ramp] = { frames: INV_ART[art], legend: { r: ramp + '-light', R: ramp, X: ramp + '-dark' } };
-    }
+  for (const ramp of ['red', 'heat', 'amber']) {
+    s['invA_' + ramp] = invaderA(ramp);
+    s['invB_' + ramp] = invaderB(ramp);
+    s['invC_' + ramp] = invaderC(ramp);
   }
   for (const kind of UNLOCKS) s['cap_' + kind] = capsuleArt(ICONS[kind]);
   return s;
 }
 
 /* ---------- Zones ----------
-   Each level has its own backdrop. They are painted once, when the page opens, into a 320 x 180 sprite:
-   bands of sky from the top down, then the scenery. The top of every sky is dark, so the invaders stand
+   Each level has its own backdrop: bands of sky from the top down, then the scenery, all as shapes. Each
+   is made into one picture the first time it is shown. The top of every sky is dark, so the invaders stand
    out; the bright colours stay low, behind the ship, which shows against anything. */
 
-// A 320 x 180 sheet of legend letters to paint on.
-function sheet(bands) {
-  const rows = [];
-  for (let y = 0; y < H; y++) {
-    let ch = bands[0][1];
-    for (const b of bands) if (y >= b[0]) ch = b[1];
-    rows.push(new Array(W).fill(ch));
-  }
+// A 320 x 180 backdrop to add shapes to, starting with its bands of sky.
+function scene(bands) {
+  const shapes = [];
+  bands.forEach((b, i) => {
+    const y1 = i + 1 < bands.length ? bands[i + 1][0] : H;
+    shapes.push({ rect: [-1, b[0], W + 2, y1 - b[0]], fill: b[1] });
+  });
   const s = {
     tw: [],                     // a few of its stars, which twinkle
-    get: (x, y) => (rows[y] ? rows[y][x] : undefined),
-    px(x, y, ch) {
-      x = Math.round(x); y = Math.round(y);
-      if (ch && x >= 0 && x < W && y >= 0 && y < H) rows[y][x] = ch;
-    },
-    rect(x, y, w, h, ch) {
-      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) s.px(x + i, y + j, ch);
-    },
-    // ch may be a function of the distance from the centre, to shade the disc or leave part of it out
-    disc(cx, cy, r, ch) {
-      for (let y = -r; y <= r; y++) {
-        for (let x = -r; x <= r; x++) {
-          if (x * x + y * y <= r * r + r * 0.5) s.px(cx + x, cy + y, typeof ch === 'function' ? ch(x, y) : ch);
-        }
-      }
-    },
-    // a skyline: straight lines from point to point, filled in down to `base`
-    ridge(points, base, ch) {
-      for (let x = 0; x < W; x++) {
-        let i = 0;
-        while (i < points.length - 2 && points[i + 1][0] <= x) i++;
-        const a = points[i];
-        const b = points[i + 1];
-        const top = Math.round(a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]));
-        for (let y = top; y < base; y++) s.px(x, y, ch);
-      }
-    },
+    add(...list) { shapes.push(...list); },
     stars(rnd, count, maxY) {
+      const tones = ['chrome-400', 'chrome-400', 'chrome-400', 'chrome-300', 'chrome-300', 'chrome-200'];
       for (let i = 0; i < count; i++) {
-        const x = Math.floor(rnd() * W);
-        const y = Math.floor(rnd() * maxY);
-        s.px(x, y, 'DDDMML'[Math.floor(rnd() * 6)]);
+        const x = Math.floor(rnd() * W) + 0.5;
+        const y = Math.floor(rnd() * maxY) + 0.5;
+        const tone = tones[Math.floor(rnd() * 6)];
+        shapes.push({ circle: [x, y, tone === 'chrome-200' ? 0.65 : 0.5], fill: tone });
         if (s.tw.length < 7 && i % 5 === 0) s.tw.push([x, y]);
       }
     },
-    art: () => ({ map: rows.map((r) => r.join('')), outline: false }),
+    // a skyline: straight lines from point to point, filled in down to `base`
+    ridge(points, base, fill) {
+      const p = [];
+      for (const pt of points) p.push(pt[0], pt[1]);
+      p.push(points[points.length - 1][0] + 1, base, points[0][0] - 1, base);
+      shapes.push({ poly: p, fill: fill, band: false });
+    },
+    // a cloud: round puffs along a flat base, with a lighter rim along the top
+    cloud(rnd, cx, cy, w, body, rim) {
+      const puffs = [];
+      for (let i = 0; i <= w; i += 4) puffs.push([cx + i + 0.5, Math.max(2, 3 + Math.floor(rnd() * 4) - Math.round(Math.abs(i - w / 2) / w * 4)) + 0.25]);
+      const outline = (lift) => {
+        const p = [];
+        const x0 = puffs[0][0] - puffs[0][1];
+        const x1 = puffs[puffs.length - 1][0] + puffs[puffs.length - 1][1];
+        for (let x = x0; x <= x1 + 0.001; x += 0.25) {
+          let top = Infinity;
+          for (const q of puffs) {
+            const dx = x - q[0];
+            if (Math.abs(dx) <= q[1]) top = Math.min(top, cy + 0.5 - lift - Math.sqrt(q[1] * q[1] - dx * dx));
+          }
+          if (top < Infinity) p.push(x, top);
+        }
+        p.push(x1, cy + 2, x0, cy + 2);
+        return p;
+      };
+      shapes.push({ poly: outline(1), fill: rim, band: false }, { poly: outline(0), fill: body, band: false });
+    },
+    art: () => ({ size: [W, H], outline: false, shapes: shapes }),
   };
   return s;
 }
@@ -420,26 +412,29 @@ function sheet(bands) {
 // 1 Low orbit: black space, a small moon, and the curve of the planet you are guarding.
 function paintOrbit() {
   const rnd = rng(11);
-  const s = sheet([[0, 'k'], [84, '0'], [128, '1']]);
+  const s = scene([[0, 'ink'], [84, 'sky-0'], [128, 'sky-1']]);
   s.stars(rnd, 64, 148);
-  s.disc(54, 34, 7, (x, y) => (x + y > 5 ? '1' : x + y > -2 ? 'D' : 'M'));
-  s.px(51, 32, 'D'); s.px(56, 30, 'M'); s.px(53, 37, '1');
-  for (let x = 0; x < W; x++) {
-    const top = 872 - Math.sqrt(720 * 720 - (x - 160) * (x - 160));
-    for (let y = Math.ceil(top); y < H; y++) {
-      const depth = y - top;                        // a thin bright line of air, then the surface
-      s.px(x, y, depth < 1 ? '5' : depth < 3 ? '4' : depth < 12 ? '3' : '2');
-    }
-  }
-  for (let i = 0; i < 30; i++) {                    // streaks of cloud
+  s.add(
+    { circle: [54.5, 34.5, 7.5], fill: ['chrome-300', 0.4, 'chrome-400', 0.75, 'sky-1'], dir: 'diag' },
+    { circle: [51.6, 32.6, 0.9], fill: 'chrome-400' },
+    { circle: [56.4, 30.4, 0.7], fill: 'chrome-300' },
+    { circle: [53.5, 37.6, 0.8], fill: 'sky-1' },
+  );
+  // the planet: a thin bright line of air, then the surface
+  const top = (x) => 872 - Math.sqrt(720 * 720 - (x - 160) * (x - 160));
+  s.add(
+    { circle: [160, 872, 720], fill: 'sky-5' },
+    { circle: [160, 872, 719], fill: 'sky-4' },
+    { circle: [160, 872, 717], fill: 'sky-3' },
+    { circle: [160, 872, 708], fill: 'sky-2' },
+  );
+  for (let i = 0; i < 30; i++) {                    // streaks of cloud, a shade darker than the surface
     const x = Math.floor(rnd() * 310);
     const y = 157 + Math.floor(rnd() * 22);
     const w = 5 + Math.floor(rnd() * 16);
-    for (let k = 0; k < w; k++) {
-      const here = s.get(x + k, y);
-      if (here === '3') s.px(x + k, y, '2');
-      else if (here === '2') s.px(x + k, y, '1');
-    }
+    const depth = Math.min(y - top(x), y - top(x + w));
+    if (depth < 3.5) continue;
+    s.add({ rect: [x, y, w, 0.9], r: 0.45, fill: depth < 12 ? 'sky-2' : 'sky-1' });
   }
   return s;
 }
@@ -447,63 +442,56 @@ function paintOrbit() {
 // 2 Dusk ridge: the kit's sunset, with the horizon pulled down low so the bright bands sit behind the ship.
 function paintDusk() {
   const rnd = rng(29);
-  const s = sheet([[0, 'k'], [40, '0'], [78, '1'], [106, '2'], [128, '3'], [142, '4'], [151, '5'], [158, '6']]);
+  const s = scene([[0, 'ink'], [40, 'sky-0'], [78, 'sky-1'], [106, 'sky-2'], [128, 'sky-3'], [142, 'sky-4'], [151, 'sky-5'], [158, 'sky-6']]);
   s.stars(rnd, 44, 104);
-  s.disc(232, 166, 22, (x, y) => (y < -17 ? 'S' : 'Y'));
-  s.ridge([[0, 158], [26, 150], [50, 157], [78, 147], [104, 156], [130, 151], [160, 158], [188, 149], [214, 157], [244, 153], [270, 146], [296, 155], [320, 150]], GROUND, 'f');
-  s.ridge([[0, 164], [30, 158], [58, 164], [88, 157], [120, 163], [150, 160], [182, 165], [212, 158], [240, 164], [272, 159], [300, 165], [320, 160]], GROUND, 'n');
-  s.rect(0, GROUND, W, H - GROUND, 'k');
+  s.add({ circle: [232.5, 166.5, 22.5], fill: ['sun-100', 0.12, 'amber'] });
+  s.ridge([[0, 158], [26, 150], [50, 157], [78, 147], [104, 156], [130, 151], [160, 158], [188, 149], [214, 157], [244, 153], [270, 146], [296, 155], [320, 150]], GROUND, 'hill-far');
+  s.ridge([[0, 164], [30, 158], [58, 164], [88, 157], [120, 163], [150, 160], [182, 165], [212, 158], [240, 164], [272, 159], [300, 165], [320, 160]], GROUND, 'hill-near');
+  s.add({ rect: [-1, GROUND, W + 2, H - GROUND + 1], fill: 'ink' });
   return s;
 }
 
 // 3 Violet storm: banks of cloud in a purple sky, and a storm rolling along underneath.
 function paintStorm() {
   const rnd = rng(47);
-  const s = sheet([[0, '1'], [28, '2'], [80, '3'], [116, '2'], [144, '1']]);
+  const s = scene([[0, 'sky-1'], [28, 'sky-2'], [80, 'sky-3'], [116, 'sky-2'], [144, 'sky-1']]);
   s.stars(rnd, 14, 26);
-  const cloud = (cx, cy, w, body, rim) => {         // flat underneath, lighter along the top
-    const puffs = [];
-    for (let i = 0; i <= w; i += 4) puffs.push([cx + i, Math.max(2, 3 + Math.floor(rnd() * 4) - Math.round(Math.abs(i - w / 2) / w * 4))]);
-    for (const p of puffs) s.disc(p[0], cy - 1, p[1], (x, y) => (y <= 1 ? rim : null));
-    for (const p of puffs) s.disc(p[0], cy, p[1], (x, y) => (y <= 1 ? body : null));
-  };
-  cloud(14, 46, 56, '1', '3');
-  cloud(206, 38, 84, '1', '3');
-  cloud(104, 68, 44, '1', '3');
-  cloud(246, 100, 60, '2', '4');
-  cloud(30, 106, 70, '2', '4');
-  cloud(138, 130, 60, '1', '3');
-  for (let x = -8; x < W; x += 30) cloud(x, 171 + (x % 4), 34, 'n', '2');
-  s.rect(0, 173, W, 7, 'n');
-  for (let x = -20; x < W; x += 38) cloud(x, 178, 30, 'k', 'n');
+  s.cloud(rnd, 14, 46, 56, 'sky-1', 'sky-3');
+  s.cloud(rnd, 206, 38, 84, 'sky-1', 'sky-3');
+  s.cloud(rnd, 104, 68, 44, 'sky-1', 'sky-3');
+  s.cloud(rnd, 246, 100, 60, 'sky-2', 'sky-4');
+  s.cloud(rnd, 30, 106, 70, 'sky-2', 'sky-4');
+  s.cloud(rnd, 138, 130, 60, 'sky-1', 'sky-3');
+  for (let x = -8; x < W; x += 30) s.cloud(rnd, x, 171 + (x % 4), 34, 'hill-near', 'sky-2');
+  s.add({ rect: [-1, 173, W + 2, 8], fill: 'hill-near' });
+  for (let x = -20; x < W; x += 38) s.cloud(rnd, x, 178, 30, 'ink', 'hill-near');
   return s;
 }
 
 // 4 Pale moon: a grey, cratered surface under a black sky, and a ringed planet far away.
 function paintMoon() {
   const rnd = rng(61);
-  const s = sheet([[0, 'k'], [112, '0']]);
+  const s = scene([[0, 'ink'], [112, 'sky-0']]);
   s.stars(rnd, 80, 158);
-  s.disc(262, 46, 14, (x, y) => (x + y < -8 ? '3' : '2'));
-  for (let i = -26; i <= 26; i++) {
-    s.px(262 + i, 46 + Math.round(i * 0.3), '4');
-    if (Math.abs(i) > 15) s.px(262 + i, 47 + Math.round(i * 0.3), '3');
-  }
-  s.ridge([[0, 165], [36, 161], [70, 166], [118, 160], [152, 165], [200, 162], [236, 166], [282, 160], [320, 164]], H, 'D');
-  for (let x = 0; x < W; x++) {
-    const top = 168 + Math.round(Math.sin(x * 0.021 + 1) * 1.2 + Math.sin(x * 0.053) * 0.8);
-    s.px(x, top, 'L');
-    for (let y = top + 1; y < H; y++) s.px(x, y, 'M');
-  }
+  s.add(
+    { circle: [262.5, 46.5, 14.5], fill: ['sky-3', 0.3, 'sky-2'], dir: 'diag' },
+    { line: [236.5, 38.8, 288.5, 54.4], width: 1, fill: 'sky-4' },              // the ring, edge on
+    { line: [236.5, 39.8, 247, 43], width: 0.9, fill: 'sky-3' },
+    { line: [278, 52, 288.5, 55.2], width: 0.9, fill: 'sky-3' },
+  );
+  s.ridge([[0, 165], [36, 161], [70, 166], [118, 160], [152, 165], [200, 162], [236, 166], [282, 160], [320, 164]], H + 1, 'chrome-400');
+  const ground = (lift) => {
+    const p = [];
+    for (let x = -1; x <= W + 1; x += 2) p.push(x, 168 + Math.sin(x * 0.021 + 1) * 1.2 + Math.sin(x * 0.053) * 0.8 + 0.5 - lift);
+    p.push(W + 1, H + 1, -1, H + 1);
+    return p;
+  };
+  s.add({ poly: ground(0.5), fill: 'chrome-200', band: false }, { poly: ground(-0.5), fill: 'chrome-300', band: false });
   for (let i = 0; i < 9; i++) {                     // craters: a dark bowl with a bright near rim
-    const cx = 16 + Math.floor(rnd() * 290);
-    const cy = 173 + Math.floor(rnd() * 5);
+    const cx = 16 + Math.floor(rnd() * 290) + 0.5;
+    const cy = 173 + Math.floor(rnd() * 5) + 0.5;
     const rx = 4 + Math.floor(rnd() * 7);
-    for (let x = -rx; x <= rx; x++) {
-      const half = Math.round(Math.sqrt(1 - (x * x) / (rx * rx)) * rx / 4);
-      for (let y = -half; y <= half; y++) s.px(cx + x, cy + y, 'D');
-      s.px(cx + x, cy + half + 1, 'L');
-    }
+    s.add({ ellipse: [cx, cy + 0.7, rx, rx / 4 + 0.5], fill: 'chrome-200' }, { ellipse: [cx, cy, rx, rx / 4 + 0.3], fill: 'chrome-400' });
   }
   return s;
 }
@@ -511,56 +499,61 @@ function paintMoon() {
 // 5 Ember forge: two volcanoes over a sea of lava.
 function paintForge() {
   const rnd = rng(83);
-  const s = sheet([[0, 'k'], [50, 'n'], [96, '1'], [124, '3'], [140, '4'], [154, 'E']]);
+  const s = scene([[0, 'ink'], [50, 'hill-near'], [96, 'sky-1'], [124, 'sky-3'], [140, 'sky-4'], [154, 'heat-dark']]);
   s.stars(rnd, 22, 60);
-  s.ridge([[0, 160], [44, 151], [72, 131], [81, 131], [106, 152], [128, 163], [150, 157], [178, 164], [214, 150], [240, 125], [251, 125], [278, 150], [300, 161], [320, 155]], GROUND, 'k');
-  s.rect(73, 131, 8, 1, 'h'); s.rect(74, 132, 6, 1, 'H');
-  s.rect(241, 125, 10, 1, 'h'); s.rect(242, 126, 8, 1, 'H');
+  s.ridge([[0, 160], [44, 151], [72, 131], [81, 131], [106, 152], [128, 163], [150, 157], [178, 164], [214, 150], [240, 125], [251, 125], [278, 150], [300, 161], [320, 155]], GROUND, 'ink');
+  s.add(
+    { rect: [73, 131, 8, 1], r: 0.5, fill: 'heat-light' }, { rect: [74, 132, 6, 1], r: 0.5, fill: 'heat' },
+    { rect: [241, 125, 10, 1], r: 0.5, fill: 'heat-light' }, { rect: [242, 126, 8, 1], r: 0.5, fill: 'heat' },
+  );
   for (const start of [[77, 133], [246, 127]]) {    // a thread of lava down each cone
     let x = start[0];
+    const pts = [x + 0.5, start[1]];
+    const sparks = [];
     for (let y = start[1]; y < GROUND; y++) {
-      s.px(x, y, y % 5 ? 'H' : 'h');
-      if (rnd() < 0.45) x += rnd() < 0.6 ? -1 : 1;
+      if (y % 5 === 0) sparks.push({ circle: [x + 0.5, y + 0.5, 0.5], fill: 'heat-light' });
+      if (rnd() < 0.45) { x += rnd() < 0.6 ? -1 : 1; pts.push(x + 0.5, y + 1); }
     }
+    pts.push(x + 0.5, GROUND);
+    s.add({ line: pts, width: 1, fill: 'heat' }, ...sparks);
   }
-  s.rect(0, GROUND, W, H - GROUND, 'E');
+  s.add({ rect: [-1, GROUND, W + 2, H - GROUND + 1], fill: 'heat-dark' });
   for (let i = 0; i < 46; i++) {
-    s.rect(Math.floor(rnd() * 312), GROUND + 1 + Math.floor(rnd() * 11), 3 + Math.floor(rnd() * 8), 1, rnd() < 0.25 ? 'Y' : 'H');
+    s.add({ rect: [Math.floor(rnd() * 312), GROUND + 1 + Math.floor(rnd() * 11), 3 + Math.floor(rnd() * 8), 1], r: 0.5, fill: rnd() < 0.25 ? 'amber' : 'heat' });
   }
-  s.rect(0, GROUND, W, 1, 'H');
+  s.add({ rect: [-1, GROUND, W + 2, 1], fill: 'heat' });
   return s;
 }
 
 // 6 Home sky: the city you have been defending all along, at night.
 function paintCity() {
   const rnd = rng(101);
-  const s = sheet([[0, 'k'], [44, '0'], [90, '1'], [124, '2'], [148, '3']]);
+  const s = scene([[0, 'ink'], [44, 'sky-0'], [90, 'sky-1'], [124, 'sky-2'], [148, 'sky-3']]);
   s.stars(rnd, 54, 120);
   let x = 0;
   while (x < W) {                                   // the far streets
     const w = 8 + Math.floor(rnd() * 12);
     const top = 146 + Math.floor(rnd() * 12);
-    s.rect(x, top, w, GROUND - top, 'f');
+    s.add({ rect: [x, top, w, GROUND - top], fill: 'hill-far' });
     x += w + (rnd() < 0.3 ? 2 : 0);
   }
-  s.rect(150, 138, 5, 30, 'n');                     // one tall tower with a mast
-  s.rect(152, 130, 1, 8, 'n');
+  s.add({ rect: [150, 138, 5, 30], fill: 'hill-near' }, { rect: [152.1, 130, 0.8, 8], fill: 'hill-near' });   // a tall tower with a mast
   x = -4;
   while (x < W) {                                   // the near streets, with a few lights on
     const w = 12 + Math.floor(rnd() * 14);
     const top = 153 + Math.floor(rnd() * 11);
-    s.rect(x, top, w, GROUND - top, 'n');
+    s.add({ rect: [x, top, w, GROUND - top], fill: 'hill-near' });
     for (let wy = top + 2; wy < 166; wy += 3) {
       for (let wx = x + 2; wx < x + w - 1; wx += 3) {
         const n = rnd();
-        if (n < 0.2) s.px(wx, wy, 'O');
-        else if (n < 0.25) s.px(wx, wy, 'Y');
+        if (n < 0.2) s.add({ rect: [wx, wy, 1, 1], r: 0.2, fill: 'amber-dark' });
+        else if (n < 0.25) s.add({ rect: [wx, wy, 1, 1], r: 0.2, fill: 'amber' });
       }
     }
     x += w + 1;
   }
-  s.rect(0, GROUND, W, H - GROUND, 'k');
-  for (x = 4; x < W; x += 16) s.rect(x, 174, 6, 1, 'D');
+  s.add({ rect: [-1, GROUND, W + 2, H - GROUND + 1], fill: 'ink' });
+  for (x = 4; x < W; x += 16) s.add({ rect: [x, 174, 6, 1], r: 0.5, fill: 'chrome-400' });
   return s;
 }
 
@@ -581,19 +574,19 @@ const ZONES = [
       rk.glow(246, 124, 13, 'heat', 0.45);
       for (let i = 0; i < 12; i++) {
         const rise = (t * (10 + i % 4 * 3) + i * 29) % 64;
-        rk.rect((i * 53 + 17) % W + Math.sin(t * 1.3 + i) * 3, GROUND - rise, 1, 1, i % 3 ? 'heat' : 'amber', 1 - rise / 64);
+        rk.circle((i * 53 + 17) % W + Math.sin(t * 1.3 + i) * 3 + 0.5, GROUND - rise + 0.5, 0.55, i % 3 ? 'heat' : 'amber', 1 - rise / 64);
       }
     } },
   { name: 'HOME SKY', label: 'Home sky', ramps: { a: 'red', b: 'heat', c: 'amber' }, paint: paintCity,
     live(rk, t) {               // the light on the mast
-      if (Math.floor(t) % 2 === 0) { rk.px(152, 129, 'amber'); rk.glow(152, 129, 5, 'amber', 0.5); }
+      if (Math.floor(t) % 2 === 0) { rk.circle(152.5, 129.5, 0.7, 'amber'); rk.glow(152.5, 129.5, 5, 'amber', 0.5); }
     } },
 ];
 
 function drawZone(rk, i, t) {
   const zone = ZONES[i];
   rk.draw('zone' + i, 0, 0);
-  zone.tw.forEach((star, n) => { if (Math.sin(t * 1.6 + n * 2.3) > 0.82) rk.px(star[0], star[1], 'chrome-100'); });
+  zone.tw.forEach((star, n) => { if (Math.sin(t * 1.6 + n * 2.3) > 0.82) rk.circle(star[0], star[1], 0.7, 'chrome-100'); });
   if (zone.live) zone.live(rk, t);
 }
 
@@ -1232,17 +1225,19 @@ function stepPowers(g, rk) {
 
 /* ---------- Drawing ---------- */
 
+// Each bunker is the arch with a round bite out of it wherever a 2 x 2 piece has been shot away.
 function drawBunkers(rk, g) {
   for (const b of g.bunkers) {
+    const cut = [];
+    let left = 0;
     for (let r = 0; r < 6; r++) {
-      const row = b.cells[r];
       for (let c = 0; c < 12; c++) {
-        if (!row[c]) continue;
-        // lit along whatever is now its top edge, dark at the foot
-        const colour = r === 0 || !b.cells[r - 1][c] ? 'chrome-200' : r > 3 ? 'chrome-400' : 'chrome-300';
-        rk.rect(b.x + c * 2, BUNKER_Y + r * 2, 2, 2, colour);
+        if (BUNKER_SHAPE[r][c] !== 'X') continue;
+        if (b.cells[r][c]) left++;
+        else cut.push([c * 2 + 1, r * 2 + 1, 1.45]);
       }
     }
+    if (left) rk.draw('bunker', b.x, BUNKER_Y, 0, { cut: cut });
   }
 }
 
@@ -1275,22 +1270,27 @@ function drawShip(rk, g) {
     rk.draw('ship', p.trail[0], SHIP_Y, 0, { alpha: 0.2 });
     rk.draw('ship', p.trail[2], SHIP_Y, 0, { alpha: 0.4 });
   }
-  const flame = 1 + ((g.tick >> 2) & 1) + (turbo ? 2 : 0);
+  const flame = 1.2 + ((g.tick >> 2) & 1) + (turbo ? 2 : 0);
+  const tone = turbo ? 'aqua' : 'aqua-light';
   rk.glow(x + 8, SHIP_Y + 10, turbo ? 10 : 6, 'aqua', 0.4);
-  rk.rect(x + 4, SHIP_Y + 9, 1, flame, turbo ? 'aqua' : 'aqua-light');
-  rk.rect(x + 12, SHIP_Y + 9, 1, flame, turbo ? 'aqua' : 'aqua-light');
+  rk.shape([                                        // the engine flames
+    { poly: [3.6 + x, SHIP_Y + 8.8, 5.4 + x, SHIP_Y + 8.8, 4.5 + x, SHIP_Y + 8.8 + flame], fill: tone },
+    { poly: [11.6 + x, SHIP_Y + 8.8, 13.4 + x, SHIP_Y + 8.8, 12.5 + x, SHIP_Y + 8.8 + flame], fill: tone },
+  ]);
   rk.draw('ship', x, SHIP_Y);
   // A strip of five lights on the hull counts down the weapon; it blinks for the last two seconds
   if (g.weaponT > 0 && !(g.weaponT < 120 && g.weaponT % 24 < 12)) {
     const lit = Math.ceil(5 * g.weaponT / g.weaponMax);
-    for (let i = 0; i < 5; i++) rk.px(x + 6 + i, SHIP_Y + 7, i < lit ? 'aqua' : 'aqua-dark');
+    for (let i = 0; i < 5; i++) rk.circle(x + 6.5 + i, SHIP_Y + 7.4, 0.42, i < lit ? 'aqua-light' : 'aqua-dark');
   }
   if (g.shield > 0 && !(g.shield < 120 && g.shield % 24 < 12)) {
     rk.glow(x + 8, SHIP_Y + 4, 16, 'aqua', 0.25);
-    for (let n = 0; n <= 16; n++) {
-      const ang = Math.PI + n * Math.PI / 16;
-      rk.px(x + 8 + Math.cos(ang) * 12, SHIP_Y + 8 + Math.sin(ang) * 11, n % 2 ? 'aqua' : 'aqua-light');
+    const arc = [];
+    for (let n = 0; n <= 24; n++) {
+      const ang = Math.PI + n * Math.PI / 24;
+      arc.push(x + 8.5 + Math.cos(ang) * 12, SHIP_Y + 8.5 + Math.sin(ang) * 11);
     }
+    rk.shape([{ line: arc, width: 1.4, fill: 'aqua', alpha: 0.5 }, { line: arc, width: 0.6, fill: 'aqua-light' }]);
   }
 }
 
@@ -1306,13 +1306,17 @@ function drawBits(rk, g) {
   }
   for (const s of g.shots) {
     if (s.kind === 'bolt') {
-      rk.rect(s.x, s.y + 6, 2, 3, 'aqua', 0.4);     // a short fading tail
-      rk.rect(s.x, s.y + 9, 2, 3, 'aqua', 0.2);
+      rk.shape([                                    // a short fading tail
+        { rect: [s.x, s.y + 5, 2, 4], r: 1, fill: 'aqua', alpha: 0.4 },
+        { rect: [s.x, s.y + 8.5, 2, 3.5], r: 1, fill: 'aqua', alpha: 0.2 },
+      ]);
       rk.glow(s.x + 1, s.y + 2, 5, 'aqua', 0.5);
       rk.draw('shot', s.x, s.y);
     } else if (s.kind === 'lance') {
-      rk.rect(s.x, s.y + 12, 2, 6, 'aqua', 0.4);
-      rk.rect(s.x, s.y + 18, 2, 6, 'aqua', 0.2);
+      rk.shape([
+        { rect: [s.x, s.y + 11, 2, 7], r: 1, fill: 'aqua', alpha: 0.4 },
+        { rect: [s.x, s.y + 17.5, 2, 6.5], r: 1, fill: 'aqua', alpha: 0.2 },
+      ]);
       rk.glow(s.x + 1, s.y + 4, 9, 'aqua', 0.55);
       rk.draw('lance', s.x, s.y);
     } else {
@@ -1334,10 +1338,10 @@ function drawBlasts(rk, g) {
     rk.glow(b.x, b.y, r + 8, 'amber', 0.5 * (1 - b.t / 12));
     for (let n = 0; n < 20; n++) {
       const ang = n * Math.PI / 10;
-      rk.rect(b.x + Math.cos(ang) * r - 1, b.y + Math.sin(ang) * r - 1, 2, 2, n % 2 ? 'amber' : 'sun-100');
+      rk.circle(b.x + Math.cos(ang) * r, b.y + Math.sin(ang) * r, 0.95, n % 2 ? 'amber' : 'sun-100');
     }
   }
-  for (const pt of g.parts) rk.rect(pt.x, pt.y, 1, 1, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+  for (const pt of g.parts) rk.circle(pt.x + 0.5, pt.y + 0.5, 0.6, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
 }
 
 /* ---------- The game ---------- */
@@ -1361,7 +1365,7 @@ RetroKit.game({
   sprites: buildSprites(),
 
   init(rk) {
-    // Paint each zone's backdrop once, and keep it as a sprite
+    // Lay out each zone's backdrop once, and keep it as a sprite
     ZONES.forEach((zone, i) => {
       const s = zone.paint();
       rk.makeSprite(s.art(), 'zone' + i);
