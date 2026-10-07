@@ -1,0 +1,14 @@
+# Windows and macOS clutter
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Claude Code's personal settings (the skill in .claude/skills IS tracked)
+.claude/settings.local.json
+
+# Built games: kit/build.py makes them from games/, so they are not kept in git
+dist/

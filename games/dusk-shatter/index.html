@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dusk Shatter</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files (and the fonts) into dist/<game>.html. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../../kit/retro-kit.css" data-rk-inline>
+<script src="../../kit/retro-kit.js" data-rk-inline></script>
+</head>
+<body>
+<script>
+/* DUSK SHATTER — a Retro Kit game. Rules for this file: .claude/skills/retro-kit/SKILL.md
+   A Breakout-style game: bounce the ball off your paddle and smash the wall of bricks against the sunset.
+   Each level adds one thing (more bricks, armoured bricks, new shapes) and the ball gets a little faster. */
+
+/* ---------- Playfield layout (game pixels; the world is 320 x 180) ---------- */
+const WALL = 6;                 // chrome rails along the left, right and top edges
+const BRICK_W = 28;             // ten bricks across with 2-pixel gaps, centred between the rails
+const BRICK_H = 8;
+const BRICK_X = 11;
+const BRICK_Y = 22;             // a gap above the wall, so the ball can get behind it
+const BRICK_STEP_X = 30;        // brick width + gap
+const BRICK_STEP_Y = 10;        // brick height + gap
+const PADDLE_Y = 156;           // the paddle hovers just above the dark ground (which starts at y 166)
+const PADDLE_W = 36;
+const PADDLE_WIDE = 52;         // while the Wide capsule lasts
+const PADDLE_SPEED = 3.5;       // pixels per update with the keys (210 a second)
+const BALL = 5;                 // the ball is 5 x 5
+const MAX_BALLS = 6;
+const MAX_ANGLE = 60;           // furthest from straight up the paddle can send the ball, in degrees
+const WIDE_TIME = 12 * 60;      // updates (12 seconds)
+
+/* Brick types: colour ramp, hits to break, points when broken. Warm colours for ordinary bricks,
+   chrome for armoured ones (they crack before they break). */
+const BRICKS = {
+  a: { ramp: 'amber', hp: 1, pts: 10, bits: ['amber-light', 'amber'] },
+  h: { ramp: 'heat', hp: 1, pts: 20, bits: ['heat-light', 'heat'] },
+  r: { ramp: 'red', hp: 1, pts: 30, bits: ['red-light', 'red'] },
+  c: { ramp: 'chrome', hp: 2, pts: 50, bits: ['chrome-200', 'chrome-300'] },
+  C: { ramp: 'chrome', hp: 3, pts: 80, bits: ['chrome-200', 'chrome-300'] },
+};
+
+/* One wall per level, ten characters a row ('.' = no brick). After the last one they repeat, faster.
+   Each level adds one thing: 1 learn the controls, 2 more bricks and gaps, 3 armoured bricks,
+   4 a deep diamond, 5 a three-hit fortress, 6 open rows the ball can get trapped in. */
+const LEVELS = [
+  ['rrrrrrrrrr',
+   'hhhhhhhhhh',
+   'aaaaaaaaaa',
+   'aaaaaaaaaa'],
+  ['rrrr..rrrr',
+   'hhhhhhhhhh',
+   'hh.hhhh.hh',
+   'aaaaaaaaaa',
+   'aaaaaaaaaa'],
+  ['rrrrrrrrrr',
+   'rrrrrrrrrr',
+   'hhhhhhhhhh',
+   'cc.cccc.cc',
+   'aaaaaaaaaa',
+   'aaaaaaaaaa'],
+  ['....cc....',
+   '...rrrr...',
+   '..rrhhrr..',
+   '.rhhaahhr.',
+   'rhhaaaahhr',
+   '.rhhaahhr.',
+   '..rrhhrr..',
+   '...cccc...'],
+  ['.CCCCCCCC.',
+   '.crrrrrrc.',
+   '.chhhhhhc.',
+   '.chhhhhhc.',
+   '.caaaaaac.',
+   '.cccccccc.'],
+  ['hhhhhhhhhh',
+   '..........',
+   'CcCcCCcCcC',
+   'rrrrrrrrrr',
+   '..........',
+   'cccccccccc',
+   'aaaaaaaaaa'],
+];
+
+/* Capsules fall from some broken bricks. Each has its own sprite and a short pop-up when caught. */
+const CAPSULES = [
+  { kind: 'wide', sprite: 'capWide', label: 'WIDE', weight: 45 },
+  { kind: 'multi', sprite: 'capMulti', label: 'x3', weight: 40 },
+  { kind: 'life', sprite: 'capLife', label: '1UP', weight: 15 },
+];
+const CAPSULE_W = 9;
+const CAPSULE_H = 7;
+const CAPSULE_CHANCE = 0.12;    // chance that a broken brick drops one
+const CAPSULE_SPEED = 0.75;
+
+/* ---------- Helpers ---------- */
+
+// Ball speed in pixels per update: gentle at level 1, about 8% faster each level, capped.
+function speedFor(level) {
+  return Math.min(2.9, 1.7 * Math.pow(1.08, level - 1));
+}
+
+// The paddle sprite at any width: aqua lights at both ends, a chrome body lit from the top left.
+function paddleRows(w) {
+  const m = w - 8;
+  return [
+    '.aaa' + 'L'.repeat(m) + 'aaa.',
+    'aAAA' + 'WW' + 'L'.repeat(m - 2) + 'AAAQ',
+    'aAAA' + 'L' + 'M'.repeat(m - 1) + 'AAAQ',
+    'AAAQ' + 'M'.repeat(m) + 'AAQQ',
+    'AAQQ' + 'D'.repeat(m) + 'AQQQ',
+    '.QQQ' + 'D'.repeat(m) + 'QQQ.',
+  ];
+}
+
+// Plays a sound at most once every few updates, so a burst of hits does not become a buzz.
+function play(g, rk, name) {
+  if (g.cool[name] > 0) return;
+  g.cool[name] = 3;
+  rk.sfx(name);
+}
+
+// Sets a ball moving at the current speed, `deg` degrees from straight up (negative = left).
+function aim(b, deg, speed) {
+  const r = deg * Math.PI / 180;
+  b.vx = speed * Math.sin(r);
+  b.vy = -speed * Math.cos(r);
+}
+
+function newBall(g) {
+  return { x: 0, y: 0, vx: 0, vy: 0, stuck: true, dead: false, trail: [] };
+}
+
+function buildLevel(g) {
+  const rows = LEVELS[(g.level - 1) % LEVELS.length];
+  g.bricks = [];
+  rows.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) {
+      const type = BRICKS[row[c]];
+      if (!type) continue;
+      g.bricks.push({
+        x: BRICK_X + c * BRICK_STEP_X, y: BRICK_Y + r * BRICK_STEP_Y, w: BRICK_W, h: BRICK_H,
+        type: type, hp: type.hp, flash: 0, dead: false,
+      });
+    }
+  });
+  g.left = g.bricks.length;
+  g.speed = speedFor(g.level);
+  g.balls = [newBall(g)];
+  g.capsules = [];
+  g.wideT = 0;
+}
+
+function spark(g, x, y, colours, count, power) {
+  for (let i = 0; i < count && g.parts.length < 240; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.random() * power;
+    g.parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.4, life: 18 + Math.random() * 18, colour: colours[i % colours.length] });
+  }
+}
+
+// Damages every brick the ball overlaps. Returns true if it touched any (so the ball bounces).
+function hitBricks(g, b, rk) {
+  let touched = false;
+  const box = { x: b.x, y: b.y, w: BALL, h: BALL };
+  for (const br of g.bricks) {
+    if (br.dead || !rk.hit(box, br)) continue;
+    touched = true;
+    br.hp--;
+    if (br.hp > 0) {
+      br.flash = 4;                       // armour holds: one quick white flash and a crack
+      play(g, rk, 'hit');
+      continue;
+    }
+    br.dead = true;
+    g.left--;
+    const cx = br.x + BRICK_W / 2;
+    const cy = br.y + BRICK_H / 2;
+    rk.addScore(br.type.pts, cx, cy);
+    play(g, rk, 'blip');
+    spark(g, cx, cy, br.type.bits, 7, 1.1);
+    if (g.capsules.length < 2 && g.left > 0 && Math.random() < CAPSULE_CHANCE) dropCapsule(g, cx, cy);
+  }
+  return touched;
+}
+
+function dropCapsule(g, cx, cy) {
+  let roll = Math.random() * CAPSULES.reduce((t, c) => t + c.weight, 0);
+  let pick = CAPSULES[0];
+  for (const c of CAPSULES) { roll -= c.weight; if (roll < 0) { pick = c; break; } }
+  g.capsules.push({ x: cx - CAPSULE_W / 2, y: cy - CAPSULE_H / 2, w: CAPSULE_W, h: CAPSULE_H, cap: pick });
+}
+
+function catchCapsule(g, rk, c) {
+  const p = g.paddle;
+  rk.addScore(50);
+  rk.popup(c.cap.label, p.x + p.w / 2, PADDLE_Y - 8, 'amber');
+  if (c.cap.kind === 'life') { rk.addLife(1); return; }   // addLife plays the pick-up sound itself
+  rk.sfx('pickup');
+  if (c.cap.kind === 'wide') g.wideT = WIDE_TIME;
+  if (c.cap.kind === 'multi') {
+    const from = g.balls.find((b) => !b.stuck && !b.dead);
+    if (!from) return;
+    const deg = Math.atan2(from.vx, -from.vy) * 180 / Math.PI;
+    [-25, 25].forEach((d) => {
+      if (g.balls.length >= MAX_BALLS) return;
+      const b = newBall(g);
+      b.stuck = false; b.x = from.x; b.y = from.y;
+      aim(b, rk.clamp(deg + d, -MAX_ANGLE, MAX_ANGLE), g.speed);
+      g.balls.push(b);
+    });
+  }
+}
+
+// Moves one ball in small steps (never more than 1 pixel), so a fast ball cannot skip through a brick.
+function moveBall(g, b, rk) {
+  const p = g.paddle;
+  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(b.vx), Math.abs(b.vy))));
+  for (let s = 0; s < steps && !b.dead; s++) {
+    // Across: side rails, then bricks
+    b.x += b.vx / steps;
+    if (b.x < WALL) { b.x = WALL; b.vx = Math.abs(b.vx); play(g, rk, 'bounce'); }
+    else if (b.x + BALL > rk.W - WALL) { b.x = rk.W - WALL - BALL; b.vx = -Math.abs(b.vx); play(g, rk, 'bounce'); }
+    else if (hitBricks(g, b, rk)) { b.x -= b.vx / steps; b.vx = -b.vx; }
+    // Up and down: top rail, bricks, then the paddle
+    const oldBottom = b.y + BALL;
+    b.y += b.vy / steps;
+    if (b.y < WALL) { b.y = WALL; b.vy = Math.abs(b.vy); play(g, rk, 'bounce'); }
+    else if (hitBricks(g, b, rk)) { b.y -= b.vy / steps; b.vy = -b.vy; }
+    else if (b.vy > 0 && oldBottom <= PADDLE_Y && b.y + BALL > PADDLE_Y && b.x + BALL > p.x && b.x < p.x + p.w) {
+      // Where it lands on the paddle sets the angle: the centre sends it straight up, the ends send it wide.
+      const off = rk.clamp((b.x + BALL / 2 - (p.x + p.w / 2)) / (p.w / 2 + BALL / 2), -1, 1);
+      b.y = PADDLE_Y - BALL;
+      aim(b, off * MAX_ANGLE, g.speed);
+      play(g, rk, 'bounce');
+    }
+    if (b.y > rk.H) b.dead = true;
+  }
+}
+
+function setPaddleWidth(g, rk, w) {
+  const p = g.paddle;
+  if (p.w === w) return;
+  p.x -= (w - p.w) / 2;                   // grow or shrink about the centre
+  p.w = w;
+  p.x = rk.clamp(p.x, WALL, rk.W - WALL - p.w);
+}
+
+function drawRails(rk) {
+  const W = rk.W, H = rk.H;
+  // left rail, lit from the left
+  rk.rect(0, 0, 1, H, 'chrome-200'); rk.rect(1, 0, 3, H, 'chrome-300'); rk.rect(4, 0, 1, H, 'chrome-400'); rk.rect(5, 0, 1, H, 'ink');
+  // right rail
+  rk.rect(W - 6, 0, 1, H, 'ink'); rk.rect(W - 5, 0, 1, H, 'chrome-200'); rk.rect(W - 4, 0, 3, H, 'chrome-300'); rk.rect(W - 1, 0, 1, H, 'chrome-400');
+  // top rail
+  rk.rect(0, 0, W, 1, 'chrome-200'); rk.rect(0, 1, W, 3, 'chrome-300'); rk.rect(0, 4, W, 1, 'chrome-400'); rk.rect(5, 5, W - 10, 1, 'ink');
+  // rivets
+  for (let y = 16; y < H; y += 20) {
+    rk.px(2, y, 'chrome-100'); rk.px(3, y + 1, 'chrome-400');
+    rk.px(W - 4, y, 'chrome-100'); rk.px(W - 3, y + 1, 'chrome-400');
+  }
+  for (let x = 20; x < W - 10; x += 40) { rk.px(x, 2, 'chrome-100'); rk.px(x + 1, 3, 'chrome-400'); }
+}
+
+function drawBrick(rk, br) {
+  if (br.flash > 0) {                     // one quick white frame when armour takes a hit
+    rk.block(br.x, br.y, br.w, br.h, 'chrome');
+    rk.rect(br.x + 1, br.y + 1, br.w - 2, br.h - 2, 'chrome-100');
+    return;
+  }
+  rk.block(br.x, br.y, br.w, br.h, br.type.ramp);
+  if (br.type.ramp !== 'chrome') return;
+  rk.px(br.x + 2, br.y + 2, 'chrome-100');            // glint
+  const damage = br.type.hp - br.hp;                  // cracks show how close it is to breaking
+  if (damage >= 1) { rk.px(br.x + 9, br.y + 2, 'ink'); rk.px(br.x + 10, br.y + 3, 'ink'); rk.px(br.x + 10, br.y + 4, 'ink'); rk.px(br.x + 11, br.y + 5, 'ink'); }
+  if (damage >= 2) { rk.px(br.x + 19, br.y + 2, 'ink'); rk.px(br.x + 18, br.y + 3, 'ink'); rk.px(br.x + 18, br.y + 4, 'ink'); rk.px(br.x + 17, br.y + 5, 'ink'); }
+}
+
+/* ---------- The game ---------- */
+RetroKit.game({
+  id: 'dusk-shatter',
+  title: 'DUSK SHATTER',
+  lives: 3,
+  livesIcon: 'dot',
+  hud: ['score', 'best', 'lives', 'level'],
+  keys: [['←', '→', 'Move'], ['Space', 'Launch'], ['P', 'Pause']],
+  touch: 'Drag to move · Tap to launch',
+
+  sprites: {
+    paddle: paddleRows(PADDLE_W),
+    paddleWide: paddleRows(PADDLE_WIDE),
+    ball: [
+      '.WLL.',
+      'WWLLM',
+      'LLLMM',
+      'LLMMD',
+      '.MMD.',
+    ],
+    capWide: [            // arrows pointing out: a wider paddle
+      '.yyyyyyy.',
+      'yYYYYYYYO',
+      'yYkYYYkYO',
+      'ykkkkkkkO',
+      'yYkYYYkYO',
+      'yYYYYYYYO',
+      '.OOOOOOO.',
+    ],
+    capMulti: [           // three balls
+      '.yyyyyyy.',
+      'yYYYYYYYO',
+      'yYYYkYYYO',
+      'yYYYYYYYO',
+      'yYkYYYkYO',
+      'yYYYYYYYO',
+      '.OOOOOOO.',
+    ],
+    capLife: [            // a plus: one more life
+      '.yyyyyyy.',
+      'yYYYYYYYO',
+      'yYYYkYYYO',
+      'yYYkkkYYO',
+      'yYYYkYYYO',
+      'yYYYYYYYO',
+      '.OOOOOOO.',
+    ],
+  },
+
+  start(rk) {
+    const g = {
+      level: 1,
+      paddle: { x: rk.W / 2 - PADDLE_W / 2, w: PADDLE_W },
+      parts: [],
+      cool: {},
+      waiting: false,     // between losing a ball and the next one appearing
+      clearing: false,    // between clearing a wall and the next one appearing
+    };
+    buildLevel(g);
+    rk.hud.set('level', g.level);
+    rk.banner('LEVEL 1', 1.5);
+    return g;
+  },
+
+  update(g, rk) {
+    for (const k in g.cool) if (g.cool[k] > 0) g.cool[k]--;
+    for (const br of g.bricks) if (br.flash > 0) br.flash--;
+    for (const pt of g.parts) { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.06; pt.life--; }
+    g.parts = g.parts.filter((pt) => pt.life > 0);
+    if (rk.ending) return;               // game over is on its way: no more control
+
+    // Paddle: arrow keys or A/D, or drag anywhere (finger or mouse) to move it by the same amount
+    const p = g.paddle;
+    const inp = rk.input;
+    if (g.wideT > 0) g.wideT--;
+    setPaddleWidth(g, rk, g.wideT > 0 ? PADDLE_WIDE : PADDLE_W);
+    if (inp.left) p.x -= PADDLE_SPEED;
+    if (inp.right) p.x += PADDLE_SPEED;
+    if (inp.pointer.down) p.x += inp.pointer.dx;
+    p.x = rk.clamp(p.x, WALL, rk.W - WALL - p.w);
+    if (g.clearing) return;
+
+    // Balls: a new ball rides on the paddle until launched
+    const launch = inp.pressed.fire || inp.tap;
+    for (const b of g.balls) {
+      if (b.stuck) {
+        b.x = p.x + p.w / 2 - BALL / 2;
+        b.y = PADDLE_Y - BALL;
+        if (launch) { b.stuck = false; aim(b, rk.pick([-1, 1]) * rk.rand(12, 30), g.speed); rk.sfx('shot'); }
+        continue;
+      }
+      b.trail.push({ x: b.x, y: b.y });
+      if (b.trail.length > 6) b.trail.shift();
+      moveBall(g, b, rk);
+    }
+
+    // Capsules fall; catch them with the paddle
+    const pbox = { x: p.x, y: PADDLE_Y, w: p.w, h: 6 };
+    for (const c of g.capsules) {
+      c.y += CAPSULE_SPEED;
+      if (rk.hit(c, pbox)) { c.done = true; catchCapsule(g, rk, c); }
+      else if (c.y > rk.H) c.done = true;
+    }
+    g.capsules = g.capsules.filter((c) => !c.done);
+
+    // Wall cleared: bonus, banner, then the next level
+    if (g.left <= 0) {
+      g.clearing = true;
+      for (const b of g.balls) spark(g, b.x + BALL / 2, b.y + BALL / 2, ['aqua-light', 'aqua'], 10, 1.2);
+      g.balls = [];
+      g.capsules = [];
+      rk.addScore(100 * g.level, p.x + p.w / 2, PADDLE_Y - 10, 'amber');
+      rk.sfx('pickup');
+      rk.banner('LEVEL ' + (g.level + 1), 1.5);
+      rk.after(1.5, () => {
+        g.level++;
+        buildLevel(g);
+        rk.hud.set('level', g.level);
+        g.clearing = false;
+      });
+      return;
+    }
+
+    // Ball lost: when the last ball drops off the bottom, a life goes
+    g.balls = g.balls.filter((b) => !b.dead);
+    if (g.balls.length === 0 && !g.waiting) {
+      g.waiting = true;
+      g.wideT = 0;
+      g.capsules = [];
+      spark(g, rk.clamp(g.lastX || rk.W / 2, WALL + 4, rk.W - WALL - 4), rk.H - 3, ['red-light', 'red', 'heat'], 16, 1.6);
+      rk.shake(2, 0.2);
+      if (rk.loseLife() > 0) {
+        rk.after(1, () => { g.balls = [newBall(g)]; g.waiting = false; });
+      }
+    }
+    if (g.balls.length) g.lastX = g.balls[g.balls.length - 1].x;
+  },
+
+  draw(ctx, g, rk) {
+    rk.backdrop.dusk();
+    drawRails(rk);
+    for (const br of g.bricks) if (!br.dead) drawBrick(rk, br);
+
+    for (const c of g.capsules) {
+      rk.glow(c.x + CAPSULE_W / 2, c.y + CAPSULE_H / 2, 10, 'amber', 0.35);
+      rk.draw(c.cap.sprite, c.x, c.y);
+    }
+    for (const pt of g.parts) rk.rect(pt.x, pt.y, 1, 1, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+
+    const p = g.paddle;
+    rk.draw(p.w > PADDLE_W ? 'paddleWide' : 'paddle', p.x, PADDLE_Y);
+
+    for (const b of g.balls) {
+      if (!b.stuck && b.trail.length >= 6) {          // two fading copies behind the moving ball
+        rk.draw('ball', b.trail[0].x, b.trail[0].y, 0, { alpha: 0.2 });
+        rk.draw('ball', b.trail[3].x, b.trail[3].y, 0, { alpha: 0.4 });
+      }
+      rk.glow(b.x + BALL / 2, b.y + BALL / 2, 9, 'aqua', 0.45);
+      rk.draw('ball', b.x, b.y);
+    }
+  },
+
+  // The title screen: the same sunset and arena, with the paddle and ball ready. No bricks here:
+  // the kit's logo sits over the top half of the world (higher still on phones), and bricks behind it clash.
+  drawTitle(ctx, rk) {
+    rk.backdrop.dusk();
+    drawRails(rk);
+    rk.draw('paddle', rk.W / 2 - PADDLE_W / 2, PADDLE_Y);
+    rk.draw('ball', rk.W / 2 - BALL / 2, PADDLE_Y - BALL);
+  },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orbit Siege</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files (and the fonts) into dist/<game>.html. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../../kit/retro-kit.css" data-rk-inline>
+<script src="../../kit/retro-kit.js" data-rk-inline></script>
+<!-- The soundtrack, kept as text in music.js. The build copies it in as well, so the game is still one file.
+     The kit plays it: see the music option in RetroKit.game, at the bottom. -->
+<script src="music.js" data-rk-inline></script>
+</head>
+<body>
+<script>
+/* ORBIT SIEGE — a Retro Kit game. Rules for this file: .claude/skills/retro-kit/SKILL.md
+   A fixed shooter: a fleet of invaders marches across the sky and steps down towards you. Slide your ship
+   along the bottom, shoot them all before they land, and use the four bunkers for cover.
+   Two modes, picked from the kit's menu after Start game (the modes option, at the bottom):
+     Classic   the traditional game: one shot in the air at a time, bunkers, and a bonus saucer.
+     Advanced  the same, plus capsules that fall from the fleet (new weapons, turbo, a shield, a freeze,
+               a rewind), invaders that break away and dive at you, and a flagship to end the set.
+   Six levels, each in its own zone with its own look. Each adds one thing; after the last one the set
+   repeats, faster.
+   The soundtrack is Barney's own MP3, kept in music.js. The kit plays it: see the music option, at the bottom. */
+
+/* ---------- Playfield layout (game pixels; the world is 320 x 180) ---------- */
+const W = 320;
+const H = 180;
+const EDGE = 6;                 // nothing comes closer to the sides than this
+const GROUND = 168;             // where bombs and capsules land
+const SHIP_W = 17;
+const SHIP_H = 9;
+const SHIP_Y = 157;             // the ship's top edge: it only ever moves left and right
+const SHIP_SPEED = 2.2;         // pixels per update with the keys (132 a second)
+const DRAG_SPEED = 3.2;         // the most it moves per update when dragged with a finger or the mouse
+const TURBO = 1.8;              // how much faster the ship goes with Turbo
+const CELL_W = 20;              // the fleet is a grid: an invader every 20 pixels across ...
+const CELL_H = 12;              // ... and every 12 down
+const INV_W = 12;
+const INV_H = 8;
+const FLEET_TOP = 20;           // where the top row starts
+const DROP = 6;                 // how far the fleet steps down each time it reaches a side
+const LAND_Y = 152;             // an invader whose feet reach this line has landed
+const SAUCER_Y = 6;
+const BUNKER_X = [28, 108, 188, 268];
+const BUNKER_Y = 134;
+const BUNKER_SHAPE = [          // each X is a 2 x 2 pixel piece of bunker
+  '..XXXXXXXX..',
+  '.XXXXXXXXXX.',
+  'XXXXXXXXXXXX',
+  'XXXXXXXXXXXX',
+  'XXXX....XXXX',
+  'XXX......XXX',
+];
+
+/* ---------- Invaders ----------
+   a, b and c are the three ordinary kinds (the higher the row, the smaller and the more they are worth).
+   d is armoured: chrome plated, and it takes two hits. */
+const KINDS = {
+  a: { art: 'A', w: 10, pts: 30, hp: 1 },
+  b: { art: 'B', w: 12, pts: 20, hp: 1 },
+  c: { art: 'C', w: 12, pts: 10, hp: 1 },
+  d: { art: 'D', w: 12, pts: 50, hp: 2 },
+};
+
+/* ---------- Levels ----------
+   rows lists the fleet from the top row down; a row of two letters alternates them across the row.
+   speed is how fast the full fleet marches (pixels per update); it speeds up as the fleet thins out.
+   fire is the shortest and longest wait between bombs (updates); bombs is how many can be falling at once.
+   Each level adds one thing: 1 learn the controls, 2 a bigger fleet, 3 armoured invaders, 4 the widest
+   fleet (and divers, in Advanced), 5 bombs that weave, 6 two armoured rows (Classic) or the flagship (Advanced). */
+const STAGES = [
+  { cols: 9, rows: ['a', 'b', 'c', 'c'], speed: 0.2, fire: [80, 140], bombs: 2, bombSpeed: 1 },
+  { cols: 10, rows: ['a', 'b', 'b', 'c', 'c'], speed: 0.22, fire: [64, 120], bombs: 3, bombSpeed: 1.1 },
+  { cols: 10, rows: ['a', 'b', 'b', 'c', 'dc'], speed: 0.24, fire: [58, 108], bombs: 3, bombSpeed: 1.2 },
+  { cols: 11, rows: ['a', 'a', 'b', 'b', 'c'], speed: 0.25, fire: [52, 98], bombs: 4, bombSpeed: 1.3, divers: true },
+  { cols: 11, rows: ['a', 'b', 'b', 'd', 'c'], speed: 0.27, fire: [46, 88], bombs: 4, bombSpeed: 1.4, divers: true, weave: true },
+  { cols: 11, rows: ['a', 'a', 'b', 'd', 'd'], speed: 0.28, fire: [42, 80], bombs: 5, bombSpeed: 1.5, weave: true,
+    flagship: { cols: 9, rows: ['a', 'b', 'c'], top: 40, hp: 16 } },
+];
+
+// Works out one level's numbers. After the sixth level the set comes round again (a "lap"), faster each time.
+function stageFor(level, advanced) {
+  const i = (level - 1) % STAGES.length;
+  const lap = Math.floor((level - 1) / STAGES.length);
+  const base = STAGES[i];
+  const boss = advanced && base.flagship ? base.flagship : null;
+  const quicker = Math.pow(0.85, lap);
+  return {
+    zone: i,
+    cols: boss ? boss.cols : base.cols,
+    rows: boss ? boss.rows : base.rows,
+    top: (boss ? boss.top : FLEET_TOP) + Math.min(12, lap * 6),
+    speed: base.speed * Math.min(1.9, 1 + lap * 0.18),
+    maxMul: Math.min(8, 5 + i * 0.5 + lap),          // how many times faster the last invader is than the full fleet
+    fire: [Math.max(22, base.fire[0] * quicker), Math.max(40, base.fire[1] * quicker)],
+    bombs: Math.min(7, base.bombs + lap),
+    bombSpeed: Math.min(2.3, base.bombSpeed + lap * 0.15),
+    aim: Math.min(0.45, 0.2 + i * 0.05 + lap * 0.1),  // how often the invader right above the ship is the one that fires
+    weave: !!base.weave || lap > 0,
+    divers: advanced && !boss && (!!base.divers || lap > 0),
+    diverMax: lap > 0 ? 2 : 1,
+    diveGap: [220 * quicker, 360 * quicker],
+    diveSpeed: Math.min(1.6, 1.15 + lap * 0.1),
+    bossHp: boss ? boss.hp + lap * 6 : 0,
+  };
+}
+
+/* ---------- Capsules (Advanced only) ----------
+   time is how long the power lasts, in updates (60 a second). A weapon replaces the one before it.
+   Level 1 drops the first three in UNLOCKS; each level after adds the next one. */
+const POWERS = {
+  rapid: { label: 'RAPID', time: 600, weapon: true, weight: 3 },     // up to four shots in the air
+  turbo: { label: 'TURBO', time: 600, weight: 3 },                   // a faster ship and faster shots
+  shield: { label: 'SHIELD', time: 1200, weight: 2 },                // takes one hit for you
+  spread: { label: 'SPREAD', time: 600, weapon: true, weight: 3 },   // three shots in a fan
+  lance: { label: 'LANCE', time: 480, weapon: true, weight: 2 },     // goes through everything in its way
+  freeze: { label: 'FREEZE', time: 240, weight: 2 },                 // stops the fleet and clears its bombs
+  blast: { label: 'BLAST', time: 480, weapon: true, weight: 2 },     // a shell that bursts and catches its neighbours
+  rewind: { label: 'REWIND', time: 0, weight: 1 },                   // pushes the fleet back up the sky
+};
+const UNLOCKS = ['rapid', 'turbo', 'shield', 'spread', 'lance', 'freeze', 'blast', 'rewind'];
+
+/* ---------- Art ----------
+   One character per game pixel; the legend is in the skill's reference. Invaders are drawn in the red
+   letters (r R X) and re-coloured for each zone. */
+const SHIP = [
+  '........W........',
+  '.......LWM.......',
+  '.......LAM.......',
+  '......LaAQM......',
+  '..L...LaAQM...M..',
+  '..L..LLLMMMM..M..',
+  '.LLLLLMMMMMMMMMD.',
+  'LLMMMMMMMMMMMMMDD',
+  'LMDD.DDMMMDD.DDMD',
+];
+
+const INV_ART = {
+  A: [[                         // one big eye
+    '....rr....',
+    '..rrRRRX..',
+    '.rRRSSRRX.',
+    'rRRSkkSRRX',
+    'rRRRSSRRRX',
+    '.RRRRRRXX.',
+    '.R..RX..X.',
+    'R...RX...X',
+  ], [
+    '....rr....',
+    '..rrRRRX..',
+    '.rRRSSRRX.',
+    'rRRSkkSRRX',
+    'rRRRSSRRRX',
+    '.RRRRRRXX.',
+    '.R..RX..X.',
+    '..R.RX.X..',
+  ]],
+  B: [[                         // horns up, legs out
+    'r..........X',
+    '.r..rRRX..X.',
+    '.rRRRRRRRRX.',
+    'rRRSRRRRSRRX',
+    'rRRRRRRRRRRX',
+    '.RRXRRRRXRX.',
+    '.R..X..R..X.',
+    'R..........X',
+  ], [
+    '..r......X..',
+    '.r..rRRX..X.',
+    '.rRRRRRRRRX.',
+    'rRRSRRRRSRRX',
+    'rRRRRRRRRRRX',
+    '.RRXRRRRXRX.',
+    '..R.X..R.X..',
+    '...R....X...',
+  ]],
+  C: [[                         // a wide dome on short legs
+    '...rrrrrr...',
+    '.rrRRRRRRXX.',
+    'rRRRRRRRRRRX',
+    'rRSkRRRRSkRX',
+    'rRRRRRRRRRRX',
+    'RRXRRXXRRXRX',
+    'R..R.XR.X..X',
+    '.R..X..R..X.',
+  ], [
+    '...rrrrrr...',
+    '.rrRRRRRRXX.',
+    'rRRRRRRRRRRX',
+    'rRSkRRRRSkRX',
+    'rRRRRRRRRRRX',
+    'RRXRRXXRRXRX',
+    '.R.R.XR.X.X.',
+    'R...X..R...X',
+  ]],
+  D: [[                         // armoured: chrome plates and a red visor
+    '.LLLLLLLLLM.',
+    'LLWLLMMMMMMD',
+    'LMMMMMMMMMMD',
+    'LMRRSRRSRRMD',
+    'LMMMMMMMMMMD',
+    '.MMDMMMMDMD.',
+    '.M.D....M.D.',
+    'M..D....M..D',
+  ], [
+    '.LLLLLLLLLM.',
+    'LLWLLMMMMMMD',
+    'LMMMMMMMMMMD',
+    'LMRRSRRSRRMD',
+    'LMMMMMMMMMMD',
+    '.MMDMMMMDMD.',
+    '..MD....MD..',
+    '..M......D..',
+  ]],
+};
+const CRACK = [[7, 0], [7, 1], [6, 2], [6, 4], [7, 5]];    // where the armour splits after its first hit
+
+const FLAGSHIP_HALF = [         // the left half; the right half is its mirror image
+  '..............rrrrrr',
+  '...........rrrRRRRRR',
+  '.........rrRRRLLLLLL',
+  '.......rrRRRRLLWWLLM',
+  '....rrrRRRRRRDMMMMMM',
+  '..rrRRRRRRRRRRRRRRRR',
+  '.rRRRYYRRRRkkRRRRYYR',
+  'rRRRRYYRRRRkkRRRRYYR',
+  'rRRRRRRRRRRRRRRRRRRR',
+  '.XRRRRRRRRRRRRRRRRRR',
+  '..XXXRRRXXXXXRRRRXXX',
+  '.....XX.DMMMD..XXX..',
+  '........DMMMD.......',
+  '.........DMD........',
+];
+const FAR_SIDE = { r: 'R', L: 'M', W: 'L' };              // the mirrored half sits away from the light
+
+const ICONS = {                 // the mark on each capsule, 7 x 7
+  rapid: ['.......', '.k.k.k.', '.k.k.k.', '.k.k.k.', '.k.k.k.', '.k.k.k.', '.......'],
+  turbo: ['.......', 'k..k...', '.k..k..', '..k..k.', '.k..k..', 'k..k...', '.......'],
+  shield: ['.......', '..kkk..', '.k...k.', 'k.....k', 'k.....k', 'k.....k', '.......'],
+  spread: ['k..k..k', 'k..k..k', '.k.k.k.', '.k.k.k.', '..kkk..', '...k...', '.......'],
+  lance: ['...k...', '..kkk..', '.kkkkk.', '...k...', '...k...', '...k...', '...k...'],
+  freeze: ['...k...', '.k.k.k.', '..kkk..', 'kkk.kkk', '..kkk..', '.k.k.k.', '...k...'],
+  blast: ['..kkk..', '.k...k.', 'k..k..k', 'k.kkk.k', 'k..k..k', '.k...k.', '..kkk..'],
+  rewind: ['...k...', '..k.k..', '.k...k.', '...k...', '..k.k..', '.k...k.', '.......'],
+};
+
+// A small repeatable random number maker, so scenery and explosions look the same every time.
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+// An amber capsule with its mark in ink.
+function capsuleArt(icon) {
+  const rows = ['.yyyyyyy.'];
+  for (const line of icon) rows.push('y' + line.replace(/\./g, 'Y') + 'O');
+  rows.push('.OOOOOOO.');
+  return rows;
+}
+
+// An explosion in four frames: a bright core, a ring of fire, the ring thinning, then embers.
+function boomArt(w, h, seed) {
+  const rnd = rng(seed);
+  const cx = (w - 1) / 2;
+  const cy = (h - 1) / 2;
+  const frames = [0.5, 0.8, 1, 1].map((size, f) => {
+    const rows = [];
+    for (let y = 0; y < h; y++) {
+      let row = '';
+      for (let x = 0; x < w; x++) {
+        const d = Math.hypot((x - cx) / (w / 2), (y - cy) / (h / 2)) / size;   // 0 at the centre, 1 at the rim
+        const n = rnd();
+        let ch = '.';
+        if (f === 3) { if (d < 1 && n < 0.1) ch = n < 0.05 ? 'H' : 'E'; }
+        else if (d < 0.4) ch = f === 2 ? (n < 0.5 ? 'Y' : '.') : 'S';
+        else if (d < 0.72) ch = n < 0.75 ? 'y' : 'Y';
+        else if (d < 1) ch = n < 0.3 ? 'H' : n < 0.55 ? 'h' : '.';
+        row += ch;
+      }
+      rows.push(row);
+    }
+    return rows;
+  });
+  return { frames: frames, outline: false };
+}
+
+function buildSprites() {
+  const s = {
+    ship: SHIP,
+    invD: {                     // frames 0 and 1 whole, 2 and 3 cracked
+      frames: INV_ART.D.concat(INV_ART.D.map((rows) => rows.map((row, y) => {
+        for (const c of CRACK) if (c[1] === y) row = row.slice(0, c[0]) + 'k' + row.slice(c[0] + 1);
+        return row;
+      }))),
+    },
+    flagship: FLAGSHIP_HALF.map((row) => row + row.split('').reverse().map((ch) => FAR_SIDE[ch] || ch).join('')),
+    saucer: { frames: [[        // the bonus ship: its lights run along the bottom
+      '.....yyyyyy.....',
+      '...yyYYYYYYOO...',
+      '.LLLLLLMMMMMMDD.',
+      'LLkLLkMMkMMkMMDD',
+      '.LMMMMMMMMMMMDD.',
+      '...YO..YO..YO...',
+    ], [
+      '.....yyyyyy.....',
+      '...yyYYYYYYOO...',
+      '.LLLLLLMMMMMMDD.',
+      'LLkLLkMMkMMkMMDD',
+      '.LMMMMMMMMMMMDD.',
+      '...Oy..Oy..Oy...',
+    ]] },
+    bomb: [                     // enemy fire: a bright core with a red edge, so it shows against every sky
+      '.r.',
+      'rSr',
+      'rSr',
+      'rSr',
+      'RSR',
+      '.R.',
+    ],
+    weave: { frames: [[         // the bomb that sways from side to side
+      'S..',
+      'rS.',
+      '.Sr',
+      '..S',
+      '.Sr',
+      'rS.',
+      'R..',
+    ], [
+      '..S',
+      '.Sr',
+      'rS.',
+      'S..',
+      'rS.',
+      '.Sr',
+      '..R',
+    ]] },
+    orb: [                      // the flagship's fire
+      '.rRR.',
+      'rSSRX',
+      'RSSRX',
+      'RRRXX',
+      '.XXX.',
+    ],
+    shot: { map: ['WW', 'aa', 'AA', 'AA', 'AA', 'QQ'], outline: false },
+    lance: { map: ['WW', 'WW', 'aa', 'aa', 'aa', 'AA', 'AA', 'AA', 'AA', 'AA', 'QQ', 'QQ'], outline: false },
+    shell: { map: ['.WW.', 'WaaA', 'aaAA', '.AA.'], outline: false },
+    pop: boomArt(12, 9, 5),
+    boom: boomArt(22, 14, 9),
+  };
+  for (const art of ['A', 'B', 'C']) {
+    s['inv' + art + '_red'] = { frames: INV_ART[art] };
+    for (const ramp of ['heat', 'amber']) {
+      s['inv' + art + '_' + ramp] = { frames: INV_ART[art], legend: { r: ramp + '-light', R: ramp, X: ramp + '-dark' } };
+    }
+  }
+  for (const kind of UNLOCKS) s['cap_' + kind] = capsuleArt(ICONS[kind]);
+  return s;
+}
+
+/* ---------- Zones ----------
+   Each level has its own backdrop. They are painted once, when the page opens, into a 320 x 180 sprite:
+   bands of sky from the top down, then the scenery. The top of every sky is dark, so the invaders stand
+   out; the bright colours stay low, behind the ship, which shows against anything. */
+
+// A 320 x 180 sheet of legend letters to paint on.
+function sheet(bands) {
+  const rows = [];
+  for (let y = 0; y < H; y++) {
+    let ch = bands[0][1];
+    for (const b of bands) if (y >= b[0]) ch = b[1];
+    rows.push(new Array(W).fill(ch));
+  }
+  const s = {
+    tw: [],                     // a few of its stars, which twinkle
+    get: (x, y) => (rows[y] ? rows[y][x] : undefined),
+    px(x, y, ch) {
+      x = Math.round(x); y = Math.round(y);
+      if (ch && x >= 0 && x < W && y >= 0 && y < H) rows[y][x] = ch;
+    },
+    rect(x, y, w, h, ch) {
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) s.px(x + i, y + j, ch);
+    },
+    // ch may be a function of the distance from the centre, to shade the disc or leave part of it out
+    disc(cx, cy, r, ch) {
+      for (let y = -r; y <= r; y++) {
+        for (let x = -r; x <= r; x++) {
+          if (x * x + y * y <= r * r + r * 0.5) s.px(cx + x, cy + y, typeof ch === 'function' ? ch(x, y) : ch);
+        }
+      }
+    },
+    // a skyline: straight lines from point to point, filled in down to `base`
+    ridge(points, base, ch) {
+      for (let x = 0; x < W; x++) {
+        let i = 0;
+        while (i < points.length - 2 && points[i + 1][0] <= x) i++;
+        const a = points[i];
+        const b = points[i + 1];
+        const top = Math.round(a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]));
+        for (let y = top; y < base; y++) s.px(x, y, ch);
+      }
+    },
+    stars(rnd, count, maxY) {
+      for (let i = 0; i < count; i++) {
+        const x = Math.floor(rnd() * W);
+        const y = Math.floor(rnd() * maxY);
+        s.px(x, y, 'DDDMML'[Math.floor(rnd() * 6)]);
+        if (s.tw.length < 7 && i % 5 === 0) s.tw.push([x, y]);
+      }
+    },
+    art: () => ({ map: rows.map((r) => r.join('')), outline: false }),
+  };
+  return s;
+}
+
+// 1 Low orbit: black space, a small moon, and the curve of the planet you are guarding.
+function paintOrbit() {
+  const rnd = rng(11);
+  const s = sheet([[0, 'k'], [84, '0'], [128, '1']]);
+  s.stars(rnd, 64, 148);
+  s.disc(54, 34, 7, (x, y) => (x + y > 5 ? '1' : x + y > -2 ? 'D' : 'M'));
+  s.px(51, 32, 'D'); s.px(56, 30, 'M'); s.px(53, 37, '1');
+  for (let x = 0; x < W; x++) {
+    const top = 872 - Math.sqrt(720 * 720 - (x - 160) * (x - 160));
+    for (let y = Math.ceil(top); y < H; y++) {
+      const depth = y - top;                        // a thin bright line of air, then the surface
+      s.px(x, y, depth < 1 ? '5' : depth < 3 ? '4' : depth < 12 ? '3' : '2');
+    }
+  }
+  for (let i = 0; i < 30; i++) {                    // streaks of cloud
+    const x = Math.floor(rnd() * 310);
+    const y = 157 + Math.floor(rnd() * 22);
+    const w = 5 + Math.floor(rnd() * 16);
+    for (let k = 0; k < w; k++) {
+      const here = s.get(x + k, y);
+      if (here === '3') s.px(x + k, y, '2');
+      else if (here === '2') s.px(x + k, y, '1');
+    }
+  }
+  return s;
+}
+
+// 2 Dusk ridge: the kit's sunset, with the horizon pulled down low so the bright bands sit behind the ship.
+function paintDusk() {
+  const rnd = rng(29);
+  const s = sheet([[0, 'k'], [40, '0'], [78, '1'], [106, '2'], [128, '3'], [142, '4'], [151, '5'], [158, '6']]);
+  s.stars(rnd, 44, 104);
+  s.disc(232, 166, 22, (x, y) => (y < -17 ? 'S' : 'Y'));
+  s.ridge([[0, 158], [26, 150], [50, 157], [78, 147], [104, 156], [130, 151], [160, 158], [188, 149], [214, 157], [244, 153], [270, 146], [296, 155], [320, 150]], GROUND, 'f');
+  s.ridge([[0, 164], [30, 158], [58, 164], [88, 157], [120, 163], [150, 160], [182, 165], [212, 158], [240, 164], [272, 159], [300, 165], [320, 160]], GROUND, 'n');
+  s.rect(0, GROUND, W, H - GROUND, 'k');
+  return s;
+}
+
+// 3 Violet storm: banks of cloud in a purple sky, and a storm rolling along underneath.
+function paintStorm() {
+  const rnd = rng(47);
+  const s = sheet([[0, '1'], [28, '2'], [80, '3'], [116, '2'], [144, '1']]);
+  s.stars(rnd, 14, 26);
+  const cloud = (cx, cy, w, body, rim) => {         // flat underneath, lighter along the top
+    const puffs = [];
+    for (let i = 0; i <= w; i += 4) puffs.push([cx + i, Math.max(2, 3 + Math.floor(rnd() * 4) - Math.round(Math.abs(i - w / 2) / w * 4))]);
+    for (const p of puffs) s.disc(p[0], cy - 1, p[1], (x, y) => (y <= 1 ? rim : null));
+    for (const p of puffs) s.disc(p[0], cy, p[1], (x, y) => (y <= 1 ? body : null));
+  };
+  cloud(14, 46, 56, '1', '3');
+  cloud(206, 38, 84, '1', '3');
+  cloud(104, 68, 44, '1', '3');
+  cloud(246, 100, 60, '2', '4');
+  cloud(30, 106, 70, '2', '4');
+  cloud(138, 130, 60, '1', '3');
+  for (let x = -8; x < W; x += 30) cloud(x, 171 + (x % 4), 34, 'n', '2');
+  s.rect(0, 173, W, 7, 'n');
+  for (let x = -20; x < W; x += 38) cloud(x, 178, 30, 'k', 'n');
+  return s;
+}
+
+// 4 Pale moon: a grey, cratered surface under a black sky, and a ringed planet far away.
+function paintMoon() {
+  const rnd = rng(61);
+  const s = sheet([[0, 'k'], [112, '0']]);
+  s.stars(rnd, 80, 158);
+  s.disc(262, 46, 14, (x, y) => (x + y < -8 ? '3' : '2'));
+  for (let i = -26; i <= 26; i++) {
+    s.px(262 + i, 46 + Math.round(i * 0.3), '4');
+    if (Math.abs(i) > 15) s.px(262 + i, 47 + Math.round(i * 0.3), '3');
+  }
+  s.ridge([[0, 165], [36, 161], [70, 166], [118, 160], [152, 165], [200, 162], [236, 166], [282, 160], [320, 164]], H, 'D');
+  for (let x = 0; x < W; x++) {
+    const top = 168 + Math.round(Math.sin(x * 0.021 + 1) * 1.2 + Math.sin(x * 0.053) * 0.8);
+    s.px(x, top, 'L');
+    for (let y = top + 1; y < H; y++) s.px(x, y, 'M');
+  }
+  for (let i = 0; i < 9; i++) {                     // craters: a dark bowl with a bright near rim
+    const cx = 16 + Math.floor(rnd() * 290);
+    const cy = 173 + Math.floor(rnd() * 5);
+    const rx = 4 + Math.floor(rnd() * 7);
+    for (let x = -rx; x <= rx; x++) {
+      const half = Math.round(Math.sqrt(1 - (x * x) / (rx * rx)) * rx / 4);
+      for (let y = -half; y <= half; y++) s.px(cx + x, cy + y, 'D');
+      s.px(cx + x, cy + half + 1, 'L');
+    }
+  }
+  return s;
+}
+
+// 5 Ember forge: two volcanoes over a sea of lava.
+function paintForge() {
+  const rnd = rng(83);
+  const s = sheet([[0, 'k'], [50, 'n'], [96, '1'], [124, '3'], [140, '4'], [154, 'E']]);
+  s.stars(rnd, 22, 60);
+  s.ridge([[0, 160], [44, 151], [72, 131], [81, 131], [106, 152], [128, 163], [150, 157], [178, 164], [214, 150], [240, 125], [251, 125], [278, 150], [300, 161], [320, 155]], GROUND, 'k');
+  s.rect(73, 131, 8, 1, 'h'); s.rect(74, 132, 6, 1, 'H');
+  s.rect(241, 125, 10, 1, 'h'); s.rect(242, 126, 8, 1, 'H');
+  for (const start of [[77, 133], [246, 127]]) {    // a thread of lava down each cone
+    let x = start[0];
+    for (let y = start[1]; y < GROUND; y++) {
+      s.px(x, y, y % 5 ? 'H' : 'h');
+      if (rnd() < 0.45) x += rnd() < 0.6 ? -1 : 1;
+    }
+  }
+  s.rect(0, GROUND, W, H - GROUND, 'E');
+  for (let i = 0; i < 46; i++) {
+    s.rect(Math.floor(rnd() * 312), GROUND + 1 + Math.floor(rnd() * 11), 3 + Math.floor(rnd() * 8), 1, rnd() < 0.25 ? 'Y' : 'H');
+  }
+  s.rect(0, GROUND, W, 1, 'H');
+  return s;
+}
+
+// 6 Home sky: the city you have been defending all along, at night.
+function paintCity() {
+  const rnd = rng(101);
+  const s = sheet([[0, 'k'], [44, '0'], [90, '1'], [124, '2'], [148, '3']]);
+  s.stars(rnd, 54, 120);
+  let x = 0;
+  while (x < W) {                                   // the far streets
+    const w = 8 + Math.floor(rnd() * 12);
+    const top = 146 + Math.floor(rnd() * 12);
+    s.rect(x, top, w, GROUND - top, 'f');
+    x += w + (rnd() < 0.3 ? 2 : 0);
+  }
+  s.rect(150, 138, 5, 30, 'n');                     // one tall tower with a mast
+  s.rect(152, 130, 1, 8, 'n');
+  x = -4;
+  while (x < W) {                                   // the near streets, with a few lights on
+    const w = 12 + Math.floor(rnd() * 14);
+    const top = 153 + Math.floor(rnd() * 11);
+    s.rect(x, top, w, GROUND - top, 'n');
+    for (let wy = top + 2; wy < 166; wy += 3) {
+      for (let wx = x + 2; wx < x + w - 1; wx += 3) {
+        const n = rnd();
+        if (n < 0.2) s.px(wx, wy, 'O');
+        else if (n < 0.25) s.px(wx, wy, 'Y');
+      }
+    }
+    x += w + 1;
+  }
+  s.rect(0, GROUND, W, H - GROUND, 'k');
+  for (x = 4; x < W; x += 16) s.rect(x, 174, 6, 1, 'D');
+  return s;
+}
+
+/* name is the banner at the start of the level, label is the HUD's Zone readout, ramps is the colour of
+   each kind of invader here, and live draws whatever moves in the scenery (t is the time in seconds). */
+const ZONES = [
+  { name: 'LOW ORBIT', label: 'Low orbit', ramps: { a: 'red', b: 'heat', c: 'amber' }, paint: paintOrbit },
+  { name: 'DUSK RIDGE', label: 'Dusk ridge', ramps: { a: 'amber', b: 'red', c: 'heat' }, paint: paintDusk,
+    live(rk) { rk.glow(232, 154, 30, 'amber', 0.25); } },
+  { name: 'VIOLET STORM', label: 'Violet storm', ramps: { a: 'heat', b: 'amber', c: 'red' }, paint: paintStorm,
+    live(rk, t) {               // now and then the storm lights up from inside
+      if (t % 3.4 < 0.12) rk.glow([70, 250, 160][Math.floor(t / 3.4) % 3], 173, 34, 'chrome-200', 0.4);
+    } },
+  { name: 'PALE MOON', label: 'Pale moon', ramps: { a: 'red', b: 'red', c: 'heat' }, paint: paintMoon },
+  { name: 'EMBER FORGE', label: 'Ember forge', ramps: { a: 'amber', b: 'heat', c: 'red' }, paint: paintForge,
+    live(rk, t) {               // glowing craters, and embers drifting up off the lava
+      rk.glow(77, 130, 11, 'heat', 0.45);
+      rk.glow(246, 124, 13, 'heat', 0.45);
+      for (let i = 0; i < 12; i++) {
+        const rise = (t * (10 + i % 4 * 3) + i * 29) % 64;
+        rk.rect((i * 53 + 17) % W + Math.sin(t * 1.3 + i) * 3, GROUND - rise, 1, 1, i % 3 ? 'heat' : 'amber', 1 - rise / 64);
+      }
+    } },
+  { name: 'HOME SKY', label: 'Home sky', ramps: { a: 'red', b: 'heat', c: 'amber' }, paint: paintCity,
+    live(rk, t) {               // the light on the mast
+      if (Math.floor(t) % 2 === 0) { rk.px(152, 129, 'amber'); rk.glow(152, 129, 5, 'amber', 0.5); }
+    } },
+];
+
+function drawZone(rk, i, t) {
+  const zone = ZONES[i];
+  rk.draw('zone' + i, 0, 0);
+  zone.tw.forEach((star, n) => { if (Math.sin(t * 1.6 + n * 2.3) > 0.82) rk.px(star[0], star[1], 'chrome-100'); });
+  if (zone.live) zone.live(rk, t);
+}
+
+/* ---------- Helpers ---------- */
+
+// Plays a sound at most once every few updates, so repeats do not become a buzz.
+function play(g, rk, name, wait) {
+  if (g.cool[name] > 0) return;
+  g.cool[name] = wait || 6;
+  rk.sfx(name);
+}
+
+// The small pop of an ordinary invader: shorter and quieter than the kit's explosion, which is kept for big things.
+function pop(g, rk) {
+  if (g.cool.pop > 0) return;
+  g.cool.pop = 6;
+  rk.sfx.noise({ dur: 0.12, vol: 0.2, from: 2600, to: 400 });
+  rk.sfx.tone({ f: 200, to: 90, dur: 0.1, vol: 0.1 });
+}
+
+function spark(g, x, y, colours, count, power) {
+  for (let i = 0; i < count && g.parts.length < 200; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = (0.3 + Math.random() * 0.7) * power;
+    g.parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 14 + Math.random() * 16, colour: colours[i % colours.length] });
+  }
+}
+
+// An explosion centred on a point. `wait` holds it back a few updates, for a chain of them.
+function boom(g, x, y, big, wait) {
+  g.booms.push({ x: x, y: y, big: !!big, t: -(wait || 0) });
+}
+
+// Where an invader's place in the fleet is right now (the top-left corner of its 12 x 8 space).
+const slotX = (g, v) => g.fleet.x + v.col * CELL_W;
+const slotY = (g, v) => g.fleet.y + v.row * CELL_H - g.introOff;
+
+function invBox(g, v) {
+  const w = KINDS[v.kind].w;
+  const inFleet = v.state === 'form';
+  return { x: (inFleet ? slotX(g, v) : v.x) + (INV_W - w) / 2, y: inFleet ? slotY(g, v) : v.y, w: w, h: INV_H };
+}
+
+// The part of the ship that can be hit: the hull, not the tip of the gun.
+const shipBox = (g) => ({ x: g.ship.x + 2, y: SHIP_Y + 3, w: SHIP_W - 4, h: SHIP_H - 3 });
+const bombBox = (b) => ({ x: b.x + b.sway, y: b.y, w: b.w, h: b.h });
+
+// The lowest invader still in the fleet in each column: the ones with a clear shot at you.
+function frontRow(g) {
+  const low = [];
+  for (const v of g.invs) {
+    if (v.dead || v.state !== 'form') continue;
+    if (!low[v.col] || v.row > low[v.col].row) low[v.col] = v;
+  }
+  return low.filter(Boolean);
+}
+
+function newBomb(x, y, vx, vy, kind) {
+  return { x: x, y: y, vx: vx, vy: vy, kind: kind, w: kind === 'orb' ? 5 : 3, h: kind === 'orb' ? 5 : kind === 'weave' ? 7 : 6, t: 0, sway: 0, dead: false };
+}
+
+/* ---------- Bunkers ---------- */
+
+// Works out which pieces of one bunker a box covers. Returns null if it misses that bunker.
+function covered(b, box) {
+  if (box.x + box.w <= b.x || box.x >= b.x + 24) return null;
+  return {
+    c0: Math.max(0, Math.floor((box.x - b.x) / 2)),
+    c1: Math.min(11, Math.floor((box.x + box.w - 0.01 - b.x) / 2)),
+    r0: Math.max(0, Math.floor((box.y - BUNKER_Y) / 2)),
+    r1: Math.min(5, Math.floor((box.y + box.h - 0.01 - BUNKER_Y) / 2)),
+  };
+}
+
+// Finds the first solid piece of bunker in a box, coming from below (your shots) or above (bombs), and
+// breaks it off along with whatever lies within `reach` pieces of it. Returns true if it hit anything.
+function chip(g, box, fromBelow, reach) {
+  if (box.y + box.h <= BUNKER_Y || box.y >= BUNKER_Y + 12) return false;
+  for (const b of g.bunkers) {
+    const at = covered(b, box);
+    if (!at) continue;
+    let hr = -1;
+    let hc = -1;
+    for (let i = 0; i <= at.r1 - at.r0 && hr < 0; i++) {
+      const r = fromBelow ? at.r1 - i : at.r0 + i;
+      for (let c = at.c0; c <= at.c1; c++) if (b.cells[r][c]) { hr = r; hc = c; break; }
+    }
+    if (hr < 0) continue;
+    for (let r = Math.max(0, hr - 2); r <= Math.min(5, hr + 2); r++) {
+      for (let c = Math.max(0, hc - 2); c <= Math.min(11, hc + 2); c++) {
+        const d = Math.hypot(c - hc, r - hr);
+        if (d <= reach - 0.9 || (d <= reach && Math.random() < 0.5) || (r === hr && c >= at.c0 && c <= at.c1)) b.cells[r][c] = 0;
+      }
+    }
+    spark(g, b.x + hc * 2 + 1, BUNKER_Y + hr * 2 + 1, ['chrome-200', 'chrome-400'], 3, 0.8);
+    return true;
+  }
+  return false;
+}
+
+// An invader that reaches a bunker flattens whatever it touches.
+function crush(g, box) {
+  if (box.y + box.h <= BUNKER_Y || box.y >= BUNKER_Y + 12) return;
+  for (const b of g.bunkers) {
+    const at = covered(b, box);
+    if (!at) continue;
+    for (let r = at.r0; r <= at.r1; r++) for (let c = at.c0; c <= at.c1; c++) b.cells[r][c] = 0;
+  }
+}
+
+/* ---------- Levels and lives ---------- */
+
+function setupLevel(g, rk) {
+  const S = stageFor(g.level, g.advanced);
+  g.stage = S;
+  g.zone = ZONES[S.zone];
+  const x = Math.round((W - ((S.cols - 1) * CELL_W + INV_W)) / 4) * 2;    // centred, on an even pixel
+  g.fleet = { fx: x, x: x, y: S.top, dir: 1, flip: 0, lastFlip: 0 };
+  g.invs = [];
+  S.rows.forEach((spec, row) => {
+    for (let col = 0; col < S.cols; col++) {
+      const kind = spec[col % spec.length];
+      g.invs.push({
+        col: col, row: row, kind: kind, hp: KINDS[kind].hp,
+        sprite: kind === 'd' ? 'invD' : 'inv' + KINDS[kind].art + '_' + g.zone.ramps[kind],
+        state: 'form',          // form = in the fleet, dive = swooping at the ship, back = on its way home
+        x: 0, y: 0, vx: 0, dropped: false, flash: 0, dead: false,
+      });
+    }
+  });
+  g.total = g.alive = g.invs.length;
+  g.bunkers = BUNKER_X.map((bx) => ({ x: bx, cells: BUNKER_SHAPE.map((row) => row.split('').map((ch) => (ch === 'X' ? 1 : 0))) }));
+  g.shots = [];
+  g.bombs = [];
+  g.caps = [];
+  g.saucer = null;
+  g.saucerT = rk.rand(700, 1100);
+  g.boss = S.bossHp ? { x: (W - 40) / 2, y: 12, hp: S.bossHp, max: S.bossHp, swing: 0, fireT: 150, drops: 0, flash: 0, dead: false } : null;
+  g.fireT = g.level === 1 ? 160 : 90;               // a little longer to find your feet on the first level
+  g.diveT = rk.rand(240, 360);
+  g.introOff = 70;              // the fleet starts above the screen and slides down into place
+  g.phase = 'intro';
+  rk.hud.set('level', g.level);
+  rk.hud.set('zone', g.zone.label);
+  rk.banner('LEVEL ' + g.level, 1.1);
+  const level = g.level;
+  rk.after(1.1, () => {
+    if (g.level !== level || g.phase !== 'intro') return;
+    rk.banner(g.zone.name, 1.2);
+    g.introOff = 0;
+    g.phase = 'play';
+  });
+}
+
+function die(g, rk) {
+  if (g.phase !== 'play') return;
+  g.phase = 'dying';
+  const cx = g.ship.x + 8;
+  boom(g, cx, SHIP_Y + 4, true);
+  spark(g, cx, SHIP_Y + 4, ['chrome-100', 'aqua', 'amber'], 24, 2);
+  rk.sfx('explosion');
+  rk.shake(3, 0.2);
+  g.shots = [];
+  g.bombs = [];
+  g.weapon = null;              // powers do not survive the ship
+  g.weaponT = 0;
+  g.turbo = 0;
+  g.shield = 0;
+  if (rk.loseLife() > 0) {
+    rk.after(1.3, () => {
+      g.ship.x = (W - SHIP_W) / 2;
+      g.ship.goal = g.ship.x;
+      g.ship.trail = [];
+      g.inv = 90;               // 1.5 seconds of blinking, when nothing can hurt it
+      g.fireT = Math.max(g.fireT, 50);
+      g.phase = 'play';
+    });
+  }
+}
+
+// Something hit the ship. The shield, if there is one, takes it.
+function hitShip(g, rk) {
+  if (g.phase !== 'play' || g.inv > 0) return;
+  if (g.shield > 0) {
+    g.shield = 0;
+    g.inv = 45;
+    rk.sfx('hit');
+    spark(g, g.ship.x + 8, SHIP_Y + 2, ['aqua-light', 'aqua'], 14, 1.6);
+    return;
+  }
+  die(g, rk);
+}
+
+// The fleet has landed: that costs a life whatever the ship is carrying, and sends the fleet back up.
+function overrun(g, rk) {
+  if (g.phase !== 'play') return;
+  rk.banner('OVERRUN', 1.2);
+  die(g, rk);
+  if (!rk.ending) rk.after(1.25, () => { g.fleet.y = g.stage.top; });
+}
+
+function clearStage(g, rk) {
+  g.phase = 'clear';
+  for (const b of g.bombs) spark(g, b.x + 1, b.y + 3, ['sun-100', 'red-light'], 4, 0.9);
+  g.bombs = [];
+  g.shots = [];
+  g.saucer = null;
+  rk.addScore(100 * g.level, g.ship.x + 8, SHIP_Y - 10, 'amber');
+  rk.sfx('pickup');
+  rk.after(1.6, () => { g.level++; setupLevel(g, rk); });
+}
+
+/* ---------- Hits and scores ---------- */
+
+function damage(g, rk, v, n) {
+  v.hp -= n;
+  if (v.hp > 0) {                                   // armour holds: a white flash, and a crack
+    v.flash = 5;
+    play(g, rk, 'hit');
+    return;
+  }
+  const box = invBox(g, v);
+  const cx = box.x + box.w / 2;
+  const cy = box.y + 4;
+  const pts = KINDS[v.kind].pts * (v.state === 'form' ? 1 : 2);     // double for one caught out of the fleet
+  v.dead = true;
+  g.alive--;
+  if (pts >= 50) rk.addScore(pts, cx, cy - 6);
+  else rk.addScore(pts);
+  boom(g, cx, cy);
+  spark(g, cx, cy, v.kind === 'd' ? ['chrome-200', 'chrome-300'] : rk.ramps[g.zone.ramps[v.kind]], 6, 1.2);
+  if (v.kind === 'd') play(g, rk, 'explosion', 10);
+  else pop(g, rk);
+  if (g.advanced) dropCapsule(g, rk, cx, cy, false);
+}
+
+function hurtBoss(g, rk, n, x) {
+  const b = g.boss;
+  b.hp -= n;
+  b.flash = 5;
+  spark(g, x, b.y + 12, ['chrome-100', 'red-light'], 4, 1.2);
+  if (b.hp > 0) {
+    play(g, rk, 'hit');
+    if (Math.floor((b.max - b.hp) / 5) > b.drops) {             // it sheds a capsule for every five hits
+      b.drops++;
+      dropCapsule(g, rk, b.x + 20, b.y + 14, true);
+    }
+    return;
+  }
+  b.dead = true;
+  for (let i = 0; i < 6; i++) boom(g, b.x + 5 + i * 6, b.y + 3 + rk.rand(0, 8), true, i * 5);
+  spark(g, b.x + 20, b.y + 7, ['sun-100', 'amber', 'heat', 'red'], 36, 2.4);
+  rk.sfx('explosion');
+  rk.shake(4, 0.25);
+  rk.addScore(1000, b.x + 20, b.y + 7, 'amber');
+}
+
+// A shell going off: it catches everything close by, and hits whatever it struck twice as hard.
+function burst(g, rk, x, y, struck) {
+  g.blasts.push({ x: x, y: y, t: 0 });
+  play(g, rk, 'explosion', 10);
+  rk.shake(2, 0.15);
+  if (struck && !struck.dead) damage(g, rk, struck, 2);
+  for (const v of g.invs) {
+    if (v.dead) continue;
+    const box = invBox(g, v);
+    if (Math.hypot(box.x + box.w / 2 - x, box.y + 4 - y) <= 17) damage(g, rk, v, 1);
+  }
+  for (const b of g.bombs) if (Math.hypot(b.x + 1 - x, b.y + 3 - y) <= 17) b.dead = true;
+  const boss = g.boss;
+  if (boss && !boss.dead && x > boss.x - 8 && x < boss.x + 48 && y < boss.y + 26) hurtBoss(g, rk, 3, x);
+}
+
+function shootSaucer(g, rk) {
+  const cx = g.saucer.x + 8;
+  rk.addScore(rk.pick([50, 100, 100, 150, 150, 300]), cx, SAUCER_Y + 3, 'amber');
+  boom(g, cx, SAUCER_Y + 3, true);
+  spark(g, cx, SAUCER_Y + 3, ['amber-light', 'amber', 'chrome-200'], 12, 1.6);
+  rk.sfx('explosion');
+  if (g.advanced) dropCapsule(g, rk, cx, SAUCER_Y + 6, true);
+  g.saucer = null;
+  g.saucerT = rk.rand(900, 1500);
+}
+
+/* ---------- Capsules ---------- */
+
+// Called for every invader destroyed in Advanced. About one in twelve drops a capsule, never more than
+// two at once, and never fourteen in a row without one. `sure` (the saucer, the flagship) always drops.
+function dropCapsule(g, rk, x, y, sure) {
+  if (!sure) {
+    g.dry++;
+    if (g.caps.length >= 2 || g.capWait > 0) return;
+    if (g.dry < 14 && Math.random() > 0.085) return;
+  }
+  g.dry = 0;
+  g.capWait = 150;
+  const sunk = g.fleet.y - g.stage.top;             // how far the fleet has come down
+  const open = UNLOCKS.slice(0, 2 + g.level);
+  let list = open.filter((k) => k !== g.lastCap && !(k === 'shield' && g.shield > 0) && !(k === 'freeze' && g.freeze > 0) && !(k === 'rewind' && sunk < 18));
+  if (!list.length) list = open;
+  const weight = (k) => POWERS[k].weight * (k === 'rewind' && sunk >= 36 ? 3 : 1);
+  let roll = Math.random() * list.reduce((sum, k) => sum + weight(k), 0);
+  let kind = list[0];
+  for (const k of list) {
+    roll -= weight(k);
+    if (roll < 0) { kind = k; break; }
+  }
+  g.lastCap = kind;
+  g.caps.push({ x: rk.clamp(x - 4.5, EDGE, W - EDGE - 9), y: y - 4, kind: kind, dead: false });
+}
+
+function collect(g, rk, kind) {
+  const power = POWERS[kind];
+  rk.addScore(50);
+  rk.sfx('pickup');
+  rk.popup(power.label, g.ship.x + 8, SHIP_Y - 8, 'amber');
+  if (power.weapon) {
+    g.weapon = kind;
+    g.weaponT = g.weaponMax = power.time;
+    g.gunT = 0;
+  } else if (kind === 'turbo') g.turbo = power.time;
+  else if (kind === 'shield') g.shield = power.time;
+  else if (kind === 'freeze') {
+    g.freeze = power.time;
+    for (const b of g.bombs) spark(g, b.x + 1, b.y + 3, ['chrome-100', 'aqua-light'], 4, 0.9);
+    g.bombs = [];
+  } else if (kind === 'rewind') {
+    g.fleet.y -= Math.min(18, g.fleet.y - g.stage.top);
+    for (const v of g.invs) {                       // a streak under each invader, left behind as it jumps
+      if (v.dead || v.state !== 'form' || g.parts.length > 190) continue;
+      g.parts.push({ x: slotX(g, v) + 6, y: slotY(g, v) + 12, vx: 0, vy: 0.9, life: 16, colour: 'aqua' });
+    }
+    rk.sfx.tone({ type: 'triangle', f: 300, to: 900, dur: 0.18, vol: 0.16 });
+  }
+}
+
+/* ---------- One update of each part of the game ---------- */
+
+function stepShip(g, rk, canFire) {
+  const p = g.ship;
+  const inp = rk.input;
+  const fast = g.turbo > 0 ? TURBO : 1;
+  let move = 0;
+  if (inp.left) move -= SHIP_SPEED * fast;
+  if (inp.right) move += SHIP_SPEED * fast;
+  // Dragging (a finger, or the mouse with its button held) moves a target by the same amount, and the
+  // ship chases the target at its top speed. So Turbo counts for something on a phone as well.
+  if (inp.pointer.pressed || !inp.pointer.down) p.goal = p.x;
+  if (inp.pointer.down) {
+    p.goal = rk.clamp(p.goal + inp.pointer.dx, EDGE, W - EDGE - SHIP_W);
+    move += rk.clamp(p.goal - p.x, -DRAG_SPEED * fast, DRAG_SPEED * fast);
+  }
+  p.x = rk.clamp(p.x + move, EDGE, W - EDGE - SHIP_W);
+  p.trail.push(p.x);
+  if (p.trail.length > 5) p.trail.shift();
+  if (g.gunT > 0) g.gunT--;
+  // Holding Space fires, and so does holding a finger down: one thumb can steer and shoot at once.
+  if (canFire && (inp.fire || inp.pointer.down || inp.tap)) fire(g, rk);
+}
+
+function addShot(g, kind, x, y, vx, vy) {
+  g.shots.push({
+    kind: kind, x: x, y: y, vx: vx, vy: vy,
+    w: kind === 'shell' ? 4 : 2, h: kind === 'lance' ? 12 : kind === 'shell' ? 4 : 6,
+    hits: kind === 'lance' ? new Set() : null, hitBoss: false, dead: false,
+  });
+}
+
+function fire(g, rk) {
+  if (g.gunT > 0) return;
+  const x = g.ship.x + 7;       // the gun is in the middle of the ship
+  const y = SHIP_Y - 5;
+  const boost = g.turbo > 0 ? 1.35 : 1;
+  const out = g.shots.length;   // how many of your shots are still in the air
+  if (g.weapon === 'rapid') {
+    if (out >= 4) return;
+    addShot(g, 'bolt', x, y, 0, -5.2 * boost);
+    g.gunT = 7;
+  } else if (g.weapon === 'spread') {
+    if (out > 3) return;
+    for (const k of [-1, 0, 1]) addShot(g, 'bolt', x + k * 2, y, k * 0.85, -4.6 * boost);
+    g.gunT = 22;
+  } else if (g.weapon === 'lance') {
+    if (out >= 1) return;
+    addShot(g, 'lance', x, y - 6, 0, -6 * boost);
+    g.gunT = 16;
+  } else if (g.weapon === 'blast') {
+    if (out >= 1) return;
+    addShot(g, 'shell', x - 1, y + 2, 0, -3.8 * boost);
+    g.gunT = 14;
+  } else {                      // the ordinary gun: one shot in the air at a time
+    if (out >= 1) return;
+    addShot(g, 'bolt', x, y, 0, -4.6 * boost);
+    g.gunT = 6;
+  }
+  if (g.turbo > 0) g.gunT = Math.round(g.gunT * 0.75);
+  play(g, rk, 'shot', 5);
+}
+
+function stepShots(g, rk) {
+  for (const s of g.shots) {
+    s.x += s.vx;
+    s.y += s.vy;
+    if (s.y + s.h < 0 || s.x < -4 || s.x > W + 2) { s.dead = true; continue; }
+    const path = { x: s.x, y: s.y, w: s.w, h: s.h - s.vy };     // the stretch it flew through this update
+    const pierce = s.kind === 'lance';
+
+    // A shot and a bomb cancel each other out
+    for (const b of g.bombs) {
+      if (b.dead || !rk.hit(path, bombBox(b))) continue;
+      b.dead = true;
+      spark(g, b.x + 1, b.y + 3, ['sun-100', 'red-light'], 4, 0.9);
+      play(g, rk, 'blip');
+      if (!pierce) { s.dead = true; break; }
+    }
+    if (s.dead) {
+      if (s.kind === 'shell') burst(g, rk, s.x + 2, s.y);
+      continue;
+    }
+
+    // Your own shots chip the bunkers from below (the lance goes straight through)
+    if (!pierce && chip(g, path, true, 0)) { s.dead = true; continue; }
+
+    // Invaders: the lowest one in the way
+    let struck = null;
+    let struckY = -99;
+    for (const v of g.invs) {
+      if (v.dead || (pierce && s.hits.has(v))) continue;
+      const box = invBox(g, v);
+      if (!rk.hit(path, box)) continue;
+      if (pierce) { s.hits.add(v); damage(g, rk, v, 2); continue; }
+      if (box.y > struckY) { struck = v; struckY = box.y; }
+    }
+    if (struck) {
+      s.dead = true;
+      if (s.kind === 'shell') burst(g, rk, s.x + 2, struckY + 4, struck);
+      else damage(g, rk, struck, 1);
+      continue;
+    }
+
+    const boss = g.boss;
+    if (boss && !boss.dead && rk.hit(path, { x: boss.x + 2, y: boss.y, w: 36, h: 12 })) {
+      if (pierce) {
+        if (!s.hitBoss) { s.hitBoss = true; hurtBoss(g, rk, 2, s.x); }
+      } else {
+        s.dead = true;
+        if (s.kind === 'shell') burst(g, rk, s.x + 2, boss.y + 12);
+        else hurtBoss(g, rk, 1, s.x);
+        continue;
+      }
+    }
+
+    if (g.saucer && rk.hit(path, { x: g.saucer.x, y: SAUCER_Y, w: 16, h: 6 })) {
+      shootSaucer(g, rk);
+      if (!pierce) s.dead = true;
+    }
+  }
+}
+
+// The march: across in 2-pixel steps, down a row at each side, faster as the fleet thins out.
+function stepFleet(g, rk) {
+  const f = g.fleet;
+  const S = g.stage;
+  let minCol = 99;
+  let maxCol = -1;
+  let lowRow = -1;
+  for (const v of g.invs) {
+    if (v.dead) continue;
+    if (v.col < minCol) minCol = v.col;
+    if (v.col > maxCol) maxCol = v.col;
+    if (v.state === 'form' && v.row > lowRow) lowRow = v.row;
+  }
+  if (maxCol < 0 || g.freeze > 0) return;
+  const speed = Math.min(2.2, S.speed * Math.min(S.maxMul, Math.pow(g.total / g.alive, 0.8)));
+  const left = EDGE - minCol * CELL_W;
+  const right = W - EDGE - INV_W - maxCol * CELL_W;
+  f.fx += f.dir * speed;
+  if (f.dir > 0 && f.fx >= right) { f.fx = right; f.dir = -1; f.y += DROP; }
+  else if (f.dir < 0 && f.fx <= left) { f.fx = left; f.dir = 1; f.y += DROP; }
+  const x = Math.round(f.fx / 2) * 2;
+  if (x !== f.x) {
+    f.x = x;
+    if (g.tick - f.lastFlip >= 6) { f.flip ^= 1; f.lastFlip = g.tick; }       // legs move with each step
+  }
+  if (lowRow < 0) return;
+  const feet = f.y + lowRow * CELL_H + INV_H;
+  if (feet >= LAND_Y) { overrun(g, rk); return; }
+  if (feet > BUNKER_Y) {
+    for (const v of g.invs) if (!v.dead && v.state === 'form') crush(g, invBox(g, v));
+  }
+}
+
+// Advanced: now and then an invader leaves the fleet and swoops at the ship, dropping a bomb on the way.
+// If it misses, it comes back in at the top and returns to its place.
+function stepDivers(g, rk) {
+  const S = g.stage;
+  if (g.freeze > 0) return;
+  let away = 0;
+  for (const v of g.invs) if (!v.dead && v.state !== 'form') away++;
+  if (S.divers && away < S.diverMax && g.alive > 1 && --g.diveT <= 0) {
+    g.diveT = rk.rand(S.diveGap[0], S.diveGap[1]);
+    const front = frontRow(g);
+    if (front.length) {
+      const v = rk.pick(front);
+      v.x = slotX(g, v);
+      v.y = slotY(g, v);
+      v.vx = 0;
+      v.dropped = false;
+      v.state = 'dive';
+      rk.sfx.tone({ type: 'sawtooth', f: 900, to: 320, dur: 0.18, vol: 0.09 });
+    }
+  }
+  for (const v of g.invs) {
+    if (v.dead || v.state === 'form') continue;
+    if (v.state === 'back') {
+      const home = slotY(g, v);
+      v.x = slotX(g, v);
+      v.y = Math.min(home, v.y + 1.8);
+      if (v.y >= home) v.state = 'form';
+      continue;
+    }
+    v.vx = rk.clamp(v.vx + Math.sign(g.ship.x + 2 - v.x) * 0.06, -1.25, 1.25);     // it steers towards the ship
+    v.x = rk.clamp(v.x + v.vx, EDGE, W - EDGE - INV_W);
+    v.y += S.diveSpeed;
+    if (g.tick % 3 === 0 && g.parts.length < 200) g.parts.push({ x: v.x + 5 + Math.random() * 2, y: v.y, vx: 0, vy: -0.3, life: 12, colour: g.tick % 2 ? 'heat' : 'amber' });
+    const box = invBox(g, v);
+    crush(g, box);
+    if (!v.dropped && v.y > 92) {
+      v.dropped = true;
+      g.bombs.push(newBomb(v.x + 5, v.y + 8, 0, S.bombSpeed + 0.4, 'bomb'));
+    }
+    if (g.phase === 'play' && g.inv <= 0 && rk.hit(box, shipBox(g))) {
+      hitShip(g, rk);
+      damage(g, rk, v, 9);       // it does not survive the crash either
+      continue;
+    }
+    if (v.y > H + 4) { v.state = 'back'; v.y = -12; }
+  }
+}
+
+// Advanced, level 6: the flagship sweeps from side to side over the fleet, and fires in threes.
+function stepBoss(g, rk) {
+  const b = g.boss;
+  if (!b || b.dead || g.freeze > 0) return;
+  const hurt = 1 - b.hp / b.max;
+  b.swing += 0.011 * (1 + hurt * 0.9);              // it gets faster as it takes damage
+  b.x = (W - 40) / 2 + Math.sin(b.swing) * 128;
+  if (hurt > 0.5 && g.tick % 6 === 0) spark(g, b.x + rk.rand(6, 34), b.y + 4, ['heat', 'chrome-400'], 1, 0.6);
+  if (--b.fireT > 0) return;
+  b.fireT = rk.lerp(84, 150, b.hp / b.max);
+  for (const k of [-1, 0, 1]) g.bombs.push(newBomb(b.x + 18, b.y + 13, k * 0.42, g.stage.bombSpeed * 0.9, 'orb'));
+  rk.sfx.tone({ type: 'sawtooth', f: 260, to: 140, dur: 0.16, vol: 0.1 });
+}
+
+// The bonus saucer crosses the top of the screen every so often. Its score is a surprise.
+function stepSaucer(g, rk) {
+  const s = g.saucer;
+  if (!s) {
+    if (!g.boss && g.alive >= 6 && --g.saucerT <= 0) {
+      const dir = rk.pick([-1, 1]);
+      g.saucer = { x: dir > 0 ? -18 : W + 2, dir: dir, t: 0 };
+    }
+    return;
+  }
+  s.x += s.dir * 0.75;
+  if (++s.t % 24 === 0) rk.sfx.tone({ f: s.t % 48 ? 700 : 880, dur: 0.06, vol: 0.05 });
+  if (s.x < -20 || s.x > W + 4) {
+    g.saucer = null;
+    g.saucerT = rk.rand(900, 1500);
+  }
+}
+
+function stepEnemyFire(g, rk) {
+  const S = g.stage;
+  if (g.freeze > 0 || --g.fireT > 0) return;
+  g.fireT = rk.rand(S.fire[0], S.fire[1]);
+  if (g.bombs.length >= S.bombs) return;
+  const front = frontRow(g);
+  if (!front.length) return;
+  let v = rk.pick(front);
+  if (Math.random() < S.aim) {  // some of the time, the one nearest above the ship takes the shot
+    const sx = g.ship.x + 2;
+    for (const other of front) if (Math.abs(slotX(g, other) - sx) < Math.abs(slotX(g, v) - sx)) v = other;
+  }
+  const weave = S.weave && Math.random() < 0.45;
+  g.bombs.push(newBomb(slotX(g, v) + 5, slotY(g, v) + INV_H, 0, S.bombSpeed * (weave ? 0.85 : 1), weave ? 'weave' : 'bomb'));
+}
+
+function stepBombs(g, rk) {
+  for (const b of g.bombs) {
+    if (b.dead) continue;
+    b.t++;
+    b.x += b.vx;
+    b.y += b.vy;
+    if (b.kind === 'weave') b.sway = Math.round(Math.sin(b.t * 0.16) * 4);
+    const box = bombBox(b);
+    if (chip(g, box, false, 1.9)) { b.dead = true; play(g, rk, 'hit', 8); continue; }
+    if (rk.hit(box, shipBox(g))) {
+      if (g.inv <= 0) b.dead = true;
+      hitShip(g, rk);
+      continue;
+    }
+    if (b.y + b.h >= GROUND) {
+      b.dead = true;
+      spark(g, box.x + 1, GROUND - 1, ['red-light', 'red'], 3, 0.8);
+    } else if (box.x < -6 || box.x > W + 6) b.dead = true;
+  }
+}
+
+function stepCaps(g, rk) {
+  if (g.capWait > 0) g.capWait--;
+  const reach = { x: g.ship.x - 1, y: SHIP_Y - 1, w: SHIP_W + 2, h: SHIP_H + 3 };
+  for (const c of g.caps) {
+    c.y += 0.6;
+    if (g.phase !== 'dying' && rk.hit({ x: c.x, y: c.y, w: 9, h: 9 }, reach)) {
+      c.dead = true;
+      collect(g, rk, c.kind);
+    } else if (c.y + 9 >= GROUND + 2) {
+      c.dead = true;
+      spark(g, c.x + 4, GROUND, ['amber', 'amber-dark'], 5, 0.8);
+    }
+  }
+  g.caps = g.caps.filter((c) => !c.dead);
+}
+
+function stepPowers(g, rk) {
+  if (g.inv > 0) g.inv--;
+  if (g.freeze > 0) g.freeze--;
+  if (g.turbo > 0) g.turbo--;
+  if (g.shield > 0) g.shield--;
+  if (g.weaponT > 0 && --g.weaponT === 0) {
+    g.weapon = null;
+    rk.sfx.tone({ type: 'triangle', f: 520, to: 260, dur: 0.15, vol: 0.14 });
+  }
+}
+
+/* ---------- Drawing ---------- */
+
+function drawBunkers(rk, g) {
+  for (const b of g.bunkers) {
+    for (let r = 0; r < 6; r++) {
+      const row = b.cells[r];
+      for (let c = 0; c < 12; c++) {
+        if (!row[c]) continue;
+        // lit along whatever is now its top edge, dark at the foot
+        const colour = r === 0 || !b.cells[r - 1][c] ? 'chrome-200' : r > 3 ? 'chrome-400' : 'chrome-300';
+        rk.rect(b.x + c * 2, BUNKER_Y + r * 2, 2, 2, colour);
+      }
+    }
+  }
+}
+
+function drawFleet(rk, g) {
+  const iced = g.freeze > 0 && !(g.freeze < 90 && g.freeze % 24 < 12);       // frozen: white statues, blinking as it wears off
+  for (const v of g.invs) {
+    if (v.dead) continue;
+    const inFleet = v.state === 'form';
+    const y = inFleet ? slotY(g, v) : v.y;
+    if (y < -10) continue;
+    let frame = inFleet ? g.fleet.flip : (g.tick >> 2) & 1;
+    if (v.kind === 'd' && v.hp < 2) frame += 2;
+    rk.draw(v.sprite, (inFleet ? slotX(g, v) : v.x) + (INV_W - KINDS[v.kind].w) / 2, y, frame, { flash: iced || v.flash > 0 });
+  }
+  const b = g.boss;
+  if (b && !b.dead) rk.draw('flagship', b.x, b.y - g.introOff, 0, { flash: iced || b.flash > 0 });
+  if (g.saucer) {
+    rk.glow(g.saucer.x + 8, SAUCER_Y + 3, 12, 'amber', 0.35);
+    rk.draw('saucer', g.saucer.x, SAUCER_Y, (g.tick >> 3) & 1);
+  }
+}
+
+function drawShip(rk, g) {
+  if (g.phase === 'dying') return;
+  if (g.inv > 0 && g.inv % 10 < 5) return;
+  const p = g.ship;
+  const x = Math.round(p.x);
+  const turbo = g.turbo > 0 && !(g.turbo < 120 && g.turbo % 24 < 12);
+  if (turbo && p.trail.length >= 5) {               // two fading copies behind a fast ship
+    rk.draw('ship', p.trail[0], SHIP_Y, 0, { alpha: 0.2 });
+    rk.draw('ship', p.trail[2], SHIP_Y, 0, { alpha: 0.4 });
+  }
+  const flame = 1 + ((g.tick >> 2) & 1) + (turbo ? 2 : 0);
+  rk.glow(x + 8, SHIP_Y + 10, turbo ? 10 : 6, 'aqua', 0.4);
+  rk.rect(x + 4, SHIP_Y + 9, 1, flame, turbo ? 'aqua' : 'aqua-light');
+  rk.rect(x + 12, SHIP_Y + 9, 1, flame, turbo ? 'aqua' : 'aqua-light');
+  rk.draw('ship', x, SHIP_Y);
+  // A strip of five lights on the hull counts down the weapon; it blinks for the last two seconds
+  if (g.weaponT > 0 && !(g.weaponT < 120 && g.weaponT % 24 < 12)) {
+    const lit = Math.ceil(5 * g.weaponT / g.weaponMax);
+    for (let i = 0; i < 5; i++) rk.px(x + 6 + i, SHIP_Y + 7, i < lit ? 'aqua' : 'aqua-dark');
+  }
+  if (g.shield > 0 && !(g.shield < 120 && g.shield % 24 < 12)) {
+    rk.glow(x + 8, SHIP_Y + 4, 16, 'aqua', 0.25);
+    for (let n = 0; n <= 16; n++) {
+      const ang = Math.PI + n * Math.PI / 16;
+      rk.px(x + 8 + Math.cos(ang) * 12, SHIP_Y + 8 + Math.sin(ang) * 11, n % 2 ? 'aqua' : 'aqua-light');
+    }
+  }
+}
+
+function drawBits(rk, g) {
+  for (const b of g.bombs) {
+    const x = b.x + b.sway;
+    if (b.kind === 'weave') rk.draw('weave', x, b.y, (b.t >> 3) & 1);
+    else rk.draw(b.kind, x, b.y);
+  }
+  for (const c of g.caps) {
+    rk.glow(c.x + 4.5, c.y + 4.5, 11, 'amber', 0.35);
+    rk.draw('cap_' + c.kind, c.x, c.y);
+  }
+  for (const s of g.shots) {
+    if (s.kind === 'bolt') {
+      rk.rect(s.x, s.y + 6, 2, 3, 'aqua', 0.4);     // a short fading tail
+      rk.rect(s.x, s.y + 9, 2, 3, 'aqua', 0.2);
+      rk.glow(s.x + 1, s.y + 2, 5, 'aqua', 0.5);
+      rk.draw('shot', s.x, s.y);
+    } else if (s.kind === 'lance') {
+      rk.rect(s.x, s.y + 12, 2, 6, 'aqua', 0.4);
+      rk.rect(s.x, s.y + 18, 2, 6, 'aqua', 0.2);
+      rk.glow(s.x + 1, s.y + 4, 9, 'aqua', 0.55);
+      rk.draw('lance', s.x, s.y);
+    } else {
+      rk.glow(s.x + 2, s.y + 2, 7, 'aqua', 0.5);
+      rk.draw('shell', s.x, s.y);
+    }
+  }
+}
+
+function drawBlasts(rk, g) {
+  for (const b of g.booms) {
+    if (b.t < 0) continue;
+    const frame = Math.floor(b.t / 4);
+    if (frame < 2) rk.glow(b.x, b.y, b.big ? 18 : 9, 'amber', 0.45);
+    rk.draw(b.big ? 'boom' : 'pop', b.x - (b.big ? 11 : 6), b.y - (b.big ? 7 : 4), frame);
+  }
+  for (const b of g.blasts) {   // a shell going off: a ring of sparks racing outwards
+    const r = 17 * b.t / 12;
+    rk.glow(b.x, b.y, r + 8, 'amber', 0.5 * (1 - b.t / 12));
+    for (let n = 0; n < 20; n++) {
+      const ang = n * Math.PI / 10;
+      rk.rect(b.x + Math.cos(ang) * r - 1, b.y + Math.sin(ang) * r - 1, 2, 2, n % 2 ? 'amber' : 'sun-100');
+    }
+  }
+  for (const pt of g.parts) rk.rect(pt.x, pt.y, 1, 1, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+}
+
+/* ---------- The game ---------- */
+RetroKit.game({
+  id: 'orbit-siege',
+  title: 'ORBIT SIEGE',
+  tagline: 'AN INVASION IN TWO MODES',
+  lives: 3,
+  hud: ['score', 'best', 'lives', 'level', { id: 'zone', label: 'Zone', type: 'text' }],
+  keys: [['←', '→', 'Move'], ['Space', 'Fire'], ['P', 'Pause']],
+  touch: 'Drag to move · Hold to fire',
+
+  // The kit offers these after Start game, hands the chosen id to start() as rk.mode, and keeps a
+  // high-score table for each.
+  modes: [
+    { id: 'classic', label: 'Classic', description: 'One shot at a time and four bunkers' },
+    { id: 'advanced', label: 'Advanced', description: 'Adds capsules, divers and a flagship' },
+  ],
+  music: { data: window.ORBIT_SIEGE_MUSIC, level: 0.35 },     // level: how loud the track is against the sound effects (1 = the file's full level)
+
+  sprites: buildSprites(),
+
+  init(rk) {
+    // Paint each zone's backdrop once, and keep it as a sprite
+    ZONES.forEach((zone, i) => {
+      const s = zone.paint();
+      rk.makeSprite(s.art(), 'zone' + i);
+      zone.tw = s.tw;
+    });
+  },
+
+  start(rk) {
+    const g = {
+      phase: 'intro',           // for each level: intro, play, and dying or clear
+      advanced: rk.mode === 'advanced',
+      level: 1,
+      tick: 0,
+      parts: [],
+      booms: [],
+      blasts: [],
+      cool: {},
+      ship: { x: (W - SHIP_W) / 2, goal: (W - SHIP_W) / 2, trail: [] },
+      gunT: 0,                  // updates until the gun can fire again
+      inv: 0,                   // updates of blinking, when nothing can hurt the ship
+      weapon: null,             // the capsule weapon in use, and how long it has left
+      weaponT: 0,
+      weaponMax: 1,
+      turbo: 0,
+      shield: 0,
+      freeze: 0,
+      dry: 0,                   // invaders destroyed since the last capsule
+      capWait: 0,
+      lastCap: '',
+      nextLife: 3000,           // an extra life at 3,000 points, then every 7,000 after
+    };
+    setupLevel(g, rk);
+    return g;
+  },
+
+  update(g, rk) {
+    g.tick++;
+    for (const k in g.cool) if (g.cool[k] > 0) g.cool[k]--;
+    for (const pt of g.parts) { pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.95; pt.vy *= 0.95; pt.life--; }
+    g.parts = g.parts.filter((pt) => pt.life > 0);
+    for (const b of g.booms) b.t++;
+    g.booms = g.booms.filter((b) => b.t < 16);
+    for (const b of g.blasts) b.t++;
+    g.blasts = g.blasts.filter((b) => b.t < 12);
+    for (const v of g.invs) if (v.flash > 0) v.flash--;
+    if (g.boss && g.boss.flash > 0) g.boss.flash--;
+    if (rk.ending || g.phase === 'dying') return;    // everything holds still while the ship is gone
+    if (g.phase === 'intro') {
+      g.introOff = Math.max(0, g.introOff - 2);
+      stepShip(g, rk, false);
+      return;
+    }
+    if (g.phase === 'clear') {
+      stepShip(g, rk, false);
+      stepCaps(g, rk);
+      return;
+    }
+
+    if (rk.score >= g.nextLife) {
+      g.nextLife += 7000;
+      rk.addLife(1);
+      rk.popup('1UP', g.ship.x + 8, SHIP_Y - 10, 'amber');
+    }
+
+    stepShip(g, rk, true);
+    stepShots(g, rk);
+    stepFleet(g, rk);
+    stepDivers(g, rk);
+    stepBoss(g, rk);
+    stepSaucer(g, rk);
+    stepEnemyFire(g, rk);
+    stepBombs(g, rk);
+    stepCaps(g, rk);
+    stepPowers(g, rk);
+    g.shots = g.shots.filter((s) => !s.dead);
+    g.bombs = g.bombs.filter((b) => !b.dead);
+
+    // Nothing left in the sky: on to the next level
+    if (g.phase === 'play' && g.alive <= 0 && (!g.boss || g.boss.dead)) clearStage(g, rk);
+  },
+
+  draw(ctx, g, rk) {
+    drawZone(rk, g.stage.zone, rk.time);
+    drawBunkers(rk, g);
+    drawFleet(rk, g);
+    drawBits(rk, g);
+    drawShip(rk, g);
+    drawBlasts(rk, g);
+  },
+
+  // The title screen: the first zone, with the ship on one side and two invaders on the other, clear of the logo.
+  drawTitle(ctx, rk) {
+    drawZone(rk, 0, rk.t);
+    const step = Math.floor(rk.t * 2) & 1;
+    rk.glow(48, SHIP_Y + 10, 6, 'aqua', 0.4);
+    rk.draw('ship', 40, SHIP_Y);
+    rk.draw('invB_heat', 252, 150, step);
+    rk.draw('invA_red', 272, 150, step);
+  },
+});
+</script>
+</body>
+</html>

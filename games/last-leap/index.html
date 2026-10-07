@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Last Leap</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files (and the fonts) into dist/<game>.html. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../../kit/retro-kit.css" data-rk-inline>
+<script src="../../kit/retro-kit.js" data-rk-inline></script>
+<!-- The soundtrack, kept as text in music.js. The build copies it in as well, so the game is still one file.
+     The kit plays it: see the music option in RetroKit.game, at the bottom. -->
+<script src="music.js" data-rk-inline></script>
+</head>
+<body>
+<script>
+/* LAST LEAP — a Retro Kit game. Rules for this file: .claude/skills/retro-kit/SKILL.md
+   A Frogger-style crossing game: hop a chrome frog over roads, rails and water to the lily pads on the
+   far side. The levels swap between country and town, and each one adds one thing (diving turtles, a
+   tram, sinking lily pads, a motorway, a steam train). After the last level the set repeats, faster.
+   The soundtrack is Barney's own MP3, kept in music.js. The kit plays it: see the music option, at the bottom. */
+
+/* ---------- Playfield layout (game pixels; the world is 320 x 180) ---------- */
+const CELL = 16;                // one hop: the world is a grid of 20 columns by 11 rows
+const ROWS = 11;
+const TOP = 2;                  // 11 rows are 176 pixels, so 2 spare pixels above and below
+const GOAL_ROW = 0;             // the far side: a hedge or wall with lily-pad bays
+const START_ROW = ROWS - 1;
+const START_X = 9 * CELL;
+const HOP_TIME = 7;             // updates one hop takes (about a ninth of a second)
+const SWIPE = 9;                // how far a finger travels (game pixels) before it counts as a swipe
+const SNAP_WARN = 70;           // updates a snapper shows only its eyes before it is dangerous
+const rowY = (r) => TOP + r * CELL;
+
+/* Which columns the lily-pad bays start at, for 3, 4 or 5 bays. Each bay is two columns wide. */
+const BAYS = { 3: [3, 9, 15], 4: [1, 6, 12, 17], 5: [1, 5, 9, 13, 17] };
+
+/* ---------- Levels ----------
+   Each level lists its nine lanes from the far side down to the start. Speeds are pixels per update
+   (60 updates a second), negative = moving left. Each level adds one thing:
+   1 learn to hop, 2 busier streets and barges, 3 a wide river with diving turtles, 4 a tram,
+   5 sinking lily pads and snappers in the bays, 6 an eight-lane bypass, 7 a steam train, 8 all of it. */
+const SAFE = { t: 'safe' };
+const road = (v, kind, n) => ({ t: 'road', v: v, kind: kind, n: n });
+const river = (v, kind, n) => ({ t: 'water', v: v, kind: kind, n: n });
+const rail = (v, kind, every) => ({ t: 'rail', v: v, kind: kind, every: every });   // a train every `every` seconds
+
+const LEVELS = [
+  { name: 'COUNTRY LANE', theme: 'country', homes: 3, time: 45, rows: [
+    river(0.30, 'logL', 3),
+    river(-0.38, 'logM', 3),
+    SAFE,
+    road(-0.55, 'car', 2),
+    road(0.30, 'tractor', 2),
+    SAFE,
+    road(0.50, 'car', 2),
+    road(-0.28, 'tractor', 3),
+    SAFE] },
+  { name: 'MARKET STREET', theme: 'urban', homes: 3, time: 40, rows: [
+    river(-0.35, 'bargeL', 3),
+    river(0.45, 'bargeS', 3),
+    SAFE,
+    road(0.45, 'bus', 2),
+    road(-0.80, 'taxi', 3),
+    road(0.60, 'car', 3),
+    SAFE,
+    road(-0.65, 'car', 3),
+    road(0.50, 'bus', 2)] },
+  { name: 'MILL RIVER', theme: 'country', homes: 4, time: 40, rows: [
+    river(0.50, 'logM', 3),
+    river(-0.45, 'turtle3', 4),
+    river(0.35, 'logL', 2),
+    river(-0.60, 'logS', 4),
+    river(0.40, 'turtle2', 5),
+    SAFE,
+    road(-0.35, 'tractor', 3),
+    road(0.70, 'car', 3),
+    road(-0.55, 'car', 3)] },
+  { name: 'TRAM LINES', theme: 'urban', homes: 4, time: 40, rows: [
+    river(0.50, 'bargeS', 3),
+    river(-0.60, 'bargeL', 2),
+    SAFE,
+    rail(-3.2, 'tram', 5.5),
+    SAFE,
+    road(-0.50, 'bus', 2),
+    road(1.00, 'coupe', 3),
+    road(-0.75, 'car', 3),
+    road(0.55, 'lorry', 2)] },
+  { name: 'HERON MARSH', theme: 'country', homes: 4, time: 40, snap: true, rows: [
+    river(0.65, 'logS', 4),
+    river(0, 'pad', 5),
+    river(-0.55, 'logM', 3),
+    river(0.50, 'turtle3', 3),
+    river(-0.75, 'logS', 3),
+    river(0, 'pad', 5),
+    SAFE,
+    road(0.45, 'tractor', 3),
+    road(-0.85, 'car', 3)] },
+  { name: 'NEON BYPASS', theme: 'urban', homes: 5, time: 35, lights: true, rows: [
+    road(1.50, 'bike', 2),
+    road(-0.60, 'lorry', 2),
+    road(1.10, 'coupe', 3),
+    road(-0.85, 'car', 4),
+    SAFE,
+    road(0.60, 'bus', 3),
+    road(-1.60, 'bike', 2),
+    road(0.70, 'lorry', 2),
+    road(-0.90, 'car', 4)] },
+  { name: 'HARVEST HALT', theme: 'country', homes: 5, time: 35, snap: true, rows: [
+    river(-0.75, 'logS', 3),
+    river(0.55, 'turtle2', 5),
+    river(-0.60, 'logM', 3),
+    SAFE,
+    rail(4.2, 'train', 5),
+    SAFE,
+    road(-0.45, 'tractor', 3),
+    road(0.95, 'car', 3),
+    road(-1.40, 'bike', 2)] },
+  { name: 'DOCKLANDS', theme: 'urban', homes: 5, time: 35, snap: true, lights: true, rows: [
+    river(0.80, 'bargeS', 3),
+    river(-0.60, 'turtle2', 5),
+    river(0.70, 'bargeS', 3),
+    rail(-3.4, 'tram', 4.5),
+    road(0.75, 'lorry', 2),
+    road(-1.25, 'coupe', 3),
+    rail(3.4, 'tram', 6),
+    road(1.70, 'bike', 2),
+    road(-0.70, 'bus', 3)] },
+];
+
+/* ---------- Sprite helpers ----------
+   Sprites are drawn below as flat shapes ("masks"). shade() then gives every shape its three tones with
+   the light from the top left, so one mask can be turned or mirrored and still be lit the right way. */
+const MATERIALS = {
+  '=': { ramp: 'LMD' },             // chrome: the frog
+  '@': { ramp: 'aAQ', own: true },  // aqua details (eyes, back stripe), shaded on their own edges
+  '%': { ramp: 'rRX' },             // red: most traffic
+  '&': { ramp: 'hHE' },             // heat: the rest of the traffic
+  '$': { ramp: 'yYO' },             // amber: logs
+  '~': { ramp: 'AQQ' },             // dark aqua: turtle shells and lily pads
+  ':': { ramp: 'MDD' },             // slate: trailers, hulls, the engine's boiler
+};
+function shade(rows) {
+  const h = rows.length;
+  const w = rows[0].length;
+  rows.forEach((r) => { if (r.length !== w) console.warn('Last Leap: a sprite row is ' + r.length + ' wide, not ' + w + ': ' + r); });
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? '.' : rows[y][x]);
+  return rows.map((row, y) => row.split('').map((ch, x) => {
+    const m = MATERIALS[ch];
+    if (!m) return ch;
+    const open = (c) => (m.own ? c !== ch : c === '.');
+    const lit = (open(at(x, y - 1)) ? 1 : 0) + (open(at(x - 1, y)) ? 1 : 0) - (open(at(x, y + 1)) ? 1 : 0) - (open(at(x + 1, y)) ? 1 : 0);
+    return m.ramp[lit > 0 ? 0 : lit < 0 ? 2 : 1];
+  }).join(''));
+}
+const mirror = (rows) => rows.map((r) => r.split('').reverse().join(''));
+const turn = (rows) => rows[0].split('').map((_, x) => rows.map((r) => r[x]).reverse().join(''));   // a quarter turn clockwise
+const paint = (rows, material) => rows.map((r) => r.split('B').join(material));                      // B = the body colour
+const join = (...parts) => parts[0].map((_, y) => parts.map((p) => p[y]).join(''));                  // side by side
+const rep = (s, n) => s.repeat(n);
+
+// One white glint on the frog: the first mid-tone pixel from the top left.
+function glint(rows) {
+  let done = false;
+  return rows.map((r) => {
+    if (done || r.indexOf('M') < 0) return r;
+    done = true;
+    return r.replace('M', 'W');
+  });
+}
+
+/* The frog, facing up: sitting, then mid-leap. The other three directions are turned copies. */
+const FROG_SIT = [
+  '..@@....@@..',
+  '..@@====@@..',
+  '.==========.',
+  '==.======.==',
+  '=..======..=',
+  '...======...',
+  '...==@@==...',
+  '.====@@====.',
+  '===.====.===',
+  '==..====..==',
+  '==...==...==',
+  '.=........=.',
+];
+const FROG_LEAP = [
+  '=.@@....@@.=',
+  '=.@@====@@.=',
+  '.==========.',
+  '..========..',
+  '...======...',
+  '...======...',
+  '...==@@==...',
+  '...==@@==...',
+  '..========..',
+  '.==.====.==.',
+  '==...==...==',
+  '=..........=',
+];
+function frogSprite(turns) {
+  let sit = FROG_SIT;
+  let leap = FROG_LEAP;
+  for (let i = 0; i < turns; i++) { sit = turn(sit); leap = turn(leap); }
+  return { frames: [glint(shade(sit)), glint(shade(leap))] };
+}
+
+/* Traffic, seen from above and facing right. B is the body colour; k is glass and tyres; S is a headlight. */
+const CAR = [
+  '..BBBBBBBBBBBBBBB...',
+  '.BBBBBBBBBBBBBBBBBS.',
+  'BBBBkkBBBBBBkkkBBBBB',
+  'BBBkkkBBBBBBkkkkBBBB',
+  'BBBkkkBBBBBBkMkkBBBB',
+  'BBBkkkBBBBBBkkkkBBBB',
+  'BBBkkkBBBBBBkkkkBBBB',
+  'BBBkkkBBBBBBkkkkBBBB',
+  'BBBBkkBBBBBBkkkBBBBB',
+  '.BBBBBBBBBBBBBBBBBS.',
+  '..BBBBBBBBBBBBBBB...',
+];
+const TAXI = CAR.map((r, y) => (y >= 4 && y <= 6 ? r.slice(0, 8) + ['yy', 'YY', 'OO'][y - 4] + r.slice(10) : r));   // a roof light
+const COUPE = [
+  '..BBBBBBBBBBBBB...',
+  '.BBBBBBBBBBBBBBBS.',
+  'BBBkkBBBBBkkkBBBBB',
+  'BBkkkBBBBBkkkkBBBB',
+  'BBkkkBBBBBkMkkBBBB',
+  'BBkkkBBBBBkkkkBBBB',
+  'BBBkkBBBBBkkkBBBBB',
+  '.BBBBBBBBBBBBBBBS.',
+  '..BBBBBBBBBBBBB...',
+];
+const BUS_SIDE = rep('B', 31) + 'kkkBB';
+const BUS_ROOF = (inside, glass) => 'BBB' + rep('k' + rep(inside, 4) + 'kBBB', 3) + 'B' + glass + 'BB';   // three skylights
+const BUS = [
+  '.' + rep('B', 34) + '.',
+  rep('B', 35) + 'S',
+  BUS_SIDE,
+  BUS_SIDE,
+  BUS_ROOF('k', 'kkk'),
+  BUS_ROOF('D', 'kMk'),
+  BUS_ROOF('D', 'kkk'),
+  BUS_ROOF('k', 'kkk'),
+  BUS_SIDE,
+  BUS_SIDE,
+  rep('B', 35) + 'S',
+  '.' + rep('B', 34) + '.',
+];
+const TRAILER = rep(':', 9) + 'M' + rep(':', 9) + 'M' + rep(':', 10);   // a slate container with two ribs
+const LORRY_CAB = (hitch, glass) => TRAILER + hitch + 'BBBBBB' + glass + 'BBB';
+const LORRY = [
+  rep(':', 30) + '...' + rep('B', 10) + '.',
+  TRAILER + '..' + rep('B', 11) + 'S',
+  LORRY_CAB('..', 'kkk'),
+  LORRY_CAB('..', 'kkk'),
+  LORRY_CAB('..', 'kkk'),
+  LORRY_CAB('DD', 'kMk'),
+  LORRY_CAB('DD', 'kkk'),
+  LORRY_CAB('..', 'kkk'),
+  LORRY_CAB('..', 'kkk'),
+  LORRY_CAB('..', 'kkk'),
+  TRAILER + '..' + rep('B', 11) + 'S',
+  rep(':', 30) + '...' + rep('B', 10) + '.',
+];
+const TRACTOR = [
+  '.kDkDkDk..........',
+  '.kkkkkkk....kkk...',
+  '.BBBBBBBBB..kDk...',
+  'BBBBBBBBBBBBBBBBB.',
+  'BBkkkkBBBBBBBBBBBS',
+  'BBkDDkBBBBBBBBBBBB',
+  'BBkDDkBBBBBBBBBBBB',
+  'BBkkkkBBBBBBBBBBBS',
+  'BBBBBBBBBBBBBBBBB.',
+  '.BBBBBBBBB..kDk...',
+  '.kkkkkkk....kkk...',
+  '.kDkDkDk..........',
+];
+const BIKE = [
+  '.....BB.....',
+  '....BBBB..B.',
+  'kkkBBBLBBkkS',
+  'kkkBBBBBBkkS',
+  '....BBBB..B.',
+  '.....BB.....',
+];
+const TRAM_ROOF = (inside) => 'BBBB' + rep('k' + rep(inside, 6) + 'kBBBB', 7);
+const TRAM = [                  // the same from both ends, so it needs no mirrored copy
+  '.' + rep('B', 86) + '.',
+  'S' + rep('B', 86) + 'S',
+  rep('B', 88),
+  TRAM_ROOF('k'),
+  TRAM_ROOF('D'),
+  TRAM_ROOF('D'),
+  TRAM_ROOF('D'),
+  TRAM_ROOF('D'),
+  TRAM_ROOF('k'),
+  rep('B', 88),
+  'S' + rep('B', 86) + 'S',
+  '.' + rep('B', 86) + '.',
+];
+const LOCO_MID = (hatch, stack, lamp) => 'BBB' + hatch + 'BBB' + rep(':', 18) + stack + '::' + 'BBB' + lamp;
+const LOCO = [                  // a steam engine: red cab, slate boiler, a glowing smokestack, a lamp in front
+  '.' + rep('B', 10) + rep('.', 29),
+  rep('B', 11) + rep('.', 24) + 'BBB..',
+  rep('B', 11) + rep(':', 24) + 'BBB..',
+  rep('B', 11) + rep(':', 24) + 'BBBB.',
+  LOCO_MID('kkkkk', 'kkkk', 'B.'),
+  LOCO_MID('kDDDk', 'kHHk', 'BS'),
+  LOCO_MID('kDDDk', 'kHHk', 'BS'),
+  LOCO_MID('kkkkk', 'kkkk', 'B.'),
+  rep('B', 11) + rep(':', 24) + 'BBBB.',
+  rep('B', 11) + rep(':', 24) + 'BBB..',
+  rep('B', 11) + rep('.', 24) + 'BBB..',
+  '.' + rep('B', 10) + rep('.', 29),
+];
+const WAGON_SIDE = rep('&&&&&&&E', 4);
+const WAGON = [
+  rep('.', 34),
+  rep('&', 32) + '..',
+  WAGON_SIDE + '..',
+  WAGON_SIDE + '..',
+  WAGON_SIDE + '..',
+  WAGON_SIDE + 'kk',
+  WAGON_SIDE + 'kk',
+  WAGON_SIDE + '..',
+  WAGON_SIDE + '..',
+  WAGON_SIDE + '..',
+  rep('&', 32) + '..',
+  rep('.', 34),
+];
+
+/* name: the mask and how big it is (filled in by buildSprites). Each becomes two sprites, nameR and nameL. */
+const VEHICLES = {
+  car: { mask: paint(CAR, '%') },
+  taxi: { mask: paint(TAXI, '&') },
+  coupe: { mask: paint(COUPE, '&') },
+  bus: { mask: paint(BUS, '&') },
+  lorry: { mask: paint(LORRY, '%') },
+  tractor: { mask: paint(TRACTOR, '&') },
+  bike: { mask: paint(BIKE, '%') },
+  tram: { mask: paint(TRAM, '%') },
+  train: { mask: paint(join(WAGON, WAGON, WAGON, LOCO), '%') },
+};
+
+/* Things to ride on the water. w is the width the frog can stand on; dy is where the sprite sits in its lane.
+   Turtles and lily pads come in groups of n and dive: `dive` is the length of each part of the cycle, in updates. */
+const PLATFORMS = {
+  logS: { w: 48, dy: 3 },
+  logM: { w: 64, dy: 3 },
+  logL: { w: 96, dy: 3 },
+  bargeS: { w: 64, dy: 2, sided: true },
+  bargeL: { w: 96, dy: 2, sided: true },
+  turtle2: { w: 32, n: 2, every: 2, dive: { cycle: 300, warn: 45, under: 50, rise: 25 } },
+  turtle3: { w: 48, n: 3, every: 2, dive: { cycle: 300, warn: 45, under: 50, rise: 25 } },
+  pad: { w: 32, n: 2, every: 1, dive: { cycle: 400, warn: 60, under: 80, rise: 30 } },
+};
+
+function logRows(w) {
+  const rows = [];
+  for (let y = 0; y < 10; y++) {
+    let s = '';
+    for (let x = 0; x < w; x++) {
+      if ((y === 0 || y === 9) && (x === 0 || x === w - 1)) s += '.';                       // rounded corners
+      else if (x === w - 4 && y > 1 && y < 8) s += 'O';                                      // the sawn end
+      else if ((y === 3 || y === 6) && x > 2 && x < w - 6 && (x * 7 + y * 3) % 11 < 4) s += 'O';   // bark
+      else s += '$';
+    }
+    rows.push(s);
+  }
+  return shade(rows);
+}
+
+// A canal barge, bow to the right: a slate hull around a plank deck.
+function bargeRows(w) {
+  const bow = [6, 4, 2, 1, 0, 0, 0, 0, 1, 2, 4, 6];
+  const stern = [2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2];
+  const rows = [];
+  for (let y = 0; y < 12; y++) {
+    let s = '';
+    for (let x = 0; x < w; x++) {
+      if (x < stern[y] || x >= w - bow[y]) s += '.';
+      else if (y >= 2 && y <= 9 && x >= stern[y] + 2 && x < w - bow[y] - 3) s += x % 8 === 5 ? 'Y' : 'O';
+      else s += ':';
+    }
+    rows.push(s);
+  }
+  return rows;
+}
+
+const TURTLE = [
+  '..DD.....DD...',
+  '..DD~~~~~DD...',
+  '..~~~~~~~~~...',
+  '.~~~~~~~~~~~..',
+  '.~~~A~~A~~~~DD',
+  '.~~~~~~~~~~~DM',
+  '.~~~~~~~~~~~DM',
+  '.~~~A~~A~~~~DD',
+  '.~~~~~~~~~~~..',
+  '..~~~~~~~~~...',
+  '..DD~~~~~DD...',
+  '..DD.....DD...',
+];
+const TURTLE_PADDLE = TURTLE.map((r, y) => (y === 0 || y === 11 ? '.DD.....DD....' : r));   // flippers swept back
+const PAD = [
+  '...~~~~~~~~...',
+  '.~~~~~~~~~~~~.',
+  '~~~~~~~~~~~~~~',
+  '~~~~~~~~~~~~~.',
+  '~~~~~~~~~~~...',
+  '~~~~~~~~~.....',
+  '~~~~~~~~~~~...',
+  '~~~~~~~~~~~~~.',
+  '~~~~~~~~~~~~~~',
+  '~~~~~~~~~~~~~~',
+  '.~~~~~~~~~~~~.',
+  '...~~~~~~~~...',
+];
+
+function buildSprites() {
+  const s = {
+    frogU: frogSprite(0),
+    frogR: frogSprite(1),
+    frogD: frogSprite(2),
+    frogL: frogSprite(3),
+    logS: logRows(PLATFORMS.logS.w - 2),
+    logM: logRows(PLATFORMS.logM.w - 2),
+    logL: logRows(PLATFORMS.logL.w - 2),
+    bargeSR: shade(bargeRows(PLATFORMS.bargeS.w - 2)),
+    bargeSL: shade(mirror(bargeRows(PLATFORMS.bargeS.w - 2))),
+    bargeLR: shade(bargeRows(PLATFORMS.bargeL.w - 2)),
+    bargeLL: shade(mirror(bargeRows(PLATFORMS.bargeL.w - 2))),
+    turtleR: { frames: [shade(TURTLE), shade(TURTLE_PADDLE)] },
+    turtleL: { frames: [shade(mirror(TURTLE)), shade(mirror(TURTLE_PADDLE))] },
+    pad: shade(PAD),
+    low: { outline: false, map: [                 // a turtle or pad going under: the warning
+      '..............',
+      '....444444....',
+      '..44......44..',
+      '.4...QQQQ...4.',
+      '.4..QQQQQQ..4.',
+      '.4..QQQQQQ..4.',
+      '.4..QQQQQQ..4.',
+      '.4..QQQQQQ..4.',
+      '.4...QQQQ...4.',
+      '..44......44..',
+      '....444444....',
+      '..............',
+    ] },
+    ripple: { outline: false, frames: [[           // nothing to stand on
+      '..............',
+      '..............',
+      '....444444....',
+      '...4......4...',
+      '..4........4..',
+      '..4........4..',
+      '..4........4..',
+      '..4........4..',
+      '...4......4...',
+      '....444444....',
+      '..............',
+      '..............',
+    ], [
+      '....44..44....',
+      '..4........4..',
+      '..............',
+      '.4..........4.',
+      '..............',
+      '4............4',
+      '4............4',
+      '..............',
+      '.4..........4.',
+      '..............',
+      '..4........4..',
+      '....44..44....',
+    ]] },
+    firefly: { frames: [[                          // a bonus that visits an empty bay
+      '.S....S.',
+      '.yS..Sy.',
+      '..yYYy..',
+      '..YYYY..',
+      '..YSSY..',
+      '..YYYO..',
+      '...OO...',
+      '........',
+    ], [
+      '........',
+      '........',
+      'SyyYYyyS',
+      '.SYYYYS.',
+      '..YSSY..',
+      '..YYYO..',
+      '...OO...',
+      '........',
+    ]] },
+    snapper: [                                     // a danger that visits an empty bay
+      '.rRRRRRRRRX.',
+      'rRRkRRRRkRRX',
+      'rRRRRRRRRRRX',
+      'rRRRRRRRRRRX',
+      '.RWRWRWRWRX.',
+      '.RkkkkkkkkX.',
+      '.RWRWRWRWRX.',
+      '..RRRRRRRX..',
+      '...XXXXXX...',
+    ],
+    snapEyes: { outline: false, map: [             // ...which shows its eyes first
+      '..rR....rR..',
+      '..RX....RX..',
+    ] },
+    splat: [                                       // where the frog was hit
+      '............',
+      '..D......D..',
+      '.DDD....DDD.',
+      '..DDDDDDDD..',
+      '...DRDDRD...',
+      '...DDDDDD...',
+      '...DRDDRD...',
+      '..DDDDDDDD..',
+      '.DDD....DDD.',
+      '..D......D..',
+      '............',
+      '............',
+    ],
+  };
+  for (const name in VEHICLES) {
+    const v = VEHICLES[name];
+    v.w = v.mask[0].length;
+    v.h = v.mask.length;
+    s[name + 'R'] = shade(v.mask);
+    s[name + 'L'] = shade(mirror(v.mask));
+  }
+  return s;
+}
+
+/* ---------- Helpers ---------- */
+
+// A small repeatable random number maker, so a level is laid out the same way every time.
+function rng(seed) {
+  return function () {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+}
+
+// Plays a sound at most once every few updates, so repeats do not become a buzz.
+function play(g, rk, name) {
+  if (g.cool[name] > 0) return;
+  g.cool[name] = 6;
+  rk.sfx(name);
+}
+
+function spark(g, x, y, colours, count, power) {
+  for (let i = 0; i < count && g.parts.length < 160; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = (0.3 + Math.random() * 0.7) * power;
+    g.parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 16 + Math.random() * 18, colour: colours[i % colours.length] });
+  }
+}
+
+// Fills one lane with traffic or things to ride, evenly spread with a little variation and a safe gap.
+function fillLane(row, spec, fast, rnd) {
+  const info = VEHICLES[spec.kind] || PLATFORMS[spec.kind];
+  const w = info.w;
+  row.v = spec.v * fast;
+  row.w = w;
+  const add = (i, x) => {
+    const it = { kind: spec.kind, x: x, w: w };
+    if (info.dive && i % info.every === info.every - 1) {
+      it.dive = Object.assign({ phase: Math.floor((i / spec.n + rnd() * 0.1) * info.dive.cycle) }, info.dive);
+    }
+    row.items.push(it);
+  };
+  if (spec.v === 0) {                     // still lily pads sit on the grid
+    const step = 320 / spec.n;
+    for (let i = 0; i < spec.n; i++) add(i, Math.round((i * step + (step - w) / 2) / CELL) * CELL);
+    return;
+  }
+  const gap = spec.t === 'water' ? 36 : 44;
+  row.period = Math.max(320 + w + 16, spec.n * (w + gap));     // the loop each lane goes round, in pixels
+  const slot = row.period / spec.n;
+  const wobble = Math.max(0, Math.min(slot - w - gap, slot * 0.4));
+  const first = rnd() * row.period;
+  for (let i = 0; i < spec.n; i++) add(i, (first + i * slot + rnd() * wobble) % row.period - w);
+}
+
+function buildLevel(g, rk) {
+  const def = LEVELS[(g.level - 1) % LEVELS.length];
+  const lap = Math.floor((g.level - 1) / LEVELS.length);       // how many times the set has been cleared
+  const fast = Math.min(1.6, 1 + 0.15 * lap);
+  const rnd = rng(g.level * 7919 + 13);
+  g.def = def;
+  g.urban = def.theme === 'urban';
+  g.timeMax = Math.round(def.time * 60 * Math.max(0.7, 1 - 0.1 * lap));
+  g.rows = [{ t: 'goal' }].concat(def.rows, [SAFE]).map((spec) => {
+    const row = { type: spec.t, kind: spec.kind, v: 0, items: [], decor: [], train: null };
+    if (spec.t === 'road' || spec.t === 'water') fillLane(row, spec, fast, rnd);
+    if (spec.t === 'rail') {
+      const info = VEHICLES[spec.kind];
+      row.v = spec.v * Math.min(1.25, fast);
+      row.train = {
+        state: 'idle', t: 150 + Math.floor(rnd() * 120), x: 0, w: info.w, h: info.h,
+        warn: Math.max(60, 90 - 10 * lap), every: Math.round(spec.every * 60 / fast),
+      };
+    }
+    const bits = { goal: 44, safe: 14, road: 8, water: 9, rail: 0 }[spec.t];     // scenery: tufts, pebbles, ripples
+    for (let i = 0; i < bits; i++) row.decor.push({ x: Math.floor(rnd() * 317), o: 2 + Math.floor(rnd() * 12), k: Math.floor(rnd() * 3) });
+    return row;
+  });
+  g.homes = BAYS[def.homes].map((c) => ({ x: c * CELL, cx: (c + 1) * CELL, filled: false }));
+  g.left = g.homes.length;
+  g.bay = null;
+  g.bayT = 360;
+  g.mark = null;
+  newFrog(g, false);
+}
+
+function newFrog(g, blink) {
+  g.frog = {
+    x: START_X, y: rowY(START_ROW), row: START_ROW, far: START_ROW, dir: 'U',
+    hop: 0, x0: 0, y0: 0, x1: 0, y1: 0, toRow: START_ROW, ride: 0, home: null,
+    inv: blink ? 90 : 0, stun: 0, dead: false, away: false,
+  };
+  g.timeLeft = g.timeMax;
+  g.queued = null;
+  g.swipe = null;
+}
+
+// 0 = up, 1 = sinking (the warning: still safe), 2 = under (not safe), 3 = coming back up (safe)
+function diveState(it, tick) {
+  const d = it.dive;
+  if (!d) return 0;
+  const c = (tick + d.phase) % d.cycle;
+  const up = d.cycle - d.warn - d.under - d.rise;
+  return c < up ? 0 : c < up + d.warn ? 1 : c < up + d.warn + d.under ? 2 : 3;
+}
+
+function die(g, rk, cause) {
+  const f = g.frog;
+  if (f.dead) return;
+  f.dead = true;
+  f.hop = 0;
+  const cx = rk.clamp(f.x + 8, 8, 312);
+  const cy = f.y + 8;
+  g.mark = { x: cx, y: cy, water: cause === 'water', t: 70 };
+  if (cause === 'water') {
+    rk.sfx.noise({ dur: 0.18, from: 1800, to: 300, vol: 0.3 });
+    spark(g, cx, cy, ['chrome-200', 'aqua-light', 'sky-4'], 14, 1.3);
+  } else {
+    if (cause === 'time') rk.popup('TIME', cx, cy - 10, 'red');
+    rk.sfx(cause === 'time' ? 'hit' : 'explosion');
+    rk.shake(3, 0.2);
+    spark(g, cx, cy, ['chrome-200', 'chrome-300', 'aqua', 'red-light'], 18, 1.6);
+  }
+  if (rk.loseLife() > 0) rk.after(1.1, () => newFrog(g, true));
+}
+
+function bump(g, rk) {
+  g.frog.stun = 6;
+  play(g, rk, 'bounce');
+}
+
+// Which way the player wants to hop this update, if any: 'U', 'D', 'L' or 'R'.
+function readHop(g, rk) {
+  const inp = rk.input;
+  const p = inp.pointer;
+  let d = inp.pressed.up ? 'U' : inp.pressed.down ? 'D' : inp.pressed.left ? 'L' : inp.pressed.right ? 'R' : null;
+  // Touch (or mouse): a swipe hops that way as soon as it is long enough; a tap hops forward.
+  if (p.pressed) g.swipe = { dx: 0, dy: 0, done: false };
+  const s = g.swipe;
+  if (s) {
+    s.dx += p.dx;
+    s.dy += p.dy;
+    const ax = Math.abs(s.dx);
+    const ay = Math.abs(s.dy);
+    const far = Math.max(ax, ay);
+    if (!s.done && (far >= SWIPE || p.released)) {
+      s.done = true;
+      d = far < 4 ? 'U' : ax > ay ? (s.dx < 0 ? 'L' : 'R') : (s.dy < 0 ? 'U' : 'D');
+    }
+    if (p.released) g.swipe = null;
+  }
+  return d;
+}
+
+function startHop(g, rk, d) {
+  const f = g.frog;
+  const dx = d === 'L' ? -1 : d === 'R' ? 1 : 0;
+  const dy = d === 'U' ? -1 : d === 'D' ? 1 : 0;
+  const row = f.row + dy;
+  let tx = f.x + dx * CELL;
+  f.dir = d;
+  f.home = null;
+  if (dy !== 0) {
+    if (row > START_ROW) { bump(g, rk); return; }
+    if (row === GOAL_ROW) {                 // only an empty bay lets the frog in
+      const cx = f.x + 8;
+      const home = g.homes.find((h) => Math.abs(cx - h.cx) <= 12);
+      if (!home || home.filled) { bump(g, rk); return; }
+      tx = home.cx - 8;
+      f.home = home;
+    } else if (g.rows[row].type !== 'water') {
+      tx = rk.clamp(Math.round(f.x / CELL) * CELL, 0, 320 - CELL);     // back onto the grid after a ride
+    }
+  } else {
+    tx = rk.clamp(tx, 0, 320 - CELL);       // the sides of the screen are walls
+    if (Math.abs(tx - f.x) < 6) { bump(g, rk); return; }
+  }
+  f.hop = 1;
+  f.x0 = f.x; f.y0 = rowY(f.row);
+  f.x1 = tx; f.y1 = rowY(row);
+  f.toRow = row;
+  f.ride = dy === 0 && g.rows[f.row].type === 'water' ? g.rows[f.row].v : 0;   // hopping along a log keeps drifting with it
+  play(g, rk, 'blip');
+}
+
+function stepHop(g, rk) {
+  const f = g.frog;
+  f.x0 += f.ride;
+  f.x1 += f.ride;
+  const t = f.hop / HOP_TIME;
+  f.x = f.x0 + (f.x1 - f.x0) * t;
+  f.y = f.y0 + (f.y1 - f.y0) * t;
+  if (f.hop < HOP_TIME) { f.hop++; return; }
+  f.hop = 0;
+  f.row = f.toRow;
+  if (f.row < f.far) {                      // points for each new row reached
+    rk.addScore(10 * (f.far - f.row));
+    f.far = f.row;
+  }
+  if (f.row === GOAL_ROW) reachHome(g, rk, f.home);
+}
+
+function reachHome(g, rk, home) {
+  const f = g.frog;
+  const ev = g.bay && g.bay.home === home ? g.bay : null;
+  if (ev && ev.kind === 'snap' && ev.age > SNAP_WARN + 10) { die(g, rk, 'snap'); return; }
+  home.filled = true;
+  g.left--;
+  f.away = true;
+  let points = 50 + 10 * Math.floor(g.timeLeft / 60);     // 50 for the bay, 10 for each second left
+  if (ev) { g.bay = null; g.bayT = rk.randInt(300, 600); }
+  if (ev && ev.kind === 'fly') points += 200;
+  rk.addScore(points, home.cx, rowY(GOAL_ROW) + 6, ev && ev.kind === 'fly' ? 'amber' : 'aqua');
+  spark(g, home.cx, rowY(GOAL_ROW) + 8, ['aqua-light', 'aqua', 'chrome-200'], 10, 1.1);
+  rk.sfx('pickup');
+  if (g.left > 0) { rk.after(0.6, () => newFrog(g, false)); return; }
+  // Every bay filled: bonus, the next place's name, then the next level
+  g.clearing = true;
+  rk.addScore(1000, 160, 58, 'amber');
+  rk.banner(LEVELS[g.level % LEVELS.length].name, 2);
+  rk.after(2, () => {
+    g.level++;
+    buildLevel(g, rk);
+    rk.hud.set('level', g.level);
+    rk.hud.set('time', 1);
+    g.clearing = false;
+  });
+}
+
+// Traffic and everything on the water keeps moving, whatever the frog is doing.
+function stepLanes(g, rk) {
+  for (const row of g.rows) {
+    if (row.v !== 0 && row.items.length) {
+      for (const it of row.items) {
+        it.x += row.v;
+        if (row.v > 0 && it.x >= row.period - row.w) it.x -= row.period;
+        else if (row.v < 0 && it.x < -row.w) it.x += row.period;
+      }
+    }
+    const tr = row.train;
+    if (!tr) continue;
+    if (tr.state === 'idle') {
+      if (--tr.t <= 0) { tr.state = 'warn'; tr.t = tr.warn; }
+    } else if (tr.state === 'warn') {       // lamps and a bell before every train
+      if (tr.t % 24 === 0) rk.sfx.tone({ type: 'triangle', f: 880, dur: 0.07, vol: 0.14 });
+      if (--tr.t <= 0) {
+        tr.state = 'run';
+        tr.x = row.v > 0 ? -tr.w : 320;
+        rk.sfx.noise({ dur: 0.19, from: 900, to: 200, vol: 0.2 });
+      }
+    } else {
+      tr.x += row.v;
+      if (tr.x > 328 || tr.x < -tr.w - 8) { tr.state = 'idle'; tr.t = tr.every + rk.randInt(-40, 40); }
+    }
+  }
+}
+
+// Now and then an empty bay gets a visitor: a firefly (bonus points) or, on later levels, a snapper.
+function stepBays(g, rk) {
+  if (g.clearing) return;
+  if (g.bay) {
+    if (++g.bay.age >= g.bay.life) { g.bay = null; g.bayT = rk.randInt(300, 600); }
+    return;
+  }
+  if (--g.bayT > 0) return;
+  const free = g.homes.filter((h) => !h.filled);
+  if (!free.length || g.frog.row <= 1) { g.bayT = 30; return; }      // never spring one on a frog at the bays
+  const snap = !!g.def.snap && Math.random() < 0.45;
+  g.bay = { kind: snap ? 'snap' : 'fly', home: rk.pick(free), age: 0, life: snap ? SNAP_WARN + 200 : 420 };
+}
+
+// Everything that can end a frog once it has moved.
+function checkHazards(g, rk) {
+  const f = g.frog;
+  // Traffic and trains hit a frog on the ground or in the air
+  if (f.inv <= 0) {
+    const box = { x: f.x + 3, y: f.y + 3, w: 10, h: 10 };
+    const r0 = Math.floor((box.y - TOP) / CELL);
+    const r1 = Math.floor((box.y + box.h - 1 - TOP) / CELL);
+    for (let r = r0; r <= r1; r++) {
+      const row = g.rows[r];
+      if (!row) continue;
+      if (row.type === 'road') {
+        const v = VEHICLES[row.kind];
+        const y = rowY(r) + ((CELL - v.h) >> 1) + 1;
+        for (const it of row.items) {
+          if (rk.hit(box, { x: it.x + 1, y: y, w: it.w - 2, h: v.h - 2 })) { die(g, rk, 'road'); return; }
+        }
+      } else if (row.train && row.train.state === 'run') {
+        const tr = row.train;
+        if (rk.hit(box, { x: tr.x + 1, y: rowY(r) + 3, w: tr.w - 2, h: tr.h - 2 })) { die(g, rk, 'road'); return; }
+      }
+    }
+  }
+  // Water: a landed frog needs something under it, and rides along with it
+  const row = g.rows[f.row];
+  if (f.hop === 0 && row.type === 'water') {
+    const cx = f.x + 8;
+    const under = row.items.find((it) => cx >= it.x && cx <= it.x + it.w && diveState(it, g.tick) !== 2);
+    if (!under) { die(g, rk, 'water'); return; }
+    f.x += row.v;
+    if (f.x + 8 < 0 || f.x + 8 > 320) die(g, rk, 'water');       // carried off the side
+  }
+}
+
+/* ---------- Drawing ---------- */
+
+function drawGoal(rk, g, y) {
+  rk.rect(0, y, 320, CELL, 'hill-far');
+  if (g.urban) {                            // a brick quay wall
+    rk.rect(0, y + 5, 320, 1, 'hill-near');
+    rk.rect(0, y + 10, 320, 1, 'hill-near');
+    for (let x = 0; x < 320; x += 8) {
+      rk.rect(x, y + 1, 1, 4, 'hill-near');
+      rk.rect(x + 4, y + 6, 1, 4, 'hill-near');
+      rk.rect(x, y + 11, 1, 4, 'hill-near');
+    }
+    rk.rect(0, y, 320, 1, 'chrome-400');
+    rk.rect(0, y + 15, 320, 1, 'chrome-400');
+  } else {                                  // a hedge
+    for (const d of g.rows[GOAL_ROW].decor) rk.rect(d.x, y + d.o, 2, 1, d.k ? 'sky-3' : 'hill-near');
+    rk.rect(0, y + 15, 320, 1, 'hill-near');
+  }
+  for (const h of g.homes) {
+    rk.rect(h.x - 1, y, 34, CELL, 'ink');
+    rk.rect(h.x, y + 1, 32, 15, 'sky-3');
+    rk.draw('pad', h.cx - 7, y + 2);
+    if (h.filled) rk.draw('frogD', h.cx - 6, y + 2);
+  }
+  const ev = g.bay;
+  if (!ev) return;
+  if (ev.kind === 'fly') {
+    rk.glow(ev.home.cx, y + 7, 10, 'amber', 0.4);
+    rk.draw('firefly', ev.home.cx - 4, y + 3, rk.frame('firefly', 8));
+  } else if (ev.age <= SNAP_WARN) rk.draw('snapEyes', ev.home.cx - 6, y + 7);
+  else rk.draw('snapper', ev.home.cx - 6, y + 4);
+}
+
+/* Ground colours are the same in town and country, so the player learns them once: safe ground is the
+   lighter purple, roads are the darkest strips, water is the brightest. The details change with the place. */
+function drawSafe(rk, g, row, y) {
+  rk.rect(0, y, 320, CELL, 'hill-far');
+  if (g.urban) {                            // pavement: kerbs, paving joints, street lamps
+    rk.rect(0, y, 320, 1, 'chrome-400');
+    rk.rect(0, y + 15, 320, 1, 'chrome-400');
+    for (let x = 15; x < 320; x += CELL) rk.rect(x, y + 1, 1, 14, 'hill-near');
+    for (let x = 39; x < 320; x += 80) {
+      rk.rect(x, y + 6, 1, 5, 'chrome-300');
+      rk.rect(x - 1, y + 5, 3, 1, 'amber-light');
+    }
+    return;
+  }
+  for (const d of row.decor) {              // verge: grass tufts and a few flowers
+    if (d.k === 2) { rk.px(d.x, y + d.o, 'sun-100'); rk.px(d.x, y + d.o + 1, 'hill-near'); continue; }
+    const tuft = d.k ? 'sky-3' : 'hill-near';
+    rk.px(d.x, y + d.o + 1, tuft);
+    rk.px(d.x + 1, y + d.o, tuft);
+    rk.px(d.x + 2, y + d.o + 1, tuft);
+  }
+}
+
+function drawRoad(rk, g, row, y, above) {
+  if (g.urban) {                            // tarmac with dashed lane marks between lanes
+    rk.rect(0, y, 320, CELL, 'sky-1');
+    if (above === 'road') for (let x = 5; x < 320; x += CELL) rk.rect(x, y, 6, 1, 'chrome-400');
+    return;
+  }
+  rk.rect(0, y, 320, CELL, 'sky-0');        // a dirt lane: wheel ruts and pebbles
+  for (let x = 2; x < 320; x += 22) {
+    rk.rect(x, y + 4, 10, 1, 'sky-1');
+    rk.rect(x + 9, y + 11, 10, 1, 'sky-1');
+  }
+  for (const d of row.decor) rk.px(d.x, y + d.o, 'sky-2');
+}
+
+function drawWater(rk, g, row, y, above, below) {
+  rk.rect(0, y, 320, CELL, 'sky-3');
+  const drift = rk.time * 6 * (row.v < 0 ? -1 : 1);
+  for (const d of row.decor) {
+    const x = (((d.x + drift) % 336) + 336) % 336 - 8;
+    rk.rect(x, y + d.o, d.k ? 5 : 3, 1, d.k ? 'sky-2' : 'sky-4');
+  }
+  const edge = g.urban ? 'chrome-400' : 'hill-near';      // a stone edge in town, a muddy bank in the country
+  if (above !== 'water' && above !== 'goal') rk.rect(0, y, 320, 1, edge);
+  if (below !== 'water') rk.rect(0, y + 15, 320, 1, edge);
+}
+
+function drawRail(rk, g, row, y) {
+  const tr = row.train;
+  const live = tr.state !== 'idle';
+  rk.rect(0, y, 320, CELL, g.urban ? 'sky-0' : 'ink');
+  if (!g.urban) for (let x = 2; x < 320; x += 8) rk.rect(x, y + 3, 3, 10, 'amber-dark');     // sleepers
+  rk.rect(0, y + 4, 320, 1, live ? 'red' : 'chrome-300');          // the rails turn red while a train is due
+  rk.rect(0, y + 11, 320, 1, live ? 'red' : 'chrome-300');
+  const lit = tr.state === 'warn' && tr.t % 24 < 12;               // warning lamps: about two blinks a second
+  for (const x of [2, 315]) {
+    rk.rect(x - 1, y + 5, 5, 6, 'ink');
+    rk.rect(x, y + 6, 3, 4, lit ? 'red-light' : 'red-dark');
+    if (lit) rk.glow(x + 1.5, y + 8, 9, 'red', 0.5);
+  }
+}
+
+function drawGround(rk, g) {
+  for (let r = 0; r < ROWS; r++) {
+    const row = g.rows[r];
+    const y = rowY(r);
+    const above = r > 0 ? g.rows[r - 1].type : '';
+    const below = r < ROWS - 1 ? g.rows[r + 1].type : '';
+    if (row.type === 'goal') drawGoal(rk, g, y);
+    else if (row.type === 'safe') drawSafe(rk, g, row, y);
+    else if (row.type === 'road') drawRoad(rk, g, row, y, above);
+    else if (row.type === 'water') drawWater(rk, g, row, y, above, below);
+    else drawRail(rk, g, row, y);
+  }
+}
+
+function drawPlatforms(rk, g) {
+  for (let r = 1; r < ROWS; r++) {
+    const row = g.rows[r];
+    if (row.type !== 'water') continue;
+    const y = rowY(r);
+    for (const it of row.items) {
+      if (it.x > 320 || it.x + it.w < 0) continue;
+      const p = PLATFORMS[it.kind];
+      if (!p.n) { rk.draw(it.kind + (p.sided ? (row.v < 0 ? 'L' : 'R') : ''), it.x + 1, y + p.dy); continue; }
+      const state = diveState(it, g.tick);
+      for (let i = 0; i < p.n; i++) {
+        const x = it.x + i * CELL + 1;
+        if (state === 2) rk.draw('ripple', x, y + 2, rk.frame('ripple', 3));
+        else if (state) rk.draw('low', x, y + 2);
+        else if (it.kind === 'pad') rk.draw('pad', x, y + 2);
+        else rk.draw(row.v < 0 ? 'turtleL' : 'turtleR', x, y + 2, rk.frame('turtleR', 4));
+      }
+    }
+  }
+}
+
+function drawTraffic(rk, g) {
+  for (let r = 1; r < ROWS; r++) {
+    const row = g.rows[r];
+    const y = rowY(r);
+    const side = row.v < 0 ? 'L' : 'R';
+    if (row.type === 'road') {
+      const v = VEHICLES[row.kind];
+      for (const it of row.items) {
+        if (it.x > 320 || it.x + it.w < 0) continue;
+        rk.draw(row.kind + side, it.x, y + ((CELL - v.h) >> 1));
+        if (g.def.lights) rk.glow(row.v < 0 ? it.x - 3 : it.x + it.w + 3, y + 8, 9, 'amber', 0.3);    // headlights at night
+      }
+    } else if (row.train && row.train.state === 'run') {
+      const tr = row.train;
+      rk.draw(row.kind + side, tr.x, y + 2);
+      rk.glow(row.v < 0 ? tr.x - 4 : tr.x + tr.w + 4, y + 8, 12, 'amber', 0.4);
+    }
+  }
+}
+
+/* ---------- The game ---------- */
+RetroKit.game({
+  id: 'last-leap',
+  title: 'LAST LEAP',
+  tagline: 'TOWN AND COUNTRY CROSSING',
+  lives: 4,
+  livesIcon: 'dot',
+  hud: ['score', { id: 'time', label: 'Time', type: 'meter', low: 0.25, full: '100%', width: 120 }, 'best', 'lives', 'level'],
+  phoneMid: 'time',             // phones show three things: the timer matters more than the level number
+  keys: [['←', '→', '↑', '↓', 'Hop'], ['P', 'Pause']],
+  touch: 'Swipe to hop · Tap to hop forward',
+
+  music: { data: window.LAST_LEAP_MUSIC, level: 0.35 },    // level: how loud the track is against the sound effects (1 = the file's full level)
+
+  sprites: buildSprites(),
+
+  start(rk) {
+    const g = {
+      level: 1,
+      tick: 0,
+      parts: [],
+      cool: {},
+      clearing: false,        // between filling the last bay and the next level appearing
+      queued: null,           // a hop pressed during a hop, remembered for a moment
+      queuedT: 0,
+      swipe: null,
+      nextLife: 10000,        // an extra frog every 10,000 points
+    };
+    buildLevel(g, rk);
+    rk.hud.set('level', 1);
+    rk.hud.set('time', 1);
+    rk.banner(g.def.name, 1.8);
+    return g;
+  },
+
+  update(g, rk) {
+    g.tick++;
+    for (const k in g.cool) if (g.cool[k] > 0) g.cool[k]--;
+    for (const pt of g.parts) { pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.93; pt.vy *= 0.93; pt.life--; }
+    g.parts = g.parts.filter((pt) => pt.life > 0);
+    if (g.mark && --g.mark.t <= 0) g.mark = null;
+    stepLanes(g, rk);
+    stepBays(g, rk);
+    if (rk.ending) return;               // game over is on its way: no more control
+
+    const f = g.frog;
+    const d = readHop(g, rk);
+    if (f.dead || f.away || g.clearing) { g.queued = null; return; }
+
+    if (rk.score >= g.nextLife) {
+      g.nextLife += 10000;
+      rk.addLife(1);
+      rk.popup('1UP', f.x + 8, f.y - 4, 'amber');
+    }
+
+    // The clock: each frog has a fixed time to get across
+    g.timeLeft--;
+    rk.hud.set('time', Math.max(0, Math.ceil(g.timeLeft / g.timeMax * 50) / 50));
+    if (g.timeLeft <= 300 && g.timeLeft > 0 && g.timeLeft % 60 === 0) rk.sfx.tone({ f: 990, dur: 0.05, vol: 0.12 });
+    if (g.timeLeft <= 0) { die(g, rk, 'time'); return; }
+
+    if (f.inv > 0) f.inv--;
+    if (f.stun > 0) f.stun--;
+    if (d) { g.queued = d; g.queuedT = 9; }
+    else if (g.queued && --g.queuedT <= 0) g.queued = null;
+
+    if (f.hop > 0) stepHop(g, rk);
+    else if (g.queued && f.stun <= 0) {
+      const next = g.queued;
+      g.queued = null;
+      startHop(g, rk, next);
+    }
+    if (!f.dead && !f.away) checkHazards(g, rk);
+  },
+
+  draw(ctx, g, rk) {
+    drawGround(rk, g);
+    drawPlatforms(rk, g);
+    if (g.mark) {
+      const m = g.mark;
+      const alpha = Math.min(1, m.t / 20);
+      if (m.water) rk.draw('ripple', m.x - 7, m.y - 6, m.t > 45 ? 0 : 1, { alpha: alpha });
+      else rk.draw('splat', m.x - 6, m.y - 6, 0, { alpha: alpha });
+    }
+    drawTraffic(rk, g);
+
+    const f = g.frog;
+    if (!f.dead && !f.away && (f.inv <= 0 || f.inv % 10 < 5)) {      // blinks while safe after a respawn
+      rk.glow(f.x + 8, f.y + 8, 11, 'aqua', 0.28);
+      rk.draw('frog' + f.dir, f.x + 2, f.y + 2, f.hop > 0 ? 1 : 0);
+    }
+    for (const pt of g.parts) rk.rect(pt.x, pt.y, 1, 1, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+  },
+
+  // The title screen: the kit's sunset, with the frog and a car waiting along the bottom, clear of the logo.
+  drawTitle(ctx, rk) {
+    rk.backdrop.dusk();
+    rk.draw('frogR', 40, 153);
+    rk.draw('carL', 262, 154);
+  },
+});
+</script>
+</body>
+</html>

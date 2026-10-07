@@ -1,0 +1,1278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chrome Chomp</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files (and the fonts) into dist/<game>.html. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../../kit/retro-kit.css" data-rk-inline>
+<script src="../../kit/retro-kit.js" data-rk-inline></script>
+<!-- The soundtrack, kept as text in music.js. The build copies it in as well, so the game is still one file.
+     The kit plays it: see the music option in RetroKit.game, at the bottom. -->
+<script src="music.js" data-rk-inline></script>
+</head>
+<body>
+<script>
+/* CHROME CHOMP — a Retro Kit game. Rules for this file: .claude/skills/retro-kit/SKILL.md
+   A maze chase: steer a chrome chomper round a maze, eat every light, and keep away from four gremlins.
+   Two modes, picked from the kit's menu after Start game (the modes option, at the bottom):
+     Classic   the four big orbs turn the gremlins blue for a few seconds, and then you can eat them.
+     Advanced  the same, plus capsules that drop into the maze: a laser, turbo, freeze, a magnet,
+               a bomb and a shield. Level 1 has the first two; each level adds the next one.
+   Five mazes, each with its own look. After the last one the set repeats, faster.
+   The soundtrack is Barney's own MP3, kept in music.js. The kit plays it: see the music option, at the bottom. */
+
+/* ---------- Playfield layout (game pixels; the world is 320 x 180) ---------- */
+const T = 10;                   // one maze tile
+const COLS = 31;                // tiles across that are on screen
+const ROWS = 17;
+const WRAP = 32;                // 31 columns plus one hidden behind the screen edge: 320 pixels, so the tunnels join up
+const OX = 5;                   // the maze sits 5 pixels in from every edge
+const OY = 5;
+const WALL = 0, PATH = 1, PEN = 2, DOOR = 3;
+const UP = 0, LEFT = 1, DOWN = 2, RIGHT = 3;
+const DX = [0, -1, 0, 1];
+const DY = [-1, 0, 1, 0];
+const FACE = ['U', 'L', 'D', 'R'];
+const EXIT = { c: 15, r: 5 };   // the tile just above the pen door: gremlins come out and go home here
+const PEN_ROW = 7;
+const START = { c: 15, r: 11 }; // where the chomper begins
+const BONUS = { c: 15, r: 9 };  // where the bonus gem appears
+const SWIPE = 7;                // how far a finger travels (game pixels) before it counts as a turn
+const TOUCH = 7;                // how close two things must be (pixels, centre to centre) to touch
+const TURBO = 1.6;              // how much faster the chomper goes with Turbo
+const FREEZE_TIME = 5 * 60;     // updates (5 seconds)
+const MAGNET_REACH = 27;        // pixels
+const BLAST_REACH = 50;
+const tx = (c) => OX + c * T + T / 2;      // the centre of a tile, in pixels
+const ty = (r) => OY + r * T + T / 2;
+const wrapC = (c) => (c + WRAP) % WRAP;
+
+/* ---------- Mazes ----------
+   Each maze is drawn as its left half; the right half is its mirror image (column 15 is the middle).
+   # wall   . light to eat   o power orb   (space) open, nothing to eat   - pen door   p inside the pen
+   A row that starts with a space is a tunnel: it runs off one side of the screen and back on the other.
+   The pen, the tile above its door, the start (15,11) and the gem spot (15,9) are the same in every maze. */
+const MAZES = [
+  [ // 1: an easy start, one tunnel
+    '################',
+    '#.......#.....##',
+    '#.#####.#.###.##',
+    '#o..............',
+    '#.###.###.#####.',
+    '#.....###.......',
+    '#####.#####.###-',
+    '     .......#ppp',
+    '#####.#####.####',
+    '#.....###.......',
+    '#.###.###.###.##',
+    '#...#...........',
+    '###.###.###.###.',
+    '#o......#...#...',
+    '#.#######.###.##',
+    '#...............',
+    '################',
+  ],
+  [ // 2: city blocks: turnings everywhere and two tunnels
+    '################',
+    '#o....###.......',
+    '#.###.###.###.##',
+    ' ...............',
+    '###.###.###.###.',
+    '#...............',
+    '#.###.#####.###-',
+    '#.###.#####.#ppp',
+    '#.###.#####.####',
+    '#...............',
+    '###.###.###.###.',
+    ' ...............',
+    '#.###.###.###.##',
+    '#o....###.......',
+    '#.#########.####',
+    '#...............',
+    '################',
+  ],
+  [ // 3: big furnaces: long corridors with few ways out
+    '################',
+    '#...............',
+    '#.#####.#######.',
+    '#o#####.#.......',
+    '#.#####.#.######',
+    '#.......#.......',
+    '#.#########.###-',
+    '     .......#ppp',
+    '#.#########.####',
+    '#.......#.......',
+    '#.#####.#.######',
+    '#o#####.#.......',
+    '#.#####.#######.',
+    '#...............',
+    '#.#####.#####.##',
+    '#...............',
+    '################',
+  ],
+  [ // 4: two long tunnels right beside the pen
+    '################',
+    '#...............',
+    '#.###.#.###.####',
+    '#o....#.....#...',
+    '#####.#######.##',
+    ' ...............',
+    '###.#######.###-',
+    '###.#######.#ppp',
+    '###.#######.####',
+    ' ...............',
+    '#####.#######.##',
+    '#.....#.....#...',
+    '#.###.#.###.####',
+    '#o....#.........',
+    '#.#######.#####.',
+    '#...............',
+    '################',
+  ],
+  [ // 5: small rooms and tight loops
+    '################',
+    '#.......#.......',
+    '#.#.###.#.###.#.',
+    '#o#.....#.....#.',
+    '#.###.#####.###.',
+    '#...............',
+    '###.###.###.###-',
+    '    ....###.#ppp',
+    '###.###.###.####',
+    '#...............',
+    '#.###.#####.###.',
+    '#.#.....#.....#.',
+    '#.#.###.#.###.#.',
+    '#o......#.......',
+    '#.#####.#.#####.',
+    '#...............',
+    '################',
+  ],
+];
+
+/* How each maze looks. wall = the three tones of its walls (sprite legend letters: light edge, body, dark
+   edge). sky = the floor, as bands from the top down, always dark so the gremlins stand out. dust = specks
+   of scenery on the floor. marks = an extra pattern inside the walls. hollow = draw only the walls' edges. */
+const THEMES = [
+  { name: 'NEON GROVE', wall: '432', sky: [[0, 'ink'], [62, 'hill-near'], [124, 'sky-0']], dust: ['sky-2', 'sky-3'],
+    mark: '4', marks: (x, y) => (x * 7 + y * 13) % 19 === 0 },                    // leaves in the hedges
+  { name: 'STEEL CITY', wall: 'MDk', sky: [[0, 'sky-0'], [56, 'sky-1'], [118, 'sky-0']], dust: ['sky-2'],
+    mark: 'M', marks: (x, y) => x % 10 === 4 && y % 10 === 4 },                   // one rivet a tile
+  { name: 'EMBER FORGE', wall: 'HEX', sky: [[0, 'ink'], [90, 'sky-0']], dust: ['heat-dark', 'red-dark'],
+    mark: 'X', marks: (x, y) => (x + (y % 10 < 5 ? 0 : 3)) % 6 === 0 },           // brick joints
+  { name: 'STAR DOCK', wall: 'LMM', hollow: true, space: true, dust: [] },         // neon tubes over open space
+  { name: 'ROSE PALACE', wall: '543', sky: [[0, 'sky-0'], [70, 'hill-near'], [130, 'ink']], dust: ['sky-3', 'sky-2'],
+    mark: '3', marks: (x, y) => (x + y) % 8 === 0 },                              // inlaid stripes
+];
+
+/* The gremlins. Each hunts in its own way (see target, further down) and has its own corner to drift to. */
+const FOES = [
+  { sprite: 'imp', corner: [COLS - 2, -2] },              // heads straight for you
+  { sprite: 'bug', corner: [1, -2] },                     // aims a few tiles ahead of you
+  { sprite: 'cyclops', corner: [COLS - 2, ROWS + 1], oneEye: true },   // tries to get round the other side
+  { sprite: 'spike', corner: [1, ROWS + 1] },             // chases from a distance, loses its nerve up close
+];
+
+/* Advanced mode capsules. time = how long the power lasts, in updates (0 = it happens at once). */
+const POWERS = {
+  laser: { sprite: 'capLaser', label: 'LASER', time: 8 * 60 },      // fire bolts down the corridor
+  turbo: { sprite: 'capTurbo', label: 'TURBO', time: 6 * 60 },      // much faster
+  freeze: { sprite: 'capFreeze', label: 'FREEZE', time: 0 },        // every gremlin stops and cannot hurt you
+  magnet: { sprite: 'capMagnet', label: 'MAGNET', time: 8 * 60 },   // nearby lights fly to you
+  bomb: { sprite: 'capBomb', label: 'BOOM', time: 0 },              // clears every gremlin near you
+  shield: { sprite: 'capShield', label: 'SHIELD', time: 15 * 60 },  // takes one hit for you
+};
+const UNLOCKS = ['laser', 'turbo', 'freeze', 'magnet', 'bomb', 'shield'];   // level 1 has the first two
+const GEM_POINTS = [100, 300, 500, 700, 1000, 2000, 3000, 5000];            // the bonus gem, by level
+
+/* How hard a level is. Speeds are pixels per update (60 updates a second). Each level is about 5% faster
+   and the gremlins get closer to your speed; power orbs last a little less each time. */
+function tuning(level, advanced) {
+  const n = level - 1;
+  const speed = Math.min(1.5, 1.1 * Math.pow(1.05, n));
+  const chase = Math.min(0.96, 0.84 + 0.03 * n) + (advanced ? 0.02 : 0);
+  return {
+    speed: speed,
+    foe: speed * chase,
+    fright: Math.max(150, 420 - 45 * n),                  // updates the gremlins stay blue after a power orb
+    cast: !advanced && level === 1 ? [0, 1, 3] : [0, 1, 2, 3],     // Classic level 1 has three gremlins, not four
+    // The gremlins take turns drifting to their corners and hunting. Updates: drift, hunt, drift, hunt...
+    waves: n < 2 ? [420, 1200, 420, 1200, 300, 1200, 300] : n < 4 ? [300, 1200, 300, 1200, 180] : [240, 1200, 180],
+    // When each one leaves the pen: after this many updates, or once this many lights have been eaten.
+    leaveAfter: [0, 60, Math.max(120, 360 - 40 * n), Math.max(240, 720 - 80 * n)],
+    leaveDots: [0, 0, 20, 45],
+  };
+}
+
+/* ---------- Sprite helpers ----------
+   Sprites are drawn below as flat shapes ("masks"). shade() then gives every shape its three tones with
+   the light from the top left, so one mask can be turned or mirrored and still be lit the right way. */
+const MATERIALS = {
+  '=': { ramp: 'LMD' },             // chrome: the chomper
+  '@': { ramp: 'aAQ', own: true },  // aqua: its eye, shaded on its own edges
+  '%': { ramp: 'rRX' },             // red
+  '^': { ramp: 'SrR' },             // pink
+  '&': { ramp: 'hHE' },             // orange
+  '*': { ramp: 'RXX' },             // crimson
+  '~': { ramp: 'AQQ' },             // dark aqua: a gremlin you can eat
+};
+function shade(rows) {
+  const h = rows.length;
+  const w = rows[0].length;
+  rows.forEach((r) => { if (r.length !== w) console.warn('Chrome Chomp: a sprite row is ' + r.length + ' wide, not ' + w + ': ' + r); });
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? '.' : rows[y][x]);
+  return rows.map((row, y) => row.split('').map((ch, x) => {
+    const m = MATERIALS[ch];
+    if (!m) return ch;
+    const open = (c) => (m.own ? c !== ch : c === '.');
+    const lit = (open(at(x, y - 1)) ? 1 : 0) + (open(at(x - 1, y)) ? 1 : 0) - (open(at(x, y + 1)) ? 1 : 0) - (open(at(x + 1, y)) ? 1 : 0);
+    return m.ramp[lit > 0 ? 0 : lit < 0 ? 2 : 1];
+  }).join(''));
+}
+const mirror = (rows) => rows.map((r) => r.split('').reverse().join(''));
+const turn = (rows) => rows[0].split('').map((_, x) => rows.map((r) => r[x]).reverse().join(''));   // a quarter turn clockwise
+
+// One white glint on the chomper: the first mid-tone pixel from the top left.
+function glint(rows) {
+  let done = false;
+  return rows.map((r) => {
+    if (done || r.indexOf('M') < 0) return r;
+    done = true;
+    return r.replace('M', 'W');
+  });
+}
+
+/* The chomper, facing right: mouth shut, half open, wide open. */
+const CHOMP = [
+  [
+    '..========..',
+    '.=====@@===.',
+    '======@@====',
+    '============',
+    '============',
+    '============',
+    '======kkkkkk',
+    '============',
+    '============',
+    '============',
+    '.==========.',
+    '..========..',
+  ], [
+    '..========..',
+    '.=====@@===.',
+    '======@@====',
+    '============',
+    '==========..',
+    '========....',
+    '========....',
+    '==========..',
+    '============',
+    '============',
+    '.==========.',
+    '..========..',
+  ], [
+    '..========..',
+    '.=====@@===.',
+    '======@@====',
+    '=========...',
+    '=======.....',
+    '=====.......',
+    '=====.......',
+    '=======.....',
+    '=========...',
+    '============',
+    '.==========.',
+    '..========..',
+  ],
+];
+const chompFacing = (change) => ({ frames: CHOMP.map((mask) => glint(shade(change(mask)))) });
+
+/* The gremlins: ten rows of body, then two rows of feet that swap to make them scuttle. Their eyes are
+   drawn on top while the game runs, so that they can look where they are going. */
+function foeSprite(body, feetA, feetB) {
+  return { frames: [shade(body.concat(feetA)), shade(body.concat(feetB))] };
+}
+const IMP = [
+  '%..........%',
+  '%%........%%',
+  '.%%%%%%%%%%.',
+  '%%%%%%%%%%%%',
+  '%%%%%%%%%%%%',
+  '%%%%%%%%%%%%',
+  '%%%%%%%%%%%%',
+  '%%%%%%%%%%%%',
+  '%%%%%%%%%%%%',
+  '.%%%%%%%%%%.',
+];
+const BUG = [
+  '..^......^..',
+  '...^....^...',
+  '..^^^^^^^^..',
+  '.^^^^^^^^^^.',
+  '^^^^^^^^^^^^',
+  '^^^^^^^^^^^^',
+  '^^^^^^^^^^^^',
+  '^^^^^^^^^^^^',
+  '^^^^^^^^^^^^',
+  '.^^^^^^^^^^.',
+];
+const CYCLOPS = [
+  '....&&&&....',
+  '..&&&&&&&&..',
+  '.&&&&&&&&&&.',
+  '.&&&&&&&&&&.',
+  '&&&&&&&&&&&&',
+  '&&&&&&&&&&&&',
+  '&&&&&&&&&&&&',
+  '&&&&&&&&&&&&',
+  '.&&&&&&&&&&.',
+  '.&&&&&&&&&&.',
+];
+const SPIKE = [
+  '.*...**...*.',
+  '.**.****.**.',
+  '.**********.',
+  '************',
+  '************',
+  '************',
+  '************',
+  '************',
+  '************',
+  '.**********.',
+];
+const SCARED = [                // any gremlin while a power orb lasts: wide eyes and a wobbly mouth
+  '............',
+  '..~~~~~~~~..',
+  '.~~~~~~~~~~.',
+  '~~~~~~~~~~~~',
+  '~~WW~~~~WW~~',
+  '~~WW~~~~WW~~',
+  '~~~~~~~~~~~~',
+  '~~a~~aa~~a~~',
+  '~a~aa~~aa~a~',
+  '~~~~~~~~~~~~',
+];
+
+function buildSprites() {
+  return {
+    chompR: chompFacing((m) => m),
+    chompL: chompFacing(mirror),
+    chompD: chompFacing(turn),
+    chompU: chompFacing((m) => turn(turn(turn(m)))),
+    imp: foeSprite(IMP, ['.%%..%%..%%.', '.%%......%%.'], ['.%%..%%..%%.', '.....%%.....']),
+    bug: foeSprite(BUG, ['..^^.^^.^^..', '..^..^^..^..'], ['..^^.^^.^^..', '...^.^^.^...']),
+    cyclops: foeSprite(CYCLOPS, ['.&&.&&&&.&&.', '&&...&&...&&'], ['.&&.&&&&.&&.', '.&&..&&..&&.']),
+    spike: foeSprite(SPIKE, ['.***.**.***.', '..*..**..*..'], ['.***.**.***.', '.*...**...*.']),
+    scared: foeSprite(SCARED, ['.~~.~~~~.~~.', '.~~..~~..~~.'], ['.~~.~~~~.~~.', '..~..~~..~..']),
+    eyes: [                     // a pair of eyes: on a gremlin, or on their own, heading home after being caught
+      '.WW....WW.',
+      'WWWW..WWWW',
+      'WWWW..WWWW',
+      '.WW....WW.',
+    ],
+    eyeOne: [
+      '.WWWW.',
+      'WWWWWW',
+      'WWWWWW',
+      'WWWWWW',
+      '.WWWW.',
+    ],
+    orb: [                      // the power orb
+      '.yYYY.',
+      'yYSYYO',
+      'YYYYYO',
+      'YYYYYO',
+      'YYYYOO',
+      '.OOOO.',
+    ],
+    gem: [                      // the bonus
+      '..yyyy..',
+      '.ySYYYO.',
+      'yYSYYYYO',
+      'YYYYYYOO',
+      '.YYYYOO.',
+      '..YYOO..',
+      '...OO...',
+    ],
+    capLaser: [                 // a bolt of lightning
+      '....yy..',
+      '...yY...',
+      '..yYY...',
+      '.yYYYYY.',
+      '...YYO..',
+      '...YO...',
+      '..YO....',
+      '..O.....',
+    ],
+    capTurbo: [                 // fast-forward arrows
+      'y...y...',
+      'Yy..Yy..',
+      '.Yy..Yy.',
+      '..YY..YY',
+      '..YO..YO',
+      '.YO..YO.',
+      'YO..YO..',
+      'O...O...',
+    ],
+    capFreeze: [                // a snowflake
+      '...aa...',
+      'a..aa..a',
+      '.a.aa.a.',
+      'aaaWWaaa',
+      'aaaWWaaa',
+      '.a.aa.a.',
+      'a..aa..a',
+      '...aa...',
+    ],
+    capMagnet: [                // a horseshoe magnet with chrome tips
+      '.yYYYYO.',
+      'yYYYYYYO',
+      'YYO..YYO',
+      'YYO..YYO',
+      'YYO..YYO',
+      'YYO..YYO',
+      'WWL..WWL',
+      'WWL..WWL',
+    ],
+    capBomb: [                  // a round bomb with a lit fuse
+      '.....yS.',
+      '....y...',
+      '..hHHH..',
+      '.hHHHHE.',
+      'hHWHHHHE',
+      'hHHHHHHE',
+      '.HHHHHE.',
+      '..EEEE..',
+    ],
+    capShield: [                // a shield
+      '.aAAAAQ.',
+      'aAWAAAAQ',
+      'aAAAAAAQ',
+      'aAAAAAAQ',
+      'aAAAAAAQ',
+      '.AAAAAQ.',
+      '..AAAQ..',
+      '...QQ...',
+    ],
+  };
+}
+
+/* ---------- Building a maze ---------- */
+let mazes = [];                 // one entry per maze, worked out once when the page opens (see init)
+
+// Turns one maze's text into what the game needs: which tiles are open, where the lights and orbs are,
+// which rows are tunnels, and how far every tile is from the pen (so a caught gremlin's eyes can run home).
+function buildMaze(half) {
+  const cells = new Uint8Array(ROWS * WRAP);
+  const dots = [];
+  const orbs = [];
+  const tunnels = [];
+  half.forEach((h, r) => {
+    if (h.length !== 16) console.warn('Chrome Chomp: maze row ' + r + ' is ' + h.length + ' wide, not 16: ' + h);
+    const row = h + h.slice(0, 15).split('').reverse().join('');
+    for (let c = 0; c < COLS; c++) {
+      const ch = row[c];
+      const i = r * WRAP + c;
+      cells[i] = ch === '#' ? WALL : ch === '-' ? DOOR : ch === 'p' ? PEN : PATH;
+      if (ch === '.') dots.push(i);
+      if (ch === 'o') orbs.push(i);
+    }
+    if (row[0] !== '#') {                   // a tunnel: the hidden column joins the two ends
+      tunnels.push(r);
+      cells[r * WRAP + COLS] = PATH;
+    }
+  });
+  const home = new Int16Array(ROWS * WRAP).fill(-1);
+  const queue = [EXIT.r * WRAP + EXIT.c];
+  home[queue[0]] = 0;
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    const c = i % WRAP;
+    const r = (i - c) / WRAP;
+    for (let d = 0; d < 4; d++) {
+      const nr = r + DY[d];
+      if (nr < 0 || nr >= ROWS) continue;
+      const n = nr * WRAP + wrapC(c + DX[d]);
+      if (cells[n] === PATH && home[n] < 0) { home[n] = home[i] + 1; queue.push(n); }
+    }
+  }
+  return { cells: cells, dots: dots, orbs: orbs, tunnels: tunnels, home: home };
+}
+
+// Draws a maze's walls as one big sprite, 320 x 180, in its theme's colours. Walls are 4 pixels thick and
+// run through the middle of their tiles, which leaves the corridors wide enough for the 12-pixel sprites.
+function mazeArt(maze, theme) {
+  const solid = new Uint8Array(320 * 180);
+  const isWall = (c, r) => {
+    if (r < 0 || r >= ROWS) return false;
+    if (c >= 0 && c < COLS) return maze.cells[r * WRAP + c] === WALL;
+    // Just off the screen: the walls above and below a tunnel carry on to the very edge
+    const tunnel = (row) => maze.tunnels.indexOf(row) >= 0;
+    return (c === -1 || c === COLS) && !tunnel(r) && (tunnel(r - 1) || tunnel(r + 1));
+  };
+  const fill = (x, y, w, h) => {
+    for (let j = Math.max(0, y); j < Math.min(180, y + h); j++) {
+      for (let i = Math.max(0, x); i < Math.min(320, x + w); i++) solid[j * 320 + i] = 1;
+    }
+  };
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = -1; c <= COLS; c++) {
+      if (!isWall(c, r)) continue;
+      const x = OX + c * T;
+      const y = OY + r * T;
+      const up = isWall(c, r - 1);
+      const down = isWall(c, r + 1);
+      const left = isWall(c - 1, r);
+      const right = isWall(c + 1, r);
+      fill(x + 3, y + 3, 4, 4);                                             // the middle of the tile
+      if (up) fill(x + 3, y, 4, 3);                                         // an arm towards each wall next door
+      if (down) fill(x + 3, y + 7, 4, 3);
+      if (left) fill(x, y + 3, 3, 4);
+      if (right) fill(x + 7, y + 3, 3, 4);
+      if (up && left && isWall(c - 1, r - 1)) fill(x, y, 3, 3);             // corners, where walls make a solid block
+      if (up && right && isWall(c + 1, r - 1)) fill(x + 7, y, 3, 3);
+      if (down && left && isWall(c - 1, r + 1)) fill(x, y + 7, 3, 3);
+      if (down && right && isWall(c + 1, r + 1)) fill(x + 7, y + 7, 3, 3);
+    }
+  }
+  const at = (x, y) => (x < 0 || y < 0 || x >= 320 || y >= 180 ? 1 : solid[y * 320 + x]);
+  const rows = [];
+  for (let y = 0; y < 180; y++) {
+    let s = '';
+    for (let x = 0; x < 320; x++) {
+      if (!solid[y * 320 + x]) s += '.';
+      else if (!at(x, y - 1) || !at(x - 1, y)) s += theme.wall[0];          // lit from the top left
+      else if (!at(x, y + 1) || !at(x + 1, y)) s += theme.wall[2];
+      else if (theme.hollow) s += '.';
+      else s += theme.marks && theme.marks(x - OX, y - OY) ? theme.mark : theme.wall[1];
+    }
+    rows.push(s);
+  }
+  return { map: rows, outline: false };
+}
+
+/* ---------- Helpers ---------- */
+
+// A small repeatable random number maker, so each maze's scenery is the same every time.
+function rng(seed) {
+  return function () {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+}
+
+// Plays a sound at most once every few updates, so repeats do not become a buzz.
+function play(g, rk, name, wait) {
+  if (g.cool[name] > 0) return;
+  g.cool[name] = wait || 6;
+  rk.sfx(name);
+}
+
+function spark(g, x, y, colours, count, power) {
+  for (let i = 0; i < count && g.parts.length < 160; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = (0.3 + Math.random() * 0.7) * power;
+    g.parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 16 + Math.random() * 18, colour: colours[i % colours.length] });
+  }
+}
+
+const cellAt = (g, c, r) => (r < 0 || r >= ROWS ? WALL : g.maze.cells[r * WRAP + wrapC(c)]);
+const canGo = (g, c, r, d) => cellAt(g, c + DX[d], r + DY[d]) === PATH;
+
+// Where something is, in pixels (its centre). The chomper and roaming gremlins are placed by tile: the
+// tile they last reached (c, r) plus how far they have gone towards the next one (off). Gremlins in or
+// around the pen move freely instead (fx, fy).
+function spot(e) {
+  if (e.state === 'pen' || e.state === 'leave' || e.state === 'enter') return [e.fx, e.fy];
+  if (e.dir < 0) return [tx(e.c), ty(e.r)];
+  return [tx(e.c) + DX[e.dir] * e.off, ty(e.r) + DY[e.dir] * e.off];
+}
+
+// How far apart two points are, allowing for the tunnels joining the two sides of the screen.
+function gap(ax, ay, bx, by) {
+  let dx = Math.abs(ax - bx);
+  if (dx > 160) dx = 320 - dx;
+  return Math.hypot(dx, ay - by);
+}
+
+// Turns something round on the spot, wherever it is in a corridor.
+function reverse(e) {
+  if (e.dir < 0) return;
+  if (e.off > 0) {
+    e.c = wrapC(e.c + DX[e.dir]);
+    e.r += DY[e.dir];
+    e.off = T - e.off;
+  }
+  e.dir = (e.dir + 2) % 4;
+}
+
+/* ---------- Levels and lives ---------- */
+
+function setupLevel(g, rk) {
+  g.stage = (g.level - 1) % MAZES.length;
+  g.maze = mazes[g.stage];
+  g.theme = THEMES[g.stage];
+  g.tune = tuning(g.level, g.advanced);
+  g.dots = new Uint8Array(ROWS * WRAP);       // 1 = a light, 2 = a power orb
+  for (const i of g.maze.dots) g.dots[i] = 1;
+  for (const i of g.maze.orbs) g.dots[i] = 2;
+  g.total = g.maze.dots.length + g.maze.orbs.length;
+  g.left = g.total;
+  g.eaten = 0;
+  g.gem = null;
+  g.gems = 0;
+  g.caps = [];
+  g.capT = 180;                               // Advanced: the first capsule drops after 3 seconds
+  g.kinds = UNLOCKS.slice(0, Math.min(UNLOCKS.length, g.level + 1));
+  resetActors(g);
+  g.phase = 'ready';
+  rk.hud.set('level', g.level);
+  rk.hud.set('power', 0);
+  rk.banner(g.theme.name, 1.8);
+  rk.after(1.8, () => { if (g.phase === 'ready') g.phase = 'play'; });
+}
+
+// Puts the chomper back at the start and the gremlins back in the pen: a new level, or a new life.
+function resetActors(g) {
+  g.player = { c: START.c, r: START.r, dir: -1, off: 0, face: LEFT, want: -1, trail: [] };
+  g.foes = g.tune.cast.map((kind, n) => {
+    const e = { kind: kind, slot: n, c: EXIT.c, r: EXIT.r, dir: -1, off: 0, state: 'roam', scared: false, turn: false, wait: 0, fx: 0, fy: 0 };
+    if (n > 0) {                              // the first starts outside; the rest wait in the pen
+      e.state = 'pen';
+      e.fx = tx([15, 13, 17][n - 1]);
+      e.fy = ty(PEN_ROW);
+    }
+    return e;
+  });
+  g.lifeT = 0;                                // updates since this life began
+  g.lifeDots = 0;                             // lights eaten in this life
+  g.wave = 0;
+  g.waveT = g.tune.waves[0];
+  g.drift = true;                             // true = the gremlins head for their corners; false = they hunt
+  g.fright = 0;
+  g.frightMax = 1;
+  g.chain = 0;
+  g.freeze = 0;
+  g.safe = 0;
+  g.pw = { laser: 0, turbo: 0, magnet: 0, shield: 0 };
+  g.bolts = [];
+  g.pulls = [];
+  g.blast = null;
+  g.fireCool = 0;
+  g.hold = 0;
+  g.swipe = null;
+}
+
+/* ---------- The chomper ---------- */
+
+// Which way the player has just asked to go, if any. Keys, or a swipe; a long drag can make several turns.
+function readTurn(g, rk) {
+  const inp = rk.input;
+  const p = inp.pointer;
+  let d = inp.pressed.up ? UP : inp.pressed.down ? DOWN : inp.pressed.left ? LEFT : inp.pressed.right ? RIGHT : -1;
+  if (p.pressed) g.swipe = { dx: 0, dy: 0 };
+  const s = g.swipe;
+  if (s && p.down) {
+    s.dx += p.dx;
+    s.dy += p.dy;
+    const ax = Math.abs(s.dx);
+    const ay = Math.abs(s.dy);
+    if (Math.max(ax, ay) >= SWIPE) {
+      d = ax > ay ? (s.dx < 0 ? LEFT : RIGHT) : (s.dy < 0 ? UP : DOWN);
+      s.dx = 0;
+      s.dy = 0;
+    }
+  }
+  if (p.released) g.swipe = null;
+  return d;
+}
+
+function stepPlayer(g, rk) {
+  const p = g.player;
+  // The turn you asked for is remembered until the next place it can happen. Turning back is instant.
+  if (p.dir >= 0 && p.want === (p.dir + 2) % 4) reverse(p);
+  let left = g.tune.speed * (g.pw.turbo > 0 ? TURBO : 1);
+  for (let guard = 0; left > 0 && guard < 6; guard++) {
+    if (p.off === 0) {                        // in the middle of a tile: the only place to turn or stop
+      if (p.want >= 0 && canGo(g, p.c, p.r, p.want)) p.dir = p.want;
+      else if (p.dir >= 0 && !canGo(g, p.c, p.r, p.dir)) p.dir = -1;
+      if (p.dir < 0) break;
+    }
+    const m = Math.min(left, T - p.off);
+    p.off += m;
+    left -= m;
+    if (p.off >= T - 0.000001) {
+      p.c = wrapC(p.c + DX[p.dir]);
+      p.r += DY[p.dir];
+      p.off = 0;
+    }
+  }
+  if (p.dir >= 0) p.face = p.dir;
+  const at = spot(p);
+  p.trail.unshift(at);
+  if (p.trail.length > 8) p.trail.pop();
+  // Eat whatever is on the tile the chomper is mostly over
+  const ahead = p.dir >= 0 && p.off >= T / 2;
+  const i = (ahead ? p.r + DY[p.dir] : p.r) * WRAP + (ahead ? wrapC(p.c + DX[p.dir]) : p.c);
+  if (g.dots[i] === 1) eatDot(g, rk, i);
+  else if (g.dots[i] === 2) eatOrb(g, rk, i);
+}
+
+function eatDot(g, rk, i) {
+  g.dots[i] = 0;
+  g.left--;
+  g.eaten++;
+  g.lifeDots++;
+  rk.addScore(10);
+  if (!(g.cool.dot > 0)) {                    // two notes taking turns
+    g.cool.dot = 5;
+    g.note = !g.note;
+    rk.sfx.tone({ type: 'triangle', f: g.note ? 494 : 392, dur: 0.06, vol: 0.16 });
+  }
+  // The gem shows up twice a level, after about a third and two thirds of the lights
+  if (g.gems < 2 && g.eaten >= g.total * (g.gems ? 0.7 : 0.35)) {
+    g.gems++;
+    g.gem = { t: 9 * 60 };
+  }
+}
+
+function eatOrb(g, rk, i) {
+  g.dots[i] = 0;
+  g.left--;
+  g.eaten++;
+  rk.addScore(50);
+  rk.sfx('pickup');
+  g.fright = g.frightMax = g.tune.fright;
+  g.chain = 0;
+  for (const e of g.foes) {
+    if (e.state === 'eyes' || e.state === 'enter') continue;
+    e.scared = true;
+    if (e.state === 'roam') e.turn = true;    // they turn tail at once
+  }
+}
+
+/* ---------- The gremlins ---------- */
+
+// The tile a gremlin is trying to reach. They always take the turning that brings them nearest to it
+// and never turn back on themselves, which is what lets a careful player out-fox them.
+function target(g, e) {
+  if (g.drift) return FOES[e.kind].corner;
+  const p = g.player;
+  const d = p.face;
+  if (e.kind === 1) return [p.c + DX[d] * 3, p.r + DY[d] * 3];
+  if (e.kind === 2) {                         // a point as far beyond you as the first gremlin is behind
+    const lead = g.foes[0];
+    return [2 * (p.c + DX[d] * 2) - lead.c, 2 * (p.r + DY[d] * 2) - lead.r];
+  }
+  if (e.kind === 3) {
+    const near = (e.c - p.c) * (e.c - p.c) + (e.r - p.r) * (e.r - p.r) <= 36;
+    return near ? FOES[3].corner : [p.c, p.r];
+  }
+  return [p.c, p.r];
+}
+
+function chooseDir(g, e) {
+  const eyes = e.state === 'eyes';
+  const back = e.dir < 0 || eyes ? -1 : (e.dir + 2) % 4;
+  const ways = [];
+  for (let d = 0; d < 4; d++) if (d !== back && canGo(g, e.c, e.r, d)) ways.push(d);
+  if (!ways.length) { e.dir = back >= 0 && canGo(g, e.c, e.r, back) ? back : -1; return; }
+  let best = ways[0];
+  if (eyes) {                                 // caught: the shortest way home
+    let least = 9999;
+    for (const d of ways) {
+      const n = g.maze.home[(e.r + DY[d]) * WRAP + wrapC(e.c + DX[d])];
+      if (n >= 0 && n < least) { least = n; best = d; }
+    }
+  } else if (e.scared) best = ways[Math.floor(Math.random() * ways.length)];
+  else if (ways.length > 1) {
+    const t = target(g, e);
+    let least = Infinity;
+    for (const d of ways) {
+      const dx = e.c + DX[d] - t[0];
+      const dy = e.r + DY[d] - t[1];
+      if (dx * dx + dy * dy < least) { least = dx * dx + dy * dy; best = d; }
+    }
+  }
+  e.dir = best;
+}
+
+function stepFoe(g, rk, e) {
+  const frozen = g.freeze > 0;
+  if (e.state === 'pen') {
+    if (frozen) return;
+    if (e.wait > 0) { if (--e.wait === 0) e.state = 'leave'; }        // back from being caught: out again soon
+    else if (g.lifeT >= g.tune.leaveAfter[e.slot] || (g.tune.leaveDots[e.slot] && g.lifeDots >= g.tune.leaveDots[e.slot])) e.state = 'leave';
+    return;
+  }
+  if (e.state === 'leave') {                  // to the middle of the pen, then up through the door
+    if (frozen) return;
+    const gx = tx(EXIT.c);
+    const gy = ty(EXIT.r);
+    if (Math.abs(e.fx - gx) > 0.01) e.fx += Math.sign(gx - e.fx) * Math.min(0.6, Math.abs(gx - e.fx));
+    else if (e.fy > gy) e.fy = Math.max(gy, e.fy - 0.6);
+    else { e.state = 'roam'; e.c = EXIT.c; e.r = EXIT.r; e.off = 0; e.dir = -1; e.turn = false; }
+    return;
+  }
+  if (e.state === 'enter') {                  // eyes dropping back into the pen
+    e.fy = Math.min(ty(PEN_ROW), e.fy + 1.6);
+    if (e.fy >= ty(PEN_ROW)) { e.state = 'pen'; e.wait = 50; }
+    return;
+  }
+  const eyes = e.state === 'eyes';
+  if (frozen && !eyes) return;
+  if (e.turn) { e.turn = false; reverse(e); }
+  let left = g.tune.foe;
+  if (eyes) left = 2.4;
+  else if (e.scared) left *= 0.6;
+  else if (g.maze.tunnels.indexOf(e.r) >= 0 && (e.c <= 1 || e.c >= COLS - 2)) left *= 0.55;     // tunnels slow them
+  else if (e.kind === 0 && g.left <= 20) left *= 1.08;                                           // the first one hurries at the end
+  for (let guard = 0; left > 0 && guard < 6; guard++) {
+    if (e.off === 0) {
+      if (eyes && e.c === EXIT.c && e.r === EXIT.r) { e.state = 'enter'; e.fx = tx(EXIT.c); e.fy = ty(EXIT.r); return; }
+      chooseDir(g, e);
+      if (e.dir < 0) return;
+    }
+    const m = Math.min(left, T - e.off);
+    e.off += m;
+    left -= m;
+    if (e.off >= T - 0.000001) {
+      e.c = wrapC(e.c + DX[e.dir]);
+      e.r += DY[e.dir];
+      e.off = 0;
+    }
+  }
+}
+
+// A gremlin is caught: its eyes run back to the pen and it comes out again as good as new.
+function catchFoe(g, rk, e, points, loud) {
+  const at = spot(e);
+  e.state = 'eyes';
+  e.scared = false;
+  e.turn = false;
+  rk.addScore(points, at[0], at[1] - 8, 'aqua');
+  spark(g, at[0], at[1], loud ? ['red-light', 'red', 'heat', 'chrome-200'] : ['aqua-light', 'aqua', 'chrome-200'], 12, 1.4);
+  if (loud) play(g, rk, 'explosion', 10);
+  else rk.sfx.tone({ f: 300, to: 1100, dur: 0.16, vol: 0.2 });
+}
+
+function die(g, rk) {
+  g.phase = 'dying';
+  g.dieT = 0;
+  rk.sfx('hit');
+}
+
+// Every update of the short pause after being caught. The chomper bursts, then (if lives remain) a fresh start.
+function stepDying(g, rk) {
+  if (++g.dieT !== 24) return;
+  const at = spot(g.player);
+  spark(g, at[0], at[1], ['chrome-100', 'chrome-200', 'chrome-300', 'aqua'], 26, 1.8);
+  rk.sfx('explosion');
+  rk.shake(3, 0.2);
+  if (rk.loseLife() > 0) {
+    rk.after(1.2, () => {
+      resetActors(g);
+      g.phase = 'ready';
+      rk.hud.set('power', 0);
+      rk.after(1, () => { if (g.phase === 'ready') g.phase = 'play'; });
+    });
+  }
+}
+
+/* ---------- Advanced mode: capsules ---------- */
+
+function dropCapsule(g, rk) {
+  const p = g.player;
+  const pool = g.kinds.filter((k) => k !== g.lastKind);
+  for (let tries = 0; tries < 30; tries++) {
+    const i = rk.pick(g.maze.dots);           // anywhere a light started out
+    const c = i % WRAP;
+    const r = (i - c) / WRAP;
+    if (Math.abs(c - p.c) + Math.abs(r - p.r) < 6) continue;          // never right under your nose
+    if (g.caps.some((cp) => cp.c === c && cp.r === r)) continue;
+    const kind = rk.pick(pool.length ? pool : g.kinds);
+    g.lastKind = kind;
+    g.caps.push({ c: c, r: r, kind: kind, t: 14 * 60 });
+    spark(g, tx(c), ty(r), ['amber-light', 'amber'], 8, 0.9);
+    rk.sfx.tone({ type: 'triangle', f: 880, to: 1320, dur: 0.09, vol: 0.12 });
+    return;
+  }
+}
+
+function usePower(g, rk, kind, x, y) {
+  rk.addScore(50);
+  rk.popup(POWERS[kind].label, x, y - 9, 'amber');
+  rk.sfx('pickup');
+  if (kind === 'freeze') g.freeze = FREEZE_TIME;
+  else if (kind === 'bomb') {
+    g.blast = { x: x, y: y, t: 0 };
+    rk.sfx('explosion');
+    rk.shake(3, 0.2);
+    spark(g, x, y, ['sun-100', 'amber', 'heat', 'heat-light'], 24, 2.2);
+    for (const e of g.foes) {
+      const at = spot(e);
+      if (e.state === 'roam' && gap(x, y, at[0], at[1]) <= BLAST_REACH) catchFoe(g, rk, e, 200, true);
+    }
+  } else g.pw[kind] = POWERS[kind].time;
+}
+
+function stepCapsules(g, rk, px, py) {
+  for (const cp of g.caps) {
+    cp.t--;
+    if (gap(px, py, tx(cp.c), ty(cp.r)) < TOUCH) {
+      cp.t = 0;
+      usePower(g, rk, cp.kind, tx(cp.c), ty(cp.r));
+    }
+  }
+  g.caps = g.caps.filter((cp) => cp.t > 0);
+  if (--g.capT <= 0) {
+    g.capT = 540 + rk.randInt(0, 180);        // then another every 9 to 12 seconds, two at most
+    if (g.caps.length < 2) dropCapsule(g, rk);
+  }
+}
+
+function stepPowers(g, rk, px, py) {
+  const p = g.player;
+  for (const k in g.pw) if (g.pw[k] > 0) g.pw[k]--;
+  if (g.fireCool > 0) g.fireCool--;
+  // Laser: Space or a tap fires a bolt the way the chomper is facing
+  if (g.pw.laser > 0 && g.fireCool <= 0 && (rk.input.pressed.fire || rk.input.pressed.alt || rk.input.tap)) {
+    g.fireCool = 16;
+    g.bolts.push({ x: (px + 320) % 320, y: py, dir: p.face, life: 150, dead: false });
+    play(g, rk, 'shot', 6);
+  }
+  for (const b of g.bolts) {
+    for (let s = 0; s < 2 && !b.dead; s++) {  // two short steps an update, so a bolt cannot jump over anything
+      b.x = (b.x + DX[b.dir] * 2.5 + 320) % 320;
+      b.y += DY[b.dir] * 2.5;
+      if (cellAt(g, Math.floor((b.x - OX) / T), Math.floor((b.y - OY) / T)) !== PATH) {
+        b.dead = true;
+        spark(g, b.x, b.y, ['aqua-light', 'aqua'], 4, 0.8);
+        break;
+      }
+      for (const e of g.foes) {
+        const at = spot(e);
+        if (e.state === 'roam' && gap(b.x, b.y, at[0], at[1]) < TOUCH) { catchFoe(g, rk, e, 200, true); b.dead = true; break; }
+      }
+    }
+    if (--b.life <= 0) b.dead = true;
+  }
+  g.bolts = g.bolts.filter((b) => !b.dead);
+  // Magnet: lights within reach are eaten from where they are, and a spark flies in from each
+  if (g.pw.magnet > 0) {
+    for (let r = p.r - 3; r <= p.r + 3; r++) {
+      for (let c = p.c - 3; c <= p.c + 3; c++) {
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+        const i = r * WRAP + c;
+        if (g.dots[i] !== 1 || gap(px, py, tx(c), ty(r)) > MAGNET_REACH) continue;
+        eatDot(g, rk, i);
+        g.pulls.push({ x: tx(c), y: ty(r), t: 0 });
+      }
+    }
+  }
+}
+
+/* ---------- Drawing ---------- */
+
+// Draws something that might be half-way through a tunnel: once where it is, and again on the far side.
+function wrapped(x, fn) {
+  fn(x);
+  if (x < 12) fn(x + 320);
+  else if (x > 308) fn(x - 320);
+}
+
+function drawFloor(rk, th) {
+  if (th.space) rk.backdrop.space({ planet: false, terrain: false });
+  else {
+    th.sky.forEach((band, i) => {
+      const next = i + 1 < th.sky.length ? th.sky[i + 1][0] : 180;
+      rk.rect(0, band[0], 320, next - band[0], band[1]);
+    });
+  }
+  for (const s of th.specks) rk.px(s.x, s.y, s.colour);
+}
+
+function drawEyes(rk, bx, by, dir, oneEye) {
+  const ex = dir >= 0 ? DX[dir] : 0;
+  const ey = dir >= 0 ? DY[dir] : 0;
+  if (oneEye) {
+    rk.draw('eyeOne', bx + 3 + ex, by + 3 + ey);
+    rk.rect(bx + 5 + ex * 2, by + 4 + ey * 2, 2, ey === 0 ? 3 : 2, 'ink');
+    return;
+  }
+  rk.draw('eyes', bx + 1 + ex, by + 3 + ey);
+  rk.rect(bx + 2 + ex * 2, by + 4 + ey * 2, 2, 2, 'ink');
+  rk.rect(bx + 8 + ex * 2, by + 4 + ey * 2, 2, 2, 'ink');
+}
+
+function drawFoe(rk, g, e) {
+  const at = spot(e);
+  const by = Math.round(at[1]) - 6;
+  const step = (g.tick >> 3) & 1;
+  const info = FOES[e.kind];
+  wrapped(at[0], (x) => {
+    const bx = Math.round(x) - 6;
+    if (e.state === 'eyes' || e.state === 'enter') { drawEyes(rk, bx, by, e.state === 'enter' ? DOWN : e.dir, false); return; }
+    if (e.scared) {             // blue, and blinking white when the orb is about to wear off
+      rk.draw('scared', bx, by, step, { flash: g.fright < 120 && g.fright % 24 < 12 });
+      return;
+    }
+    const iced = g.freeze > 0 && !(g.freeze < 90 && g.freeze % 24 < 12);     // frozen solid: a white statue
+    rk.draw(info.sprite, bx, by, iced ? 0 : step, { flash: iced });
+    drawEyes(rk, bx, by, e.state === 'roam' ? e.dir : -1, info.oneEye);
+  });
+}
+
+function drawPlayer(rk, g) {
+  const p = g.player;
+  if (g.phase === 'dying' && g.dieT >= 24) return;
+  if (g.safe > 0 && g.safe % 10 >= 5) return;
+  const at = spot(p);
+  const name = 'chomp' + FACE[p.face];
+  const frame = g.phase === 'play' && p.dir >= 0 ? [0, 1, 2, 1][(g.tick >> 2) & 3] : 1;
+  const fading = (t) => t > 0 && !(t < 120 && t % 24 < 12);          // a power blinks out before it ends
+  if (g.pw.turbo > 0 && g.phase === 'play') {                         // two fading copies behind
+    for (const k of [6, 3]) {
+      const old = p.trail[k];
+      if (old) wrapped(old[0], (x) => rk.draw(name, x - 6, old[1] - 6, frame, { alpha: k === 6 ? 0.2 : 0.4 }));
+    }
+  }
+  wrapped(at[0], (x) => {
+    const y = at[1];
+    rk.glow(x, y, g.pw.turbo > 0 ? 15 : 10, 'aqua', g.pw.turbo > 0 ? 0.4 : 0.25);
+    if (fading(g.pw.magnet)) {                                        // a slow ring of amber points
+      for (let n = 0; n < 12; n++) {
+        const ang = n * Math.PI / 6 + g.tick * 0.05;
+        rk.px(x + Math.cos(ang) * MAGNET_REACH, y + Math.sin(ang) * MAGNET_REACH, 'amber');
+      }
+    }
+    rk.draw(name, x - 6, y - 6, frame, { flash: g.phase === 'dying' && g.dieT < 12 });
+    if (fading(g.pw.laser)) {                                         // a lit muzzle
+      rk.rect(x + DX[p.face] * 7 - 1, y + DY[p.face] * 7 - 1, 2, 2, 'aqua-light');
+      rk.glow(x + DX[p.face] * 7, y + DY[p.face] * 7, 5, 'aqua', 0.6);
+    }
+    if (fading(g.pw.shield)) {                                        // a ring round the chomper
+      rk.glow(x, y, 16, 'aqua', 0.3);
+      for (let n = 0; n < 16; n++) {
+        const ang = n * Math.PI / 8 + g.tick * 0.08;
+        rk.px(x + Math.cos(ang) * 9, y + Math.sin(ang) * 9, n % 2 ? 'aqua' : 'aqua-light');
+      }
+    }
+  });
+}
+
+function drawMaze(rk, g) {
+  drawFloor(rk, g.theme);
+  rk.draw('maze' + g.stage, 0, 0);
+  // Level clear: the walls blink pale twice a second
+  if (g.phase === 'clear' && g.clearT % 30 < 15) rk.draw('maze' + g.stage, 0, 0, 0, { flash: true, alpha: 0.5 });
+  rk.rect(tx(EXIT.c) - 5, ty(EXIT.r + 1) - 1, 10, 2, 'chrome-300');   // the pen door
+  for (const i of g.maze.dots) {
+    if (g.dots[i]) rk.rect(OX + (i % WRAP) * T + 4, OY + Math.floor(i / WRAP) * T + 4, 2, 2, 'amber-light');
+  }
+  const pulse = Math.sin(g.tick * 0.12) * 2;
+  for (const i of g.maze.orbs) {
+    if (!g.dots[i]) continue;
+    const x = tx(i % WRAP);
+    const y = ty(Math.floor(i / WRAP));
+    rk.glow(x, y, 9 + pulse, 'amber', 0.5);
+    rk.draw('orb', x - 3, y - 3);
+  }
+  if (g.gem && !(g.gem.t < 120 && g.gem.t % 24 < 12)) {
+    rk.glow(tx(BONUS.c), ty(BONUS.r), 11, 'amber', 0.45);
+    rk.draw('gem', tx(BONUS.c) - 4, ty(BONUS.r) - 4 + (((g.tick >> 4) & 1) ? 0 : 1));
+  }
+  for (const cp of g.caps) {
+    if (cp.t < 180 && cp.t % 24 < 12) continue;                      // blinks before it goes
+    const x = tx(cp.c);
+    const y = ty(cp.r) + (((g.tick >> 4) + cp.c) & 1);
+    rk.glow(x, y, 10, 'amber', 0.45);
+    rk.draw(POWERS[cp.kind].sprite, x - 4, y - 4);
+  }
+}
+
+function drawBits(rk, g) {
+  for (const b of g.bolts) {
+    rk.glow(b.x, b.y, 7, 'aqua', 0.55);
+    rk.rect(b.x - (DX[b.dir] ? 3 : 1), b.y - (DY[b.dir] ? 3 : 1), DX[b.dir] ? 6 : 2, DY[b.dir] ? 6 : 2, 'aqua');
+    rk.rect(b.x - 1 + DX[b.dir] * 2, b.y - 1 + DY[b.dir] * 2, 2, 2, 'chrome-100');
+  }
+  const at = spot(g.player);
+  for (const pl of g.pulls) {   // a magnet's catch, flying in
+    const k = pl.t / 8;
+    rk.rect(pl.x + (at[0] - pl.x) * k - 1, pl.y + (at[1] - pl.y) * k - 1, 2, 2, 'amber-light');
+  }
+  if (g.blast) {                // the bomb: a ring of sparks racing outwards
+    const r = BLAST_REACH * g.blast.t / 14;
+    rk.glow(g.blast.x, g.blast.y, r + 10, 'amber', 0.5 * (1 - g.blast.t / 14));
+    for (let n = 0; n < 40; n++) {
+      const ang = n * Math.PI / 20;
+      rk.rect(g.blast.x + Math.cos(ang) * r - 1, g.blast.y + Math.sin(ang) * r - 1, 2, 2, n % 2 ? 'amber' : 'sun-100');
+    }
+  }
+  for (const pt of g.parts) rk.rect(pt.x, pt.y, 1, 1, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+}
+
+/* ---------- The game ---------- */
+RetroKit.game({
+  id: 'chrome-chomp',
+  title: 'CHROME CHOMP',
+  tagline: 'A MAZE CHASE IN TWO MODES',
+  lives: 3,
+  livesIcon: 'dot',
+  hud: ['score', { id: 'power', label: 'Power', type: 'meter', width: 120, full: 'Full' }, 'best', 'lives', 'level'],
+  phoneMid: 'power',            // phones show three things: how long a power has left matters more than the level number
+  keys: [['←', '→', '↑', '↓', 'Move'], ['Space', 'Fire'], ['P', 'Pause']],
+  touch: 'Swipe to turn · Tap to fire',
+
+  // The kit offers these after Start game, hands the chosen id to start() as rk.mode, and keeps a
+  // high-score table for each.
+  modes: [
+    { id: 'classic', label: 'Classic', description: 'Power orbs turn the gremlins blue' },
+    { id: 'advanced', label: 'Advanced', description: 'Adds capsules: laser, turbo and more' },
+  ],
+  music: { data: window.CHROME_CHOMP_MUSIC, level: 0.35 },    // level: how loud the track is against the sound effects (1 = the file's full level)
+
+  sprites: buildSprites(),
+
+  init(rk) {
+    // Work out each maze once and draw its walls as a sprite, with its scenery
+    mazes = MAZES.map(buildMaze);
+    mazes.forEach((maze, i) => {
+      const th = THEMES[i];
+      rk.makeSprite(mazeArt(maze, th), 'maze' + i);
+      const rnd = rng(i * 977 + 5);
+      th.specks = [];
+      for (let n = 0; n < (th.dust.length ? 44 : 0); n++) {
+        th.specks.push({ x: Math.floor(rnd() * 320), y: Math.floor(rnd() * 180), colour: th.dust[n % th.dust.length] });
+      }
+    });
+  },
+
+  start(rk) {
+    const g = {
+      phase: 'ready',           // for each level: ready, play, and dying or clear
+      advanced: rk.mode === 'advanced',
+      level: 1,
+      tick: 0,
+      parts: [],
+      cool: {},
+      bolts: [],
+      pulls: [],
+      blast: null,
+      player: null,
+      note: false,
+      lastKind: '',
+      nextLife: 10000,          // an extra life at 10,000 points, then every 20,000 after
+    };
+    setupLevel(g, rk);
+    return g;
+  },
+
+  update(g, rk) {
+    g.tick++;
+    for (const k in g.cool) if (g.cool[k] > 0) g.cool[k]--;
+    for (const pt of g.parts) { pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.93; pt.vy *= 0.93; pt.life--; }
+    g.parts = g.parts.filter((pt) => pt.life > 0);
+    for (const pl of g.pulls) pl.t++;
+    g.pulls = g.pulls.filter((pl) => pl.t < 8);
+    if (g.blast && ++g.blast.t > 14) g.blast = null;
+    if (rk.ending) return;               // game over is on its way: no more control
+
+    const p = g.player;
+    const d = readTurn(g, rk);
+    if (d >= 0) p.want = d;              // a turn asked for during a pause still counts
+    if (g.phase === 'dying') { stepDying(g, rk); return; }
+    if (g.phase === 'clear') { g.clearT++; return; }
+    if (g.phase !== 'play') return;
+    if (g.hold > 0) { g.hold--; return; }             // a beat of stillness when a gremlin is eaten
+
+    if (rk.score >= g.nextLife) {
+      g.nextLife += 20000;
+      rk.addLife(1);
+      const here = spot(p);
+      rk.popup('1UP', here[0], here[1] - 10, 'amber');
+    }
+
+    g.lifeT++;
+    stepPlayer(g, rk);
+    const at = spot(p);
+    stepPowers(g, rk, at[0], at[1]);
+    if (g.advanced) stepCapsules(g, rk, at[0], at[1]);
+    if (g.gem) {
+      if (gap(at[0], at[1], tx(BONUS.c), ty(BONUS.r)) < TOUCH) {
+        rk.addScore(GEM_POINTS[Math.min(g.level, GEM_POINTS.length) - 1], tx(BONUS.c), ty(BONUS.r) - 8, 'amber');
+        rk.sfx('pickup');
+        g.gem = null;
+      } else if (--g.gem.t <= 0) g.gem = null;
+    }
+
+    // Every light eaten: on to the next maze
+    if (g.left <= 0) {
+      g.phase = 'clear';
+      g.clearT = 0;
+      g.bolts = [];
+      rk.sfx('pickup');
+      rk.hud.set('power', 0);
+      rk.after(1.6, () => { g.level++; setupLevel(g, rk); });
+      return;
+    }
+
+    // The gremlins' clocks: blue time, frozen time, and their turns at drifting and hunting
+    if (g.freeze > 0) g.freeze--;
+    else if (g.fright > 0) {
+      if (--g.fright === 0) for (const e of g.foes) e.scared = false;
+    } else if (g.wave < g.tune.waves.length && --g.waveT <= 0) {
+      g.wave++;
+      g.drift = g.wave % 2 === 0 && g.wave < g.tune.waves.length;
+      g.waveT = g.tune.waves[g.wave] || 0;
+      for (const e of g.foes) if (e.state === 'roam') e.turn = true;
+    }
+    if (g.safe > 0) g.safe--;
+    for (const e of g.foes) stepFoe(g, rk, e);
+
+    // Touching a gremlin
+    for (const e of g.foes) {
+      if (e.state !== 'roam') continue;
+      const ep = spot(e);
+      if (gap(at[0], at[1], ep[0], ep[1]) >= TOUCH) continue;
+      if (e.scared) {                    // eaten: 200, then 400, 800, 1600 from the same orb
+        catchFoe(g, rk, e, 200 << Math.min(g.chain, 3), false);
+        g.chain++;
+        g.hold = 18;
+      } else if (g.freeze > 0 || g.safe > 0) continue;
+      else if (g.pw.shield > 0) {        // the shield takes the hit, and the gremlin with it
+        g.pw.shield = 0;
+        g.safe = 45;
+        rk.sfx('hit');
+        catchFoe(g, rk, e, 200, true);
+      } else { die(g, rk); return; }
+    }
+
+    // The Power meter: how much is left of whichever power has longest to run
+    let most = g.fright / g.frightMax;
+    most = Math.max(most, g.freeze / FREEZE_TIME);
+    for (const k in g.pw) most = Math.max(most, g.pw[k] / POWERS[k].time);
+    rk.hud.set('power', Math.ceil(most * 40) / 40);
+  },
+
+  draw(ctx, g, rk) {
+    drawMaze(rk, g);
+    if (g.phase !== 'clear' && !(g.phase === 'dying' && g.dieT >= 24)) for (const e of g.foes) drawFoe(rk, g, e);
+    drawPlayer(rk, g);
+    drawBits(rk, g);
+  },
+
+  // The title screen: the kit's sunset, with the chomper and a gremlin along the bottom, clear of the logo.
+  drawTitle(ctx, rk) {
+    rk.backdrop.dusk();
+    rk.draw('chompR', 20, 153, [0, 1, 2, 1][Math.floor(rk.t * 6) & 3]);
+    for (const x of [40, 49, 58]) rk.rect(x, 158, 2, 2, 'amber-light');     // kept left of the menu on a phone
+    rk.draw('imp', 284, 153, Math.floor(rk.t * 4) & 1);
+    drawEyes(rk, 284, 153, LEFT, false);
+  },
+});
+</script>
+</body>
+</html>

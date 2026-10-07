@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Retro Kit game</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files (and the fonts) into dist/<game>.html. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../../kit/retro-kit.css" data-rk-inline>
+<script src="../../kit/retro-kit.js" data-rk-inline></script>
+</head>
+<body>
+<script>
+/* MY GAME — a Retro Kit game. Rules for this file: .claude/skills/retro-kit/SKILL.md */
+RetroKit.game({
+  id: 'my-game',                 // the folder name: lowercase-with-hyphens; high scores are saved under it
+  title: 'MY GAME',              // invented name, ALL CAPS, 12 characters or fewer per line
+  lives: 3,
+  hud: ['score', 'best', 'lives', 'level'],
+  keys: [['←', '→', 'Move'], ['Space', 'Fire'], ['P', 'Pause']],
+  touch: 'Drag to move · Tap to fire',
+
+  sprites: {
+    // One character per game pixel. Legend in the skill's reference. The kit adds the ink outline.
+    player: [
+      '..LL..',
+      '.LWWL.',
+      'LMAAML',
+      'DMMMMD',
+    ],
+  },
+
+  // New game: build and return this game's state. Score and lives are handled by the kit.
+  start(rk) {
+    rk.hud.set('level', 1);
+    return { x: rk.W / 2 - 3, y: rk.H - 20, level: 1 };
+  },
+
+  // Rules: called 60 times a second during play.
+  update(g, rk) {
+    const speed = 2;
+    if (rk.input.left) g.x -= speed;
+    if (rk.input.right) g.x += speed;
+    if (rk.input.pointer.down) g.x += rk.input.pointer.dx;   // drag anywhere: touch, or mouse on desktop
+    g.x = rk.clamp(g.x, 0, rk.W - 6);
+  },
+
+  // Picture: called every frame. Draw the backdrop first, then the world.
+  draw(ctx, g, rk) {
+    rk.backdrop.space();
+    rk.draw('player', g.x, g.y);
+  },
+});
+</script>
+</body>
+</html>
