@@ -1,6 +1,7 @@
-/* Retro Kit 1.1 — runtime
+/* Retro Kit 2.0 (beta) — runtime
    One file, no dependencies. Exposes window.RetroKit. Pair it with retro-kit.css.
-   It owns everything every game shares: the pixel canvas and its scaling, the game loop, keyboard and
+   It owns everything every game shares: the canvas (drawn at the screen's real resolution; games work in
+   a 320 x 180 world), shape art, the game loop, keyboard and
    touch input, every screen outside play (title, mode choice, pause, game over, initials, high scores,
    settings, rotate), the HUD, sprites, backdrops, glow, pop-ups, banners, screen shake, sound, music
    and saved data.
@@ -8,7 +9,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.1.0';
+  const VERSION = '2.0.0-beta.2';
   const W = 320;
   const H = 180;
   const STEP = 1 / 60;
@@ -122,6 +123,7 @@
 
   /* ---------- Sprites ---------- */
   function makeSprite(C, def, name) {
+    if (!isPixelDef(def)) return makeShapeSprite(C, def, name);
     let frames;
     let legend = LEGEND;
     let outline = true;
@@ -187,7 +189,7 @@
       flashes.push(fc);
       return c;
     });
-    return { name: name, w: w, h: h, pad: pad, frames: canvases, flashes: flashes, flipped: [], flippedFlash: [] };
+    return { name: name, kind: 'pixel', w: w, h: h, pad: pad, frames: canvases, flashes: flashes, flipped: [], flippedFlash: [] };
   }
 
   function flippedFrame(spr, i, flash) {
@@ -201,6 +203,251 @@
       cache[i] = c;
     }
     return cache[i];
+  }
+
+  /* ---------- Shape art (kit 2.0) ----------
+     Characters and scenery are lists of simple shapes in world units (the 320 x 180 grid), drawn at the
+     screen's real resolution: smooth edges, flat colour in hard bands, an ink outline round the outside.
+     A shape is an object with one geometry key and some paint keys:
+       { poly: [x1, y1, x2, y2, ...] }          a closed polygon
+       { rect: [x, y, w, h], r: 1 }             a box, optionally with rounded corners
+       { circle: [cx, cy, r] }                  { ellipse: [cx, cy, rx, ry, turnDegrees] }
+       { line: [x1, y1, x2, y2, ...], width: 1 } an open stroke with round ends
+       { path: 'M0 0 L4 2 Q6 6 0 8 Z' }         SVG path data, for curves
+     Paint: fill is a token ('aqua-light', 'ink'), a ramp ('aqua', 'red', 'amber', 'heat', 'chrome': drawn as
+     light / base / dark bands, top to bottom), or explicit bands ['sun-100', 0.2, 'amber', 0.6, 'heat'].
+     band: false (ramp as its base tone only) or [lightEnd, darkStart]. dir: 'down' (default), 'diag' or
+     'right', or degrees: which way the bands run. alpha: 0 to 1. stroke: 0.8 draws only the shape's edge,
+     that wide (rings, arcs). outline: false leaves the shape out of the ink outline (glows, flames). */
+  const OUTLINE = 0.6;               // ink outline width, world pixels
+  const BAND = [0.3, 0.7];           // a ramp's light band ends, and its dark band starts, at these fractions
+  const DIRS = { down: 0, diag: 45, right: 90 };
+
+  function isPixelDef(def) {
+    if (Array.isArray(def)) return true;
+    if (!def || typeof def !== 'object') return true;
+    if (def.map) return true;
+    return Array.isArray(def.frames) && Array.isArray(def.frames[0]) && typeof def.frames[0][0] === 'string';
+  }
+
+  function roundRectPath(p, x, y, w, h, r) {
+    r = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+    if (!r) { p.rect(x, y, w, h); return; }
+    p.moveTo(x + r, y);
+    p.lineTo(x + w - r, y); p.arcTo(x + w, y, x + w, y + r, r);
+    p.lineTo(x + w, y + h - r); p.arcTo(x + w, y + h, x + w - r, y + h, r);
+    p.lineTo(x + r, y + h); p.arcTo(x, y + h, x, y + h - r, r);
+    p.lineTo(x, y + r); p.arcTo(x, y, x + r, y, r);
+    p.closePath();
+  }
+
+  /* Geometry once, at load: a Path2D plus a function giving the shape's extent along a direction. */
+  function shapeGeom(s, box, warn) {
+    const g = { s: s, kind: 'fill', width: 0, path: new Path2D(), ext: null };
+    const fromPoints = (pts, grow) => (sn, cs) => {
+      let a = Infinity, b = -Infinity;
+      for (let i = 0; i + 1 < pts.length; i += 2) {
+        const t = pts[i] * sn + pts[i + 1] * cs;
+        if (t < a) a = t;
+        if (t > b) b = t;
+      }
+      return [a - grow, b + grow];
+    };
+    if (s.poly) {
+      const p = s.poly;
+      for (let i = 0; i + 1 < p.length; i += 2) i ? g.path.lineTo(p[i], p[i + 1]) : g.path.moveTo(p[i], p[i + 1]);
+      g.path.closePath();
+      g.ext = fromPoints(p, 0);
+    } else if (s.rect) {
+      const [x, y, w, h] = s.rect;
+      roundRectPath(g.path, x, y, w, h, s.r);
+      g.ext = fromPoints([x, y, x + w, y, x, y + h, x + w, y + h], 0);
+    } else if (s.circle) {
+      const [cx, cy, r] = s.circle;
+      g.path.arc(cx, cy, r, 0, Math.PI * 2);
+      g.ext = (sn, cs) => { const t = cx * sn + cy * cs; return [t - r, t + r]; };
+    } else if (s.ellipse) {
+      const [cx, cy, rx, ry] = s.ellipse;
+      const turn = (s.ellipse[4] || 0) * Math.PI / 180;
+      g.path.ellipse(cx, cy, rx, ry, turn, 0, Math.PI * 2);
+      g.ext = (sn, cs) => {
+        const u = Math.cos(turn) * sn + Math.sin(turn) * cs;
+        const v = -Math.sin(turn) * sn + Math.cos(turn) * cs;
+        const half = Math.sqrt(rx * rx * u * u + ry * ry * v * v);
+        const t = cx * sn + cy * cs;
+        return [t - half, t + half];
+      };
+    } else if (s.line) {
+      const p = s.line;
+      for (let i = 0; i + 1 < p.length; i += 2) i ? g.path.lineTo(p[i], p[i + 1]) : g.path.moveTo(p[i], p[i + 1]);
+      g.kind = 'stroke';
+      g.width = s.width || 1;
+      g.ext = fromPoints(p, g.width / 2);
+    } else if (s.path) {
+      try { g.path = new Path2D(s.path); } catch (e) { warn('a path it cannot read'); }
+      const b = s.box || box;
+      g.ext = fromPoints([b[0], b[1], b[0] + b[2], b[1], b[0], b[1] + b[3], b[0] + b[2], b[1] + b[3]], 0);
+    } else {
+      warn('a shape with no poly, rect, circle, ellipse, line or path');
+      return null;
+    }
+    if (s.stroke && g.kind === 'fill') {             // just the edge: rings, arcs, frames
+      g.kind = 'stroke';
+      g.width = s.stroke;
+      const inner = g.ext;
+      g.ext = (sn, cs) => { const e = inner(sn, cs); return [e[0] - s.stroke / 2, e[1] + s.stroke / 2]; };
+    }
+    return g;
+  }
+
+  function bandsOf(fill, band) {
+    if (Array.isArray(fill)) {
+      const out = [];
+      let from = 0;
+      for (let i = 0; i < fill.length; i += 2) {
+        const to = i + 1 < fill.length ? fill[i + 1] : 1;
+        out.push([fill[i], from, to]);
+        from = to;
+      }
+      return out;
+    }
+    const ramp = RAMPS[fill];
+    if (!ramp) return [[fill || 'chrome-300', 0, 1]];
+    if (band === false) return [[ramp[1], 0, 1]];
+    const b = Array.isArray(band) ? band : BAND;
+    return [[ramp[0], 0, b[0]], [ramp[1], b[0], b[1]], [ramp[2], b[1], 1]];
+  }
+
+  /* Paint one shape's colour (no outline) into g, which is in world units. */
+  function paintGeom(g, colourOf, geom, k, flashColour) {
+    const s = geom.s;
+    const alpha = s.alpha == null ? 1 : s.alpha;
+    g.globalAlpha = alpha;
+    const bands = flashColour ? [[flashColour, 0, 1]] : bandsOf(s.fill, s.band);
+    if (geom.kind === 'stroke') {
+      g.strokeStyle = colourOf(bands[Math.floor(bands.length / 2)][0]);
+      g.lineWidth = geom.width;
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      g.stroke(geom.path);
+      g.globalAlpha = 1;
+      return;
+    }
+    /* The middle band first, over the whole shape, with a hairline stroke so neighbouring shapes meet without a seam */
+    const base = colourOf(bands[Math.floor(bands.length / 2)][0]);
+    g.fillStyle = base;
+    g.fill(geom.path);
+    if (alpha === 1) { g.strokeStyle = base; g.lineWidth = 1 / k; g.lineJoin = 'round'; g.stroke(geom.path); }
+    if (bands.length > 1) {
+      const deg = typeof s.dir === 'number' ? s.dir : DIRS[s.dir] || 0;
+      const a = deg * Math.PI / 180;
+      const sn = Math.sin(a), cs = Math.cos(a);
+      const [t0, t1] = geom.ext(sn, cs);
+      g.save();
+      g.clip(geom.path);
+      g.rotate(-a);
+      for (const b of bands) {
+        if (b[2] <= b[1]) continue;
+        g.fillStyle = colourOf(b[0]);
+        const ya = t0 + (t1 - t0) * b[1];
+        const yb = t0 + (t1 - t0) * b[2];
+        g.fillRect(-4000, ya, 8000, yb - ya);
+      }
+      g.restore();
+    }
+    g.globalAlpha = 1;
+  }
+
+  /* All of a sprite frame: the ink outline under everything, then the colours in order. */
+  function paintShapes(g, C, colourOf, geoms, o, k, flash) {
+    if (o > 0) {
+      g.fillStyle = C.ink; g.strokeStyle = C.ink;
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      for (const geom of geoms) {
+        if (geom.s.outline === false) continue;
+        if (geom.kind === 'stroke') { g.lineWidth = geom.width + o * 2; g.stroke(geom.path); }
+        else { g.lineWidth = o * 2; g.fill(geom.path); g.stroke(geom.path); }
+      }
+    }
+    for (const geom of geoms) paintGeom(g, colourOf, geom, k, flash ? 'chrome-100' : null);
+  }
+
+  function makeShapeSprite(C, def, name) {
+    const warned = {};
+    const warn = (what) => {
+      if (warned[what]) return;
+      warned[what] = 1;
+      console.warn('Retro Kit: sprite "' + name + '" has ' + what + '.');
+    };
+    const colourOf = (t) => {
+      if (C[t]) return C[t];
+      warn('"' + t + '", which is not a colour token');
+      return '#ff00ff';
+    };
+    const lists = def.frames || [def.shapes || []];
+    let size = def.size;
+    if (!size) {
+      warn('no size: add size: [w, h], the box rk.draw places at x, y');
+      size = [8, 8];
+    }
+    const box = [0, 0, size[0], size[1]];
+    const frames = lists.map((list) => (list || []).map((s) => shapeGeom(s, box, warn)).filter(Boolean));
+    const o = def.outline === false ? 0 : typeof def.outline === 'number' ? def.outline : OUTLINE;
+    return {
+      name: name, kind: 'shape', w: size[0], h: size[1], o: o, pad: o, frames: frames,
+      C: C, colourOf: colourOf, cache: { k: 0, img: {} }
+    };
+  }
+
+  /* A sprite frame as an image at k screen pixels per world pixel, made the first time it is needed. */
+  function shapeImage(spr, i, flash, flip, k) {
+    if (spr.cache.k !== k) spr.cache = { k: k, img: {} };
+    const key = i + (flash ? 'f' : '') + (flip ? 'm' : '');
+    let c = spr.cache.img[key];
+    if (c) return c;
+    const pd = Math.ceil(spr.o * k) + 2;
+    c = document.createElement('canvas');
+    c.width = Math.ceil(spr.w * k) + pd * 2;
+    c.height = Math.ceil(spr.h * k) + pd * 2;
+    c.pd = pd;
+    const g = c.getContext('2d');
+    g.setTransform(k, 0, 0, k, pd, pd);
+    if (flip) { g.translate(spr.w, 0); g.scale(-1, 1); }
+    paintShapes(g, spr.C, spr.colourOf, spr.frames[i], spr.o, k, flash);
+    spr.cache.img[key] = c;
+    return c;
+  }
+
+  /* A sprite frame with round bites taken out of it (a shelter that is being shot away). cut lists
+     [x, y, r] in the sprite's own box; each bite gets an ink rim. Kept until the bites change. */
+  function cutImage(spr, i, flash, flip, cut, k) {
+    const base = shapeImage(spr, i, flash, flip, k);
+    if (!spr.cuts || spr.cuts.k !== k || spr.cuts.n > 64) spr.cuts = { k: k, n: 0, img: {} };
+    const key = i + (flash ? 'f' : '') + (flip ? 'm' : '') + '|' + cut.map((c) => c.join(',')).join(';');
+    let c = spr.cuts.img[key];
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = base.width; c.height = base.height; c.pd = base.pd;
+    const g = c.getContext('2d');
+    g.drawImage(base, 0, 0);
+    g.setTransform(k, 0, 0, k, base.pd, base.pd);
+    const rim = Math.max(spr.o, 0.4);
+    const bite = (grow) => {
+      g.beginPath();
+      for (const b of cut) {
+        const x = flip ? spr.w - b[0] : b[0];
+        g.moveTo(x + b[2] + grow, b[1]);
+        g.arc(x, b[1], b[2] + grow, 0, Math.PI * 2);
+      }
+      g.fill();
+    };
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = spr.C.ink;
+    bite(rim);
+    g.globalCompositeOperation = 'destination-out';
+    bite(0);
+    spr.cuts.img[key] = c;
+    spr.cuts.n++;
+    return c;
   }
 
   /* ---------- Backdrop geometry (game pixels) ---------- */
@@ -557,41 +804,89 @@
     const C = readColours();
 
     /* ----- Drawing ----- */
+    /* The canvas holds the screen's real pixels. Games draw in world units (320 x 180): the context is
+       scaled by V.kx, V.ky (screen pixels per world pixel) and shifted by V.ox, V.oy (screen shake, whole
+       screen pixels). Flat boxes snap to whole screen pixels; shapes are anti-aliased. */
+    const V = { k: 1, kx: 1, ky: 1, ox: 0, oy: 0 };
     const warnedColours = {};
     function col(c) {
       if (C[c]) return C[c];
       if (!warnedColours[c]) { console.warn('Retro Kit: "' + c + '" is not a colour token. Use a token name such as "aqua" or "chrome-300".'); warnedColours[c] = 1; }
       return c;
     }
+    const snapX = (x) => (Math.round(x * V.kx + V.ox) - V.ox) / V.kx;
+    const snapY = (y) => (Math.round(y * V.ky + V.oy) - V.oy) / V.ky;
     function rect(x, y, w, h, colour, alpha) {
+      if (!(w > 0 && h > 0)) return;
+      const x0 = snapX(x), y0 = snapY(y);
+      const x1 = Math.max(snapX(x + w), x0 + 1 / V.kx);
+      const y1 = Math.max(snapY(y + h), y0 + 1 / V.ky);
       ctx.globalAlpha = alpha == null ? 1 : alpha;
       ctx.fillStyle = col(colour);
-      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
       ctx.globalAlpha = 1;
     }
     function px(x, y, colour) { rect(x, y, 1, 1, colour); }
-    function circle(cx, cy, r, colour) {
+    function circle(cx, cy, r, colour, alpha) {
+      if (!(r > 0)) return;
+      ctx.globalAlpha = alpha == null ? 1 : alpha;
       ctx.fillStyle = col(colour);
-      cx = Math.round(cx); cy = Math.round(cy); r = Math.max(1, Math.round(r));
-      for (let y = 0; y < r * 2; y++) {
-        const yy = y + 0.5 - r;
-        const half = Math.sqrt(Math.max(0, r * r - yy * yy));
-        const x0 = Math.round(cx - half);
-        const x1 = Math.round(cx + half);
-        if (x1 > x0) ctx.fillRect(x0, cy - r + y, x1 - x0, 1);
-      }
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    /* An image made at the current scale, placed with its top-left (less its padding) on a whole screen pixel */
+    function blit(img, x, y, alpha) {
+      const dx = Math.round(x * V.kx + V.ox) - (img.pd || 0);
+      const dy = Math.round(y * V.ky + V.oy) - (img.pd || 0);
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (alpha != null) ctx.globalAlpha = alpha;
+      ctx.drawImage(img, dx, dy);
+      ctx.restore();
+    }
+    /* Bricks, platforms, logs: a rounded tile with an ink edge, banded light / base / dark, and a glint */
+    let blockCache = { k: 0, img: {} };
+    function blockImage(w, h, ramp) {
+      const k = V.k;
+      if (blockCache.k !== k) blockCache = { k: k, img: {} };
+      const key = w.toFixed(2) + 'x' + h.toFixed(2) + ramp;
+      let c = blockCache.img[key];
+      if (c) return c;
+      const r = RAMPS[ramp] || RAMPS.chrome;
+      c = document.createElement('canvas');
+      c.width = Math.ceil(w * k) + 2;
+      c.height = Math.ceil(h * k) + 2;
+      c.pd = 1;
+      const g = c.getContext('2d');
+      g.setTransform(k, 0, 0, k, 1, 1);
+      const o = Math.min(0.5, w / 6, h / 6);
+      const rad = Math.min(1.2, h * 0.22, w * 0.22);
+      const outer = new Path2D();
+      roundRectPath(outer, 0, 0, w, h, rad);
+      g.fillStyle = C.ink;
+      g.fill(outer);
+      const iw = w - o * 2, ih = h - o * 2;
+      const inner = new Path2D();
+      roundRectPath(inner, o, o, iw, ih, Math.max(0, rad - o * 0.6));
+      g.save();
+      g.clip(inner);
+      g.fillStyle = C[r[1]]; g.fillRect(0, 0, w, h);
+      g.fillStyle = C[r[0]]; g.fillRect(0, 0, w, o + ih * 0.26);
+      g.fillStyle = C[r[2]]; g.fillRect(0, o + ih * 0.7, w, h);
+      const gl = new Path2D();
+      roundRectPath(gl, o + Math.min(1.4, iw * 0.08), o + ih * 0.08, Math.min(5, iw * 0.2), Math.max(0.45, ih * 0.11), 0.3);
+      g.globalAlpha = 0.5;
+      g.fillStyle = C['chrome-100'];
+      g.fill(gl);
+      g.restore();
+      blockCache.img[key] = c;
+      return c;
     }
     function block(x, y, w, h, ramp) {
-      const r = RAMPS[ramp] || RAMPS.chrome;
-      x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
-      ctx.fillStyle = C.ink;
-      ctx.fillRect(x + 1, y, w - 2, 1);
-      ctx.fillRect(x + 1, y + h - 1, w - 2, 1);
-      ctx.fillRect(x, y + 1, 1, h - 2);
-      ctx.fillRect(x + w - 1, y + 1, 1, h - 2);
-      ctx.fillStyle = C[r[1]]; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-      ctx.fillStyle = C[r[0]]; ctx.fillRect(x + 1, y + 1, w - 2, 1);
-      ctx.fillStyle = C[r[2]]; ctx.fillRect(x + 1, y + h - 2, w - 2, 1);
+      if (!(w > 0 && h > 0)) return;
+      blit(blockImage(w, h, ramp), x, y);
     }
 
     const sprites = {};
@@ -605,8 +900,16 @@
       const s = sprite(nameOrSprite);
       const i = (frame || 0) % s.frames.length;
       const flash = !!(opts && opts.flash);
-      const img = opts && opts.flip ? flippedFrame(s, i, flash) : (flash ? s.flashes : s.frames)[i];
-      if (opts && opts.alpha != null) ctx.globalAlpha = opts.alpha;
+      const flip = !!(opts && opts.flip);
+      const alpha = opts && opts.alpha != null ? opts.alpha : null;
+      if (s.kind === 'shape') {
+        const cut = opts && opts.cut && opts.cut.length ? opts.cut : null;
+        blit(cut ? cutImage(s, i, flash, flip, cut, V.k) : shapeImage(s, i, flash, flip, V.k), x, y, alpha);
+        return;
+      }
+      /* A pixel-map sprite from kit 1.x: still drawn (enlarged, blocky) until every game is redrawn as shapes */
+      const img = flip ? flippedFrame(s, i, flash) : (flash ? s.flashes : s.frames)[i];
+      if (alpha != null) ctx.globalAlpha = alpha;
       ctx.drawImage(img, Math.round(x) - s.pad, Math.round(y) - s.pad);
       ctx.globalAlpha = 1;
     }
@@ -616,105 +919,76 @@
       return Math.floor(time * (fps || 8)) % s.frames.length;
     }
 
-    /* Backdrops */
+    /* Backdrops: flat bands and smooth shapes */
     function bands(list) {
       for (let i = 0; i < list.length; i++) {
         const y0 = list[i][0];
         const y1 = i + 1 < list.length ? list[i + 1][0] : H;
-        ctx.fillStyle = C[list[i][1]];
-        ctx.fillRect(0, y0, W, y1 - y0);
+        rect(-8, y0, W + 16, y1 - y0, list[i][1]);
       }
     }
     function ridge(points, base, colour, offset) {
       const period = points[points.length - 1][0];
+      const off = ((offset % period) + period) % period;
       ctx.fillStyle = C[colour];
-      for (let x = 0; x < W; x++) {
-        const p = (((x + offset) % period) + period) % period;
-        let i = 0;
-        while (i < points.length - 2 && points[i + 1][0] <= p) i++;
-        const a = points[i];
-        const b = points[i + 1];
-        const y = Math.round(base + a[1] + (b[1] - a[1]) * (p - a[0]) / (b[0] - a[0]));
-        ctx.fillRect(x, y, 1, H - y);
+      ctx.beginPath();
+      ctx.moveTo(-8, H + 8);
+      for (let rep = 0; rep <= 1; rep++) {
+        for (let i = rep ? 1 : 0; i < points.length; i++) ctx.lineTo(points[i][0] - off + rep * period, base + points[i][1]);
       }
+      ctx.lineTo(period * 2 - off + 8, H + 8);
+      ctx.closePath();
+      ctx.fill();
     }
     function steps(t, colour, offset) {
-      ctx.fillStyle = C[colour];
       const off = ((offset % t.period) + t.period) % t.period;
       for (let rep = 0; rep <= 1; rep++) {
         for (const s of t.steps) {
-          const x = Math.round(s[0] - off + rep * t.period);
+          const x = s[0] - off + rep * t.period;
           if (x + s[1] < 0 || x > W) continue;
-          ctx.fillRect(x, H - s[2], s[1], s[2]);
+          rect(x, H - s[2], s[1], s[2], colour);
         }
       }
     }
-    let planetCanvas = null;
-    function planet() {
-      if (planetCanvas) return planetCanvas;
-      const r = 25;
-      const d = r * 2 + 2;
-      const c = document.createElement('canvas');
-      c.width = d; c.height = d;
-      const g = c.getContext('2d');
-      const stops = [[0.14, 'sun-100'], [0.38, 'amber'], [0.64, 'sky-6'], [0.84, 'sky-5'], [1.01, 'sky-4']];
-      const dir = [Math.sin(160 * Math.PI / 180), -Math.cos(160 * Math.PI / 180)];
-      const len = 2 * r * (Math.abs(dir[0]) + Math.abs(dir[1]));
-      for (let y = 0; y < d; y++) {
-        for (let x = 0; x < d; x++) {
-          const dx = x + 0.5 - d / 2;
-          const dy = y + 0.5 - d / 2;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist > r + 1) continue;
-          if (dist > r) { g.fillStyle = C.ink; g.fillRect(x, y, 1, 1); continue; }
-          const t = 0.5 + (dx * dir[0] + dy * dir[1]) / len;
-          let colour = stops[stops.length - 1][1];
-          for (const s of stops) { if (t < s[0]) { colour = s[1]; break; } }
-          const sx = dx + 10;
-          const sy = dy + 5;
-          const shade = Math.sqrt(sx * sx + sy * sy) > r;
-          g.fillStyle = shade ? mixHex(C[colour], C.ink, 0.5) : C[colour];
-          g.fillRect(x, y, 1, 1);
-        }
-      }
-      planetCanvas = c;
-      return c;
+    /* Shapes drawn straight onto the world (no outline, no cache): for scenery that moves */
+    const sceneWarn = (what) => console.warn('Retro Kit: a backdrop shape has ' + what + '.');
+    function fillShape(s) {
+      if (Array.isArray(s)) { s.forEach(fillShape); return; }
+      const geom = shapeGeom(s, [0, 0, W, H], sceneWarn);
+      if (geom) paintGeom(ctx, col, geom, V.k, null);
     }
+    const planetSprite = makeShapeSprite(C, {
+      size: [52, 52],
+      outline: OUTLINE,
+      shapes: [
+        { circle: [26, 26, 25], fill: ['sun-100', 0.14, 'amber', 0.38, 'sky-6', 0.64, 'sky-5', 0.84, 'sky-4'], dir: 20 },
+        /* the shadowed crescent: the part of the disc outside a copy of it moved 10 left and 5 up */
+        { path: 'M31.89 1.71 A25 25 0 1 1 10.11 45.29 A25 25 0 0 0 31.89 1.71 Z', fill: 'ink', alpha: 0.5, outline: false }
+      ]
+    }, 'planet');
     const backdrop = {
       dusk(o) {
         o = o || {};
         const scroll = o.scroll || 0;
         bands(DUSK_BANDS);
-        for (const s of DUSK_STARS) { ctx.fillStyle = C[s[2]]; ctx.fillRect(s[0], s[1], 1, 1); }
+        for (const s of DUSK_STARS) circle(s[0] + 0.5, s[1] + 0.5, 0.5, s[2]);
         if (o.sun !== false) {
-          const cx = 160, cy = 129, r = 30;
-          for (let y = 0; y < r * 2; y++) {
-            const yy = y + 0.5 - r;
-            const half = Math.sqrt(r * r - yy * yy);
-            const f = y / (r * 2);
-            ctx.fillStyle = C[f < 0.16 ? 'sun-100' : f < 0.5 ? 'amber' : 'sky-6'];
-            const x0 = Math.round(cx - half);
-            ctx.fillRect(x0, cy - r + y, Math.round(cx + half) - x0, 1);
-          }
-          glow(cx, cy, 52, 'amber', 0.3);
+          fillShape({ circle: [160, 129, 30], fill: ['sun-100', 0.16, 'amber', 0.5, 'sky-6'] });
+          glow(160, 129, 52, 'amber', 0.3);
         }
         ridge(FAR_RIDGE, 110, 'hill-far', scroll * 0.25);
         ridge(NEAR_RIDGE, 110, 'hill-near', scroll * 0.5);
-        ctx.fillStyle = C.ink;
-        ctx.fillRect(0, 166, W, H - 166);
+        rect(-8, 166, W + 16, H - 166 + 8, 'ink');
       },
       space(o) {
         o = o || {};
         const scroll = o.scroll || 0;
         bands(SPACE_BANDS);
-        for (const s of SPACE_STARS) {
-          ctx.fillStyle = C[s[2]];
-          ctx.fillRect(((Math.round(s[0] - scroll * 0.1) % W) + W) % W, s[1], 1, 1);
-        }
+        for (const s of SPACE_STARS) circle(((s[0] - scroll * 0.1) % W + W) % W + 0.5, s[1] + 0.5, 0.5, s[2]);
         if (o.planet !== false) {
-          const p = planet();
-          const x = Math.round(257 - scroll * 0.03);
-          ctx.drawImage(p, ((x + p.width) % (W + p.width) + W + p.width) % (W + p.width) - p.width, 15);
+          const span = W + 52;
+          const x = ((257 - scroll * 0.03 + 52) % span + span) % span - 52;
+          draw(planetSprite, x, 15);
         }
         if (o.terrain !== false) {
           steps(FAR_STEPS, 'sky-1', scroll * 0.25);
@@ -723,7 +997,7 @@
       }
     };
 
-    /* Glow: soft halos on a full-resolution layer above the pixels (Effects setting) */
+    /* Glow: soft halos on a layer above the world, blended as light (Effects setting) */
     const glowQueue = [];
     function glow(x, y, r, colour, alpha) {
       if (!settings.effects) return;
@@ -957,11 +1231,12 @@
       } else {
         const bar = el('div', 'rk-topbar');
         const panel = el('div', 'rk-panel');
-        const first = hudItems.find((it) => it.id === 'score') || hudItems.find((it) => it.type === 'num' && it.id !== 'best');
+        let first = hudItems.find((it) => it.id === 'score') || hudItems.find((it) => it.type === 'num' && it.id !== 'best');
         const mid = cfg.phoneMid ? hudItems.find((it) => it.id === cfg.phoneMid)
           : hudItems.find((it) => ['stage', 'level', 'wave', 'round'].indexOf(it.id) >= 0)
             || hudItems.find((it) => it !== first && ['best', 'lives'].indexOf(it.id) < 0);
         const lives = hudItems.find((it) => it.type === 'lives');
+        if (first && first === mid) first = null;   // phoneMid named the slot that would have gone first
         const c1 = first ? statNode(first, true) : { root: el('div', 'rk-tb-cell') };
         const c2 = mid ? statNode(mid, true) : { root: el('div', 'rk-tb-cell') };
         c2.root.classList.add('is-mid');
@@ -1015,22 +1290,28 @@
       if ('lives' in hudVals) hud.set('lives', state.lives);
     }
 
-    /* ----- Layout: whole-number scaling in screen pixels ----- */
+    /* ----- Layout: the playfield fills the space at 16:9; the canvas holds its real screen pixels ----- */
+    const MAX_DPR = 2;   // above this (some phones are 3) the canvas is drawn at 2x and enlarged smoothly: same look, far less work
     function layout() {
       barSlot.style.display = state.inGame ? '' : 'none';
       titleScreen.hidden = state.inGame;
       root.classList.toggle('rk-in-game', state.inGame);
       const r = viewport.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      const k = Math.max(1, Math.floor(Math.min(r.width * dpr / W, r.height * dpr / H)));
-      const cw = W * k / dpr;
-      const ch = H * k / dpr;
+      const fit = Math.max(0.5, Math.min(r.width * dpr / W, r.height * dpr / H));   // screen pixels per world pixel
+      const cw = Math.floor(W * fit) / dpr;
+      const ch = Math.floor(H * fit) / dpr;
       stage.style.width = cw + 'px';
       stage.style.height = ch + 'px';
       root.style.setProperty('--rk-sw', cw + 'px');
-      const fw = Math.round(cw * dpr);
-      const fh = Math.round(ch * dpr);
-      if (fx.width !== fw || fx.height !== fh) { fx.width = fw; fx.height = fh; }
+      const q = Math.min(dpr, MAX_DPR);
+      const bw = Math.max(W, Math.round(cw * q));
+      const bh = Math.max(H, Math.round(ch * q));
+      if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
+      if (fx.width !== bw || fx.height !== bh) { fx.width = bw; fx.height = bh; }
+      V.kx = bw / W;
+      V.ky = bh / H;
+      V.k = V.kx;
       stageRect = null;
     }
     if (window.ResizeObserver) new ResizeObserver(layout).observe(viewport);
@@ -1604,15 +1885,18 @@
     function render() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
+      ctx.imageSmoothingEnabled = false;   // images are made at screen size, so they are copied 1:1
       ctx.fillStyle = C.ink;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       let sx = 0;
       let sy = 0;
       if (state.shakeT > 0 && state.shakeAmt > 0 && !settings.reduceMotion) {
         sx = randInt(-state.shakeAmt, state.shakeAmt);
         sy = randInt(-state.shakeAmt, state.shakeAmt);
-        ctx.setTransform(1, 0, 0, 1, sx, sy);
       }
+      V.ox = Math.round(sx * V.kx);
+      V.oy = Math.round(sy * V.ky);
+      ctx.setTransform(V.kx, 0, 0, V.ky, V.ox, V.oy);
       try {
         if (state.inGame && state.game) cfg.draw(ctx, state.game, api);
         else if (cfg.drawTitle) cfg.drawTitle(ctx, api);
@@ -1651,7 +1935,7 @@
       addScore: addScore, loseLife: loseLife, addLife: addLife, gameOver: gameOver,
       sprite: sprite, draw: draw, frame: frameAt,
       makeSprite: (def, name) => { const s = makeSprite(C, def, name || 'sprite'); if (name) sprites[name] = s; return s; },
-      rect: rect, px: px, circle: circle, block: block,
+      rect: rect, px: px, circle: circle, block: block, shape: fillShape,
       glow: glow, popup: popup, banner: banner, shake: shake, after: after,
       rand: rand, randInt: randInt, pick: pick, clamp: clamp, lerp: lerp, hit: hit,
       ramps: RAMPS, legend: LEGEND
@@ -1683,7 +1967,8 @@
       start: (mode) => { if (modes.some((m) => m.id === mode)) setMode(mode); startGame(); },
       pause: pause, resume: resume, quit: quitToTitle,
       showGameOver: showGameOver, openSettings: openSettings, openScores: openScores, openModes: openModes,
-      music: music
+      music: music,
+      view: V
     };
     return api;
   }

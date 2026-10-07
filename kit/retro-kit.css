@@ -1,6 +1,6 @@
-/* Retro Kit 1.1 — stylesheet
+/* Retro Kit 2.0 (beta) — stylesheet
    The tokens, fonts and interface classes of the Retro Kit design system, plus the game shell layout.
-   Two layers: the World (pixel art on the canvas) and the Interface (glass, outside the playfield).
+   Two layers: the World (shape art on the canvas) and the Interface (glass, outside the playfield).
    Games never edit this file. Change the design system first, then this file. */
 
 /* ---------- Fonts (SIL Open Font License, see kit/licences) ---------- */
@@ -61,7 +61,7 @@ html,body{margin:0;height:100%;background:var(--ink);overflow:hidden}
 .rk-viewport{position:relative;flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center}
 .rk-stage{position:relative;flex:0 0 auto}
 .rk-in-game .rk-stage{box-shadow:0 0 0 1px var(--ui-kbd-fill)}
-.rk-canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.rk-canvas{position:absolute;inset:0;width:100%;height:100%}
 .rk-fxcanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen}
 .rk-world{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .rk-bar-slot{flex:0 0 auto}
