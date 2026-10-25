@@ -16,6 +16,7 @@ An arcade world in the spirit of around 1990 (banded dusk skies, chrome, bold ch
 | Reward | `amber` ramp | pick-ups, bonus items, the sun, explosion rings |
 | Fire and heat | `heat` ramp, `amber`, `sun-100` core | flames, explosions, enemy engines (the player's own engine flame is `aqua`) |
 | Sky and distance | `sky-0` … `sky-6`, `hill-far`, `hill-near` | backgrounds only, never for things the player must react to |
+| Water the player can fall into | `aqua-dark`, with `aqua` and `aqua-light` marks | rivers and canals in crossing games: the one piece of scenery that uses aqua, because players read teal as water. Never for land, roads or anything to stand on |
 | Outline and deepest ground | `ink` | the kit's outline, eyes, glass, ground, letterbox |
 
 - Every gameplay object must stand out from what is behind it. Chrome and aqua read on every sky band; red reads on `ink` to `sky-4` but not on `sky-5`/`sky-6`. Keep enemies away from the bright horizon bands or draw them over darker scenery.
@@ -45,7 +46,13 @@ A sprite is a handful of simple shapes (reference.md, Sprites): rounded boxes, c
 ## Genre notes
 
 - **Paddle and bricks (Breakout-style).** Chrome rails 6 pixels thick down both sides and across the top (`rk.rect` strips in the chrome ramp, light edge inside, rivets as small circles). Ten bricks of 28 × 8 with 2-pixel gaps fill the width between the rails; start the wall about 20 pixels below the top rail. Bricks are `rk.block` (a glossy rounded tile). Paddle at y 156 or so, above the dusk ground (which starts at y 166). Backdrop: `rk.backdrop.dusk()`, or `space({ planet: false, terrain: false })` so the bricks own the colour. Use `livesIcon: 'dot'`. See `games/dusk-shatter`.
-- **Crossing (Frogger-style).** A 16-pixel grid: 20 columns, 11 rows (plus a 4-pixel margin). Safe rows in `hill-near` and `ink`, road lanes in `sky-1`/`sky-0` with chrome lane marks, water lanes in `sky-2`/`sky-3` bands. Vehicles seen from above, facing right, with `mirror: true` copies. One hop per press (`rk.input.pressed.up` etc.); on touch, a swipe hops that way and a tap hops forward. See `games/last-leap`.
+- **Crossing (Frogger-style).** A 16-pixel grid: 20 columns, 11 rows (plus a 4-pixel margin). The ground must show at a glance where the player can walk, so use three surfaces that look nothing like each other, the same way on every level:
+  - **Land** (safe rows): `hill-far`, with small details in `hill-near` and `sky-3`.
+  - **Roads**: grey tarmac (a strip of `ink` with `chrome-400` over it at 0.4 alpha) and dashed `chrome-200` lane marks between lanes.
+  - **Water**: `aqua-dark`, with `aqua` wave marks that drift the way the lane flows and `aqua-light` foam along the banks. Nothing else on the ground is teal. Do not paint water or roads in the `sky-*` purples and blues: players took a purple river for land.
+  - **Things to ride** must stand out on the water: `amber` for logs, decks and shells, `aqua-light` over `aqua` for lily pads. Never `aqua-dark`.
+
+  Vehicles seen from above, facing right, with `mirror: true` copies. One hop per press (`rk.input.pressed.up` etc.); on touch, a swipe hops that way and a tap hops forward. See `games/last-leap`.
 - **Fixed shooter (invaders).** A fleet in a grid, a ship along the bottom, shelters drawn with `cut`. See `games/orbit-siege`.
 - **Maze chase.** Walls as thick rounded lines from tile centre to tile centre (three passes: a dark edge, a light edge, then the body). See `games/chrome-chomp`.
 - **Shooter (horizontal).** `rk.backdrop.space({ scroll })` with `scroll` rising 0.5–1 pixel per update; the planet and terrain are scenery, never solid. Red enemies read poorly on the planet's bright bands: pass `{ planet: false }` if enemies fly through that corner a lot. The ship starts on the left third and moves freely up and down, and forwards to about the middle of the screen. Enemies come in waves from the right, scripted as a timeline in the game's state (a list of `{ at: seconds, wave: … }` read in `update`); a boss ends each stage, with its health in a `meter` HUD slot. Player shots `aqua`, enemy shots small and red-edged so they read against everything.
@@ -58,7 +65,7 @@ The kit draws the logo, tagline and menu over the middle of your title world, an
 
 - `rk.glow` for things that emit light: shots, engines, explosions, the ball, power-ups. Not for scenery or enemies at rest. A halo radius of 1–3× the object's size, alpha 0.3–0.6.
 - `rk.shake` only for big moments: the player dying, a boss hit, a large explosion. Not for every bullet.
-- Never flash the whole screen, and nothing flashes or blinks faster than 3 times a second. A hit flash is the sprite drawn with `{ flash: true }` for about 4 updates, then not again for at least 16 (so a boss under rapid fire flashes at most 3 times a second); for blocks, a `chrome-100` rounded box inside the block for the same time. Blinking while invulnerable: visible 10 updates, hidden 10 (`g.inv % 20 < 10`).
+- Never flash the whole screen, and nothing bigger than a character (a boss, a big explosion, a wall, a band of the screen) flashes or blinks faster than 3 times a second. A hit flash is the sprite drawn with `{ flash: true }` for about 4 updates, then not again for at least 16 (so a boss under rapid fire flashes at most 3 times a second); for blocks, a `chrome-100` rounded box inside the block for the same time. The one faster thing allowed is the player's own blink while protected after a respawn: one small sprite, up to 6 times a second (visible 5 updates, hidden 5: `g.inv % 10 < 5`), or 3 times a second (`g.inv % 20 < 10`).
 - Trails: up to two fading copies behind fast objects (ball, shots) at alpha 0.4 then 0.2. Keep the last two positions in state.
 
 ## Words

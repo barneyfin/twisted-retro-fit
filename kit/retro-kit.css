@@ -6,7 +6,6 @@
 /* ---------- Fonts (SIL Open Font License, see kit/licences) ---------- */
 @font-face{font-family:"Bungee";src:url("fonts/Bungee-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
 @font-face{font-family:"Chakra Petch";src:url("fonts/ChakraPetch-600.woff2") format("woff2");font-weight:600;font-style:normal;font-display:block}
-@font-face{font-family:"DotGothic16";src:url("fonts/DotGothic16-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
 @font-face{font-family:"Geist";src:url("fonts/Geist-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
 @font-face{font-family:"Geist";src:url("fonts/Geist-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
 @font-face{font-family:"Geist";src:url("fonts/Geist-600.woff2") format("woff2");font-weight:600;font-style:normal;font-display:block}
@@ -35,7 +34,6 @@
   /* Type */
   --font-display:Bungee,system-ui,sans-serif;
   --font-world:"Chakra Petch",system-ui,sans-serif;
-  --font-readout:DotGothic16,monospace;
   --font-ui:Geist,system-ui,sans-serif;
   --font-mono:"Geist Mono",ui-monospace,monospace;
   /* Spacing, radius, shadow, blur, size, opacity */
@@ -211,7 +209,7 @@ html,body{margin:0;height:100%;background:var(--ink);overflow:hidden}
 .rk-rotate svg{width:40px;height:40px;color:var(--aqua)}
 
 /* ---------- World-layer DOM (pop-ups and banners over the canvas) ---------- */
-.rk-popup{position:absolute;transform:translate(-50%,-50%);font-family:var(--font-readout);font-size:calc(var(--rk-sw) * 0.01875);line-height:1;white-space:nowrap;color:var(--aqua);animation:rk-popup 600ms ease-out forwards}
+.rk-popup{position:absolute;transform:translate(-50%,-50%);font-family:var(--font-world);font-weight:600;font-size:calc(var(--rk-sw) * 0.01875);line-height:1;white-space:nowrap;color:var(--aqua);animation:rk-popup 600ms ease-out forwards}
 .rk-fx .rk-popup{text-shadow:0 0 6px currentColor,0 0 14px currentColor}
 .rk-banner{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);display:flex;justify-content:center;animation:rk-fade 240ms ease-out}
 .rk-banner .rk-logo>span{font-size:calc(var(--rk-sw) * 0.0354)}

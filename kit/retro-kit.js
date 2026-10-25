@@ -1,15 +1,14 @@
-/* Retro Kit 2.0 — runtime
+/* Retro Kit 2.1 — runtime
    One file, no dependencies. Exposes window.RetroKit. Pair it with retro-kit.css.
    It owns everything every game shares: the canvas (drawn at the screen's real resolution; games work in
-   a 320 x 180 world), shape art, the game loop, keyboard and
-   touch input, every screen outside play (title, mode choice, pause, game over, initials, high scores,
-   settings, rotate), the HUD, sprites, backdrops, glow, pop-ups, banners, screen shake, sound, music
-   and saved data.
+   a 320 x 180 world), shape art, the game loop, keyboard and touch input (up to two fingers at once),
+   every screen outside play (title, mode choice, pause, game over, initials, high scores, settings,
+   rotate), the HUD, sprites, backdrops, glow, pop-ups, banners, screen shake, sound, music and saved data.
    A game supplies only its own rules and art: see .claude/skills/retro-kit/SKILL.md. */
 (function () {
   'use strict';
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.1.0';
   const W = 320;
   const H = 180;
   const STEP = 1 / 60;
@@ -1026,11 +1025,15 @@
     const physical = new Set();   // keys physically down right now, whatever the screen
     let stale = new Set();        // keys held over from a menu: ignored until released
     const pointer = { x: W / 2, y: H / 2, down: false, pressed: false, released: false, moved: false, dx: 0, dy: 0, id: null, sx: 0, sy: 0, st: 0 };
+    // A second finger, down while the first one is: it never moves `pointer`, so one thumb can steer
+    // while the other taps or holds. A quick tap with it counts as `tap`, like the first finger's.
+    const pointer2 = { x: W / 2, y: H / 2, down: false, pressed: false, released: false, id: null, sx: 0, sy: 0, st: 0 };
     let tapPending = false;
     const input = {
       left: false, right: false, up: false, down: false, fire: false, alt: false,
       pressed: { left: false, right: false, up: false, down: false, fire: false, alt: false },
       pointer: pointer,
+      pointer2: pointer2,
       tap: false,
       any: false,
       key: (code) => keys.has(code),
@@ -1042,7 +1045,7 @@
         input.pressed[name] = KEYMAP[name].some((c) => justKeys.has(c));
       }
       input.tap = tapPending;
-      input.any = justKeys.size > 0 || tapPending || pointer.pressed;
+      input.any = justKeys.size > 0 || tapPending || pointer.pressed || pointer2.pressed;
     }
     function endTickInput() {
       justKeys.clear();
@@ -1051,6 +1054,8 @@
       pointer.moved = false;
       pointer.dx = 0;
       pointer.dy = 0;
+      pointer2.pressed = false;
+      pointer2.released = false;
       tapPending = false;
     }
     function resetInput() {
@@ -1059,22 +1064,38 @@
       endTickInput();
       pointer.down = false;
       pointer.id = null;
+      pointer2.down = false;
+      pointer2.id = null;
     }
     let stageRect = null;
+    const worldX = (e) => { if (!stageRect) stageRect = stage.getBoundingClientRect(); return (e.clientX - stageRect.left) / stageRect.width * W; };
+    const worldY = (e) => { if (!stageRect) stageRect = stage.getBoundingClientRect(); return (e.clientY - stageRect.top) / stageRect.height * H; };
     function setPointer(e) {
-      if (!stageRect) stageRect = stage.getBoundingClientRect();
-      const nx = (e.clientX - stageRect.left) / stageRect.width * W;
-      const ny = (e.clientY - stageRect.top) / stageRect.height * H;
+      const nx = worldX(e);
+      const ny = worldY(e);
       pointer.dx += nx - pointer.x;
       pointer.dy += ny - pointer.y;
       pointer.x = nx;
       pointer.y = ny;
       pointer.moved = true;
     }
+    // A touch that ends short and still is a tap, whichever finger made it.
+    const isTap = (p, e) => Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 10 && performance.now() - p.st < 300;
     viewport.addEventListener('pointerdown', (e) => {
       audio.unlock();
       if (state.screen !== 'play') return;
       e.preventDefault();
+      if (pointer.down && e.pointerId !== pointer.id) {   // a second finger: the first keeps steering
+        if (pointer2.down) return;                        // a third is ignored
+        try { viewport.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        pointer2.id = e.pointerId;
+        pointer2.x = worldX(e); pointer2.y = worldY(e);
+        pointer2.down = true;
+        pointer2.pressed = true;
+        pointer2.sx = e.clientX; pointer2.sy = e.clientY; pointer2.st = performance.now();
+        hintEl.hidden = true;
+        return;
+      }
       try { viewport.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
       pointer.id = e.pointerId;
       setPointer(e);
@@ -1086,17 +1107,24 @@
     });
     viewport.addEventListener('pointermove', (e) => {
       if (state.screen !== 'play') return;
+      if (pointer2.down && e.pointerId === pointer2.id) { pointer2.x = worldX(e); pointer2.y = worldY(e); return; }
       if (pointer.down && e.pointerId !== pointer.id) return;
       setPointer(e);
     });
     const pointerEnd = (e) => {
+      if (pointer2.down && e.pointerId === pointer2.id) {
+        pointer2.down = false;
+        pointer2.released = true;
+        pointer2.id = null;
+        if (state.screen === 'play' && isTap(pointer2, e)) tapPending = true;
+        return;
+      }
       if (e.pointerId !== pointer.id) return;
       pointer.down = false;
       pointer.released = true;
       pointer.id = null;
       if (state.screen !== 'play') return;
-      const moved = Math.hypot(e.clientX - pointer.sx, e.clientY - pointer.sy);
-      if (moved < 10 && performance.now() - pointer.st < 300) tapPending = true;
+      if (isTap(pointer, e)) tapPending = true;
     };
     viewport.addEventListener('pointerup', pointerEnd);
     viewport.addEventListener('pointercancel', pointerEnd);
@@ -1900,7 +1928,7 @@
     layout();
     if (cfg.init) { try { cfg.init(api); } catch (e) { reportError(e); } }
     if (music && !settings.muted) setTimeout(music.load, 300);   // get the track ready behind the title screen
-    const fontLoads = ['400 20px Bungee', '600 12px "Chakra Petch"', '400 18px DotGothic16', '400 14px Geist', '500 14px Geist', '600 14px Geist', '500 14px "Geist Mono"', '600 14px "Geist Mono"']
+    const fontLoads = ['400 20px Bungee', '600 12px "Chakra Petch"', '400 14px Geist', '500 14px Geist', '600 14px Geist', '500 14px "Geist Mono"', '600 14px "Geist Mono"']
       .map((f) => (document.fonts && document.fonts.load ? document.fonts.load(f) : Promise.resolve()));
     const reveal = () => { root.classList.remove('rk-loading'); layout(); };
     Promise.race([Promise.all(fontLoads), new Promise((r) => setTimeout(r, 2500))]).then(reveal, reveal);

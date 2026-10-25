@@ -1,0 +1,2127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stompoids</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files (and the fonts) into dist/<game>.html. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../../kit/retro-kit.css" data-rk-inline>
+<script src="../../kit/retro-kit.js" data-rk-inline></script>
+<!-- The soundtrack, kept as text in music.js. The build copies it in as well, so the game is still one file.
+     The kit plays it: see the music option in RetroKit.game, at the bottom. -->
+<script src="music.js" data-rk-inline></script>
+</head>
+<body>
+<script>
+/* STOMPOIDS — a Retro Kit game. Rules for this file: .claude/skills/retro-kit/SKILL.md
+   A city-smashing game in the style of the 1980s monster arcade games: you are a giant alien, dropped
+   into a city by your mothership. Climb the sides of the buildings, punch holes in them until they
+   collapse, and topple every building to clear the city. The army fights back: troopers lean out of
+   windows and march along the street, then gunships, tanks and jets join in. Punch them, stomp them,
+   and smash windows with goo jars in them to win back health.
+   Three aliens to play, picked from the kit's menu after Start game (the modes option, at the bottom):
+     Zorbo  slow and tough: one blow smashes a window
+     Vexa   quick: climbs fast and leaps high
+     Gloop  a long tentacle that smashes two windows at a time
+   Six cities, each adding one thing; after the last one the set repeats, faster.
+   The soundtrack is Barney's own MP3, kept in music.js. The kit plays it: see the music option, at the bottom. */
+
+/* ---------- Playfield layout (world pixels; the world is 320 x 180) ---------- */
+const W = 320;
+const H = 180;
+const GROUND = 160;             // the pavement: feet, buildings and street troopers stand on this line
+const CW = 10;                  // a building is a grid of cells, one window each: 10 wide ...
+const FH = 11;                  // ... and one floor (11) tall
+const PROP = 14;                // room above a roof for its water tower, mast or sign (part of the building's picture)
+const AW = 22;                  // the alien's box
+const AH = 26;
+const GRAV = 0.2;               // pixels per update, added to the fall speed every update
+const FALL_MAX = 5;
+const GRAB = 9;                 // how close to a building's edge the alien has to be to climb it
+const STICK = 16;               // touch: how far the finger can lead the point it pressed down on before that point follows
+const TANK_Y = 160.5;           // the far lane of the road
+const CAR_Y = 170;              // the near lane
+const SHELL_G = 0.05;           // how fast tank shells drop
+const BOMB_G = 0.07;
+const INV = 90;                 // updates of blinking protection after the alien is beamed back in
+const NEED = 0.34;              // a building falls once this share of its windows is smashed
+
+/* Points. A building that falls is worth PER_CELL for every window it had. */
+const PTS = { crack: 10, cell: 50, trooper: 100, car: 150, chopper: 300, jet: 400, tank: 500, snack: 200, gem: 750 };
+const PER_CELL = 25;
+
+/* ---------- The three aliens ----------
+   walk and climb are pixels per update, jump is the take-off speed, reach how far a punch goes from the
+   alien's middle, dmg how much a window takes per blow (an ordinary window has 2, a steel one 3), cd the
+   updates between punches, armour how much of each hit gets through, hits how many windows one blow can
+   smash. chest and shoulder place the punching arm inside the alien's 22 x 26 box (facing right). */
+const ALIENS = {
+  zorbo: { walk: 1.05, climb: 0.9, jump: 3.5, reach: 14, dmg: 2, cd: 20, armour: 0.75, hits: 1, stride: 7,
+    chest: 12, shoulder: [14.2, 11.6], arm: ['aqua', 3.3], fist: 'fistZorbo' },
+  vexa: { walk: 1.65, climb: 1.5, jump: 4.3, reach: 14, dmg: 1, cd: 9, armour: 0.95, hits: 1, stride: 9,
+    chest: 11, shoulder: [14.6, 11], arm: ['aqua', 1.5], fist: 'fistVexa' },
+  gloop: { walk: 1.3, climb: 1.15, jump: 3.8, reach: 20, dmg: 1, cd: 19, armour: 0.9, hits: 2, stride: 8,
+    chest: 14, shoulder: [18.6, 15.4], arm: ['aqua', 1.9], fist: 'fistGloop', wavy: true },
+};
+
+/* ---------- Buildings ----------
+   facade and trim colour the building (warm targets, steel for the armoured ones), lit is the colour of
+   its lit windows, hp how many blows a window takes, roof what stands on top, win the window style. */
+const STYLES = {
+  brick: { facade: 'heat-dark', trim: 'heat', lit: 'amber-light', hp: 2, roof: 'tank', win: 'square' },
+  sand: { facade: 'amber-dark', trim: 'amber', lit: 'sun-100', hp: 2, roof: 'mast', win: 'arch' },
+  office: { facade: 'chrome-400', trim: 'chrome-300', lit: 'amber', hp: 2, roof: 'sign', win: 'grid' },
+  steel: { facade: 'chrome-300', trim: 'chrome-200', lit: 'amber-light', hp: 3, roof: 'spire', win: 'ribbon' },
+};
+
+/* ---------- Cities ----------
+   blocks lists the buildings: [x, columns, floors, style]. army is what fights back: win, street, chopper,
+   tank and jet are the shortest and longest wait (updates) between new ones, ...Max how many at once,
+   wires how many live-wire windows each building has. Each city adds one thing:
+   1 troopers in windows, 2 troopers on the street, 3 gunships, 4 tanks, 5 live wires, 6 jets and steel towers. */
+const CITIES = [
+  { name: 'BAYFRONT', label: 'Bayfront', paint: paintBayfront, live: liveBayfront,
+    blocks: [[40, 4, 6, 'brick'], [140, 4, 7, 'sand'], [236, 4, 5, 'brick']],
+    army: { win: [170, 280], winMax: 2 } },
+  { name: 'MIDTOWN', label: 'Midtown', paint: paintMidtown, live: liveMidtown,
+    blocks: [[28, 4, 8, 'office'], [98, 3, 9, 'brick'], [162, 5, 7, 'sand'], [250, 4, 10, 'office']],
+    army: { win: [160, 260], winMax: 2, street: [300, 460], streetMax: 2 } },
+  { name: 'NEON ROW', label: 'Neon row', paint: paintNeon, live: liveNeon,
+    blocks: [[24, 4, 9, 'sand'], [92, 5, 8, 'office'], [176, 3, 11, 'brick'], [236, 5, 9, 'office']],
+    army: { win: [150, 250], winMax: 2, street: [300, 440], streetMax: 2, chopper: [480, 720], chopperMax: 1 } },
+  { name: 'DOCKLANDS', label: 'Docklands', paint: paintDocks, live: liveDocks,
+    blocks: [[20, 5, 7, 'brick'], [100, 4, 10, 'office'], [172, 4, 8, 'sand'], [242, 5, 10, 'brick']],
+    army: { win: [140, 240], winMax: 3, street: [280, 420], streetMax: 2, chopper: [460, 700], chopperMax: 1, tank: [640, 900], tankMax: 1 } },
+  { name: 'STORMGATE', label: 'Stormgate', paint: paintStorm, live: liveStorm, front: rain,
+    blocks: [[18, 4, 10, 'office'], [84, 3, 11, 'brick'], [140, 5, 9, 'sand'], [216, 3, 10, 'office'], [270, 4, 8, 'brick']],
+    army: { win: [130, 220], winMax: 4, street: [280, 400], streetMax: 3, chopper: [420, 640], chopperMax: 2, tank: [620, 880], tankMax: 1, wires: 2 } },
+  { name: 'SPIRE HEIGHTS', label: 'Spire heights', paint: paintSpire, live: liveSpire,
+    blocks: [[22, 4, 11, 'steel'], [92, 4, 9, 'steel'], [160, 4, 11, 'office'], [230, 5, 10, 'steel']],
+    army: { win: [120, 210], winMax: 4, street: [260, 380], streetMax: 3, chopper: [400, 620], chopperMax: 2, tank: [600, 860], tankMax: 1, wires: 2, jet: [380, 560] } },
+];
+
+// One level's army. After the sixth city the set comes round again (a "lap") with everything in it, faster.
+function armyFor(level) {
+  const i = (level - 1) % CITIES.length;
+  const lap = Math.floor((level - 1) / CITIES.length);
+  const base = Object.assign({}, lap ? CITIES[CITIES.length - 1].army : {}, CITIES[i].army);
+  const quick = Math.pow(0.86, lap);
+  const out = { lap: lap, shot: Math.min(2.1, 1.2 + i * 0.05 + lap * 0.18), dmg: Math.min(0.08, 0.04 + i * 0.004 + lap * 0.01), wires: base.wires || 0 };
+  for (const k of ['win', 'street', 'chopper', 'tank', 'jet']) {
+    out[k] = base[k] ? [base[k][0] * quick, base[k][1] * quick] : null;
+    out[k + 'Max'] = base[k] ? (base[k + 'Max'] || 1) + (lap && k !== 'jet' ? 1 : 0) : 0;
+  }
+  return out;
+}
+
+/* ---------- Small helpers ---------- */
+
+// A small repeatable random number maker, so buildings and scenery look the same every time.
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+// Moves every point in an SVG path (absolute M, L, C, Q and Z only) by dx, dy.
+function movePath(d, dx, dy) {
+  let i = 0;
+  return d.replace(/-?\d*\.?\d+/g, (n) => String(Math.round((+n + (i++ % 2 ? dy : dx)) * 100) / 100));
+}
+
+// A copy of a list of shapes, moved by dx, dy (used to make the body bob as the alien walks).
+function shift(list, dx, dy) {
+  return list.map((s) => {
+    const o = Object.assign({}, s);
+    const pts = (p) => p.map((v, i) => v + (i % 2 ? dy : dx));
+    if (s.poly) o.poly = pts(s.poly);
+    else if (s.line) o.line = pts(s.line);
+    else if (s.rect) o.rect = [s.rect[0] + dx, s.rect[1] + dy, s.rect[2], s.rect[3]];
+    else if (s.circle) o.circle = [s.circle[0] + dx, s.circle[1] + dy, s.circle[2]];
+    else if (s.ellipse) o.ellipse = [s.ellipse[0] + dx, s.ellipse[1] + dy, ...s.ellipse.slice(2)];
+    else if (s.path) {
+      o.path = movePath(s.path, dx, dy);
+      if (s.box) o.box = [s.box[0] + dx, s.box[1] + dy, s.box[2], s.box[3]];
+    }
+    return o;
+  });
+}
+
+/* ---------- Art: the aliens ----------
+   Each alien is drawn facing right in a 22 x 26 box, in ten frames:
+   0-3 walking (0 and 2 also make the idle bob), 4 punching (the punching arm is drawn by the game, so it
+   can reach out of the box), 5-6 climbing, 7 in the air, 8 hurt, 9 punching while climbing. */
+
+// ZORBO: a hunched boulder of a brute, with a spiked back, three eyes, tusks and knuckle-dragging fists.
+function zorboArt() {
+  const legs = (b, f) => [
+    { rect: [5 + b[0], 18.4, 5, 7.6 - b[1]], r: 2, fill: 'aqua-dark' },
+    { rect: [12 + f[0], 18.4, 5.4, 7.6 - f[1]], r: 2, fill: 'aqua', band: [0.18, 0.62] },
+  ];
+  const backArm = (x, y, bob) => [{ line: [8.6, 11.2 + (bob || 0), x, y], width: 3, fill: 'aqua-dark' }, { circle: [x, y, 2.1], fill: 'chrome-400' }];
+  // the front arm has a thin dark edge of its own, so it reads against the body behind it
+  const frontArm = (x, y, bob) => [
+    { line: [14.2, 11.6 + (bob || 0), x, y], width: 4.1, fill: 'ink' },
+    { line: [14.2, 11.6 + (bob || 0), x, y], width: 3.2, fill: 'aqua' },
+    { circle: [x, y, 2.6], fill: 'chrome', dir: 'diag', band: [0.4, 0.75] },
+  ];
+  const body = [
+    { poly: [3.4, 10, 1.6, 6.4, 5.8, 7.4], fill: 'chrome', band: [0.4, 0.8] },
+    { poly: [6.2, 6.4, 5.4, 2.6, 9.2, 4.8], fill: 'chrome', band: [0.4, 0.8] },
+    { poly: [10, 4.2, 11, 0.6, 13.6, 3.8], fill: 'chrome', band: [0.4, 0.8] },
+    { path: 'M2.6 17 C1.6 10.4 5 3.6 11 3.3 C17 3 20.8 7.6 20.4 13 C20.1 18.4 17 21.6 11.6 21.6 C6.6 21.6 3.2 20 2.6 17 Z', box: [1.6, 3.2, 19.2, 18.4], fill: 'aqua', band: [0.26, 0.72] },
+    { ellipse: [11.4, 16.6, 5, 4], fill: 'aqua-light', alpha: 0.5 },
+    { path: 'M13.2 9.4 L21.6 9 C21.9 11.6 20.8 13.6 18.2 13.8 L14.6 13.6 C13.4 12.8 13 10.8 13.2 9.4 Z', box: [13, 9, 8.9, 4.8], fill: 'ink' },
+    { path: 'M13.6 11.6 L21.4 11.2 C21.2 13.2 20 14.2 18 14.3 L14.8 14.1 C13.9 13.4 13.6 12.4 13.6 11.6 Z', box: [13.6, 11.2, 7.8, 3.1], fill: 'aqua-dark' },
+    { poly: [14.6, 11.8, 15.3, 8.6, 16.2, 11.7], fill: 'chrome-100' },
+    { poly: [19.1, 11.5, 19.9, 8.4, 20.8, 11.4], fill: 'chrome-100' },
+  ];
+  const eyes = [
+    { circle: [11.4, 6.6, 1.25], fill: 'sun-100' }, { circle: [14.4, 5.8, 1.45], fill: 'sun-100' }, { circle: [17.4, 6.4, 1.25], fill: 'sun-100' },
+    { circle: [11.8, 6.7, 0.6], fill: 'ink' }, { circle: [14.9, 5.9, 0.7], fill: 'ink' }, { circle: [17.8, 6.5, 0.6], fill: 'ink' },
+  ];
+  const shut = [
+    { line: [10.4, 6.6, 12.4, 6.6], width: 0.6, fill: 'ink' }, { line: [13.3, 5.8, 15.5, 5.8], width: 0.6, fill: 'ink' },
+    { line: [16.4, 6.4, 18.4, 6.4], width: 0.6, fill: 'ink' },
+  ];
+  const top = (dx, dy, e) => shift([...body, ...(e || eyes)], dx, dy);
+  const walk = (b, f, bob, ba, fa) => [...backArm(ba[0], ba[1], bob), ...legs(b, f), ...top(0, bob), ...frontArm(fa[0], fa[1], bob)];
+  return {
+    size: [AW, AH],
+    frames: [
+      walk([0, 0], [0, 0], 0, [6.6, 19.2], [17, 19.4]),
+      walk([-1.8, 0], [1.6, 1.8], -0.7, [8, 19.4], [15.4, 19.6]),
+      walk([0, 0], [0, 0], 0.5, [6.6, 19.6], [17, 19.8]),
+      walk([1.6, 1.8], [-1.8, 0], -0.7, [5.2, 18.8], [18.4, 18.6]),
+      [...backArm(3.6, 14.4), ...legs([-2, 0], [2, 0]), ...top(1, 0.4)],
+      [...backArm(16.4, 5), ...legs([-1, 3.2], [1, 0]), ...top(0, 0), ...frontArm(19, 8.4)],
+      [...backArm(16.8, 8.8), ...legs([1, 0], [-1, 3.2]), ...top(0, 0), ...frontArm(19, 3.4)],
+      [...backArm(4.4, 4.2, -0.6), ...legs([-1, 3.4], [1.2, 3.4]), ...top(0, -0.6), ...frontArm(18.6, 3.6, -0.6)],
+      [...backArm(2.8, 5, 0.6), ...legs([-1, 1], [1, 1]), ...top(0, 0.6, shut), ...frontArm(19.2, 4.6, 0.6)],
+      [...backArm(16.6, 6.4), ...legs([-1, 3.2], [1, 0]), ...top(0.6, 0)],
+    ],
+  };
+}
+
+// VEXA: a quick, lanky runner on bird-like legs, with a long tail and a hammer-shaped head with an eye at each end.
+function vexaArt() {
+  const leg = (p, lift, fill) => ({ line: [p[0], 16.6, p[1], 20.4 - lift, p[2], 23.6 - lift, p[3], 25.4 - lift], width: 1.8, fill: fill });
+  const legs = (back, bl, front, fl) => [leg(back, bl, 'aqua-dark'), leg(front, fl, 'aqua')];
+  const tail = (s) => [
+    { line: [8.4, 15.6, 4.6, 17.6 + s, 1.8, 16.2 + s, 1.2, 12.8 + s], width: 1.7, fill: 'aqua-dark' },
+    { poly: [1.2, 13.4 + s, 0.4, 10.6 + s, 2.8, 12 + s], fill: 'chrome-200' },
+  ];
+  const body = [
+    { poly: [8.6, 9.4, 8.4, 6.8, 10.4, 8.6], fill: 'chrome-200' },          // spines down the back
+    { poly: [6.9, 12, 5.6, 9.8, 8.2, 10.6], fill: 'chrome-200' },
+    { poly: [6.4, 15, 4.6, 13.4, 7, 13.2], fill: 'chrome-200' },
+    { ellipse: [11.2, 13.2, 4.3, 5.6, 28], fill: 'aqua', band: [0.3, 0.72] },
+    { line: [9.2, 9.8, 10.8, 11.6], width: 1, fill: 'aqua-dark' },
+    { line: [8.1, 12.6, 9.7, 14.2], width: 1, fill: 'aqua-dark' },
+    { line: [8.2, 15.8, 9.6, 16.9], width: 1, fill: 'aqua-dark' },
+    { line: [14, 9.8, 15.8, 6], width: 2.6, fill: 'aqua' },
+    { poly: [14.8, 5.2, 20.8, 5.8, 20.2, 7.4, 15.6, 8.4], fill: 'aqua-dark' },
+    { line: [15.6, 6.8, 20.2, 6.6], width: 0.45, fill: 'ink' },
+    { poly: [18.4, 6.7, 19, 7.9, 19.5, 6.7], fill: 'chrome-100' },
+    { poly: [14, 2.8, 15.4, 0.2, 18, 2.8], fill: 'chrome-200' },
+    { rect: [11, 2.3, 10, 3.5], r: 1.75, fill: 'aqua', band: [0.36, 0.72] },
+  ];
+  const eyes = [
+    { circle: [12, 4.05, 1.7], fill: 'sun-100' }, { circle: [20, 4.05, 1.7], fill: 'sun-100' },
+    { circle: [12.4, 4.15, 0.8], fill: 'ink' }, { circle: [20.4, 4.15, 0.8], fill: 'ink' },
+  ];
+  const shut = [{ line: [10.8, 4.1, 13.2, 4.1], width: 0.6, fill: 'ink' }, { line: [18.8, 4.1, 21.2, 4.1], width: 0.6, fill: 'ink' }];
+  const arm = (x, y, back, bob) => (back
+    ? [{ line: [12.6, 11.4 + (bob || 0), x, y], width: 1.3, fill: 'aqua-dark' }, { poly: [x - 0.4, y + 0.4, x + 2, y - 1.8, x + 2.6, y - 0.8, x + 0.6, y + 1.2], fill: 'chrome-300' }]
+    : [{ line: [14.6, 11 + (bob || 0), x, y], width: 2.3, fill: 'ink' }, { line: [14.6, 11 + (bob || 0), x, y], width: 1.5, fill: 'aqua' }, { poly: [x - 0.4, y + 0.5, x + 2.4, y - 2.2, x + 3.1, y - 1, x + 0.7, y + 1.3], fill: 'chrome-200' }]);
+  const top = (dx, dy, e) => shift([...body, ...(e || eyes)], dx, dy);
+  const STAND = [[9.4, 11.8, 9, 11.6], 0, [10.8, 13.2, 10.6, 13.2], 0];
+  const STEP_A = [[9.4, 10.2, 6.8, 8.8], 0, [10.8, 14.8, 13, 15.6], 1.8];
+  const STEP_B = [[9.4, 12.8, 11.4, 13.8], 1.8, [10.8, 11.6, 8.6, 10.8], 0];
+  const TUCK = [[9.4, 12.6, 9.6, 12], 3, [10.8, 14.4, 11.6, 14.6], 3.4];
+  const walk = (lp, s, bob, ba, fa) => [...tail(s), ...arm(ba[0], ba[1], true, bob), ...legs(...lp), ...top(0, bob), ...arm(fa[0], fa[1], false, bob)];
+  return {
+    size: [AW, AH],
+    frames: [
+      walk(STAND, 0, 0, [15.6, 14.8], [17.6, 14.6]),
+      walk(STEP_A, -0.6, -0.5, [16.4, 15], [16.8, 14.8]),
+      walk(STAND, 0, 0.4, [15.6, 15.2], [17.6, 15]),
+      walk(STEP_B, 0.6, -0.5, [14.8, 14.6], [18.4, 14.4]),
+      [...tail(0.6), ...arm(9.6, 14, true), ...legs(...STEP_A), ...top(1, 0.3)],
+      [...tail(0.4), ...arm(16.4, 8.8, true), ...legs(STEP_A[0], 3, STAND[2], 0), ...top(0, 0), ...arm(18.4, 5.4)],
+      [...tail(-0.4), ...arm(16.4, 4.8, true), ...legs(STAND[0], 0, STEP_B[2], 3), ...top(0, 0), ...arm(18.4, 9)],
+      [...tail(-1), ...arm(15.4, 7.4, true, -0.5), ...legs(...TUCK), ...top(0, -0.5), ...arm(18.6, 8, false, -0.5)],
+      [...tail(1), ...arm(9, 4.2, true, 0.5), ...legs(...STAND), ...top(0, 0.5, shut), ...arm(18.4, 3.6, false, 0.5)],
+      [...tail(0.4), ...arm(16.6, 6.4, true), ...legs(STEP_A[0], 3, STAND[2], 0), ...top(0.6, 0)],
+    ],
+  };
+}
+
+// GLOOP: a one-eyed squid that walks on four tentacles; its mantle sweeps back like a hood.
+function gloopArt() {
+  const mantle = [
+    { path: 'M5 15.6 C2.8 10.6 2.2 4.8 4.4 0.8 C9.6 1.2 15.6 4.4 18.8 8.8 C20.4 11.2 20.8 13.6 20.2 15.6 Z', box: [2.2, 0.8, 18.6, 14.8], fill: 'aqua', band: [0.34, 0.76] },
+    { circle: [7.2, 5.4, 1.2], fill: 'aqua-light' }, { circle: [10.4, 7.6, 0.9], fill: 'aqua-light' }, { circle: [6.4, 10, 1], fill: 'aqua-light' },
+    { ellipse: [12.6, 16.4, 8, 3.2], fill: 'aqua-dark' },
+  ];
+  const eye = [
+    { circle: [15.2, 11.6, 3.6], fill: 'sun-100' },
+    { circle: [16.2, 11.9, 2], fill: 'amber' },
+    { circle: [16.5, 12, 1.05], fill: 'ink' },
+    { circle: [15.4, 10.6, 0.55], fill: 'chrome-100' },
+    { path: 'M11.4 10.4 C12 7.4 18.4 7.4 19 10.4 C17.4 9.6 13 9.6 11.4 10.4 Z', box: [11.4, 7.4, 7.6, 3], fill: 'aqua-dark' },
+  ];
+  const shut = [
+    { circle: [15.2, 11.6, 3.6], fill: 'sun-100' },
+    { path: 'M11.4 12 C12 7.4 18.4 7.4 19 12 C17.4 11.2 13 11.2 11.4 12 Z', box: [11.4, 7.4, 7.6, 4.6], fill: 'aqua-dark' },
+    { line: [12.2, 13, 15.2, 14, 18.2, 13], width: 0.6, fill: 'ink' },
+  ];
+  // a tentacle leg from under the mantle, swayed and lifted, with a curled tip
+  const tent = (x, sway, lift, fill) => [
+    { line: [x, 17, x + sway, 21 - lift * 0.4, x - sway * 0.4, 25 - lift], width: 2, fill: fill },
+    { circle: [x - sway * 0.4 + 0.6, 25 - lift, 1], fill: fill },
+  ];
+  const legs = (s, l) => [...tent(6, -s, l, 'aqua-dark'), ...tent(14, -s, l, 'aqua-dark'), ...tent(10, s, l ? 0 : 1.2, 'aqua'), ...tent(17.6, s, l ? 0 : 1.2, 'aqua')];
+  const arm = (pts, back) => [
+    { line: [back ? 6.4 : 18.6, 15.4, ...pts], width: 1.7, fill: back ? 'aqua-dark' : 'aqua' },
+    { circle: [pts[pts.length - 2], pts[pts.length - 1], 1.1], fill: 'aqua-light' },
+  ];
+  const top = (dx, dy, e) => shift([...mantle, ...(e || eye)], dx, dy);
+  const walk = (s, l, bob, ba, fa) => [...arm(ba, true), ...legs(s, l), ...top(0, bob), ...arm(fa)];
+  return {
+    size: [AW, AH],
+    frames: [
+      walk(0, 0, 0, [3.6, 18.6, 4.6, 21.6], [20.4, 18.4, 19.2, 21.4]),
+      walk(1.4, 1.2, -0.6, [3.2, 18.4, 3.8, 21.2], [20.6, 18.2, 20, 21]),
+      walk(0, 0, 0.5, [3.6, 19, 4.6, 22], [20.4, 18.8, 19.2, 21.8]),
+      walk(-1.4, 1.2, -0.6, [4, 18.8, 5.4, 21.8], [20.2, 18.6, 18.6, 21.6]),
+      [...arm([2.4, 14, 1.4, 11], true), ...legs(1.6, 0), ...top(1, 0.3)],
+      [...arm([12, 8.4, 18.4, 9.6], true), ...legs(1.4, 2.4), ...top(0, 0), ...arm([20.6, 11, 19.8, 6])],
+      [...arm([12, 6, 18.4, 5.2], true), ...legs(-1.4, 2.4), ...top(0, 0), ...arm([20.6, 13, 19.8, 10.4])],
+      [...arm([2.4, 13, 2.8, 9], true), ...legs(2, 2.6), ...top(0, -0.5), ...arm([20.6, 12.4, 20.2, 8.6])],
+      [...arm([2, 12, 3.4, 7.6], true), ...legs(0, 1), ...top(0, 0.5, shut), ...arm([20.8, 11.6, 19.6, 7])],
+      [...arm([12, 7, 18.4, 7.6], true), ...legs(1.4, 2.4), ...top(0.6, 0)],
+    ],
+  };
+}
+
+// The end of each alien's punching arm.
+const FISTS = {
+  fistZorbo: { size: [7, 7], shapes: [
+    { circle: [3.5, 3.5, 3.2], fill: 'chrome', dir: 'diag', band: [0.38, 0.72] },
+    { line: [4.6, 1.4, 4.6, 5.6], width: 0.45, fill: 'chrome-400' }, { line: [2.6, 1.8, 2.6, 5.2], width: 0.45, fill: 'chrome-400' },
+  ] },
+  fistVexa: { size: [7, 7], shapes: [
+    { poly: [1.4, 6.6, 5.6, 4.2, 6.6, 5.4, 3, 6.9], fill: 'chrome-300' },
+    { poly: [0.4, 5.2, 4.2, 0.6, 6.6, 1.4, 4.8, 3.4, 2.6, 6.4], fill: 'chrome-200' },
+  ] },
+  fistGloop: { size: [7, 7], shapes: [
+    { circle: [3.5, 3.5, 2.9], fill: 'aqua', dir: 'diag' },
+    { circle: [3.9, 3.5, 1.3], fill: 'aqua-light' },
+    { circle: [3.9, 3.5, 0.5], fill: 'aqua-dark' },
+  ] },
+};
+
+/* ---------- Art: the army and the street ---------- */
+
+// A trooper: red helmet and jacket, grey legs, a rifle. Frames: two walking, one aiming up.
+function trooperArt() {
+  const body = [
+    { rect: [1.4, 4, 4.2, 3.8], r: 1, fill: 'red', band: [0.3, 0.7] },
+    { circle: [3.5, 2.6, 2.1], fill: 'red', band: [0.35, 0.75] },
+    { rect: [3.4, 2.1, 2.6, 1], r: 0.4, fill: 'ink' },
+  ];
+  const legs = (a, b) => [{ line: [2.6, 7.4, 2.6 + a, 9.5], width: 1.2, fill: 'chrome-400' }, { line: [4.4, 7.4, 4.4 + b, 9.5], width: 1.2, fill: 'chrome-400' }];
+  const gun = (up) => [{ line: [3.2, 5.6, 6.8, up ? 3 : 5.4], width: 0.8, fill: 'chrome-400' }];
+  return { size: [7, 10], frames: [[...legs(-0.6, 0.6), ...body, ...gun(false)], [...legs(0.6, -0.6), ...body, ...gun(false)], [...legs(-0.4, 0.4), ...body, ...gun(true)]] };
+}
+
+// A trooper knocked flying: arms and legs out. Made in four quarter turns so it can tumble.
+function fallerArt(turn) {
+  return {
+    size: [8, 8], turn: turn,
+    shapes: [
+      { line: [2.8, 3.8, 0.8, 2.2], width: 1, fill: 'red-dark' }, { line: [5.2, 3.8, 7.2, 2.4], width: 1, fill: 'red-dark' },
+      { line: [3.3, 6, 2.2, 7.6], width: 1.1, fill: 'chrome-400' }, { line: [4.7, 6, 5.8, 7.6], width: 1.1, fill: 'chrome-400' },
+      { rect: [2.6, 3, 2.8, 3.2], r: 0.8, fill: 'red' },
+      { circle: [4, 2, 1.7], fill: 'red', band: [0.35, 0.75] },
+    ],
+  };
+}
+
+// A gunship: a round red body under a rotor, the glass nose facing right. Two frames turn the rotor.
+function chopperArt() {
+  const body = [
+    { poly: [1.6, 5.6, 10, 4.8, 10, 7.6, 2, 7], fill: 'red-dark' },
+    { poly: [0.4, 2.6, 2.8, 4.6, 2.8, 7.2, 0.6, 7.4], fill: 'red', band: false },
+    { line: [11, 11.2, 22, 11.2], width: 0.8, fill: 'chrome-400' },
+    { line: [13, 9.4, 12.4, 11.2], width: 0.6, fill: 'chrome-400' }, { line: [20, 9.4, 20.6, 11.2], width: 0.6, fill: 'chrome-400' },
+    { ellipse: [16, 6.6, 7.2, 4], fill: 'red', band: [0.32, 0.72] },
+    { path: 'M17 6.4 C17 4 18.6 3 20 3 C21.8 3 23 4.6 23 6.4 Z', box: [17, 3, 6, 3.4], fill: 'ink' },
+    { ellipse: [19.6, 4.3, 1, 0.45, -20], fill: 'chrome-400' },
+    { line: [16, 2.6, 16, 1.4], width: 0.8, fill: 'chrome-400' },
+    { circle: [9, 8.2, 0.7], fill: 'amber' },
+  ];
+  return {
+    size: [26, 12],
+    frames: [
+      [{ line: [3, 1.2, 25, 1.2], width: 0.7, fill: 'chrome-300' }, ...body],
+      [{ line: [10, 0.6, 22, 1.8], width: 0.7, fill: 'chrome-300' }, { line: [7, 1.6, 12, 1], width: 0.6, fill: 'chrome-300' }, ...body],
+    ],
+  };
+}
+
+// A tank: grey treads, a red hull and turret. Its gun is drawn by the game, so it can aim.
+const TANK = {
+  size: [24, 11],
+  frames: [0, 1].map((n) => [
+    { rect: [0.8, 6.4, 22.4, 4.4], r: 2.2, fill: 'chrome-400' },
+    ...[3.6, 7.8, 12, 16.2, 20.4].map((x, i) => ({ circle: [x, 8.6, 1.3], fill: (i + n) % 2 ? 'chrome-300' : 'chrome-200' })),
+    { poly: [1.6, 6.8, 4, 3.8, 20.4, 3.8, 23, 6.8], fill: 'red', band: [0.3, 0.72] },
+    { rect: [7.4, 0.8, 9.2, 3.6], r: 1.8, fill: 'red', band: [0.3, 0.7] },
+    { circle: [12, 2.2, 0.7], fill: 'ink' },
+  ]),
+};
+
+// A jet, nose to the right.
+const JET = {
+  size: [20, 7],
+  shapes: [
+    { poly: [6.4, 3.8, 11.6, 3.8, 7.6, 6.8, 5, 6.8], fill: 'red-dark' },
+    { poly: [0.4, 2.8, 4.6, 1.8, 14, 2, 19.6, 3.6, 14, 5.2, 4.6, 5.2, 0.4, 4.4], fill: 'red', band: [0.3, 0.7] },
+    { poly: [1, 2.8, 2, 0.2, 4.2, 2], fill: 'red-dark' },
+    { ellipse: [14.4, 3, 2.2, 0.9], fill: 'ink' },
+  ],
+};
+
+// A car in a warm colour, facing right; frame 1 is the wreck.
+function carArt(ramp) {
+  const whole = [
+    { path: 'M4 3.6 L5.8 0.8 L11.6 0.8 L14 3.6 Z', box: [4, 0.8, 10, 2.8], fill: ramp, band: false },
+    { poly: [6.2, 3.4, 7, 1.6, 9.4, 1.6, 9.4, 3.4], fill: 'ink' }, { poly: [10.2, 3.4, 10.2, 1.6, 11.2, 1.6, 12.8, 3.4], fill: 'ink' },
+    { rect: [0.4, 3.2, 17.2, 3.4], r: 1.4, fill: ramp, band: [0.3, 0.7] },
+    { rect: [16.2, 3.9, 1.1, 1], r: 0.3, fill: 'sun-100' },
+  ];
+  const wreck = [
+    { poly: [4.4, 3.6, 6.4, 2.4, 11.4, 2.8, 13.6, 3.6], fill: 'chrome-400' },
+    { rect: [0.4, 3.4, 17.2, 3.2], r: 1.2, fill: 'chrome-400' },
+    { line: [3, 4.4, 6, 5.4, 9, 4.2, 13, 5.6], width: 0.5, fill: 'ink' },
+  ];
+  const wheels = [
+    { circle: [4.4, 6.6, 1.5], fill: 'ink' }, { circle: [13.6, 6.6, 1.5], fill: 'ink' },
+    { circle: [4.4, 6.6, 0.55], fill: 'chrome-300' }, { circle: [13.6, 6.6, 0.55], fill: 'chrome-300' },
+  ];
+  return { size: [18, 8], frames: [[...whole, ...wheels], [...wreck, ...wheels]] };
+}
+
+// Enemy fire: red with a bright core, so it shows against every sky and wall.
+const BULLET = { size: [3, 3], outline: 0.4, shapes: [{ circle: [1.5, 1.5, 1.45], fill: 'red' }, { circle: [1.3, 1.3, 0.65], fill: 'sun-100' }] };
+const SHELL = { size: [4, 4], outline: 0.4, shapes: [{ circle: [2, 2, 1.9], fill: 'red', band: [0.3, 0.7] }, { circle: [1.6, 1.6, 0.8], fill: 'sun-100' }] };
+const BOMB = { size: [4, 6], outline: 0.4, shapes: [{ poly: [0.2, 0, 2, 2, 3.8, 0], fill: 'chrome-400' }, { rect: [0.6, 1, 2.8, 5], r: 1.4, fill: 'red', band: [0.3, 0.7] }] };
+
+// What can be found in a window: a jar of glowing goo (health), a gem (points), a live wire (it bites).
+const SNACK = { size: [6, 6], shapes: [
+  { rect: [1, 1.4, 4, 4.4], r: 1, fill: 'amber', band: [0.3, 0.7] },
+  { rect: [0.8, 0.3, 4.4, 1.3], r: 0.4, fill: 'chrome-300' },
+  { circle: [2.4, 3.4, 0.55], fill: 'amber-light' }, { circle: [3.6, 4.5, 0.4], fill: 'amber-light' },
+] };
+const GEM = { size: [6, 6], shapes: [
+  { poly: [3, 0.3, 5.7, 2.3, 3, 5.8, 0.3, 2.3], fill: 'amber', band: [0.3, 0.7] },
+  { line: [0.6, 2.3, 5.4, 2.3], width: 0.4, fill: 'amber-light' }, { line: [3, 0.6, 3, 5.4], width: 0.4, fill: 'amber-dark' },
+] };
+function wireArt() {
+  const bolt = (m) => {
+    const pts = [0.8, 0.6, 2.6, 2.6, 1.4, 3.4, 4.6, 5.6].map((v, i) => (i % 2 === 0 && m ? 6 - v : v));
+    return [{ line: pts, width: 1.6, fill: 'red' }, { line: pts, width: 0.6, fill: 'sun-100' }];
+  };
+  const dead = [{ line: [0.8, 1, 2.6, 3, 1.4, 3.6, 4.6, 5.4], width: 0.8, fill: 'chrome-400' }];
+  return { size: [6, 6], outline: 0.4, frames: [bolt(false), bolt(true), dead] };
+}
+
+// The mothership: the aliens' own, so chrome with an aqua dome. Its rim lights chase round.
+function motherArt() {
+  const body = [
+    { path: 'M16.5 6.2 C16.5 2.2 19.8 0.4 24 0.4 C28.2 0.4 31.5 2.2 31.5 6.2 Z', box: [16.5, 0.4, 15, 5.8], fill: 'aqua', band: [0.45, 0.85] },
+    { ellipse: [21.6, 2.6, 2, 0.8, -15], fill: 'aqua-light' },
+    { path: 'M0.6 8.6 C2.4 5.6 10 4.8 24 4.8 C38 4.8 45.6 5.6 47.4 8.6 C45.6 11 38 12.2 24 12.2 C10 12.2 2.4 11 0.6 8.6 Z', box: [0.6, 4.8, 46.8, 7.4], fill: 'chrome', band: [0.36, 0.7] },
+    { rect: [19, 11.4, 10, 3], r: 1.4, fill: 'chrome-400' },
+    { circle: [24, 13, 1.5], fill: 'aqua-light' },
+  ];
+  const lights = (n) => [5.5, 11.5, 17.5, 30.5, 36.5, 42.5].map((x, i) => ({ circle: [x, 8.6, 0.95], fill: (i + n) % 2 ? 'aqua-light' : 'aqua-dark' }));
+  return { size: [48, 15], frames: [[...body, ...lights(0)], [...body, ...lights(1)]] };
+}
+
+// The flash where a punch lands: white-hot in the middle, aqua at the tips (it is the alien's).
+function smackArt() {
+  const star = (r, inner, turn) => {
+    const p = [];
+    for (let i = 0; i < 16; i++) {
+      const a = turn + i * Math.PI / 8;
+      const k = i % 2 ? inner : 1;
+      p.push(5.5 + Math.cos(a) * r * k, 5.5 + Math.sin(a) * r * k);
+    }
+    return p;
+  };
+  return { size: [11, 11], outline: false, frames: [
+    [{ poly: star(5.2, 0.45, 0), fill: 'aqua-light' }, { poly: star(3.4, 0.5, 0.2), fill: 'chrome-100' }],
+    [{ poly: star(4.2, 0.4, 0.3), fill: 'aqua-light', alpha: 0.7 }],
+  ] };
+}
+
+// An explosion in four frames: a white-hot flash, a burst of fire, the burst thinning, then embers.
+function blastArt(size, seed) {
+  const rnd = rng(seed);
+  const c = size / 2;
+  const star = (r, spikes, inner) => {
+    const p = [];
+    const turn = rnd() * Math.PI;
+    for (let i = 0; i < spikes * 2; i++) {
+      const a = turn + i * Math.PI / spikes;
+      const k = i % 2 ? inner : 0.78 + rnd() * 0.22;
+      p.push(c + Math.cos(a) * r * k, c + Math.sin(a) * r * k);
+    }
+    return p;
+  };
+  const embers = [];
+  for (let i = 0; i < 10; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = (0.45 + rnd() * 0.5) * c;
+    embers.push({ circle: [c + Math.cos(a) * d, c + Math.sin(a) * d, 0.5 + rnd() * 0.45], fill: i % 3 ? 'heat' : 'chrome-400' });
+  }
+  return {
+    size: [size, size], outline: false,
+    frames: [
+      [{ poly: star(c * 0.6, 8, 0.5), fill: 'amber-light' }, { circle: [c, c, c * 0.22], fill: 'sun-100' }],
+      [{ poly: star(c * 0.98, 10, 0.58), fill: 'heat' }, { poly: star(c * 0.7, 10, 0.55), fill: 'amber' }, { circle: [c, c, c * 0.24], fill: 'sun-100' }],
+      [{ poly: star(c, 11, 0.6), fill: 'heat-dark', alpha: 0.85 }, { poly: star(c * 0.62, 9, 0.6), fill: 'heat', alpha: 0.8 }],
+      embers,
+    ],
+  };
+}
+
+// The street along the bottom: the pavement everything stands on, then a two-lane road.
+const STREET = {
+  size: [W, 20], outline: false,
+  shapes: [
+    { rect: [-1, 0, W + 2, 4], fill: 'chrome-400' },
+    { rect: [-1, 0, W + 2, 0.9], fill: 'chrome-300' },
+    ...Array.from({ length: 27 }, (_, i) => ({ rect: [i * 12 + 4, 1, 0.5, 3], fill: 'ink', alpha: 0.35 })),
+    { rect: [-1, 4, W + 2, 1.2], fill: 'chrome-300' },
+    { rect: [-1, 5.2, W + 2, 14.8], fill: 'ink' },
+    { rect: [-1, 5.2, W + 2, 14.8], fill: 'chrome-400', alpha: 0.35 },
+    ...Array.from({ length: 15 }, (_, i) => ({ rect: [i * 22 + 3, 12.2, 9, 0.9], r: 0.45, fill: 'chrome-200' })),
+    { rect: [-1, 19, W + 2, 1], fill: 'chrome-400' },
+  ],
+};
+
+function buildSprites() {
+  const s = Object.assign({
+    zorbo: zorboArt(),
+    vexa: vexaArt(),
+    gloop: gloopArt(),
+    trooper: trooperArt(),
+    post: { size: [6, 6], shapes: [
+      { rect: [0.8, 3.6, 4.4, 2.4], r: 0.8, fill: 'red-dark' },
+      { circle: [3, 2.4, 2], fill: 'red', band: [0.35, 0.75] },
+      { rect: [2.8, 1.9, 2.4, 0.9], r: 0.4, fill: 'ink' },
+    ] },
+    gyro: chopperArt(),
+    tank: TANK,
+    jet: JET,
+    car_heat: carArt('heat'),
+    car_amber: carArt('amber'),
+    bullet: BULLET,
+    shell: SHELL,
+    bomb: BOMB,
+    snack: SNACK,
+    gem: GEM,
+    wire: wireArt(),
+    mother: motherArt(),
+    smack: smackArt(),
+    blast: blastArt(24, 3),
+    pop: blastArt(14, 8),
+    street: STREET,
+  }, FISTS);
+  for (let t = 0; t < 4; t++) s['faller' + t] = fallerArt(t);
+  return s;
+}
+
+/* ---------- Art: buildings ----------
+   Each building is one sprite: its roof prop, facade, windows, ledges and shopfront. The rules keep it as
+   a grid of cells; a smashed cell is drawn as two round bites out of the picture (rk.draw's cut), and the
+   dark rooms behind show through. */
+
+function windowArt(sh, S, x, y, lit) {
+  if (S.win === 'square') {
+    sh.push({ rect: [x + 2.2, y + 2.6, 5.6, 5.8], r: 0.6, fill: lit ? S.lit : 'ink' });
+    sh.push(lit ? { rect: [x + 4.7, y + 2.6, 0.6, 5.8], fill: S.facade } : { line: [x + 3.2, y + 6, x + 5, y + 3.8], width: 0.5, fill: 'chrome-400' });
+    sh.push({ rect: [x + 1.6, y + 8.3, 6.8, 0.9], fill: S.trim });
+  } else if (S.win === 'arch') {
+    sh.push({ rect: [x + 2.8, y + 2, 4.4, 7.2], r: 2.2, fill: lit ? S.lit : 'ink' });
+    if (!lit) sh.push({ line: [x + 3.8, y + 6.6, x + 5, y + 4.6], width: 0.5, fill: 'chrome-400' });
+  } else if (S.win === 'grid') {
+    sh.push({ rect: [x + 1.2, y + 1.8, 7.6, 7.2], fill: lit ? S.lit : 'ink' });
+    sh.push(lit ? { rect: [x + 1.2, y + 5, 7.6, 0.6], fill: S.facade } : { line: [x + 2.6, y + 7.4, x + 5.4, y + 3.2], width: 0.6, fill: 'chrome-400' });
+  }
+}
+
+function roofArt(sh, S, w, top, rnd) {
+  const cx = 7 + Math.floor(rnd() * Math.max(1, w - 18));
+  for (let i = 0; i < 2; i++) {             // little plant rooms and vents along the roof
+    const bx = 2 + Math.floor(rnd() * (w - 8));
+    if (Math.abs(bx + 2 - cx) < 7) continue;
+    sh.push({ rect: [bx, top - 2.6, 4, 2.8], r: 0.4, fill: 'chrome-400' });
+  }
+  if (S.roof === 'tank') {                  // a water tower on legs
+    sh.push(
+      { line: [cx - 3.6, top, cx - 3, top - 5.4], width: 0.8, fill: 'chrome-400' },
+      { line: [cx + 3.6, top, cx + 3, top - 5.4], width: 0.8, fill: 'chrome-400' },
+      { line: [cx - 3.4, top - 1, cx + 3.2, top - 4.4], width: 0.5, fill: 'chrome-400' },
+      { rect: [cx - 4.4, top - 11.2, 8.8, 6.4], r: 0.8, fill: 'heat', band: [0.3, 0.7] },
+      { poly: [cx - 5, top - 11, cx, top - 13.8, cx + 5, top - 11], fill: 'heat-dark' },
+    );
+  } else if (S.roof === 'mast') {           // a radio mast with a lamp
+    sh.push(
+      { line: [cx, top, cx, top - 12.6], width: 0.9, fill: 'chrome-400' },
+      { line: [cx - 2.6, top - 5, cx + 2.6, top - 5], width: 0.6, fill: 'chrome-400' },
+      { line: [cx - 1.8, top - 9, cx + 1.8, top - 9], width: 0.6, fill: 'chrome-400' },
+      { ellipse: [cx + 3, top - 3.2, 1.6, 2.2, 20], fill: 'chrome-300' },
+      { circle: [cx, top - 13, 0.8], fill: 'amber' },
+    );
+  } else if (S.roof === 'sign') {           // a billboard: a picture, no words
+    const x0 = Math.min(cx - 6, w - 20);
+    sh.push(
+      { line: [x0 + 4, top, x0 + 4, top - 4], width: 0.8, fill: 'chrome-400' },
+      { line: [x0 + 14, top, x0 + 14, top - 4], width: 0.8, fill: 'chrome-400' },
+      { rect: [x0, top - 11.6, 18, 7.6], r: 0.6, fill: 'amber', band: false },
+      { circle: [x0 + 5, top - 7.8, 2.4], fill: 'heat' },
+      { rect: [x0 + 9, top - 9.6, 7, 1.2], r: 0.6, fill: 'ink' },
+      { rect: [x0 + 9, top - 7, 5, 1.2], r: 0.6, fill: 'heat-dark' },
+    );
+  } else if (S.roof === 'spire') {          // a steel needle
+    sh.push(
+      { rect: [cx - 3.4, top - 3.6, 6.8, 3.8], r: 0.6, fill: 'chrome', band: [0.3, 0.7] },
+      { poly: [cx - 2, top - 3.4, cx, top - 13.8, cx + 2, top - 3.4], fill: 'chrome', band: [0.3, 0.7] },
+    );
+  }
+}
+
+function shopfrontArt(sh, S, w, y) {
+  for (let x = 0, n = 0; x < w; x += 10 / 3, n++) sh.push({ rect: [x, y + 1.2, 10 / 3 + 0.05, 2.4], fill: n % 2 ? 'chrome-200' : S.trim });
+  sh.push(
+    { rect: [1.8, y + 4.4, w - 3.6, 5.4], fill: 'ink' },
+    { line: [3, y + 8.6, 5.6, y + 5.4], width: 0.5, fill: 'chrome-400' },
+    { line: [w - 6, y + 8.6, w - 3.4, y + 5.4], width: 0.5, fill: 'chrome-400' },
+    { rect: [w / 2 - 2.4, y + 3.8, 4.8, 7.2], fill: S.trim },
+    { rect: [w / 2 - 1.5, y + 4.6, 3, 6.4], fill: 'ink' },
+  );
+}
+
+function buildingArt(b, rnd) {
+  const S = STYLES[b.style];
+  const w = b.w;
+  const top = PROP;
+  const sh = [];
+  roofArt(sh, S, w, top, rnd);
+  sh.push({ rect: [0, top, w, b.h], fill: S.facade });
+  for (let f = 0; f < b.floors; f++) {
+    const y = top + (b.floors - 1 - f) * FH;
+    if (f === 0) { shopfrontArt(sh, S, w, y); continue; }
+    if (S.win === 'ribbon') {               // steel: one band of glass along each floor
+      sh.push({ rect: [1.4, y + 2.4, w - 2.8, 6.2], fill: 'ink' });
+      for (let c = 0; c < b.cols; c++) if (rnd() < 0.34) sh.push({ rect: [c * CW + 1.6, y + 2.4, 6.8, 6.2], fill: S.lit });
+      for (let c = 1; c < b.cols; c++) sh.push({ rect: [c * CW - 0.5, y + 2.4, 1, 6.2], fill: S.trim });
+      sh.push({ line: [3, y + 7.6, 6, y + 3.4], width: 0.6, fill: 'chrome-400' });
+    } else {
+      for (let c = 0; c < b.cols; c++) windowArt(sh, S, c * CW, y, rnd() < 0.36);
+    }
+    sh.push({ rect: [0, y + FH - 1.2, w, 1.2], fill: S.trim });
+  }
+  sh.push(
+    { rect: [0, top, w, 2.4], fill: S.trim },
+    { rect: [0, top + 2.4, w, 0.7], fill: 'ink', alpha: 0.45 },
+    { rect: [0, top, 1.2, b.h], fill: S.trim },
+    { rect: [w - 1.2, top, 1.2, b.h], fill: 'ink', alpha: 0.35 },
+  );
+  return { size: [w, PROP + b.h], shapes: sh };
+}
+
+// What is left once a building has gone down: a heap of its own bricks, with a few bits of steel sticking out.
+function rubbleArt(b, rnd) {
+  const S = STYLES[b.style];
+  const w = b.w + 10;
+  const h = 10;
+  const surface = (x) => h - 1 - Math.sin(Math.min(1, Math.max(0, x / w)) * Math.PI) * (h - 3);
+  const pts = [0, h];
+  for (let x = 0; x <= w; x += 2.5) pts.push(x, surface(x) + rnd() * 1.4);
+  pts.push(w, h);
+  const sh = [{ poly: pts, fill: S.facade }];
+  for (let i = 0; i < 4; i++) {
+    const x = 6 + rnd() * (w - 12);
+    const y = surface(x) + 1;
+    sh.push({ line: [x, y, x + (rnd() < 0.5 ? -4 : 4), y - 2.6 - rnd() * 2], width: 0.6, fill: 'chrome-300' });
+  }
+  for (let i = 0; i < 12; i++) {
+    const x = 3 + rnd() * (w - 6);
+    const y = surface(x) + 1.2 + rnd() * (h - surface(x) - 2);
+    const s = 0.9 + rnd() * 1.1;
+    const a = rnd() * Math.PI;
+    sh.push({ poly: [x + Math.cos(a) * s, y + Math.sin(a) * s, x + Math.cos(a + 2.2) * s, y + Math.sin(a + 2.2) * s, x + Math.cos(a + 4.1) * s, y + Math.sin(a + 4.1) * s], fill: rnd() < 0.5 ? S.trim : 'chrome-400' });
+  }
+  return { size: [w, h], shapes: sh };
+}
+
+/* ---------- Art: the cities ----------
+   Each city's backdrop is one 320 x 180 picture of shapes, made once: bands of sky from the top down, then
+   distant skylines. The buildings to smash stand in front of it. live() draws whatever moves. */
+
+function backdrop(bands) {
+  const shapes = [];
+  bands.forEach((b, i) => {
+    const end = i + 1 < bands.length ? bands[i + 1][0] : H;
+    shapes.push({ rect: [-1, b[0], W + 2, end - b[0]], fill: b[1] });
+  });
+  const bd = {
+    tw: [],                     // stars that twinkle
+    lamps: [],                  // lamps on masts and cranes that blink
+    add(...list) { shapes.push(...list); },
+    stars(rnd, n, maxY) {
+      for (let i = 0; i < n; i++) {
+        const x = Math.floor(rnd() * W) + 0.5;
+        const y = Math.floor(rnd() * maxY) + 0.5;
+        const big = rnd() < 0.15;
+        shapes.push({ circle: [x, y, big ? 0.7 : 0.5], fill: big ? 'chrome-200' : rnd() < 0.5 ? 'chrome-300' : 'chrome-400' });
+        if (bd.tw.length < 8 && i % 4 === 1) bd.tw.push([x, y]);
+      }
+    },
+    // a row of towers down to the street: o.top and o.w are [least, most]; returns each tower as [x, top, w]
+    towers(rnd, o) {
+      const list = [];
+      let x = o.from == null ? -2 : o.from;
+      const to = o.to == null ? W + 2 : o.to;
+      while (x < to) {
+        const w = o.w[0] + Math.floor(rnd() * (o.w[1] - o.w[0] + 1));
+        const top = o.top[0] + Math.floor(rnd() * (o.top[1] - o.top[0] + 1));
+        shapes.push({ rect: [x, top, w, (o.base || GROUND) - top], fill: o.fill });
+        if (o.caps && rnd() < 0.35) shapes.push({ rect: [x + Math.floor(w * 0.25), top - 3, Math.max(2, Math.floor(w * 0.5)), 3.2], fill: o.fill });
+        if (o.masts && rnd() < 0.22) {
+          const mh = 6 + Math.floor(rnd() * 7);
+          shapes.push({ line: [x + w / 2, top, x + w / 2, top - mh], width: 0.7, fill: o.fill });
+          bd.lamps.push([x + w / 2, top - mh]);
+        }
+        if (o.lights) {
+          for (let wy = top + 2; wy < (o.base || GROUND) - 2; wy += 3) {
+            for (let wx = x + 1.5; wx < x + w - 1; wx += 2.5) if (rnd() < o.lights) shapes.push({ rect: [wx, wy, 0.9, 0.9], fill: rnd() < 0.2 ? o.lit2 : o.lit });
+          }
+        }
+        list.push([x, top, w]);
+        x += w + (rnd() < (o.gaps || 0) ? 1 + Math.floor(rnd() * 3) : 0);
+      }
+      return list;
+    },
+    // a bank of cloud: round puffs along a flat base, a lighter rim along the top
+    clouds(rnd, x0, x1, y, body, rim) {
+      const puffs = [];
+      for (let x = x0; x <= x1; x += 6 + rnd() * 4) puffs.push([x, y - rnd() * 3, 4 + rnd() * 5]);
+      for (const p of puffs) shapes.push({ circle: [p[0], p[1] - 1, p[2]], fill: rim });
+      for (const p of puffs) shapes.push({ circle: [p[0], p[1], p[2]], fill: body });
+      shapes.push({ rect: [x0 - 4, y, x1 - x0 + 8, 5], r: 2.5, fill: body });
+    },
+    art: () => ({ size: [W, H], outline: false, shapes: shapes }),
+  };
+  return bd;
+}
+
+// 1 Bayfront: a sunset over the bay, a bridge far off on the left.
+function paintBayfront() {
+  const rnd = rng(7);
+  const bd = backdrop([[0, 'sky-0'], [30, 'sky-1'], [56, 'sky-2'], [80, 'sky-3'], [98, 'sky-4'], [112, 'sky-5'], [122, 'sky-6']]);
+  bd.stars(rnd, 28, 52);
+  bd.add({ circle: [252.5, 118.5, 19], fill: ['sun-100', 0.32, 'amber'] });
+  for (const c of [[18, 64, 70, 'sky-3', 'sky-4'], [150, 72, 54, 'sky-3', 'sky-4'], [214, 58, 80, 'sky-3', 'sky-4'], [40, 90, 46, 'sky-4', 'sky-5'], [118, 103, 64, 'sky-5', 'sky-6'], [232, 96, 50, 'sky-4', 'sky-5']]) {
+    bd.add({ rect: [c[0], c[1], c[2], 2], r: 1, fill: c[3] }, { rect: [c[0] + 6, c[1] + 2, c[2] - 14, 1], r: 0.5, fill: c[4] });
+  }
+  const cable = [-1, 118, 25.5, 99, 56, 121, 87.5, 99, 122, 117];
+  bd.add({ rect: [-1, 126, 124, 2.2], fill: 'hill-far' }, { rect: [24, 97, 3, 31], fill: 'hill-far' }, { rect: [86, 97, 3, 31], fill: 'hill-far' }, { line: cable, width: 0.8, fill: 'hill-far' });
+  for (let x = 4; x < 120; x += 5) {
+    const seg = x < 25.5 ? [-1, 118, 25.5, 99] : x < 56 ? [25.5, 99, 56, 121] : x < 87.5 ? [56, 121, 87.5, 99] : [87.5, 99, 122, 117];
+    const k = (x - seg[0]) / (seg[2] - seg[0]);
+    const cy = seg[1] + (seg[3] - seg[1]) * k + Math.sin(k * Math.PI) * 4;
+    if (cy < 125) bd.add({ line: [x, cy, x, 126], width: 0.35, fill: 'hill-far' });
+  }
+  bd.towers(rnd, { from: 124, top: [106, 124], w: [7, 14], fill: 'hill-far', gaps: 0.4, caps: true });
+  bd.towers(rnd, { top: [126, 146], w: [10, 20], fill: 'hill-near', gaps: 0.2, lights: 0.1, lit: 'amber-dark', lit2: 'amber' });
+  return bd;
+}
+
+// 2 Midtown: a clear night, a big moon, towers in every direction.
+function paintMidtown() {
+  const rnd = rng(19);
+  const bd = backdrop([[0, 'ink'], [46, 'sky-0'], [88, 'sky-1'], [122, 'sky-2']]);
+  bd.stars(rnd, 70, 100);
+  bd.add(
+    { circle: [62.5, 38.5, 13], fill: ['chrome-200', 0.42, 'chrome-300'], dir: 'diag' },
+    { circle: [58, 35, 2.2], fill: 'chrome-300' }, { circle: [66.5, 42.5, 1.6], fill: 'chrome-300' }, { circle: [65, 32.5, 1], fill: 'chrome-300' },
+  );
+  bd.towers(rnd, { top: [66, 108], w: [9, 16], fill: 'hill-far', gaps: 0.5, caps: true, masts: true, lights: 0.05, lit: 'sky-3', lit2: 'amber-dark' });
+  bd.towers(rnd, { top: [112, 140], w: [10, 18], fill: 'hill-near', gaps: 0.25, lights: 0.12, lit: 'amber-dark', lit2: 'amber' });
+  return bd;
+}
+
+// 3 Neon row: a violet haze, a thin moon, signs glowing on the towers and searchlights sweeping the sky.
+function paintNeon() {
+  const rnd = rng(31);
+  const bd = backdrop([[0, 'sky-1'], [34, 'sky-2'], [72, 'sky-3'], [106, 'sky-4'], [130, 'sky-3']]);
+  bd.stars(rnd, 16, 30);
+  bd.add({ circle: [258, 22, 9], fill: 'chrome-200' }, { circle: [261.6, 19.6, 8.2], fill: 'sky-1' });
+  bd.towers(rnd, { top: [86, 116], w: [8, 15], fill: 'hill-far', gaps: 0.4, caps: true, masts: true });
+  const near = bd.towers(rnd, { top: [116, 142], w: [11, 19], fill: 'hill-near', gaps: 0.3, lights: 0.08, lit: 'amber-dark', lit2: 'heat-light' });
+  near.forEach((t, i) => {
+    if (i % 3 === 1) bd.add({ rect: [t[0] + 2, t[1] + 4, 1.4, 9], r: 0.7, fill: i % 2 ? 'heat-light' : 'amber-light' });
+    if (i % 3 === 2) bd.add({ rect: [t[0] + 2, t[1] + 3, Math.min(10, t[2] - 4), 1.3], r: 0.65, fill: i % 2 ? 'amber-light' : 'heat-light' });
+  });
+  return bd;
+}
+
+// 4 Docklands: a low moon over the harbour, cranes and stacked containers along the quay.
+function paintDocks() {
+  const rnd = rng(43);
+  const bd = backdrop([[0, 'sky-0'], [40, 'sky-1'], [82, 'sky-2'], [112, 'sky-3'], [126, 'sky-2']]);
+  bd.stars(rnd, 40, 78);
+  bd.add({ circle: [230.5, 112.5, 12], fill: ['sun-100', 0.35, 'amber-light'] });
+  bd.towers(rnd, { top: [110, 126], w: [6, 13], fill: 'hill-far', gaps: 0.5, base: 134 });
+  bd.add({ rect: [-1, 134, W + 2, GROUND - 134], fill: 'sky-1' });
+  for (let i = 0; i < 5; i++) bd.add({ rect: [230.5 - (6 - i) * 1.3 + (i % 2 ? 1.5 : -1), 137 + i * 4, (6 - i) * 2.6, 0.8], r: 0.4, fill: 'amber-dark' });
+  for (const x of [60, 168]) {              // two gantry cranes
+    bd.add(
+      { line: [x, GROUND, x + 4, 104], width: 1.3, fill: 'hill-near' },
+      { line: [x + 16, GROUND, x + 12, 104], width: 1.3, fill: 'hill-near' },
+      { line: [x + 1.5, 140, x + 14.5, 140], width: 1, fill: 'hill-near' },
+      { line: [x + 2.6, 122, x + 13.4, 122], width: 1, fill: 'hill-near' },
+      { rect: [x - 20, 101, 58, 3.2], fill: 'hill-near' },
+      { line: [x + 8, 101, x + 8, 92], width: 1, fill: 'hill-near' },
+      { line: [x + 8, 92, x - 18, 101.5], width: 0.5, fill: 'hill-near' },
+      { line: [x + 8, 92, x + 36, 101.5], width: 0.5, fill: 'hill-near' },
+      { line: [x - 10, 104, x - 10, 124], width: 0.4, fill: 'hill-near' },
+      { rect: [x - 13, 124, 6, 3], fill: 'hill-near' },
+    );
+    bd.lamps.push([x + 8, 91]);
+  }
+  let x = -2;
+  while (x < W) {                           // container stacks and sheds on the quay
+    const w = 10 + Math.floor(rnd() * 14);
+    const top = 144 + Math.floor(rnd() * 8);
+    bd.add({ rect: [x, top, w, GROUND - top], fill: rnd() < 0.5 ? 'hill-near' : 'hill-far' });
+    for (let y = top + 3; y < GROUND - 1; y += 4) bd.add({ rect: [x + 1, y, w - 2, 0.6], fill: 'sky-1' });
+    x += w + 1 + Math.floor(rnd() * 6);
+  }
+  return bd;
+}
+
+// 5 Stormgate: heavy cloud, a dark city under it, rain driving across (drawn in front, by rain()).
+function paintStorm() {
+  const rnd = rng(59);
+  const bd = backdrop([[0, 'hill-near'], [24, 'sky-1'], [60, 'sky-2'], [100, 'sky-1'], [132, 'sky-0']]);
+  bd.clouds(rnd, -8, 120, 18, 'sky-1', 'sky-2');
+  bd.clouds(rnd, 150, 330, 26, 'sky-1', 'sky-2');
+  bd.clouds(rnd, 40, 210, 52, 'sky-2', 'sky-3');
+  bd.clouds(rnd, 230, 330, 70, 'sky-2', 'sky-3');
+  bd.clouds(rnd, -10, 90, 84, 'sky-2', 'sky-3');
+  bd.towers(rnd, { top: [96, 122], w: [8, 15], fill: 'hill-far', gaps: 0.4, caps: true, masts: true });
+  bd.towers(rnd, { top: [122, 146], w: [10, 18], fill: 'hill-near', gaps: 0.25, lights: 0.06, lit: 'amber-dark', lit2: 'amber' });
+  return bd;
+}
+
+// 6 Spire heights: the aliens' ringed home planet hangs over a city of needles.
+function paintSpire() {
+  const rnd = rng(71);
+  const bd = backdrop([[0, 'ink'], [62, 'sky-0'], [100, 'sky-1'], [132, 'sky-2']]);
+  bd.stars(rnd, 90, 120);
+  // the rings, tilted 10 degrees, as two halves: the far half (the upper one) goes on before the planet,
+  // so the planet hides it where they cross; the near half goes on after, across the planet's face
+  const arc = (rx, ry, from, to) => {
+    const pts = [];
+    const turn = -10 * Math.PI / 180;
+    for (let i = 0; i <= 48; i++) {
+      const t = from + (to - from) * i / 48;
+      const ex = Math.cos(t) * rx;
+      const ey = Math.sin(t) * ry;
+      pts.push(262.5 + ex * Math.cos(turn) - ey * Math.sin(turn), 44 + ex * Math.sin(turn) + ey * Math.cos(turn));
+    }
+    return pts;
+  };
+  const rings = (from, to) => [
+    { line: arc(64, 9, from, to), width: 1.4, fill: 'sky-5' },
+    { line: arc(56, 7, from, to), width: 0.6, fill: 'sky-4' },
+  ];
+  bd.add(
+    ...rings(Math.PI, Math.PI * 2),
+    { circle: [262.5, 40.5, 38], fill: ['sky-4', 0.28, 'sky-3', 0.62, 'sky-2'], dir: 'diag' },
+    { ellipse: [256, 30, 26, 2.4, -8], fill: 'sky-5', alpha: 0.5 },
+    { ellipse: [266, 50, 30, 2, -8], fill: 'sky-2', alpha: 0.6 },
+    ...rings(0, Math.PI),
+  );
+  let x = -4;
+  while (x < W) {                           // needle spires, far off
+    const w = 6 + Math.floor(rnd() * 8);
+    const top = 58 + Math.floor(rnd() * 50);
+    bd.add({ poly: [x, GROUND, x + w * 0.2, top + 12, x + w / 2, top, x + w * 0.8, top + 12, x + w, GROUND], fill: 'hill-far' });
+    if (rnd() < 0.4) bd.lamps.push([x + w / 2, top + 1]);
+    x += w + Math.floor(rnd() * 6);
+  }
+  bd.towers(rnd, { top: [116, 140], w: [10, 18], fill: 'hill-near', gaps: 0.25, lights: 0.1, lit: 'amber-dark', lit2: 'amber' });
+  return bd;
+}
+
+/* What moves in each city (t is seconds of play). Nothing flashes faster than once a second. */
+function blinkLamps(rk, t, lamps) {
+  lamps.forEach((p, i) => {
+    if (Math.floor(t * 0.8 + i * 0.37) % 2 === 0) rk.circle(p[0], p[1], 0.65, 'amber');
+  });
+}
+function searchlights(rk, t, list) {
+  for (const s of list) {
+    const a = Math.sin(t * s[1] + s[2]) * 0.55;
+    const tx = s[0] + Math.sin(a) * 190;
+    const ty = GROUND - Math.cos(a) * 190;
+    const px = Math.cos(a) * 10;
+    const py = Math.sin(a) * 10;
+    rk.shape({ poly: [s[0] - 1, GROUND - 6, s[0] + 1, GROUND - 6, tx + px, ty + py, tx - px, ty - py], fill: 'chrome-200', alpha: 0.07 });
+  }
+}
+function liveBayfront(rk) { rk.glow(252, 116, 34, 'amber', 0.2); }
+function liveMidtown(rk, t, city) { blinkLamps(rk, t, city.lamps); }
+function liveNeon(rk, t, city) {
+  searchlights(rk, t, [[70, 0.42, 0], [212, 0.36, 2.2]]);
+  blinkLamps(rk, t, city.lamps);
+}
+function liveDocks(rk, t, city) {
+  blinkLamps(rk, t, city.lamps);
+  for (let i = 0; i < 14; i++) {            // the water moving
+    const x = (i * 23.7 + t * 7) % 340 - 10;
+    rk.rect(x, 136 + (i * 7) % 10, 4 + (i % 3), 0.6, 'chrome-400', 0.6);
+  }
+}
+function liveStorm(rk, t) {
+  const n = Math.floor(t / 4.3);
+  if (t % 4.3 < 0.12) rk.glow([60, 250, 150, 30, 200][n % 5], 40, 46, 'chrome-200', 0.35);   // lightning inside the clouds, now and then
+}
+function liveSpire(rk, t, city) {
+  searchlights(rk, t, [[40, 0.33, 1], [150, 0.4, 3.1], [290, 0.37, 5]]);
+  blinkLamps(rk, t, city.lamps);
+  for (let i = 0; i < 3; i++) {             // more of the fleet, far away
+    const x = (t * (5 + i * 2) + i * 130) % 380 - 30;
+    const y = 72 + i * 11;
+    rk.shape([{ ellipse: [x, y, 3.4, 0.9], fill: 'chrome-400' }, { ellipse: [x, y - 0.8, 1.3, 0.8], fill: 'aqua-dark' }]);
+  }
+}
+function rain(rk, t) {
+  const drops = [];
+  for (let i = 0; i < 64; i++) {
+    const x = (i * 47.3 + t * 40) % (W + 40) - 20;
+    const y = (i * 29.7 + t * 250) % (H + 20) - 10;
+    drops.push({ line: [x, y, x - 1.6, y + 6], width: 0.5, fill: 'chrome-300', alpha: 0.28 });
+  }
+  rk.shape(drops);
+}
+
+function drawCity(rk, i, t) {
+  const city = CITIES[i];
+  rk.draw('city' + i, 0, 0);
+  city.tw.forEach((s, n) => { if (Math.sin(t * 1.3 + n * 1.7) > 0.85) rk.circle(s[0], s[1], 0.75, 'chrome-100'); });
+  city.live(rk, t, city);
+}
+
+/* ---------- Sound ---------- */
+
+// Plays a sound at most once every few updates, so a burst of hits does not become a buzz.
+function sound(g, rk, name, wait) {
+  if (g.cool[name] > 0) return;
+  g.cool[name] = wait || 6;
+  const s = SOUNDS[name];
+  if (s) s(rk);
+  else rk.sfx(name);
+}
+const SOUNDS = {
+  whoosh: (rk) => rk.sfx.noise({ dur: 0.06, from: 900, to: 2600, vol: 0.06 }),
+  thud: (rk) => { rk.sfx.noise({ dur: 0.1, from: 700, to: 90, vol: 0.2 }); rk.sfx.tone({ f: 120, to: 60, dur: 0.08, type: 'square', vol: 0.07 }); },
+  crunch: (rk) => { rk.sfx.noise({ dur: 0.14, from: 2200, to: 160, vol: 0.26 }); rk.sfx.tone({ f: 160, to: 70, dur: 0.1, type: 'square', vol: 0.08 }); },
+  rumble: (rk) => rk.sfx.noise({ dur: 0.2, from: 320, to: 50, vol: 0.4 }),
+  zap: (rk) => rk.sfx.tone({ f: 1400, to: 180, dur: 0.15, type: 'sawtooth', vol: 0.12 }),
+  pew: (rk) => rk.sfx.tone({ f: 1500, to: 700, dur: 0.05, type: 'square', vol: 0.04 }),
+  boom: (rk) => rk.sfx.noise({ dur: 0.12, from: 1600, to: 200, vol: 0.2 }),
+  jump: (rk) => rk.sfx.tone({ f: 200, to: 480, dur: 0.1, type: 'triangle', vol: 0.1 }),
+  ouch: (rk) => rk.sfx.tone({ f: 340, to: 110, dur: 0.12, type: 'square', vol: 0.1 }),
+  beam: (rk) => { rk.sfx.tone({ f: 320, to: 960, dur: 0.18, type: 'sine', vol: 0.1 }); rk.sfx.tone({ f: 480, to: 1440, dur: 0.18, type: 'sine', vol: 0.05, delay: 0.05 }); },
+  jet: (rk) => rk.sfx.noise({ dur: 0.2, from: 200, to: 1400, vol: 0.08 }),
+};
+
+/* ---------- Effects ---------- */
+
+function sparks(g, x, y, colours, count, power) {
+  for (let i = 0; i < count && g.sparks.length < 200; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = (0.3 + Math.random() * 0.7) * power;
+    g.sparks.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.3, life: 14 + Math.random() * 14, colour: colours[i % colours.length] });
+  }
+}
+// bits of building flying off a punched window: little tumbling triangles that land on the pavement
+function chunks(g, x, y, style, count) {
+  const S = STYLES[style];
+  const colours = [S.facade, S.trim, 'chrome-400'];
+  for (let i = 0; i < count && g.chunks.length < 160; i++) {
+    g.chunks.push({ x: x + Math.random() * 6 - 3, y: y + Math.random() * 6 - 3, vx: Math.random() * 2.4 - 1.2, vy: -Math.random() * 1.8 - 0.3,
+      rot: Math.random() * 6, vr: Math.random() * 0.4 - 0.2, s: 0.8 + Math.random() * 1.2, colour: colours[i % 3], life: 60 + Math.random() * 40 });
+  }
+}
+// dust
+function puffs(g, x, y, count, spread) {
+  for (let i = 0; i < count && g.puffs.length < 150; i++) {
+    const life = 30 + Math.random() * 30;
+    g.puffs.push({ x: x + (Math.random() - 0.5) * (spread || 12), y: y - Math.random() * 3, r: 1.5 + Math.random() * 2, vx: (Math.random() - 0.5) * 0.5, vy: -0.15 - Math.random() * 0.35, life: life, max: life, colour: Math.random() < 0.5 ? 'chrome-300' : 'chrome-400' });
+  }
+}
+function blast(g, x, y, big) {
+  g.booms.push({ x: x, y: y, big: !!big, t: 0 });
+}
+function stepFx(g) {
+  for (const p of g.sparks) { p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life--; }
+  g.sparks = g.sparks.filter((p) => p.life > 0);
+  for (const c of g.chunks) {
+    c.vy += 0.15; c.x += c.vx; c.y += c.vy; c.rot += c.vr; c.life--;
+    if (c.y > GROUND - 1) { c.y = GROUND - 1; c.vy *= -0.3; c.vx *= 0.6; c.vr *= 0.5; }
+  }
+  g.chunks = g.chunks.filter((c) => c.life > 0);
+  for (const p of g.puffs) { p.x += p.vx; p.y += p.vy; p.r += 0.07; p.life--; }
+  g.puffs = g.puffs.filter((p) => p.life > 0);
+  for (const b of g.booms) b.t++;
+  g.booms = g.booms.filter((b) => b.t < 16);
+  for (const s of g.smacks) s.t++;
+  g.smacks = g.smacks.filter((s) => s.t < 7);
+  for (const f of g.fallers) {
+    f.vy += 0.15; f.x += f.vx; f.y += f.vy; f.t++;
+    if (f.y > GROUND - 6) { f.dead = true; puffs(g, f.x + 4, GROUND, 4, 6); }
+  }
+  g.fallers = g.fallers.filter((f) => !f.dead);
+}
+
+/* ---------- Buildings in play ---------- */
+
+function makeBuilding(spec, i, j) {
+  const [x, cols, floors, style] = spec;
+  const S = STYLES[style];
+  const rnd = rng(900 + i * 37 + j * 11);
+  const b = {
+    x: x, cols: cols, floors: floors, style: style, w: cols * CW, h: floors * FH, y: GROUND - floors * FH,
+    sprite: 'b' + i + '-' + j, rubble: 'r' + i + '-' + j,
+    cells: [], broken: 0, need: Math.ceil(cols * floors * NEED), cut: [], state: 'up', sink: 0, vs: 0,
+  };
+  const r1 = (n) => Math.round(n * 10) / 10;
+  for (let f = 0; f < floors; f++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      const cx = c * CW + 5;
+      const cy = PROP + (floors - 1 - f) * FH + 5.5;
+      const top = (floors - 1 - f) * FH;    // the cell's top, from the building's roof
+      const crack = (k) => [c * CW + 1 + rnd() * 2, top + 1 + k, c * CW + 3 + rnd() * 3, top + 4, c * CW + 2 + rnd() * 4, top + 7.4, c * CW + 4 + rnd() * 4, top + 10 - k];
+      row.push({
+        c: c, f: f, hp: S.hp, max: S.hp, occ: null,
+        bites: [[r1(cx + rnd() * 2 - 1), r1(cy + rnd() * 2 - 1), r1(5.2 + rnd() * 0.8)], [r1(cx + rnd() * 4 - 2), r1(cy + rnd() * 3 - 1.5), r1(3.6 + rnd() * 1.2)]],
+        cracks: [crack(0), crack(1.5)],
+      });
+    }
+    b.cells.push(row);
+  }
+  return b;
+}
+
+// The cell under a point, if it belongs to a standing building and is not smashed yet.
+function cellAt(g, x, y) {
+  for (const b of g.blds) {
+    if (b.state !== 'up' || x < b.x || x >= b.x + b.w || y < b.y || y >= GROUND) continue;
+    const c = Math.floor((x - b.x) / CW);
+    const f = Math.min(b.floors - 1, Math.floor((GROUND - y) / FH));
+    const cell = b.cells[f][c];
+    return cell.hp > 0 ? { b: b, cell: cell } : null;
+  }
+  return null;
+}
+
+function hitCell(g, rk, b, cell, dmg, byAlien) {
+  const x = b.x + cell.c * CW + 5;
+  const y = GROUND - cell.f * FH - FH / 2;
+  if (cell.occ && byAlien) takeOccupant(g, rk, b, cell, x, y);
+  cell.hp = Math.max(0, cell.hp - dmg);
+  chunks(g, x, y, b.style, cell.hp > 0 ? 2 : 6);
+  if (cell.hp > 0) {
+    rk.addScore(PTS.crack);
+    sound(g, rk, 'hit', 4);
+    return;
+  }
+  cell.occ = null;
+  b.broken++;
+  b.cut.push(cell.bites[0], cell.bites[1]);
+  rk.addScore(PTS.cell);
+  sound(g, rk, 'crunch', 4);
+  if (b.broken >= b.need) topple(g, rk, b);
+}
+
+function takeOccupant(g, rk, b, cell, x, y) {
+  const o = cell.occ;
+  const a = g.a;
+  if (o.kind === 'trooper') {
+    cell.occ = null;
+    rk.addScore(PTS.trooper, x, y - 6);
+    g.fallers.push({ x: x - 4, y: y - 4, vx: a.face * 0.9, vy: -1.6, t: 0 });
+    sound(g, rk, 'blip', 4);
+  } else if (o.kind === 'snack') {
+    cell.occ = null;
+    a.health = Math.min(1, a.health + 0.25);
+    rk.addScore(PTS.snack, x, y - 6, 'amber');
+    rk.sfx('pickup');
+    sparks(g, x, y, ['amber-light', 'amber'], 8, 0.9);
+  } else if (o.kind === 'gem') {
+    cell.occ = null;
+    rk.addScore(PTS.gem, x, y - 6, 'amber');
+    rk.sfx('pickup');
+    sparks(g, x, y, ['amber-light', 'sun-100', 'amber'], 12, 1.2);
+  } else if (o.kind === 'wire' && wireLive(g, o)) {
+    hurtAlien(g, rk, 0.1, true);
+    sound(g, rk, 'zap', 8);
+    sparks(g, x, y, ['sun-100', 'red-light'], 10, 1.4);
+  }
+}
+
+// A live wire sparks for three seconds, then rests for a second and a half: smash its window while it rests.
+function wireLive(g, o) {
+  return (g.tick + o.phase) % 270 < 180;
+}
+
+function topple(g, rk, b) {
+  b.state = 'down';
+  b.vs = 0.2;
+  for (const row of b.cells) for (const cell of row) cell.occ = null;
+  rk.addScore(PER_CELL * b.cols * b.floors, b.x + b.w / 2, Math.max(24, b.y + 10), 'amber');
+  rk.sfx('explosion');
+  sound(g, rk, 'rumble', 10);
+  rk.shake(3, 0.25);
+  const a = g.a;
+  if ((a.state === 'climb' && a.wall.b === b) || (a.state === 'stand' && a.on === b)) drop(a, true);
+}
+
+function stepBuildings(g, rk) {
+  for (const b of g.blds) {
+    if (b.state === 'up') {
+      // nearly gone: bits trickle off the roof as a warning
+      if (b.broken >= b.need - 2 && g.tick % 24 === 0) chunks(g, b.x + (Math.random() < 0.5 ? 1 : b.w - 1), b.y + 2, b.style, 2);
+      continue;
+    }
+    if (b.state !== 'down') continue;
+    b.vs = Math.min(1.8, b.vs + 0.025);
+    b.sink += b.vs;
+    puffs(g, b.x + b.w / 2, GROUND, 2, b.w + 10);
+    if (b.sink >= b.h + PROP) b.state = 'gone';
+  }
+}
+
+/* ---------- The alien ---------- */
+
+function newAlien(x) {
+  return {
+    x: x, y: -40, vx: 0, vy: 0, face: 1, state: 'stand', on: null, wall: null, health: 1,
+    punchT: 0, punchCD: 0, flash: 0, hurtCD: 0, inv: 0, stun: 0, step: 0, awayT: 0,
+    moving: false, jumped: false, fallHurt: false, ko: false, hidden: false,
+  };
+}
+
+const NO_INPUT = { dx: 0, dy: 0, upNow: false, downNow: false, smash: false, jump: false };
+
+// Keys, or on touch a stick that floats: press anywhere and drag from that point. A tap smashes, and the kit
+// counts a tap by a second finger too, so one thumb can steer while the other smashes.
+function readControls(g, rk) {
+  const inp = rk.input;
+  const p = inp.pointer;
+  let dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+  let dy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
+  if (p.pressed) g.stick = { x: p.x, y: p.y };
+  if (p.down && g.stick) {
+    let ox = p.x - g.stick.x;
+    let oy = p.y - g.stick.y;
+    const len = Math.hypot(ox, oy);
+    if (len > STICK) {                      // the pressed point trails the finger, so turning round needs no long drag back
+      g.stick.x = p.x - ox / len * STICK;
+      g.stick.y = p.y - oy / len * STICK;
+      ox = p.x - g.stick.x;
+      oy = p.y - g.stick.y;
+    }
+    if (Math.abs(ox) > 4) dx = ox > 0 ? 1 : -1;
+    if (Math.abs(oy) > 7 && Math.abs(oy) > Math.abs(ox) * 0.6) dy = oy > 0 ? 1 : -1;
+  } else if (!p.down) {
+    g.stick = null;
+  }
+  const c = { dx: dx, dy: dy, upNow: dy < 0 && g.lastDy >= 0, downNow: dy > 0 && g.lastDy <= 0, smash: inp.pressed.fire || inp.tap, jump: inp.pressed.alt };
+  g.lastDy = dy;
+  return c;
+}
+
+// The nearest building edge the alien can climb from where it is (its feet must be below that roof).
+function findEdge(g, a) {
+  const cx = a.x + AW / 2;
+  const feet = a.y + AH;
+  let best = null;
+  let bestD = GRAB;
+  for (const b of g.blds) {
+    if (b.state !== 'up' || feet <= b.y + 6) continue;
+    for (const side of [-1, 1]) {
+      const d = Math.abs(cx - (side < 0 ? b.x : b.x + b.w));
+      if (d <= bestD) { best = { b: b, side: side }; bestD = d; }
+    }
+  }
+  return best;
+}
+
+// Grab a wall: side -1 is the building's left edge (the alien hangs on its left, facing right).
+function startClimb(a, e) {
+  a.state = 'climb'; a.wall = e; a.on = null; a.vx = 0; a.vy = 0; a.awayT = 0; a.fallHurt = false; a.jumped = false;
+  a.face = -e.side;
+  a.x = (e.side < 0 ? e.b.x - 2 : e.b.x + e.b.w + 2) - AW / 2;
+  a.y = Math.min(Math.max(a.y, e.b.y - 8), GROUND - AH);
+}
+
+function drop(a, hurt) {
+  a.state = 'air'; a.on = null; a.wall = null; a.vy = 0; a.vx = 0; a.fallHurt = hurt; a.jumped = false;
+}
+
+function stepAlien(g, rk, c) {
+  const a = g.a;
+  if (a.punchT > 0) a.punchT--;
+  if (a.punchCD > 0) a.punchCD--;
+  if (a.flash > 0) a.flash--;
+  if (a.hurtCD > 0) a.hurtCD--;
+  if (a.inv > 0) a.inv--;
+  if (a.stun > 0) { a.stun--; c = NO_INPUT; }
+  a.moving = false;
+  if (a.state === 'stand') standStep(g, rk, c);
+  else if (a.state === 'climb') climbStep(g, rk, c);
+  else airStep(g, rk, c);
+  if (c.smash && a.punchCD === 0) punch(g, rk);
+}
+
+function standStep(g, rk, c) {
+  const a = g.a;
+  const al = g.al;
+  if (c.dx) {
+    a.face = c.dx;
+    a.x += c.dx * al.walk * (a.punchT > 0 ? 0.5 : 1);
+    a.step += al.walk;
+    a.moving = true;
+  }
+  a.x = rk.clamp(a.x, -4, W - AW + 4);
+  const cx = a.x + AW / 2;
+  if (a.on && (a.on.state !== 'up' || cx < a.on.x - 4 || cx > a.on.x + a.on.w + 4)) {   // walked off the roof
+    drop(a, false);
+    return;
+  }
+  if (c.dy < 0) {
+    const e = findEdge(g, a);
+    if (e) { startClimb(a, e); return; }
+  }
+  if (c.dy > 0 && a.on) {                   // down at the edge of a roof: climb down its side
+    const b = a.on;
+    const side = cx < b.x + b.w / 2 ? -1 : 1;
+    if (Math.abs(cx - (side < 0 ? b.x : b.x + b.w)) < GRAB + 4) {
+      startClimb(a, { b: b, side: side });
+      a.y = b.y - 8;
+      return;
+    }
+  }
+  if (c.jump || c.upNow) {
+    a.state = 'air'; a.on = null; a.vy = -al.jump; a.vx = 0; a.jumped = true;
+    sound(g, rk, 'jump');
+  }
+}
+
+function climbStep(g, rk, c) {
+  const a = g.a;
+  const al = g.al;
+  const w = a.wall;
+  const b = w.b;
+  if (b.state !== 'up') { drop(a, true); return; }
+  if (c.dx) {
+    a.face = c.dx;
+    if (c.dx === w.side && ++a.awayT > 14) { drop(a, false); a.vx = w.side * 0.8; return; }   // held away from the wall: let go
+  }
+  if (c.dx !== w.side) a.awayT = 0;
+  if (c.jump) {                             // leap away from the wall
+    a.state = 'air'; a.wall = null; a.vy = -al.jump * 0.8; a.vx = w.side * al.walk * 1.1; a.face = w.side; a.jumped = true;
+    sound(g, rk, 'jump');
+    return;
+  }
+  if (a.punchT > 0) return;
+  if (c.dy < 0) {
+    a.y -= al.climb;
+    a.step += al.climb;
+    if (a.y < b.y - 8) {                    // over the top and onto the roof
+      a.state = 'stand'; a.wall = null; a.on = b; a.y = b.y - AH;
+      a.x = (w.side < 0 ? b.x + 9 : b.x + b.w - 9) - AW / 2;
+      a.face = -w.side;
+      sound(g, rk, 'thud', 8);
+    }
+  } else if (c.dy > 0) {
+    a.y += al.climb;
+    a.step += al.climb;
+    if (a.y >= GROUND - AH) { a.y = GROUND - AH; a.state = 'stand'; a.wall = null; }
+  }
+}
+
+function airStep(g, rk, c) {
+  const a = g.a;
+  const al = g.al;
+  if (c.dx) a.face = c.dx;
+  a.x += c.dx * al.walk * 0.9 + a.vx;
+  a.vx *= 0.97;
+  a.x = rk.clamp(a.x, -4, W - AW + 4);
+  const feet0 = a.y + AH;
+  a.vy = Math.min(FALL_MAX, a.vy + GRAV);
+  a.y += a.vy;
+  if (c.dy < 0) {                           // grab a wall on the way past
+    const e = findEdge(g, a);
+    if (e) { startClimb(a, e); return; }
+  }
+  if (a.vy <= 0) return;
+  const cx = a.x + AW / 2;
+  const feet = a.y + AH;
+  for (const b of g.blds) {
+    if (b.state === 'up' && feet0 <= b.y + 0.01 && feet >= b.y && cx >= b.x - 3 && cx <= b.x + b.w + 3) { land(g, rk, b); return; }
+  }
+  if (feet >= GROUND) land(g, rk, null);
+}
+
+function land(g, rk, b) {
+  const a = g.a;
+  const hard = a.vy > 2.4;
+  a.state = 'stand'; a.on = b; a.y = (b ? b.y : GROUND) - AH; a.vy = 0; a.vx = 0;
+  sound(g, rk, 'thud', 8);
+  puffs(g, a.x + AW / 2, a.y + AH, hard ? 5 : 2, 14);
+  if (!b && a.jumped && hard) stomp(g, rk);
+  a.jumped = false;
+  if (a.fallHurt) { a.fallHurt = false; hurtAlien(g, rk, 0.07, true); }
+}
+
+// Landing from a jump flattens whatever is underfoot on the street.
+function stomp(g, rk) {
+  const a = g.a;
+  const box = { x: a.x + 1, y: GROUND - 12, w: AW - 2, h: 30 };
+  smashThreats(g, rk, box);
+  rk.shake(1.5, 0.12);
+}
+
+function punch(g, rk) {
+  const a = g.a;
+  const al = g.al;
+  a.punchT = 12;
+  a.punchCD = al.cd;
+  const cx = a.x + AW / 2;
+  const fy = a.y + al.chest;
+  const x0 = cx + a.face * 3;
+  const x1 = cx + a.face * al.reach;
+  const low = a.state === 'stand' && !a.on;
+  const box = { x: Math.min(x0, x1) - 1, y: fy - 7, w: Math.abs(x1 - x0) + 4, h: low ? GROUND + 14 - (fy - 7) : 14 };
+  let landed = smashThreats(g, rk, box);
+  let hits = al.hits;
+  let last = null;
+  const scan = (y) => {                     // along the arm, nearest window first
+    for (let i = 0; hits > 0 && i <= al.reach - 3; i++) {
+      const x = x0 + a.face * i;
+      const t = cellAt(g, x, y);
+      if (t && t.cell !== last) {
+        last = t.cell; hits--; landed = true;
+        hitCell(g, rk, t.b, t.cell, al.dmg, true);
+        g.smacks.push({ x: x, y: y, t: 0 });
+      }
+    }
+  };
+  scan(fy);
+  if (hits === al.hits && low) scan(GROUND - 5);          // on the street: the ground floor too
+  if (hits === al.hits && a.on && a.state === 'stand') {  // on a roof: the blow lands on the floor underfoot
+    const t = cellAt(g, cx + a.face * 7, a.on.y + 5);
+    if (t) {
+      landed = true;
+      hitCell(g, rk, t.b, t.cell, al.dmg, true);
+      g.smacks.push({ x: cx + a.face * 7, y: a.on.y + 2, t: 0 });
+    }
+  }
+  if (!landed) sound(g, rk, 'whoosh', 4);
+}
+
+function hurtAlien(g, rk, dmg, knock) {
+  const a = g.a;
+  if (g.phase !== 'play' || a.inv > 0 || a.hurtCD > 0) return;
+  a.health = Math.max(0, a.health - dmg * g.al.armour);
+  a.hurtCD = 40;                          // two-thirds of a second before the next hit can land
+  a.flash = 4;
+  if (knock) a.stun = Math.max(a.stun, 12);
+  sound(g, rk, 'ouch', 6);
+  if (a.health <= 0) knockOut(g, rk);
+}
+
+/* ---------- Lives, the mothership and the flow between cities ---------- */
+
+function knockOut(g, rk) {
+  const a = g.a;
+  g.phase = 'dying';
+  g.dieT = 0;
+  g.called = false;
+  a.state = 'air'; a.on = null; a.wall = null; a.vy = -1.8; a.vx = 0; a.punchT = 0; a.stun = 0; a.ko = true; a.fallHurt = false;
+  rk.shake(3, 0.25);
+  sparks(g, a.x + AW / 2, a.y + AH / 2, ['aqua-light', 'aqua', 'chrome-200'], 16, 1.6);
+  g.shots = [];
+  g.livesLeft = rk.loseLife();
+}
+
+function stepDying(g, rk) {
+  const a = g.a;
+  g.dieT++;
+  if (a.state === 'air') {
+    a.vy = Math.min(FALL_MAX, a.vy + GRAV);
+    a.y += a.vy;
+    if (a.y + AH >= GROUND) {
+      a.y = GROUND - AH; a.state = 'stand'; a.vy = 0;
+      puffs(g, a.x + AW / 2, GROUND, 5, 16);
+      sound(g, rk, 'thud', 8);
+    }
+  }
+  if (a.state === 'stand' && g.dieT > 40 && !g.called) {   // the mothership comes to take it home
+    g.called = true;
+    callShip(g, rk, 'up', () => {
+      a.hidden = true;
+      if (g.livesLeft > 0) rk.after(0.5, () => { if (rk.ending) return; respawn(g, rk); });
+    });
+  }
+}
+
+function respawn(g, rk) {
+  const x = rk.clamp(g.a.x, 6, W - AW - 6);
+  g.a = newAlien(x);
+  g.shots = [];
+  g.phase = 'drop';
+  callShip(g, rk, 'down', () => { g.phase = 'play'; g.a.inv = INV; });
+}
+
+// The mothership swoops in over the alien, holds its beam while the alien rides it down (or up), then leaves.
+const ARRIVE = 14;
+const BEAM = 46;
+const LEAVE = 16;
+function callShip(g, rk, mode, onDone) {
+  const a = g.a;
+  g.ship = { x: a.x + AW / 2, t: 0, mode: mode, onDone: onDone, fired: false, y0: mode === 'down' ? 8 : a.y, y1: mode === 'down' ? GROUND - AH : -36 };
+  if (mode === 'down') { a.y = -40; a.state = 'stand'; a.on = null; }
+}
+function stepShip(g, rk) {
+  const s = g.ship;
+  if (!s) return;
+  s.t++;
+  if (s.t === ARRIVE) sound(g, rk, 'beam', 10);
+  if (s.t > ARRIVE && s.t <= ARRIVE + BEAM) {
+    const k = (s.t - ARRIVE) / BEAM;
+    g.a.y = s.y0 + (s.y1 - s.y0) * k * k * (3 - 2 * k);
+  }
+  if (s.t === ARRIVE + BEAM && !s.fired) {
+    s.fired = true;
+    if (s.onDone) s.onDone();
+  }
+  if (s.t >= ARRIVE + BEAM + LEAVE && g.ship === s) g.ship = null;
+}
+const riding = (g) => g.ship && g.ship.t > ARRIVE && g.ship.t <= ARRIVE + BEAM;
+
+function loadLevel(g, rk) {
+  const i = (g.level - 1) % CITIES.length;
+  const city = CITIES[i];
+  g.city = i;
+  g.army = armyFor(g.level);
+  g.blds = city.blocks.map((spec, j) => makeBuilding(spec, i, j));
+  g.posts = [];
+  g.troopers = [];
+  g.choppers = [];
+  g.tanks = [];
+  g.jets = [];
+  g.shots = [];
+  g.timers = { win: 100, street: 260, chopper: 420, tank: 600, jet: 480 };
+  g.lt = 0;
+  // treats and traps in the windows: a goo jar in each building, live wires (from Stormgate), one gem
+  const freeCell = (b, minF) => {
+    const list = [];
+    for (const row of b.cells) for (const cell of row) if (!cell.occ && cell.f >= minF) list.push(cell);
+    return list.length ? rk.pick(list) : null;
+  };
+  for (const b of g.blds) {
+    const s = freeCell(b, 1);
+    if (s) s.occ = { kind: 'snack' };
+    for (let k = 0; k < g.army.wires; k++) {
+      const w = freeCell(b, 1);
+      if (w) w.occ = { kind: 'wire', phase: rk.randInt(0, 269) };
+    }
+  }
+  const gem = freeCell(rk.pick(g.blds), 2);
+  if (gem) gem.occ = { kind: 'gem' };
+  rk.hud.set('level', g.level);
+  rk.hud.set('city', city.label);
+  rk.banner(city.name, 1.6);
+}
+
+function cityCleared(g, rk) {
+  g.phase = 'clear';
+  const a = g.a;
+  const bonus = 1000 + 250 * (g.level - 1) + Math.round(a.health * 10) * 100;
+  rk.addScore(bonus, a.x + AW / 2, Math.max(20, a.y - 6), 'amber');
+  rk.sfx('pickup');
+  rk.banner('CITY TOPPLED', 1.6);
+  for (const t of g.troopers) t.leave = true;
+  for (const c of g.choppers) c.leave = true;
+  for (const t of g.tanks) t.leave = true;
+  g.shots = [];
+  rk.after(1.8, () => {
+    if (rk.ending) return;
+    g.phase = 'lift';
+    a.punchT = 0; a.state = 'stand'; a.vy = 0;
+    callShip(g, rk, 'up', () => {
+      a.hidden = true;
+      rk.after(0.4, () => {
+        if (rk.ending) return;
+        g.level++;
+        loadLevel(g, rk);
+        const health = Math.min(1, a.health + 0.15);   // a little patched up between cities, no more
+        g.a = newAlien(10);
+        g.a.health = health;
+        g.phase = 'drop';
+        callShip(g, rk, 'down', () => { g.phase = 'play'; });
+      });
+    });
+  });
+}
+
+/* ---------- The army ---------- */
+
+function spawnThreats(g, rk) {
+  const A = g.army;
+  const T = g.timers;
+  const press = 1 - 0.5 * Math.min(1, g.lt / 4800);   // the longer a city stands, the harder it fights
+  const due = (k) => {
+    if (!A[k]) return false;
+    if (--T[k] > 0) return false;
+    T[k] = rk.rand(A[k][0], A[k][1]) * press;
+    return true;
+  };
+  if (due('win') && g.posts.length < A.winMax) addPost(g, rk);
+  if (due('street') && g.troopers.length < A.streetMax) addTrooper(g, rk);
+  if (due('chopper') && g.choppers.length < A.chopperMax) addChopper(g, rk);
+  if (due('tank') && g.tanks.length < A.tankMax) addTank(g, rk);
+  if (due('jet') && g.jets.length < A.jetMax) addJet(g, rk);
+}
+
+function fireAt(g, rk, x, y, speed, spread) {
+  const a = g.a;
+  const ang = Math.atan2(a.y + AH * 0.45 - y, a.x + AW / 2 - x) + rk.rand(-spread, spread);
+  g.shots.push({ kind: 'bullet', x: x, y: y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, grav: 0, dmg: g.army.dmg, r: 1.5 });
+  sound(g, rk, 'pew', 5);
+}
+
+// A trooper leans out of a window (not the one right next to the alien), fires a few shots, then ducks back in.
+function addPost(g, rk) {
+  const ax = g.a.x + AW / 2;
+  const spots = [];
+  for (const b of g.blds) {
+    if (b.state !== 'up') continue;
+    for (const row of b.cells) for (const cell of row) {
+      if (cell.hp > 0 && !cell.occ && cell.f > 0 && Math.abs(b.x + cell.c * CW + 5 - ax) > 20) spots.push([b, cell]);
+    }
+  }
+  if (!spots.length) return;
+  const [b, cell] = rk.pick(spots);
+  cell.occ = { kind: 'trooper', t: 0, fire: rk.randInt(60, 90), life: rk.randInt(300, 380), shotT: 0 };
+  g.posts.push({ b: b, cell: cell });
+}
+
+function stepPosts(g, rk, live) {
+  for (const p of g.posts) {
+    const o = p.cell.occ;
+    if (!o || o.kind !== 'trooper' || p.b.state !== 'up') { p.gone = true; continue; }
+    o.t++;
+    if (o.shotT > 0) o.shotT--;
+    if (live && o.t >= o.fire && o.t < o.life - 20) {
+      fireAt(g, rk, p.b.x + p.cell.c * CW + 5, GROUND - p.cell.f * FH - FH / 2, g.army.shot, 0.2);
+      o.fire += rk.randInt(110, 150);
+      o.shotT = 4;
+    }
+    if (o.t >= o.life) { p.cell.occ = null; p.gone = true; }
+  }
+  g.posts = g.posts.filter((p) => !p.gone);
+}
+
+// Troopers march in from the side further from the alien, stop at a distance and fire.
+function addTrooper(g, rk) {
+  const fromLeft = g.a.x + AW / 2 > W / 2;
+  g.troopers.push({ x: fromLeft ? -8 : W + 1, y: GROUND - 10, w: 7, h: 10, face: fromLeft ? 1 : -1, stopAt: rk.rand(56, 96), state: 'walk', t: 0, fire: rk.randInt(40, 70), shotT: 0, leave: false });
+}
+
+function stepTroopers(g, rk, live) {
+  const ax = g.a.x + AW / 2;
+  for (const t of g.troopers) {
+    t.t++;
+    if (t.shotT > 0) t.shotT--;
+    const tx = t.x + 3.5;
+    if (t.leave) {
+      t.face = tx < W / 2 ? -1 : 1;
+      t.x += t.face * 0.8;
+      if (t.x < -12 || t.x > W + 12) t.dead = true;
+      continue;
+    }
+    t.face = ax > tx ? 1 : -1;
+    const d = Math.abs(ax - tx);
+    if (t.state === 'walk') {
+      t.x += t.face * 0.45;
+      if (d < t.stopAt) t.state = 'aim';
+    } else {
+      if (d < t.stopAt - 30) t.x -= t.face * 0.35;           // too close: back off while still facing it
+      else if (d > t.stopAt + 30) t.state = 'walk';
+      if (live && --t.fire <= 0) {
+        fireAt(g, rk, tx + t.face * 3, GROUND - 6, g.army.shot, 0.1);
+        t.fire = rk.randInt(100, 140);
+        t.shotT = 10;
+      }
+    }
+    t.x = rk.clamp(t.x, -10, W + 3);
+  }
+  g.troopers = g.troopers.filter((t) => !t.dead);
+}
+
+function knockTrooper(g, rk, t) {
+  t.dead = true;
+  rk.addScore(PTS.trooper, t.x + 3.5, t.y - 2);
+  g.fallers.push({ x: t.x - 0.5, y: t.y, vx: g.a.face * 1.1, vy: -2.2, t: 0 });
+  sound(g, rk, 'blip', 4);
+}
+
+// Gunships hover off to one side of the alien, above it, and fire bursts of three.
+function addChopper(g, rk) {
+  const fromLeft = Math.random() < 0.5;
+  g.choppers.push({ x: fromLeft ? -28 : W + 2, y: rk.rand(24, 54), w: 26, h: 12, vx: 0, vy: 0, t: 0, face: fromLeft ? 1 : -1,
+    fire: rk.randInt(120, 180), burst: 0, life: rk.randInt(900, 1200), flash: 0, leave: false });
+}
+
+function stepChoppers(g, rk, live) {
+  const a = g.a;
+  const ax = a.x + AW / 2;
+  for (const c of g.choppers) {
+    c.t++;
+    if (c.flash > 0) c.flash--;
+    if (c.t > c.life) c.leave = true;
+    let tx;
+    let ty;
+    if (c.leave) {
+      tx = c.x + 13 < W / 2 ? -70 : W + 70;
+      ty = c.y - 10;
+    } else {
+      const side = c.x + 13 < ax ? -1 : 1;
+      tx = rk.clamp(ax + side * 58 - 13, 6, W - 32);
+      ty = rk.clamp(a.y + 4, 16, 100) + Math.sin(c.t * 0.05) * 6;   // level with the alien, so it can be caught
+    }
+    c.vx = (c.vx + rk.clamp((tx - c.x) * 0.003, -0.05, 0.05)) * 0.94;   // tops out a little slower than the aliens walk
+    c.vy = (c.vy + rk.clamp((ty - c.y) * 0.004, -0.05, 0.05)) * 0.94;
+    c.x += c.vx;
+    c.y += c.vy;
+    c.face = ax > c.x + 13 ? 1 : -1;
+    if (live && !c.leave) {
+      if (--c.fire <= 0) { c.burst = 3; c.fire = rk.randInt(150, 200); }
+      if (c.burst > 0 && c.t % 8 === 0) { fireAt(g, rk, c.x + 13 + c.face * 9, c.y + 7, g.army.shot * 1.15, 0.06); c.burst--; }
+    }
+    if (c.leave && (c.x < -40 || c.x > W + 14)) c.dead = true;
+  }
+  g.choppers = g.choppers.filter((c) => !c.dead);
+}
+
+function downChopper(g, rk, c) {
+  c.dead = true;
+  rk.addScore(PTS.chopper, c.x + 13, c.y);
+  blast(g, c.x + 13, c.y + 6, true);
+  sparks(g, c.x + 13, c.y + 6, ['heat-light', 'amber', 'red'], 14, 1.6);
+  chunks(g, c.x + 13, c.y + 6, 'brick', 5);
+  rk.sfx('explosion');
+  rk.shake(2, 0.15);
+}
+
+// Tanks roll in along the far lane, keep their distance and lob shells at the alien.
+function addTank(g, rk) {
+  const fromLeft = g.a.x + AW / 2 > W / 2;
+  g.tanks.push({ x: fromLeft ? -26 : W + 2, y: TANK_Y, w: 24, h: 11, dir: fromLeft ? 1 : -1, face: fromLeft ? 1 : -1, stopAt: rk.rand(70, 120),
+    state: 'roll', fire: 90, hp: 2, flash: 0, hitCD: 0, aim: -0.6, t: 0, leave: false });
+}
+
+// The speed a shell needs, from (x, y), to come down on the alien.
+function lob(g, rk, x, y) {
+  const a = g.a;
+  const dx = a.x + AW / 2 - x;
+  const dy = a.y + 10 - y;
+  const T = rk.clamp(Math.abs(dx) / 1.6, 40, 72);
+  return { vx: dx / T, vy: (dy - 0.5 * SHELL_G * T * T) / T };
+}
+
+function stepTanks(g, rk, live) {
+  const ax = g.a.x + AW / 2;
+  for (const t of g.tanks) {
+    t.t++;
+    if (t.flash > 0) t.flash--;
+    if (t.hitCD > 0) t.hitCD--;
+    const tx = t.x + 12;
+    if (t.leave) {
+      t.face = tx < W / 2 ? -1 : 1;
+      t.x += t.face * 0.7;
+      if (t.x < -30 || t.x > W + 6) t.dead = true;
+      continue;
+    }
+    const d = Math.abs(ax - tx);
+    if (t.state === 'roll') {
+      t.face = t.dir;
+      t.x += t.dir * 0.5;
+      if (d < t.stopAt && t.x > 2 && t.x < W - 26) t.state = 'fire';
+    } else {
+      t.face = ax > tx ? 1 : -1;
+      if (d < 46) t.x = rk.clamp(t.x - t.face * 0.35, -4, W - 20);   // backs away from the alien
+      const v = lob(g, rk, tx + t.face * 8, TANK_Y + 1);
+      t.aim = Math.atan2(v.vy, v.vx);
+      if (live && --t.fire <= 0) {
+        const mx = tx + Math.cos(t.aim) * 9;
+        const my = TANK_Y + 2.2 + Math.sin(t.aim) * 9;
+        const s = lob(g, rk, mx, my);
+        g.shots.push({ kind: 'shell', x: mx, y: my, vx: s.vx, vy: s.vy, grav: SHELL_G, dmg: 0.1, r: 2 });
+        t.fire = rk.randInt(150, 200);
+        sound(g, rk, 'boom', 6);
+        sparks(g, mx, my, ['sun-100', 'heat-light'], 5, 0.8);
+      }
+    }
+  }
+  g.tanks = g.tanks.filter((t) => !t.dead);
+}
+
+function hitTank(g, rk, t) {
+  if (t.hitCD > 0) return;                 // a hit flashes for 4 updates, then no more hits (or flashes) for 20
+  t.hp--;
+  t.flash = 4;
+  t.hitCD = 20;
+  sound(g, rk, 'hit', 4);
+  if (t.hp > 0) return;
+  t.dead = true;
+  rk.addScore(PTS.tank, t.x + 12, t.y - 4);
+  blast(g, t.x + 12, t.y + 4, true);
+  sparks(g, t.x + 12, t.y + 4, ['heat-light', 'amber', 'red'], 16, 1.8);
+  rk.sfx('explosion');
+  rk.shake(2.5, 0.2);
+}
+
+// Jets scream across the top of the sky and drop bombs near the alien. Bombs also smash the windows they hit.
+function addJet(g, rk) {
+  const fromLeft = Math.random() < 0.5;
+  g.jets.push({ x: fromLeft ? -22 : W + 2, y: rk.rand(12, 24), w: 20, h: 7, dir: fromLeft ? 1 : -1, bombs: 2 + Math.min(2, g.army.lap), gap: 0 });
+  sound(g, rk, 'jet', 10);
+}
+
+function stepJets(g, rk, live) {
+  const ax = g.a.x + AW / 2;
+  for (const j of g.jets) {
+    j.x += j.dir * 2.6;
+    if (j.gap > 0) j.gap--;
+    if (live && j.bombs > 0 && j.gap === 0 && Math.abs(j.x + 10 - (ax - j.dir * 22)) < 26) {
+      g.shots.push({ kind: 'bomb', x: j.x + 10, y: j.y + 6, vx: j.dir * 1.1, vy: 0.4, grav: BOMB_G, dmg: 0.08, r: 2 });
+      j.bombs--;
+      j.gap = 9;
+    }
+    if (j.x < -30 || j.x > W + 10) j.dead = true;
+  }
+  g.jets = g.jets.filter((j) => !j.dead);
+}
+
+function downJet(g, rk, j) {
+  j.dead = true;
+  rk.addScore(PTS.jet, j.x + 10, j.y);
+  blast(g, j.x + 10, j.y + 3, true);
+  sparks(g, j.x + 10, j.y + 3, ['heat-light', 'amber', 'red'], 14, 1.6);
+  rk.sfx('explosion');
+}
+
+// Ordinary traffic in the near lane: worth points if the alien stomps or punches it.
+function stepCars(g, rk) {
+  if (--g.carT <= 0) {
+    g.carT = rk.randInt(260, 460);
+    if (g.cars.length < 2 && g.phase !== 'lift') {
+      const fromLeft = Math.random() < 0.5;
+      g.cars.push({ x: fromLeft ? -20 : W + 2, y: CAR_Y, w: 18, h: 8, dir: fromLeft ? 1 : -1, speed: rk.rand(0.9, 1.5), ramp: rk.pick(['heat', 'amber']), state: 'drive', t: 0 });
+    }
+  }
+  for (const c of g.cars) {
+    if (c.state === 'drive') c.x += c.dir * c.speed;
+    else if (++c.t > 90) c.dead = true;
+    if (c.state === 'wreck' && c.t % 10 === 0) puffs(g, c.x + 9, c.y + 2, 1, 6);
+    if (c.x < -24 || c.x > W + 6) c.dead = true;
+  }
+  g.cars = g.cars.filter((c) => !c.dead);
+}
+
+function wreckCar(g, rk, c) {
+  c.state = 'wreck';
+  c.t = 0;
+  rk.addScore(PTS.car, c.x + 9, c.y - 2);
+  blast(g, c.x + 9, c.y + 3, false);
+  sound(g, rk, 'boom', 4);
+}
+
+// Everything the punch box (or a stomp) touches on the street and in the air.
+function smashThreats(g, rk, box) {
+  let hit = false;
+  for (const t of g.troopers) if (!t.dead && !t.leave && rk.hit(box, t)) { knockTrooper(g, rk, t); hit = true; }
+  for (const c of g.choppers) if (!c.dead && rk.hit(box, c)) { downChopper(g, rk, c); hit = true; }
+  for (const t of g.tanks) if (!t.dead && rk.hit(box, t)) { hitTank(g, rk, t); hit = true; }
+  for (const c of g.cars) if (c.state === 'drive' && rk.hit(box, c)) { wreckCar(g, rk, c); hit = true; }
+  for (const j of g.jets) if (!j.dead && rk.hit(box, j)) { downJet(g, rk, j); hit = true; }
+  if (hit) g.smacks.push({ x: box.x + (g.a.face > 0 ? box.w : 0), y: box.y + 7, t: 0 });
+  return hit;
+}
+
+function stepShots(g, rk, live) {
+  const a = g.a;
+  const box = { x: a.x + 4, y: a.y + 3, w: AW - 8, h: AH - 4 };
+  for (const s of g.shots) {
+    s.vy += s.grav;
+    s.x += s.vx;
+    s.y += s.vy;
+    if (s.kind !== 'bullet' && s.y >= GROUND + (s.kind === 'shell' ? 4 : 1)) {
+      s.dead = true;
+      blast(g, s.x, Math.min(s.y, GROUND + 2), false);
+      puffs(g, s.x, GROUND, 3, 8);
+      sound(g, rk, 'boom', 6);
+      continue;
+    }
+    if (s.kind === 'bomb') {
+      const t = cellAt(g, s.x, s.y);
+      if (t) { s.dead = true; hitCell(g, rk, t.b, t.cell, 1, false); blast(g, s.x, s.y, false); sound(g, rk, 'boom', 6); continue; }
+    }
+    if (live && rk.hit(box, { x: s.x - s.r, y: s.y - s.r, w: s.r * 2, h: s.r * 2 })) {
+      s.dead = true;
+      hurtAlien(g, rk, s.dmg, s.kind !== 'bullet');
+      if (s.kind === 'bullet') sparks(g, s.x, s.y, ['red-light', 'sun-100'], 4, 0.8);
+      else blast(g, s.x, s.y, false);
+      continue;
+    }
+    if (s.x < -10 || s.x > W + 10 || s.y < -20 || s.y > H + 10) s.dead = true;
+  }
+  g.shots = g.shots.filter((s) => !s.dead);
+}
+
+/* ---------- Drawing ---------- */
+
+function drawBuilding(rk, g, b) {
+  if (b.state === 'gone') return;
+  const jx = b.state === 'down' && !rk.settings.reduceMotion ? ((g.tick >> 1) & 1 ? 0.6 : -0.6) : 0;
+  const x = b.x + jx;
+  const oy = b.sink;
+  if (b.broken > 0) {                       // the dark rooms that show through the holes
+    rk.rect(x + 1.2, b.y + oy, b.w - 2.4, b.h, 'ink');
+    for (let f = 1; f < b.floors; f++) rk.rect(x + 1.2, GROUND - f * FH - 1 + oy, b.w - 2.4, 1.2, 'hill-near');
+  }
+  rk.draw(b.sprite, x, b.y - PROP + oy, 0, b.cut.length ? { cut: b.cut } : undefined);
+  const ax = g.a.x + AW / 2;
+  for (const row of b.cells) {
+    for (const cell of row) {
+      if (cell.hp <= 0) continue;
+      if (cell.hp < cell.max) {
+        const n = cell.max - cell.hp;
+        for (let k = 0; k < n && k < 2; k++) rk.shape({ line: cell.cracks[k].map((v, i) => v + (i % 2 ? b.y + oy : x)), width: 0.55, fill: 'ink' });
+      }
+      const o = cell.occ;
+      if (!o) continue;
+      const wx = x + cell.c * CW + 2;
+      const wy = GROUND - (cell.f + 1) * FH + 2.6 + oy;
+      if (o.kind === 'snack') {
+        rk.glow(wx + 3, wy + 3, 6, 'amber', 0.3);
+        rk.draw('snack', wx, wy);
+      } else if (o.kind === 'gem') {
+        rk.glow(wx + 3, wy + 3, 7, 'amber', 0.4);
+        rk.draw('gem', wx, wy);
+      } else if (o.kind === 'wire') {
+        if (wireLive(g, o)) {
+          rk.glow(wx + 3, wy + 3, 6, 'red', 0.35);
+          rk.draw('wire', wx, wy, Math.floor(g.tick / 15) % 2);
+        } else rk.draw('wire', wx, wy, 2);
+      } else if (o.kind === 'trooper') {
+        const face = ax > wx + 3 ? 1 : -1;
+        const rise = Math.max(0, 6 - o.t * 0.75) + Math.max(0, (o.t - o.life + 8) * 0.75);
+        rk.draw('post', wx, wy + 1 + rise, 0, { flip: face < 0 });
+        if (rise < 2) {
+          rk.shape([{ line: [wx + 3, wy + 4.6, wx + 3 + face * 4.4, wy + 4], width: 1.4, fill: 'ink' }, { line: [wx + 3, wy + 4.6, wx + 3 + face * 4.4, wy + 4], width: 0.7, fill: 'chrome-400' }]);
+          if (o.shotT > 0) { rk.circle(wx + 3 + face * 5, wy + 4, 1, 'sun-100'); rk.glow(wx + 3 + face * 5, wy + 4, 5, 'amber', 0.5); }
+        }
+      }
+    }
+  }
+}
+
+function drawRubble(rk, b) {
+  if (b.state === 'up') return;
+  const k = b.state === 'gone' ? 1 : rk.clamp((b.sink - b.h * 0.35) / (b.h * 0.5), 0, 1);
+  if (k > 0) rk.draw(b.rubble, b.x - 5, GROUND - 10 * k);
+}
+
+function alienFrame(g, rk) {
+  const a = g.a;
+  if (a.ko || a.stun > 0) return 8;
+  if (riding(g)) return 7;
+  if (a.punchT > 0) return a.state === 'climb' ? 9 : 4;
+  if (a.state === 'climb') return 5 + (Math.floor(a.step / 7) & 1);
+  if (a.state === 'air') return 7;
+  if (a.moving) return Math.floor(a.step / g.al.stride) % 4;
+  return Math.floor(rk.time * 2) % 2 ? 2 : 0;
+}
+
+// The punching arm: out from the shoulder in three updates, held, then back. Gloop's tentacle ripples.
+function drawPunch(rk, g) {
+  const a = g.a;
+  const al = g.al;
+  const e = a.punchT >= 9 ? (13 - a.punchT) / 4 : a.punchT >= 4 ? 1 : a.punchT / 4;
+  const sx = a.x + (a.face > 0 ? al.shoulder[0] : AW - al.shoulder[0]) + (a.state === 'climb' ? 0 : a.face);
+  const sy = a.y + al.shoulder[1];
+  const fx = a.x + AW / 2 + a.face * (3 + e * (al.reach - 3));
+  const fy = a.y + al.chest;
+  let pts = [sx, sy, fx, fy];
+  if (al.wavy) {
+    pts = [];
+    for (let i = 0; i <= 6; i++) {
+      const k = i / 6;
+      const wob = Math.sin(k * Math.PI * 2 + g.tick * 0.6) * 1.3 * Math.sin(k * Math.PI);
+      pts.push(sx + (fx - sx) * k, sy + (fy - sy) * k + wob);
+    }
+  }
+  rk.shape([{ line: pts, width: al.arm[1] + 1.2, fill: 'ink' }, { line: pts, width: al.arm[1], fill: al.arm[0] }]);
+  rk.draw(al.fist, fx - 3.5, fy - 3.5, 0, { flip: a.face < 0 });
+}
+
+function drawAlien(rk, g) {
+  const a = g.a;
+  if (a.hidden) return;
+  if (a.inv > 0 && a.inv % 10 >= 5) return;  // blinking while protected
+  const ride = riding(g);
+  rk.draw(g.kind, a.x, a.y, alienFrame(g, rk), { flip: a.face < 0, flash: a.flash > 0, alpha: ride ? 0.75 : null });
+  if (a.punchT > 0) drawPunch(rk, g);
+}
+
+function shipY(s) {
+  if (s.t < ARRIVE) return -16 + 20 * (s.t / ARRIVE);
+  if (s.t <= ARRIVE + BEAM) return 4;
+  return 4 - 20 * ((s.t - ARRIVE - BEAM) / LEAVE);
+}
+
+function drawBeam(rk, g) {
+  const s = g.ship;
+  if (!s || !riding(g)) return;
+  const y = shipY(s) + 14;
+  rk.shape([
+    { poly: [s.x - 5, y, s.x + 5, y, s.x + 17, GROUND, s.x - 17, GROUND], fill: 'aqua', alpha: 0.16 },
+    { poly: [s.x - 2.5, y, s.x + 2.5, y, s.x + 9, GROUND, s.x - 9, GROUND], fill: 'aqua-light', alpha: 0.14 },
+  ]);
+  for (let i = 0; i < 4; i++) {             // rings running along the beam
+    const k = ((s.t * 0.025 * (s.mode === 'up' ? -1 : 1) + i / 4) % 1 + 1) % 1;
+    const ry = y + (GROUND - y) * k;
+    rk.shape({ ellipse: [s.x, ry, 5 + 12 * k, 1.2 + 1.5 * k], stroke: 0.7, fill: 'aqua-light', alpha: 0.5 });
+  }
+}
+
+function drawShip(rk, g) {
+  const s = g.ship;
+  if (!s) return;
+  const y = shipY(s);
+  if (riding(g)) rk.glow(s.x, y + 13, 10, 'aqua', 0.5);
+  rk.draw('mother', s.x - 24, y, Math.floor(s.t / 10) % 2);
+}
+
+function drawStreetThings(rk, g) {
+  for (const t of g.troopers) {
+    const frame = t.shotT > 0 ? 2 : t.state === 'walk' || t.leave ? Math.floor(t.t / 8) % 2 : 0;
+    rk.draw('trooper', t.x, t.y, frame, { flip: t.face < 0 });
+    if (t.shotT > 6) { rk.circle(t.x + 3.5 + t.face * 4.2, t.y + 3, 0.9, 'sun-100'); rk.glow(t.x + 3.5 + t.face * 4.2, t.y + 3, 5, 'amber', 0.5); }
+  }
+  for (const f of g.fallers) rk.draw('faller' + (Math.floor(f.t / 5) % 4), f.x, f.y);
+}
+
+function drawRoad(rk, g) {
+  for (const t of g.tanks) {
+    const bx = t.x + 12;
+    const by = t.y + 2.2;
+    const ang = t.state === 'fire' ? t.aim : (t.face > 0 ? -0.25 : Math.PI + 0.25);
+    const ex = bx + Math.cos(ang) * 9;
+    const ey = by + Math.sin(ang) * 9;
+    rk.shape([{ line: [bx, by, ex, ey], width: 2.2, fill: 'ink' }, { line: [bx, by, ex, ey], width: 1.1, fill: 'chrome-300' }]);
+    rk.draw('tank', t.x, t.y, Math.floor(t.x / 2) & 1, { flip: t.face < 0, flash: t.flash > 0 });
+  }
+  for (const c of g.cars) rk.draw('car_' + c.ramp, c.x, c.y, c.state === 'wreck' ? 1 : 0, { flip: c.dir < 0 });
+}
+
+function drawAir(rk, g) {
+  for (const c of g.choppers) rk.draw('gyro', c.x, c.y, Math.floor(g.tick / 5) % 2, { flip: c.face < 0, flash: c.flash > 0 });
+  for (const j of g.jets) {
+    const tail = j.dir > 0 ? j.x : j.x + 20;
+    rk.shape({ poly: [tail, j.y + 2.6, tail - j.dir * (4 + (g.tick % 3)), j.y + 3.5, tail, j.y + 4.4], fill: 'heat-light' });
+    rk.glow(tail - j.dir * 2, j.y + 3.5, 5, 'heat', 0.5);
+    rk.draw('jet', j.x, j.y, 0, { flip: j.dir < 0 });
+  }
+  for (const s of g.shots) {
+    if (s.kind === 'bullet') { rk.glow(s.x, s.y, 4, 'red', 0.4); rk.draw('bullet', s.x - 1.5, s.y - 1.5); }
+    else if (s.kind === 'shell') { rk.glow(s.x, s.y, 6, 'heat', 0.45); rk.draw('shell', s.x - 2, s.y - 2); }
+    else { rk.glow(s.x, s.y, 5, 'heat', 0.35); rk.draw('bomb', s.x - 2, s.y - 3); }
+  }
+}
+
+function drawFx(rk, g) {
+  for (const c of g.chunks) {
+    const p = [];
+    for (let k = 0; k < 3; k++) p.push(c.x + Math.cos(c.rot + k * 2.1) * c.s, c.y + Math.sin(c.rot + k * 2.1) * c.s);
+    rk.shape({ poly: p, fill: c.colour, alpha: c.life < 20 ? c.life / 20 : 1 });
+  }
+}
+
+function drawFxFront(rk, g) {
+  for (const b of g.booms) {
+    const frame = Math.floor(b.t / 4);
+    if (frame < 2) rk.glow(b.x, b.y, b.big ? 20 : 10, 'amber', 0.45);
+    rk.draw(b.big ? 'blast' : 'pop', b.x - (b.big ? 12 : 7), b.y - (b.big ? 12 : 7), frame);
+  }
+  for (const s of g.smacks) {
+    if (s.t < 3) rk.glow(s.x, s.y, 8, 'aqua', 0.5);
+    rk.draw('smack', s.x - 5.5, s.y - 5.5, s.t < 4 ? 0 : 1);
+  }
+  for (const p of g.sparks) rk.circle(p.x, p.y, 0.6, p.colour, p.life > 10 ? 1 : p.life / 10);
+  for (const p of g.puffs) rk.circle(p.x, p.y, p.r, p.colour, 0.45 * p.life / p.max);
+}
+
+/* ---------- The game ---------- */
+RetroKit.game({
+  id: 'stompoids',
+  title: 'STOMPOIDS',
+  tagline: 'TOPPLE THE CITY',
+  lives: 3,
+  livesIcon: 'dot',
+  hud: ['score', 'best', { id: 'health', label: 'Health', type: 'meter', low: 0.3, full: 'Full' }, 'lives', 'level', { id: 'city', label: 'City', type: 'text' }],
+  phoneMid: 'health',
+  keys: [['←', '→', 'Walk'], ['↑', '↓', 'Climb'], ['Space', 'Smash'], ['X', 'Jump'], ['P', 'Pause']],
+  touch: 'Drag to move, climb or jump · Tap with your other thumb to smash',
+
+  // The kit offers these after Start game, hands the chosen id to start() as rk.mode, and keeps a
+  // high-score table for each alien.
+  modes: [
+    { id: 'zorbo', label: 'Zorbo', description: 'Slow and tough: one blow per window' },
+    { id: 'vexa', label: 'Vexa', description: 'A quick climber with a huge leap' },
+    { id: 'gloop', label: 'Gloop', description: 'Long tentacle: two windows a blow' },
+  ],
+  music: { data: window.STOMPOIDS_MUSIC, level: 0.35 },     // level: how loud the track is against the sound effects (1 = the file's full level)
+
+  sprites: buildSprites(),
+
+  init(rk) {
+    // Each city's backdrop and buildings are laid out once and kept as sprites.
+    CITIES.forEach((city, i) => {
+      const bd = city.paint();
+      rk.makeSprite(bd.art(), 'city' + i);
+      city.tw = bd.tw;
+      city.lamps = bd.lamps;
+      city.blocks.forEach((spec, j) => {
+        const b = makeBuilding(spec, i, j);
+        const rnd = rng(300 + i * 53 + j * 7);
+        rk.makeSprite(buildingArt(b, rnd), b.sprite);
+        rk.makeSprite(rubbleArt(b, rnd), b.rubble);
+      });
+    });
+  },
+
+  start(rk) {
+    const kind = ALIENS[rk.mode] ? rk.mode : 'zorbo';
+    const g = {
+      kind: kind,
+      al: ALIENS[kind],
+      level: 1,
+      tick: 0,
+      phase: 'drop',            // drop (beamed in), play, dying, clear (city down), lift (beamed out)
+      cool: {},
+      sparks: [], chunks: [], puffs: [], booms: [], smacks: [], fallers: [],
+      cars: [], carT: 60,
+      ship: null,
+      stick: null,
+      lastDy: 0,
+      nextLife: 20000,          // an extra life at 20,000 points, then every 40,000
+    };
+    g.a = newAlien(12);
+    loadLevel(g, rk);
+    rk.hud.set('health', 1);
+    callShip(g, rk, 'down', () => { g.phase = 'play'; });
+    return g;
+  },
+
+  update(g, rk) {
+    g.tick++;
+    for (const k in g.cool) if (g.cool[k] > 0) g.cool[k]--;
+    stepFx(g);
+    stepBuildings(g, rk);
+    stepShip(g, rk);
+    stepCars(g, rk);
+    const c = readControls(g, rk);
+    const live = g.phase === 'play' && !rk.ending;
+    if (g.phase === 'dying') stepDying(g, rk);
+    else if (!rk.ending && (g.phase === 'play' || g.phase === 'clear')) stepAlien(g, rk, c);
+    if (live) {
+      g.lt++;
+      spawnThreats(g, rk);
+    }
+    stepPosts(g, rk, live);
+    stepTroopers(g, rk, live);
+    stepChoppers(g, rk, live);
+    stepTanks(g, rk, live);
+    stepJets(g, rk, live);
+    stepShots(g, rk, live);
+    if (g.phase === 'play' && !rk.ending) {
+      if (rk.score >= g.nextLife) {
+        g.nextLife += 40000;
+        rk.addLife(1);
+        rk.popup('1UP', g.a.x + AW / 2, g.a.y - 6, 'amber');
+      }
+      if (g.blds.every((b) => b.state === 'gone')) cityCleared(g, rk);
+    }
+    rk.hud.set('health', g.a.health);
+  },
+
+  draw(ctx, g, rk) {
+    drawCity(rk, g.city, rk.time);
+    for (const b of g.blds) drawBuilding(rk, g, b);
+    for (const b of g.blds) drawRubble(rk, b);
+    drawFx(rk, g);
+    rk.draw('street', 0, GROUND);
+    drawStreetThings(rk, g);
+    drawBeam(rk, g);
+    drawAlien(rk, g);
+    drawRoad(rk, g);
+    drawAir(rk, g);
+    drawFxFront(rk, g);
+    drawShip(rk, g);
+    const city = CITIES[g.city];
+    if (city.front) city.front(rk, rk.time);
+  },
+
+  // The title screen: Bayfront at sunset, with two of the aliens on the street, clear of the logo.
+  drawTitle(ctx, rk) {
+    drawCity(rk, 0, rk.t);
+    rk.draw('street', 0, GROUND);
+    const bob = Math.floor(rk.t * 2) % 2 ? 2 : 0;
+    rk.draw('zorbo', 28, GROUND - AH, bob);
+    rk.draw('gloop', W - 50, GROUND - AH, bob ? 0 : 2, { flip: true });
+  },
+});
+</script>
+</body>
+</html>

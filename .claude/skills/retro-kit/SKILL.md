@@ -44,7 +44,7 @@ Read its `games/<name>/index.html` first, change only what was asked, rebuild wi
 - **Kit owns score, lives and the flow.** Use `rk.addScore()`, `rk.loseLife()`, `rk.gameOver()`. Do not keep your own score or lives, and do not make your own game-over screen.
 - **Both controls, always.** Every game must be fully playable with the keyboard alone and with touch alone (phone in landscape). P and Esc are reserved for pause.
 - **Offline, one file.** No images, audio files, fonts, libraries or network requests. Art is shapes (sprites and `rk.shape`); sound is `rk.sfx()`. One exception, and only when Barney supplies an MP3: a soundtrack. It lives beside the game as `games/<name>/music.js`, which holds the MP3 as base64 text and nothing else (one line: `window.MY_GAME_MUSIC = "...";`), is pulled in by `<script src="music.js" data-rk-inline></script>` after the kit's two tags, and is played by the kit through the `music` option (reference.md, Music). The build copies it into the one built file. A game never plays audio itself (no `AudioContext`, no `<audio>`), and no other extra file is allowed.
-- **Safe effects.** Nothing flashes more than 3 times a second; no full-screen colour flashes. Shake only through `rk.shake()` (the kit caps it and respects Reduce motion). Halos only through `rk.glow()` (respects Effects).
+- **Safe effects.** Nothing bigger than a character flashes more than 3 times a second (the player's respawn blink may reach 6; design.md, Effects); no full-screen colour flashes. Shake only through `rk.shake()` (the kit caps it and respects Reduce motion). Halos only through `rk.glow()` (respects Effects).
 - **Do not change `kit/`** to make one game work. If the kit lacks something a game needs, finish the game without it and tell Barney what the kit should gain.
 - **Players are adults and teens:** standard arcade difficulty. Start gentle, ramp with each level or wave, keep every death readable (a clear cause, a short pause, then respawn).
 
@@ -54,7 +54,7 @@ Read its `games/<name>/index.html` first, change only what was asked, rebuild wi
 - [ ] Every sprite is shapes (design.md, Characters and objects): nothing drawn as rows of letters or pixel by pixel, and no character that looks like a famous one.
 - [ ] Title is invented and ALL CAPS; HUD labels and `keys` actions are sentence case.
 - [ ] `keys` lists the real controls; `touch` describes the real gestures.
-- [ ] Touch works: movement via `rk.input.pointer`, actions via `rk.input.tap` or `pointer.pressed`.
+- [ ] Touch works: movement via `rk.input.pointer`, actions via `rk.input.tap` or `pointer.pressed` (or `pointer2.down` for hold-to-act with a second finger). Steering and acting at once with two thumbs works.
 - [ ] Score, lives and game over go through `rk`; the game reaches the kit's game-over card.
 - [ ] Every level can be finished, and the next one is harder.
 - [ ] If you can run a browser, open `dist/<name>.html` and check the console has no errors and no red error chip shows on the playfield (reference.md, Testing). If you cannot, say so and ask Barney to play it.

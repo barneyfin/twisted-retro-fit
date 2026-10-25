@@ -1,4 +1,4 @@
-# Retro Kit API reference (kit 2.0)
+# Retro Kit API reference (kit 2.1)
 
 A game is one call: `RetroKit.game(config)`. The kit calls your hooks and hands every hook `rk`, the toolbox.
 
@@ -102,7 +102,8 @@ hud: ['score', { id: 'beam', label: 'Beam', type: 'meter', low: 0.2, full: 'Read
 | `pointer.down`, `pointer.pressed`, `pointer.released` | Touch or mouse button held / went down / came up this update. |
 | `pointer.dx`, `pointer.dy` | How far the pointer moved this update, in world pixels. Use for drag-anywhere steering: `ship.x += rk.input.pointer.dx`. |
 | `pointer.moved` | The pointer moved this update. |
-| `tap` | A quick tap (short and still) finished this update. |
+| `pointer2.x`, `pointer2.y`, `pointer2.down`, `pointer2.pressed`, `pointer2.released` | A second finger, put down while the first is still down (phones). It never moves `pointer`: the first finger keeps steering. A third finger is ignored. |
+| `tap` | A quick tap (short and still) finished this update, by either finger. |
 | `any` | Any key, tap or press this update. |
 | `key(code)`, `keyPressed(code)` | Any other key by `KeyboardEvent.code`, e.g. `rk.input.keyPressed('KeyE')`. |
 | `rk.touch` | `true` on phones and tablets. |
@@ -111,6 +112,7 @@ P and Esc pause; the kit handles them. Touch patterns:
 - **Steer:** drag anywhere moves the player by `pointer.dx/dy` (relative, so the finger never covers the player).
 - **Act:** `tap` for one-off actions (launch, fire, hop). For hold-to-fire, use `pointer.down`. When dragging already steers and fires, a `tap` (short and still) is the second action (a bomb, a special); keep it for things that are fine to trigger by accident now and then.
 - **Directional hops (Frogger):** compare a swipe: on `pointer.released`, use the total movement since `pointer.pressed`; treat a tap as "forward".
+- **Two thumbs:** the kit follows two fingers at once. While one thumb drags to steer, a quick tap with the other is a `tap`, so a game that steers with `pointer` and acts on `tap` gets two-thumb play for free. For hold-to-act with the other thumb (hold to fire), use `pointer2.down`. Lifting the first finger ends its drag; the second finger stays `pointer2` until it lifts, and the next finger down becomes `pointer`. Say so in the `touch` hint when it matters ("Drag to move · Tap with your other thumb to smash").
 
 ## Sprites
 
@@ -231,7 +233,7 @@ if (!g.dead && rk.hit(player, enemy)) {
   if (rk.loseLife() > 0) rk.after(1.2, () => { g.dead = false; g.inv = 90; /* reset position */ });
 }
 ```
-Blink while invulnerable: `if (g.inv > 0) g.inv--;` in update, and in draw `if (g.inv % 20 < 10) rk.draw('player', ...)` (3 blinks a second: never faster).
+Blink while invulnerable: `if (g.inv > 0) g.inv--;` in update, and in draw `if (g.inv % 10 < 5) rk.draw('player', ...)` (6 blinks a second, the fastest allowed and only for the player's own sprite; `g.inv % 20 < 10` gives a calmer 3).
 
 **Level clear**
 ```js

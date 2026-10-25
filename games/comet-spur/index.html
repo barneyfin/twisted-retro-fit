@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comet Spur</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files (and the fonts) into dist/<game>.html. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../../kit/retro-kit.css" data-rk-inline>
+<script src="../../kit/retro-kit.js" data-rk-inline></script>
+</head>
+<body>
+<script>
+/* COMET SPUR — a Retro Kit game. Rules for this file: .claude/skills/retro-kit/SKILL.md
+   A horizontal shooter in the spirit of the late 80s. Your ship flies right through waves of enemies
+   coming in from the right; at the end of each stage the Warden, a fortress with one great eye, blocks
+   the way. Its jaws open and shut: shoot the eye while they are open.
+   Shoot down a whole line of orange wisps and the last one drops a power capsule (Single, Twin, Wide gun).
+   Shooting things down also charges the Nova burst: a ring that clears the screen around you.
+   Three stages, each adding one thing; after the third the set comes round again, faster. */
+
+/* ---------- Playfield layout (world pixels; the world is 320 x 180) ---------- */
+const W = 320;
+const H = 180;
+const SHIP_W = 20;
+const SHIP_H = 10;
+const SHIP_SPEED = 1.9;         // pixels per update with the keys (114 a second)
+const SHIP_MIN_X = 4;
+const SHIP_MAX_X = 196;         // the ship keeps to the left of the screen, where it has room to react
+const SHIP_MIN_Y = 4;
+const SHIP_MAX_Y = H - 4 - SHIP_H;
+const START_X = 24;             // where the ship starts and respawns
+const START_Y = 85;
+const FIRE_GAP = 7;             // updates between volleys while Fire is held (about 8 a second)
+const SHOT_SPEED = 5;
+const MAX_SHOTS = 40;
+const MAX_BULLETS = 60;         // enemy fire on screen at once
+const SCROLL = 0.75;            // how far the world moves past each update
+const INVULNERABLE = 90;        // updates of blinking after a respawn (1.5 seconds)
+const FIRST_LIFE = 20000;       // an extra life at 20,000 points, then every 40,000 after
+const NEXT_LIFE = 40000;
+const NOVA_BOSS_DAMAGE = 6;     // what a Nova burst does to the Warden's eye, open or shut
+
+/* What each enemy is worth, and how much of the Nova meter it charges (1 = full). */
+const FOES = {
+  wisp: { pts: 100, nova: 0.04 },
+  hornet: { pts: 200, nova: 0.07 },
+  pod: { pts: 300, nova: 0.1 },
+};
+const LINE_BONUS = 500;         // for shooting down every wisp in a line
+const POWER_NAMES = ['', 'Single', 'Twin', 'Wide'];
+const POWER_POPS = ['', '', 'TWIN', 'WIDE'];
+
+/* ---------- Stages ----------
+   Each stage is a list of waves (t: seconds after the stage starts) and then the Warden (boss: seconds).
+     wisps    a line of five that fly in from the right along the same path. y: the centre line,
+              amp: how far they weave up and down. cap: true makes them orange: shoot down all five
+              and the last one drops a power capsule.
+     pods     gun pods that fly in, hover on the right and fire at you, then leave. ys: their heights.
+     hornets  chargers that take aim at your height, then dash across the screen. n: how many.
+   The look of each stage: planet and terrain are the kit's space backdrop layers; rocks is a far belt
+   of asteroids. Each stage adds one thing: 1 wisps and gun pods; 2 hornets, and a Warden with side
+   cannons; 3 wisps that shoot back, pods that fire in threes, and a Warden that fires five at a time. */
+const STAGES = [
+  {
+    look: { planet: true, terrain: true, rocks: false },
+    speed: 1, podGap: 110, podFan: 1, wispShoot: 0,
+    waves: [
+      { t: 1.5, kind: 'wisps', y: 60, amp: 0 },
+      { t: 5, kind: 'wisps', y: 120, amp: 0 },
+      { t: 9, kind: 'wisps', y: 50, amp: 18, cap: true },
+      { t: 13, kind: 'pods', ys: [90] },
+      { t: 17, kind: 'wisps', y: 125, amp: 18 },
+      { t: 21, kind: 'wisps', y: 75, amp: 26, cap: true },
+      { t: 24, kind: 'pods', ys: [45, 135] },
+      { t: 29, kind: 'wisps', y: 40, amp: 22 },
+      { t: 31, kind: 'wisps', y: 135, amp: 22 },
+      { t: 35, kind: 'pods', ys: [60, 120] },
+      { t: 39, kind: 'wisps', y: 90, amp: 36, cap: true },
+      { t: 43, kind: 'wisps', y: 55, amp: 20 },
+    ],
+    boss: 49, bossHp: 24, bossFan: 3, bossCannons: false,
+  },
+  {
+    look: { planet: false, terrain: false, rocks: true },
+    speed: 1.08, podGap: 100, podFan: 1, wispShoot: 0,
+    waves: [
+      { t: 1.5, kind: 'wisps', y: 50, amp: 20 },
+      { t: 4.5, kind: 'hornets', n: 1 },
+      { t: 7, kind: 'wisps', y: 125, amp: 20, cap: true },
+      { t: 10, kind: 'pods', ys: [60, 120] },
+      { t: 14, kind: 'hornets', n: 2 },
+      { t: 17, kind: 'wisps', y: 88, amp: 40 },
+      { t: 20, kind: 'wisps', y: 42, amp: 16, cap: true },
+      { t: 23, kind: 'pods', ys: [35, 90, 145] },
+      { t: 27, kind: 'hornets', n: 3 },
+      { t: 31, kind: 'wisps', y: 130, amp: 24 },
+      { t: 33, kind: 'wisps', y: 50, amp: 24 },
+      { t: 37, kind: 'hornets', n: 2 },
+      { t: 40, kind: 'wisps', y: 90, amp: 44, cap: true },
+      { t: 43, kind: 'pods', ys: [70, 110] },
+    ],
+    boss: 50, bossHp: 32, bossFan: 3, bossCannons: true,
+  },
+  {
+    look: { planet: true, terrain: false, rocks: true },
+    speed: 1.16, podGap: 95, podFan: 3, wispShoot: 0.35,
+    waves: [
+      { t: 1.5, kind: 'wisps', y: 60, amp: 24 },
+      { t: 3.5, kind: 'wisps', y: 120, amp: 24 },
+      { t: 7, kind: 'pods', ys: [90] },
+      { t: 10, kind: 'hornets', n: 2 },
+      { t: 13, kind: 'wisps', y: 45, amp: 20, cap: true },
+      { t: 15, kind: 'wisps', y: 135, amp: 20 },
+      { t: 19, kind: 'pods', ys: [40, 140] },
+      { t: 22, kind: 'hornets', n: 3 },
+      { t: 26, kind: 'wisps', y: 90, amp: 48, cap: true },
+      { t: 29, kind: 'pods', ys: [60, 120] },
+      { t: 33, kind: 'hornets', n: 3 },
+      { t: 36, kind: 'wisps', y: 50, amp: 30 },
+      { t: 38, kind: 'wisps', y: 130, amp: 30 },
+      { t: 42, kind: 'pods', ys: [35, 90, 145] },
+      { t: 46, kind: 'wisps', y: 90, amp: 40, cap: true },
+    ],
+    boss: 53, bossHp: 40, bossFan: 5, bossCannons: true,
+  },
+];
+
+// Works out one stage's numbers. After stage 3 the set comes round again (a "lap"), faster each time.
+function stageFor(n) {
+  const index = (n - 1) % STAGES.length;
+  const lap = Math.floor((n - 1) / STAGES.length);
+  const base = STAGES[index];
+  const quick = Math.min(1.45, 1 + lap * 0.15);
+  return {
+    index: index,
+    lap: lap,
+    look: base.look,
+    waves: base.waves,
+    speed: base.speed * quick,                                  // how fast enemies fly
+    shotSpeed: Math.min(2.4, 1.35 * base.speed * quick),        // how fast enemy fire flies
+    podGap: Math.max(50, Math.round(base.podGap / quick)),      // updates between a gun pod's shots
+    podFan: base.podFan,
+    wispShoot: Math.min(0.6, base.wispShoot + lap * 0.15),      // the chance that a wisp fires once
+    bossAt: base.boss,
+    bossHp: base.bossHp + lap * 12,
+    bossFan: Math.min(7, base.bossFan + lap * 2),
+    bossCannons: base.bossCannons || lap > 0,
+    bossOpen: 120,                                              // updates the jaws stay open
+    bossShut: Math.max(90, Math.round(150 / quick)),            // ... and shut
+    bossBonus: 5000 + index * 2500 + lap * 2500,
+  };
+}
+
+/* ---------- Art ----------
+   Every character is a few shapes in its own box (world pixels; the box is also what the rules use for
+   hits). The kit draws them smooth, in hard bands lit from above, with an ink outline round the outside.
+   Your ship faces right; everything that comes at you faces left. */
+
+// Your ship: a chrome dart with a forked tail and an aqua canopy.
+const SHIP = {
+  size: [SHIP_W, SHIP_H],
+  shapes: [
+    { poly: [0.6, 0.4, 5, 0.4, 9.4, 3.6, 3, 3.6], fill: 'chrome', band: [0.4, 0.8] },            // upper tail prong
+    { poly: [3, 6.4, 9.4, 6.4, 5, 9.6, 0.6, 9.6], fill: 'chrome', band: [0.3, 0.6] },            // lower tail prong
+    { rect: [0.4, 3.2, 4, 3.6], r: 1, fill: 'chrome-400' },                                       // engine block
+    { poly: [2.5, 2.9, 11, 2, 16.5, 3.4, 20, 5, 16.5, 6.6, 11, 8, 2.5, 7.1], fill: 'chrome', band: [0.42, 0.74] },   // hull
+    { ellipse: [12.4, 4.1, 3, 1.35], fill: 'aqua', band: [0.4, 0.78] },                           // canopy
+    { rect: [4.6, 5.3, 6.4, 0.9], r: 0.45, fill: 'aqua-dark' },                                   // a stripe down the side
+  ],
+};
+
+// Wisp: a one-eyed seed pod trailing two fins, which flick as it flies. Red, or orange (heat) in a
+// line that carries a power capsule.
+function wispArt(ramp) {
+  const fins = (s) => [
+    { line: [8.5, 3.6, 11.6, 0.8 + s], width: 1.2, fill: ramp + '-light' },
+    { line: [8.5, 6.4, 11.6, 9.2 - s], width: 1.2, fill: ramp + '-light' },
+  ];
+  const body = [
+    { path: 'M0.6 5 C0.6 2.4 2.6 0.9 5 0.9 C7.4 0.9 9.2 2.6 10.4 5 C9.2 7.4 7.4 9.1 5 9.1 C2.6 9.1 0.6 7.6 0.6 5 Z', fill: ramp, band: [0.3, 0.72] },
+    { circle: [4.4, 5, 2.1], fill: 'sun-100' },
+    { circle: [3.7, 5.1, 1.05], fill: 'ink' },
+  ];
+  return { size: [12, 10], frames: [[...fins(0), ...body], [...fins(1.6), ...body]] };
+}
+
+// Gun pod: a red shell under a chrome hood, two horns swept forward, and a barrel that points at you.
+const POD = {
+  size: [14, 12],
+  shapes: [
+    { line: [10, 3, 7.6, 1, 4.6, 0.7], width: 1.1, fill: 'chrome-300' },                          // horns
+    { line: [10, 9, 7.6, 11, 4.6, 11.3], width: 1.1, fill: 'chrome-300' },
+    { rect: [0.2, 4.9, 5.4, 2.2], r: 0.9, fill: 'chrome-400' },                                   // barrel
+    { ellipse: [8.6, 6, 5, 4.4], fill: 'red', band: [0.3, 0.72] },                                // shell
+    { path: 'M9 1.6 C12 1.6 13.8 3.6 13.8 6 C13.8 8.4 12 10.4 9 10.4 C10.5 9 11 7.6 11 6 C11 4.4 10.5 3 9 1.6 Z', fill: 'chrome', band: [0.3, 0.7] },   // hood
+    { circle: [6.4, 6, 1.8], fill: 'sun-100' },                                                    // eye
+    { circle: [5.8, 6, 0.9], fill: 'ink' },
+  ],
+};
+
+// Hornet: a long red dart with pincers, a striped tail and buzzing glassy wings.
+function hornetArt() {
+  const wings = (tilt) => [
+    { ellipse: [10.4, 2, 4.2, 1.5, tilt], fill: 'chrome-200', alpha: 0.75 },
+    { ellipse: [13, 2.3, 2.8, 1.1, tilt], fill: 'chrome-300', alpha: 0.75 },
+  ];
+  const body = [
+    { line: [3.6, 3.3, 1.2, 2.4, 0.4, 3.5], width: 0.9, fill: 'red-light' },                      // pincers
+    { line: [3.6, 4.7, 1.2, 5.6, 0.4, 4.5], width: 0.9, fill: 'red-light' },
+    { path: 'M2.6 4 C2.6 2.5 4.6 1.8 7 2 L15.4 3.4 C16 3.6 16 4.4 15.4 4.6 L7 6 C4.6 6.2 2.6 5.5 2.6 4 Z', fill: 'red', band: [0.32, 0.72] },
+    { line: [9.6, 2.6, 9.6, 5.4], width: 0.7, fill: 'red-dark' },                                 // stripes
+    { line: [12.2, 3, 12.2, 5], width: 0.7, fill: 'red-dark' },
+    { circle: [4.8, 3.5, 1.05], fill: 'sun-100' },
+    { circle: [4.3, 3.6, 0.5], fill: 'ink' },
+  ];
+  return { size: [16, 8], frames: [[...wings(-18), ...body], [...wings(-4), ...body]] };
+}
+
+// The Warden: a red fortress between two chrome plates, a cannon on each plate, and one great eye
+// behind a pair of chrome jaws. Frame 0: jaws shut (shots bounce off). Frame 1: jaws open (hit the eye).
+const BOSS_W = 56;
+const BOSS_H = 48;
+function wardenArt() {
+  const body = [
+    { rect: [44, 15, 11.6, 18], r: 2.5, fill: 'chrome-400' },                                     // engine block
+    { rect: [5, 4.4, 12, 3.6], r: 1.4, fill: 'chrome-400' },                                      // top cannon
+    { rect: [5, 40, 12, 3.6], r: 1.4, fill: 'chrome-400' },                                       // bottom cannon
+    { rect: [13, 0.4, 38, 15], r: 6, fill: 'chrome', band: [0.3, 0.7] },                           // top plate
+    { rect: [13, 32.6, 38, 15], r: 6, fill: 'chrome', band: [0.3, 0.7] },                          // bottom plate
+    { ellipse: [31, 24, 23, 13.5], fill: 'red', band: [0.3, 0.72] },                              // hull
+    { circle: [24.5, 6.5, 1.1], fill: 'sun-100' }, { circle: [33.5, 6.5, 1.1], fill: 'sun-100' }, { circle: [42.5, 6.5, 1.1], fill: 'sun-100' },
+    { circle: [24.5, 41.5, 1.1], fill: 'sun-100' }, { circle: [33.5, 41.5, 1.1], fill: 'sun-100' }, { circle: [42.5, 41.5, 1.1], fill: 'sun-100' },
+    { circle: [17, 24, 8.4], fill: 'ink' },                                                        // eye socket
+    { circle: [17, 24, 6.4], fill: ['sun-100', 0.28, 'red-light', 0.62, 'red'], dir: 'diag' },     // the eye
+    { ellipse: [15.4, 24, 1.9, 3.6], fill: 'ink' },
+  ];
+  const shut = [
+    { poly: [4, 15.6, 24, 14.6, 25, 24, 2.6, 24], fill: 'chrome', band: [0.35, 0.75] },
+    { poly: [2.6, 24, 25, 24, 24, 33.4, 4, 32.4], fill: 'chrome', band: [0.25, 0.65] },
+    { line: [3.2, 24, 24.4, 24], width: 0.6, fill: 'ink' },
+  ];
+  const open = [
+    { poly: [7, 11.4, 25, 11, 25, 15.6, 9, 16.2], fill: 'chrome', band: [0.35, 0.75] },
+    { poly: [9, 31.8, 25, 32.4, 25, 37, 7, 36.6], fill: 'chrome', band: [0.35, 0.75] },
+  ];
+  return { size: [BOSS_W, BOSS_H], frames: [[...body, ...shut], [...body, ...open]] };
+}
+
+// Power capsule: an amber pill with a double chevron.
+const CAPSULE = {
+  size: [9, 9],
+  shapes: [
+    { rect: [0, 0, 9, 9], r: 2.4, fill: 'amber', band: [0.28, 0.76] },
+    { line: [2.4, 2.6, 4.2, 4.5, 2.4, 6.4], width: 0.9, fill: 'ink' },
+    { line: [5, 2.6, 6.8, 4.5, 5, 6.4], width: 0.9, fill: 'ink' },
+  ],
+};
+
+// Your fire: aqua with a white-hot tip, no outline. The Wide gun adds two round pellets that fly at an angle.
+const SHOT = { size: [7, 2], outline: false, shapes: [{ rect: [0, 0, 7, 2], r: 1, fill: ['aqua', 0.45, 'aqua-light', 0.8, 'chrome-100'], dir: 'right' }] };
+const PELLET = { size: [3, 3], outline: false, shapes: [{ circle: [1.5, 1.5, 1.45], fill: ['chrome-100', 0.35, 'aqua-light', 0.7, 'aqua'], dir: 'diag' }] };
+// Enemy fire: a small red ball with a bright core, so it reads against every band of sky.
+const ORB = { size: [4, 4], outline: 0.4, shapes: [{ circle: [2, 2, 1.9], fill: 'red', band: [0.3, 0.7] }, { circle: [1.7, 1.6, 0.8], fill: 'sun-100' }] };
+
+// A small repeatable random number maker, so the scenery and explosions look the same every time.
+function rng(seed) {
+  let s = seed % 2147483647 || 1;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+
+// An explosion in four frames: a white-hot flash, a ball of fire, the ball breaking into puffs, then embers.
+function blastArt(size, seed) {
+  const rnd = rng(seed);
+  const c = size / 2;
+  const puffs = (count, dist, rad, fill, alpha) => {
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + rnd() * 0.6;
+      const d = dist * (0.7 + rnd() * 0.3);
+      out.push({ circle: [c + Math.cos(a) * d, c + Math.sin(a) * d, rad * (0.8 + rnd() * 0.4)], fill: fill, alpha: alpha });
+    }
+    return out;
+  };
+  const embers = [];
+  for (let i = 0; i < 8; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = c * (0.5 + rnd() * 0.42);
+    embers.push({ circle: [c + Math.cos(a) * d, c + Math.sin(a) * d, 0.5 + rnd() * 0.3], fill: i % 3 ? 'heat' : 'amber' });
+  }
+  return {
+    size: [size, size], outline: false,
+    frames: [
+      [{ circle: [c, c, c * 0.42], fill: 'amber-light' }, { circle: [c, c, c * 0.26], fill: 'sun-100' }],
+      [...puffs(6, c * 0.45, c * 0.38, 'heat-light', 1), { circle: [c, c, c * 0.48], fill: 'amber' }, { circle: [c, c, c * 0.24], fill: 'sun-100' }],
+      [...puffs(7, c * 0.62, c * 0.3, 'heat', 0.85), ...puffs(4, c * 0.3, c * 0.2, 'amber-light', 0.8)],
+      embers,
+    ],
+  };
+}
+
+// A far-off belt of asteroids: dark rocks with a lit edge, drawn behind everything and scrolled slowly.
+function rocksArt() {
+  const rnd = rng(7);
+  const shapes = [];
+  for (let i = 0; i < 9; i++) {
+    const cx = 18 + i * 35 + rnd() * 12;
+    const cy = 14 + rnd() * 34;
+    const r = 3 + rnd() * 6;
+    const pts = [];
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * Math.PI * 2;
+      const rr = r * (0.75 + rnd() * 0.3);
+      pts.push(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.8);
+    }
+    shapes.push({ poly: pts, fill: ['sky-3', 0.3, 'hill-far'] });
+  }
+  return { size: [W, 64], outline: false, shapes: shapes };
+}
+
+/* ---------- Helpers ---------- */
+
+// Plays a sound at most once every few updates, so a burst of hits does not become a buzz.
+function play(g, rk, name, wait) {
+  if (g.cool[name] > 0) return;
+  g.cool[name] = wait || 6;
+  rk.sfx(name);
+}
+
+// A custom tone, with the same limit.
+function tone(g, rk, key, wait, spec) {
+  if (g.cool[key] > 0) return;
+  g.cool[key] = wait;
+  rk.sfx.tone(spec);
+}
+
+function spark(g, x, y, colours, count, power) {
+  for (let i = 0; i < count && g.parts.length < 220; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = (0.3 + Math.random() * 0.7) * power;
+    g.parts.push({ x: x, y: y, vx: Math.cos(a) * s - 0.3, vy: Math.sin(a) * s, life: 14 + Math.random() * 16, colour: colours[i % colours.length] });
+  }
+}
+
+// An explosion centred on a point. `wait` holds it back a few updates, for a chain of them.
+function boom(g, x, y, big, wait) {
+  g.booms.push({ x: x, y: y, big: !!big, t: -(wait || 0) });
+}
+
+// A hit flash: white for 4 updates, at most three times a second however fast the hits come.
+function flashOn(o) {
+  if (o.fcool > 0) return;
+  o.flash = 4;
+  o.fcool = 20;
+}
+
+// The part of the ship that can be hit: the middle of the hull, not the tail prongs or the nose.
+const shipBox = (g) => ({ x: g.ship.x + 4, y: g.ship.y + 3, w: 12, h: 4 });
+const bulletBox = (b) => ({ x: b.x - 1.5, y: b.y - 1.5, w: 3, h: 3 });
+
+// Fires `count` enemy shots from x, y at the ship, fanned `spread` radians apart.
+function fireAt(g, x, y, speed, count, spread) {
+  const base = Math.atan2(g.ship.y + SHIP_H / 2 - y, g.ship.x + SHIP_W / 2 - x);
+  for (let k = 0; k < count && g.bullets.length < MAX_BULLETS; k++) {
+    const a = base + (k - (count - 1) / 2) * spread;
+    g.bullets.push({ x: x, y: y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dead: false });
+  }
+}
+
+// The Warden's parts, where they are now: the eye (only while the jaws are open) and the solid parts
+// that stop your shots and destroy your ship.
+function wardenParts(b) {
+  const solid = [
+    { x: b.x + 12, y: b.y + 1, w: 43, h: 46 },                       // plates and hull
+    { x: b.x + 5, y: b.y + 4.4, w: 8, h: 3.6 },                     // cannons
+    { x: b.x + 5, y: b.y + 40, w: 8, h: 3.6 },
+  ];
+  if (b.open) {
+    solid.push({ x: b.x + 7, y: b.y + 11, w: 18, h: 5 }, { x: b.x + 7, y: b.y + 32, w: 18, h: 5 });
+    return { core: { x: b.x + 10, y: b.y + 17.5, w: 13, h: 13 }, solid: solid };
+  }
+  solid.push({ x: b.x + 3, y: b.y + 15, w: 22, h: 18 });            // the shut jaws cover the eye
+  return { core: null, solid: solid };
+}
+
+/* ---------- Stages, waves and lives ---------- */
+
+function setupStage(g, rk) {
+  g.S = stageFor(g.n);
+  g.phase = 'waves';            // waves, then boss, then clear
+  g.clock = 0;                  // updates of this stage's waves so far (it stops while the ship is gone)
+  g.next = 0;                   // the next wave in the list
+  g.boss = null;
+  g.groups = {};
+  rk.hud.set('stage', String(g.n));
+  rk.banner('STAGE ' + g.n, 1.5);
+}
+
+function spawnWave(g, rk, w) {
+  const S = g.S;
+  if (w.kind === 'wisps') {
+    const id = ++g.groupId;
+    g.groups[id] = { left: 5, shot: 0, cap: !!w.cap };
+    for (let i = 0; i < 5; i++) {
+      g.foes.push({
+        kind: 'wisp', sprite: w.cap ? 'wispHeat' : 'wisp', x: W + 4 + i * 18, y: w.y - 5, y0: w.y - 5, amp: w.amp,
+        w: 12, h: 10, hp: 1, flash: 0, fcool: 0, group: id,
+        fireX: Math.random() < S.wispShoot ? rk.rand(150, 260) : -1,     // where it fires its one shot, if it does
+      });
+    }
+  } else if (w.kind === 'pods') {
+    w.ys.forEach((y, i) => {
+      g.foes.push({
+        kind: 'pod', sprite: 'pod', x: W + 2 + i * 12, y: y - 6, y0: y - 6, tx: 256 + (i % 2) * 26, vx: 0,
+        w: 14, h: 12, hp: S.index === 2 ? 4 : 3, flash: 0, fcool: 0, age: 0, seed: i * 1.7,
+        fireT: 70 + i * 24, leaving: false,
+      });
+    });
+  } else if (w.kind === 'hornets') {
+    for (let i = 0; i < w.n; i++) {
+      g.foes.push({
+        kind: 'hornet', sprite: 'hornet', x: W + 4, y: 0, w: 16, h: 8, hp: 2, flash: 0, fcool: 0,
+        state: 'wait', wait: i * 45, t: 0, vx: 0,
+      });
+    }
+  }
+}
+
+function spawnBoss(g, rk) {
+  const S = g.S;
+  g.phase = 'boss';
+  g.boss = {
+    x: W + 6, y: (H - BOSS_H) / 2, t: 0, hp: S.bossHp, max: S.bossHp,
+    entering: true, open: false, cycle: S.bossShut, volley: false, cannonT: 120,
+    flash: 0, fcool: 0, dead: false,
+  };
+  rk.banner('WARNING', 1.6);
+  tone(g, rk, 'warn', 30, { type: 'square', f: 220, to: 140, dur: 0.18, vol: 0.12 });
+}
+
+function die(g, rk) {
+  if (g.dead || g.inv > 0 || rk.ending) return;
+  g.dead = true;
+  const cx = g.ship.x + SHIP_W / 2;
+  const cy = g.ship.y + SHIP_H / 2;
+  boom(g, cx, cy, true);
+  spark(g, cx, cy, ['chrome-100', 'aqua', 'amber'], 26, 2);
+  rk.sfx('explosion');
+  rk.shake(3, 0.2);
+  g.shots = [];
+  g.ring = null;
+  g.power = Math.max(1, g.power - 1);             // the gun loses one step with the ship
+  rk.hud.set('power', POWER_NAMES[g.power]);
+  if (rk.loseLife() > 0) rk.after(1.2, () => respawn(g));
+}
+
+// A safe restart: enemy fire is cleared, and the ship blinks for 1.5 seconds while nothing can hurt it.
+function respawn(g) {
+  for (const b of g.bullets) spark(g, b.x, b.y, ['sun-100', 'red-light'], 2, 0.8);
+  g.bullets = [];
+  g.ship.x = START_X;
+  g.ship.y = START_Y;
+  g.inv = INVULNERABLE;
+  g.gunT = 0;
+  g.dead = false;
+}
+
+/* ---------- Hits and scores ---------- */
+
+function hurtFoe(g, rk, f, n) {
+  f.hp -= n;
+  if (f.hp > 0) {
+    flashOn(f);
+    play(g, rk, 'hit', 6);
+    return;
+  }
+  killFoe(g, rk, f, true);
+}
+
+// `byYou` is false when it crashed into the ship: no points for that.
+function killFoe(g, rk, f, byYou) {
+  f.dead = true;
+  const cx = f.x + f.w / 2;
+  const cy = f.y + f.h / 2;
+  boom(g, cx, cy, f.kind === 'pod');
+  spark(g, cx, cy, f.sprite === 'wispHeat' ? rk.ramps.heat : f.kind === 'pod' ? ['red-light', 'chrome-200'] : rk.ramps.red, 6, 1.2);
+  play(g, rk, 'explosion', 6);
+  if (byYou) {
+    const info = FOES[f.kind];
+    if (info.pts >= 300) rk.addScore(info.pts, cx, cy - 6);
+    else rk.addScore(info.pts);
+    g.nova = Math.min(1, g.nova + info.nova);
+  }
+  if (f.group) lineGone(g, rk, f, byYou, cx, cy);
+}
+
+// One wisp of a line has gone (shot down, crashed or flown off). When the whole line has been shot
+// down: a capsule from an orange line, a bonus from any other.
+function lineGone(g, rk, f, byYou, cx, cy) {
+  const line = g.groups[f.group];
+  if (!line) return;
+  line.left--;
+  if (byYou) line.shot++;
+  if (line.left > 0) return;
+  delete g.groups[f.group];
+  if (line.shot < 5) return;
+  if (line.cap) g.caps.push({ x: cx - 4.5, y: cy - 4.5, y0: cy - 4.5, t: 0 });
+  else rk.addScore(LINE_BONUS, cx, cy - 8, 'amber');
+}
+
+function hurtBoss(g, rk, n, x, y) {
+  const b = g.boss;
+  if (!b || b.dead || b.entering) return;
+  b.hp -= n;
+  flashOn(b);
+  spark(g, x, y, ['chrome-100', 'red-light'], 4, 1.2);
+  g.nova = Math.min(1, g.nova + 0.012 * n);
+  if (b.hp > 0) {
+    play(g, rk, 'hit', 6);
+    return;
+  }
+  // Destroyed: a chain of explosions across the hull, then the stage is clear
+  b.dead = true;
+  for (let i = 0; i < 8; i++) boom(g, b.x + 8 + rk.rand(0, 42), b.y + 6 + rk.rand(0, 36), true, i * 6);
+  spark(g, b.x + 28, b.y + 24, ['sun-100', 'amber', 'heat', 'red'], 40, 2.4);
+  for (const bl of g.bullets) spark(g, bl.x, bl.y, ['sun-100', 'red-light'], 2, 0.8);
+  g.bullets = [];
+  rk.sfx('explosion');
+  rk.shake(4, 0.25);
+  rk.addScore(g.S.bossBonus, b.x + 20, b.y + 24, 'amber');
+  g.phase = 'clear';
+  rk.after(2.2, () => {
+    if (rk.ending) return;
+    rk.sfx('pickup');
+    rk.banner('STAGE CLEAR', 1.6);
+  });
+  rk.after(4, () => {
+    if (rk.ending) return;
+    g.n++;
+    setupStage(g, rk);
+  });
+}
+
+function collect(g, rk, c) {
+  rk.sfx('pickup');
+  const cx = g.ship.x + SHIP_W / 2;
+  if (g.power < 3) {
+    g.power++;
+    rk.hud.set('power', POWER_NAMES[g.power]);
+    rk.addScore(500);
+    rk.popup(POWER_POPS[g.power], cx, g.ship.y - 6, 'amber');
+  } else {
+    rk.addScore(1000, cx, g.ship.y - 6, 'amber');    // the gun is already as wide as it goes
+  }
+}
+
+function releaseNova(g, rk) {
+  g.nova = 0;
+  g.ring = { x: g.ship.x + SHIP_W / 2, y: g.ship.y + SHIP_H / 2, r: 6, bossHit: false };
+  tone(g, rk, 'nova', 10, { type: 'triangle', f: 160, to: 900, dur: 0.18, vol: 0.18 });
+  play(g, rk, 'explosion', 6);
+  rk.shake(2, 0.2);
+}
+
+/* ---------- One update of each part of the game ---------- */
+
+function stepShip(g, rk) {
+  const p = g.ship;
+  const inp = rk.input;
+  if (g.dead || rk.ending) return;
+  // Keys: arrows or WASD (a diagonal is no faster than straight). Drag anywhere: the ship moves as the finger does.
+  let mx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+  let my = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
+  const k = mx && my ? Math.SQRT1_2 : 1;
+  p.x += mx * SHIP_SPEED * k;
+  p.y += my * SHIP_SPEED * k;
+  if (inp.pointer.down) {
+    p.x += inp.pointer.dx;
+    p.y += inp.pointer.dy;
+  }
+  p.x = rk.clamp(p.x, SHIP_MIN_X, SHIP_MAX_X);
+  p.y = rk.clamp(p.y, SHIP_MIN_Y, SHIP_MAX_Y);
+  if (g.inv > 0) g.inv--;
+  if (g.gunT > 0) g.gunT--;
+  // Holding Fire shoots, and so does holding a finger down: one thumb can steer and shoot at once.
+  if ((inp.fire || inp.pointer.down) && g.gunT <= 0) fire(g, rk);
+  if (g.nova >= 1 && (inp.pressed.alt || inp.tap)) releaseNova(g, rk);
+}
+
+function addShot(g, kind, x, y, vx, vy) {
+  if (g.shots.length >= MAX_SHOTS) return;
+  const size = kind === 'shot' ? [7, 2] : [3, 3];
+  g.shots.push({ kind: kind, x: x, y: y, w: size[0], h: size[1], vx: vx, vy: vy, dead: false });
+}
+
+function fire(g, rk) {
+  const nx = g.ship.x + SHIP_W - 3;
+  const ny = g.ship.y + SHIP_H / 2;
+  if (g.power === 1) addShot(g, 'shot', nx, ny - 1, SHOT_SPEED, 0);
+  else {
+    addShot(g, 'shot', nx - 1, ny - 3, SHOT_SPEED, 0);
+    addShot(g, 'shot', nx - 1, ny + 1, SHOT_SPEED, 0);
+  }
+  if (g.power >= 3) {
+    addShot(g, 'pellet', nx - 5, ny - 3, SHOT_SPEED * 0.9, -1.3);
+    addShot(g, 'pellet', nx - 5, ny, SHOT_SPEED * 0.9, 1.3);
+  }
+  g.gunT = FIRE_GAP;
+  play(g, rk, 'shot', 12);
+}
+
+function stepShots(g, rk) {
+  const b = g.boss;
+  const parts = b && !b.dead ? wardenParts(b) : null;
+  for (const s of g.shots) {
+    s.x += s.vx;
+    s.y += s.vy;
+    if (s.x > W + 2 || s.y < -4 || s.y > H + 4) { s.dead = true; continue; }
+    for (const f of g.foes) {
+      if (f.dead || f.state === 'wait' || f.x > W) continue;
+      if (rk.hit(s, f)) { s.dead = true; hurtFoe(g, rk, f, 1); break; }
+    }
+    if (s.dead || !parts || b.dead) continue;
+    if (parts.core && rk.hit(s, parts.core)) {
+      s.dead = true;
+      hurtBoss(g, rk, 1, s.x + s.w, s.y + s.h / 2);
+    } else if (parts.solid.some((r) => rk.hit(s, r))) {
+      s.dead = true;                                            // armour: the shot glances off
+      spark(g, s.x + s.w, s.y + s.h / 2, ['chrome-200', 'chrome-300'], 2, 0.9);
+      tone(g, rk, 'tink', 8, { type: 'square', f: 1800, to: 1300, dur: 0.04, vol: 0.05 });
+    }
+  }
+  g.shots = g.shots.filter((s) => !s.dead);
+}
+
+function stepWaves(g, rk) {
+  if (g.phase !== 'waves' || g.dead || rk.ending) return;
+  g.clock++;
+  const S = g.S;
+  while (g.next < S.waves.length && g.clock >= S.waves[g.next].t * 60) spawnWave(g, rk, S.waves[g.next++]);
+  // The Warden comes once the last wave has gone (or after a few seconds, if it is still hanging about)
+  if (g.clock >= S.bossAt * 60 && (g.foes.length === 0 || g.clock >= (S.bossAt + 5) * 60)) spawnBoss(g, rk);
+}
+
+function stepFoes(g, rk) {
+  const S = g.S;
+  const canFire = !g.dead && !rk.ending;
+  const sy = g.ship.y + 1;                                       // the hornets line up with this
+  for (const f of g.foes) {
+    if (f.dead) continue;
+    if (f.flash > 0) f.flash--;
+    if (f.fcool > 0) f.fcool--;
+    if (f.kind === 'wisp') {
+      f.x -= 1.15 * S.speed;
+      f.y = f.y0 + f.amp * Math.sin((W + 4 - f.x) * 0.035);   // every wisp of a line follows the same path
+      if (f.fireX > 0 && f.x <= f.fireX) {
+        f.fireX = -1;
+        if (canFire) fireAt(g, f.x + 2, f.y + 5, S.shotSpeed * 0.85, 1, 0);
+      }
+      if (f.x < -14) { f.dead = true; lineGone(g, rk, f, false, 0, 0); }
+    } else if (f.kind === 'pod') {
+      f.age++;
+      if (!f.leaving) {
+        f.x += (f.tx - f.x) * 0.05;                              // glide in and settle
+        if (f.age > 420) f.leaving = true;
+        if (--f.fireT <= 0 && f.x < W - 8) {
+          f.fireT = S.podGap;
+          if (canFire) {
+            fireAt(g, f.x + 1, f.y + 6, S.shotSpeed, S.podFan, 0.26);
+            tone(g, rk, 'podfire', 8, { type: 'square', f: 420, to: 260, dur: 0.06, vol: 0.06 });
+          }
+        }
+      } else {
+        f.vx = Math.max(f.vx - 0.03, -1.6 * S.speed);          // then leave across the screen
+        f.x += f.vx;
+      }
+      f.y = f.y0 + Math.sin(f.age * 0.045 + f.seed) * 5;
+      if (f.x < -16) f.dead = true;
+    } else if (f.kind === 'hornet') {
+      f.t++;
+      if (f.state === 'wait') {
+        if (--f.wait <= 0) {
+          f.state = 'in';
+          f.t = 0;
+          f.y = rk.clamp(sy, 8, H - 16);
+        }
+      } else if (f.state === 'in') {
+        f.x += (284 - f.x) * 0.08;
+        f.y += rk.clamp((sy - f.y) * 0.03, -0.6, 0.6);
+        if (f.t > 30) { f.state = 'aim'; f.t = 0; tone(g, rk, 'aim', 10, { type: 'sawtooth', f: 500, to: 950, dur: 0.12, vol: 0.07 }); }
+      } else if (f.state === 'aim') {
+        f.y += rk.clamp((sy - f.y) * 0.03, -0.5, 0.5);
+        if (f.t > 36) { f.state = 'dash'; f.t = 0; }
+      } else {
+        f.vx = Math.max(f.vx - 0.18, -3.3 * S.speed);
+        f.x += f.vx;
+        f.y += rk.clamp((sy - f.y) * 0.01, -0.35, 0.35);
+        if (f.x < -20) f.dead = true;
+      }
+    }
+  }
+  g.foes = g.foes.filter((f) => !f.dead);
+}
+
+// The Warden: slides in, then drifts up and down. Its jaws open and shut; each time they open it fires
+// a fan from the eye. From stage 2 its cannons fire at you as well. It speeds up as it is damaged.
+function stepBoss(g, rk) {
+  const b = g.boss;
+  if (!b || b.dead) return;
+  const S = g.S;
+  if (b.flash > 0) b.flash--;
+  if (b.fcool > 0) b.fcool--;
+  if (b.entering) {
+    b.x -= 0.9;
+    if (b.x <= 250) { b.x = 250; b.entering = false; }
+    return;
+  }
+  const hurt = 1 - b.hp / b.max;
+  b.t += 1 + hurt * 0.6;
+  b.y = (H - BOSS_H) / 2 + Math.sin(b.t * 0.011) * 50;
+  b.x = 250 + Math.sin(b.t * 0.0065) * 12;
+  if (hurt > 0.5 && g.tick % 5 === 0) spark(g, b.x + rk.rand(16, 50), b.y + rk.rand(4, 44), ['heat', 'chrome-400'], 1, 0.5);
+  const canFire = !g.dead && !rk.ending;
+  if (--b.cycle <= 0) {
+    b.open = !b.open;
+    b.cycle = b.open ? S.bossOpen : S.bossShut;
+    b.volley = false;
+    if (b.open && canFire) {
+      fireAt(g, b.x + 12, b.y + 24, S.shotSpeed, S.bossFan, 0.2);
+      tone(g, rk, 'roar', 10, { type: 'sawtooth', f: 240, to: 110, dur: 0.18, vol: 0.12 });
+    }
+  }
+  // A second fan halfway through, once it fires five at a time
+  if (b.open && !b.volley && S.bossFan >= 5 && b.cycle < S.bossOpen / 2) {
+    b.volley = true;
+    if (canFire) fireAt(g, b.x + 12, b.y + 24, S.shotSpeed, S.bossFan - 1, 0.24);
+  }
+  if (S.bossCannons && --b.cannonT <= 0) {
+    b.cannonT = rk.lerp(70, 110, b.hp / b.max);
+    if (canFire) {
+      fireAt(g, b.x + 5, b.y + 6.2, S.shotSpeed * 0.9, 1, 0);
+      fireAt(g, b.x + 5, b.y + 41.8, S.shotSpeed * 0.9, 1, 0);
+      tone(g, rk, 'cannon', 8, { type: 'square', f: 330, to: 200, dur: 0.06, vol: 0.06 });
+    }
+  }
+}
+
+function stepBullets(g, rk) {
+  for (const b of g.bullets) {
+    b.x += b.vx;
+    b.y += b.vy;
+    if (b.x < -6 || b.x > W + 6 || b.y < -6 || b.y > H + 6) b.dead = true;
+  }
+  g.bullets = g.bullets.filter((b) => !b.dead);
+}
+
+function stepCaps(g, rk) {
+  for (const c of g.caps) {
+    c.t++;
+    c.x -= 0.45;
+    c.y = c.y0 + Math.sin(c.t * 0.06) * 3;
+    if (!g.dead && rk.hit({ x: c.x, y: c.y, w: 9, h: 9 }, { x: g.ship.x, y: g.ship.y, w: SHIP_W, h: SHIP_H })) {
+      c.dead = true;
+      collect(g, rk, c);
+    } else if (c.x < -10) c.dead = true;
+  }
+  g.caps = g.caps.filter((c) => !c.dead);
+}
+
+// The Nova ring races outwards: everything it reaches is destroyed, enemy fire included.
+function stepRing(g, rk) {
+  const R = g.ring;
+  if (!R) return;
+  R.r += 5;
+  for (const f of g.foes) {
+    if (f.dead || f.state === 'wait' || f.x > W) continue;
+    if (Math.hypot(f.x + f.w / 2 - R.x, f.y + f.h / 2 - R.y) <= R.r) killFoe(g, rk, f, true);
+  }
+  for (const b of g.bullets) {
+    if (!b.dead && Math.hypot(b.x - R.x, b.y - R.y) <= R.r) { b.dead = true; spark(g, b.x, b.y, ['aqua-light', 'sun-100'], 1, 0.6); }
+  }
+  const boss = g.boss;
+  if (boss && !boss.dead && !boss.entering && !R.bossHit && Math.hypot(boss.x + 17 - R.x, boss.y + 24 - R.y) <= R.r) {
+    R.bossHit = true;
+    hurtBoss(g, rk, NOVA_BOSS_DAMAGE, boss.x + 12, boss.y + 24);
+  }
+  if (R.r > 360) g.ring = null;
+}
+
+// Anything that touches the ship's hull destroys it (unless it is blinking after a respawn).
+function stepCrashes(g, rk) {
+  if (g.dead || g.inv > 0 || rk.ending) return;
+  const me = shipBox(g);
+  for (const b of g.bullets) {
+    if (rk.hit(me, bulletBox(b))) { b.dead = true; die(g, rk); return; }
+  }
+  for (const f of g.foes) {
+    if (f.dead || f.state === 'wait' || f.x > W) continue;
+    if (rk.hit(me, f)) { killFoe(g, rk, f, false); die(g, rk); return; }
+  }
+  const b = g.boss;
+  if (b && !b.dead) {
+    const parts = wardenParts(b);
+    if ((parts.core && rk.hit(me, parts.core)) || parts.solid.some((r) => rk.hit(me, r))) die(g, rk);
+  }
+}
+
+/* ---------- Drawing ---------- */
+
+function drawSpace(rk, look, scroll) {
+  rk.backdrop.space({ scroll: scroll, planet: look.planet, terrain: look.terrain });
+  if (look.rocks) {
+    const off = (scroll * 0.35) % W;
+    rk.draw('rocks', -off, 104);
+    rk.draw('rocks', W - off, 104);
+  }
+}
+
+// Space dust streaking past: it sells the speed. Scenery only, so it is dim and thin.
+function drawDust(rk, g) {
+  for (const d of g.dust) rk.shape({ rect: [d.x, d.y, d.len, 0.6], r: 0.3, fill: 'chrome-400', alpha: 0.7 });
+}
+
+function drawShip(rk, x, y, tick) {
+  const len = 3 + ((tick >> 2) & 1) * 1.6;                      // the exhaust flickers between two lengths
+  rk.glow(x + 1, y + 5, 6, 'heat', 0.35);
+  rk.shape([
+    { poly: [x + 0.8, y + 3.6, x + 0.8, y + 6.4, x - len, y + 5], fill: 'heat-light' },
+    { poly: [x + 0.8, y + 4.3, x + 0.8, y + 5.7, x - len * 0.55, y + 5], fill: 'sun-100' },
+  ]);
+  rk.draw('ship', x, y);
+}
+
+function drawFoes(rk, g) {
+  for (const f of g.foes) {
+    if (f.dead || f.state === 'wait' || f.x > W + 2) continue;
+    const opts = { flash: f.flash > 0 };
+    if (f.kind === 'hornet') {
+      let x = f.x;
+      if (f.state === 'aim') {
+        x += (g.tick & 2) ? 0.5 : -0.5;                          // it shivers, and its eye lights up, before the dash
+        rk.glow(f.x + 4.8, f.y + 3.5, 5, 'red', 0.55);
+      }
+      rk.draw('hornet', x, f.y, rk.frame('hornet', 12), opts);
+    } else if (f.kind === 'pod') {
+      if (!f.leaving && f.fireT < 18) rk.glow(f.x + 1, f.y + 6, 5, 'red', 0.5);   // charging: the barrel glows
+      rk.draw('pod', f.x, f.y, 0, opts);
+    } else {
+      rk.draw(f.sprite, f.x, f.y, rk.frame(f.sprite, 8), opts);
+    }
+  }
+}
+
+function drawBoss(rk, g) {
+  const b = g.boss;
+  if (!b || b.dead) return;
+  if (b.open) rk.glow(b.x + 17, b.y + 24, 12, 'red', 0.35);
+  else if (b.cycle < 24 && !b.entering) rk.glow(b.x + 12, b.y + 24, 7, 'red', 0.45);   // the eye glints through the seam before the jaws open
+  rk.draw('warden', b.x, b.y, b.open ? 1 : 0, { flash: b.flash > 0 });
+}
+
+function drawShots(rk, g) {
+  for (const s of g.shots) {
+    rk.glow(s.x + s.w / 2, s.y + s.h / 2, 5, 'aqua', 0.45);
+    rk.draw(s.kind, s.x, s.y);
+  }
+}
+
+function drawBlasts(rk, g) {
+  for (const b of g.booms) {
+    if (b.t < 0) continue;
+    const frame = Math.floor(b.t / 4);
+    if (frame < 2) rk.glow(b.x, b.y, b.big ? 18 : 9, 'amber', 0.45);
+    rk.draw(b.big ? 'boom' : 'pop', b.x - (b.big ? 11 : 6), b.y - (b.big ? 11 : 6), frame);
+  }
+  for (const pt of g.parts) rk.circle(pt.x, pt.y, 0.6, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+  const R = g.ring;
+  if (R) {
+    const fade = Math.max(0, 1 - R.r / 360);
+    if (R.r < 40) rk.glow(R.x, R.y, 20, 'aqua', 0.5);
+    rk.shape([
+      { circle: [R.x, R.y, R.r], stroke: 2.4, fill: 'aqua', alpha: 0.35 * fade },
+      { circle: [R.x, R.y, R.r], stroke: 0.9, fill: 'aqua-light', alpha: fade },
+    ]);
+  }
+}
+
+function drawBullets(rk, g) {
+  for (const b of g.bullets) {
+    rk.glow(b.x, b.y, 4, 'red', 0.3);
+    rk.draw('orb', b.x - 2, b.y - 2);
+  }
+}
+
+/* ---------- The game ---------- */
+RetroKit.game({
+  id: 'comet-spur',
+  title: 'COMET SPUR',
+  tagline: 'A SIDE-SCROLLING SHOOTER',
+  lives: 3,
+  hud: [
+    'score', 'best', 'lives', 'stage',
+    { id: 'power', label: 'Power', type: 'text', value: 'Single' },
+    { id: 'nova', label: 'Nova', type: 'meter', low: 0, full: 'Ready' },
+  ],
+  phoneMid: 'nova',
+  keys: [['←', '→', '↑', '↓', 'Move'], ['Space', 'Fire'], ['Shift', 'Nova burst'], ['P', 'Pause']],
+  touch: 'Drag to fly and fire · Tap for nova',
+
+  sprites: {
+    ship: SHIP,
+    wisp: wispArt('red'),
+    wispHeat: wispArt('heat'),
+    pod: POD,
+    hornet: hornetArt(),
+    warden: wardenArt(),
+    capsule: CAPSULE,
+    shot: SHOT,
+    pellet: PELLET,
+    orb: ORB,
+    pop: blastArt(12, 5),
+    boom: blastArt(22, 9),
+  },
+
+  init(rk) {
+    rk.makeSprite(rocksArt(), 'rocks');
+  },
+
+  start(rk) {
+    const dust = [];
+    for (let i = 0; i < 14; i++) dust.push({ x: rk.rand(0, W), y: rk.rand(4, H - 4), len: rk.rand(3, 8), speed: rk.rand(2.2, 4) });
+    const g = {
+      n: 1,                     // stage number: 4 is stage 1 again, faster
+      tick: 0,
+      scroll: 0,
+      ship: { x: START_X, y: START_Y },
+      dead: false,              // between losing a ship and the next one appearing
+      inv: 0,                   // updates of blinking, when nothing can hurt the ship
+      gunT: 0,                  // updates until the gun can fire again
+      power: 1,                 // 1 Single, 2 Twin, 3 Wide
+      nova: 0,                  // the Nova meter, 0 to 1
+      ring: null,               // a Nova burst on its way out
+      shots: [], bullets: [], foes: [], caps: [], booms: [], parts: [],
+      groups: {}, groupId: 0,
+      cool: {},
+      dust: dust,
+      nextLife: FIRST_LIFE,
+    };
+    setupStage(g, rk);
+    rk.hud.set('power', POWER_NAMES[g.power]);
+    rk.hud.set('nova', 0);
+    return g;
+  },
+
+  update(g, rk) {
+    g.tick++;
+    g.scroll += SCROLL;
+    for (const k in g.cool) if (g.cool[k] > 0) g.cool[k]--;
+    for (const d of g.dust) { d.x -= d.speed; if (d.x + d.len < 0) { d.x = W + rk.rand(0, 40); d.y = rk.rand(4, H - 4); } }
+    for (const pt of g.parts) { pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.96; pt.vy *= 0.96; pt.life--; }
+    g.parts = g.parts.filter((pt) => pt.life > 0);
+    for (const b of g.booms) b.t++;
+    g.booms = g.booms.filter((b) => b.t < 16);
+
+    if (rk.score >= g.nextLife) {
+      g.nextLife += NEXT_LIFE;
+      rk.addLife(1);
+      rk.popup('1UP', g.ship.x + SHIP_W / 2, g.ship.y - 8, 'amber');
+    }
+
+    stepShip(g, rk);
+    stepWaves(g, rk);
+    stepFoes(g, rk);
+    stepBoss(g, rk);
+    stepShots(g, rk);
+    stepBullets(g, rk);
+    stepCaps(g, rk);
+    stepRing(g, rk);
+    stepCrashes(g, rk);
+    g.foes = g.foes.filter((f) => !f.dead);
+    g.bullets = g.bullets.filter((b) => !b.dead);
+    rk.hud.set('nova', g.nova);
+  },
+
+  draw(ctx, g, rk) {
+    drawSpace(rk, g.S.look, g.scroll);
+    drawDust(rk, g);
+    for (const c of g.caps) {
+      rk.glow(c.x + 4.5, c.y + 4.5, 11, 'amber', 0.35);
+      rk.draw('capsule', c.x, c.y);
+    }
+    drawBoss(rk, g);
+    drawFoes(rk, g);
+    drawShots(rk, g);
+    // The ship blinks after a respawn, three times a second
+    if (!g.dead && !(g.inv > 0 && Math.floor(g.inv / 10) % 2 === 1)) {
+      if (g.nova >= 1) rk.glow(g.ship.x + 10, g.ship.y + 5, 14, 'aqua', 0.2 + 0.1 * Math.sin(rk.time * 4));   // Nova ready
+      drawShip(rk, g.ship.x, g.ship.y, g.tick);
+    }
+    drawBlasts(rk, g);
+    drawBullets(rk, g);
+  },
+
+  // The title screen: space scrolling by, with the ship in the bottom-left corner and a wisp in the
+  // bottom-right, clear of the logo and menu.
+  drawTitle(ctx, rk) {
+    rk.backdrop.space({ scroll: rk.t * 30 });
+    drawShip(rk, 34, 158, Math.floor(rk.t * 60));
+    rk.draw('wisp', 272, 160, rk.frame('wisp', 8));
+  },
+});
+</script>
+</body>
+</html>
