@@ -1,0 +1,41 @@
+{
+  "games": [
+    {
+      "id": "stompoids",
+      "genre": "City smasher",
+      "new": true,
+      "blurb": "You are a giant alien, dropped into a city by your mothership. Climb the towers, punch them till they fall, and swat the army that fights back.",
+      "picture": "A spiky teal alien walks towards three tower blocks, with soldiers at the windows, on a city street at dusk."
+    },
+    {
+      "id": "comet-spur",
+      "genre": "Shooter",
+      "blurb": "Fly through waves of enemies, grab power capsules and charge a Nova burst. At the end of each stage, shoot the Warden's eye while its jaws are open.",
+      "picture": "A silver ship fires at a line of red one-eyed enemies, with a striped orange planet behind."
+    },
+    {
+      "id": "chrome-chomp",
+      "genre": "Maze chase",
+      "blurb": "Steer a chrome chomper round five mazes, eat every light and keep clear of four gremlins. The big orbs turn the tables for a few seconds.",
+      "picture": "A purple maze full of lights, with a chrome chomper and three red gremlins."
+    },
+    {
+      "id": "orbit-siege",
+      "genre": "Fixed shooter",
+      "blurb": "A fleet of invaders marches down the sky. Slide along the ground, shoot them all before they land, and use the bunkers for cover.",
+      "picture": "Rows of red and amber invaders above four grey bunkers and a ship on a purple planet."
+    },
+    {
+      "id": "last-leap",
+      "genre": "Crossing",
+      "blurb": "Hop a chrome frog over roads, rails and rivers to the lily pads, past trams, steam trains and diving turtles, in town and country.",
+      "picture": "A frog in the road between cars and trucks, with logs on the river and lily pads beyond."
+    },
+    {
+      "id": "dusk-shatter",
+      "genre": "Brick breaker",
+      "blurb": "Bounce the ball off your paddle and smash the wall of bricks against the sunset. Each level brings armoured bricks, new shapes and a faster ball.",
+      "picture": "A wall of red, orange and amber bricks above a glowing ball, a chrome paddle and a setting sun behind mountains."
+    }
+  ]
+}

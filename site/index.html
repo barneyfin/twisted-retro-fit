@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Twisted Retro Fit</title>
+<meta name="description" content="Twisted Retro Fit: {{COUNT_LOWER}} original arcade games to play free in your browser, on a computer or a phone.">
+<!-- Browser chrome and tab icon can't read the kit's tokens, so these repeat ink, sun-100, amber and heat from kit/retro-kit.css -->
+<meta name="theme-color" content="#07070c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2307070c'/%3E%3CclipPath id='s'%3E%3Ccircle cx='16' cy='17' r='10'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23s)'%3E%3Crect y='7' width='32' height='6' fill='%23fff4d6'/%3E%3Crect y='13' width='32' height='5' fill='%23ffb547'/%3E%3Crect y='18' width='32' height='9' fill='%23f2683a'/%3E%3C/g%3E%3Crect x='3' y='21' width='26' height='2' fill='%2307070c'/%3E%3C/svg%3E">
+<!-- The kit's colours and typefaces. site/build.py copies this file (and the fonts) into the page. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../kit/retro-kit.css" data-rk-inline>
+<style>
+/* Twisted Retro Fit: the arcade's front page. Colours and type come from the kit's tokens. */
+html,body{height:auto;overflow:visible}   /* the kit locks the page for games; this page scrolls */
+html{scroll-behavior:smooth}
+body{font-family:var(--font-ui);color:var(--ui-text);background:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.5}
+a{color:inherit}
+a:focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.icon{width:var(--icon-size);height:var(--icon-size);flex-shrink:0}
+
+/* ---------- Hero: a title screen for the whole arcade ---------- */
+.hero{position:relative;isolation:isolate;overflow:hidden;min-height:min(780px,94svh);box-sizing:border-box;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px var(--space-4) 120px;text-align:center}
+.scene{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
+.scene .s0{fill:var(--sky-0)}.scene .s1{fill:var(--sky-1)}.scene .s2{fill:var(--sky-2)}.scene .s3{fill:var(--sky-3)}
+.scene .s4{fill:var(--sky-4)}.scene .s5{fill:var(--sky-5)}.scene .s6{fill:var(--sky-6)}
+.scene .sun1{fill:var(--sun-100)}.scene .sun2{fill:var(--amber)}.scene .sun3{fill:var(--heat)}
+.scene .far{fill:var(--hill-far)}.scene .near{fill:var(--hill-near)}.scene .ground{fill:var(--ink)}
+.scene .stars{fill:var(--chrome-200)}
+.tw{animation:twinkle 4.8s ease-in-out infinite}.t1{animation-delay:-1.6s}.t2{animation-delay:-3.2s}
+@keyframes twinkle{50%{opacity:.25}}
+.hero-logo{margin:0}
+.hero-logo>span{font-size:clamp(44px,10vw,112px)}
+.hero .rk-tagline{margin:20px 0 0;font-size:13px}
+.hero-panel{margin-top:36px;max-width:460px;padding:var(--space-6);display:flex;flex-direction:column;align-items:center;gap:18px}
+.hero-panel p{margin:0;font-size:16px;line-height:24px;color:var(--ui-text-2)}
+.hero-panel .rk-btn{text-decoration:none}
+
+/* ---------- Sections ---------- */
+main{max-width:1240px;margin:0 auto;padding:0 var(--space-5) 72px}
+.section-head{display:flex;justify-content:center;margin:var(--space-2) 0 var(--space-8)}
+.section-head .rk-tagline{margin:0;font-size:13px}
+.howto{margin-top:72px}
+
+/* ---------- Game cards: a little arcade cabinet each ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:var(--space-6)}
+.cab{position:relative;display:flex;flex-direction:column;overflow:hidden;container-type:inline-size;transition:transform .18s ease,box-shadow .18s ease}
+.cab:hover{transform:translateY(-4px);box-shadow:var(--shadow-panel),0 0 0 1px var(--ui-focus)}
+/* Marquee: the game's own logo over a strip of dusk sky */
+.cab-marquee{padding:22px var(--space-4) 20px;text-align:center;border-bottom:2px solid var(--chrome-300);
+  background:linear-gradient(to bottom,var(--sky-0) 0 34%,var(--sky-1) 34% 58%,var(--sky-2) 58% 78%,var(--sky-3) 78% 89%,var(--sky-4) 89% 94%,var(--sky-5) 94% 97.5%,var(--sky-6) 97.5%)}
+.cab-title{margin:0}
+.cab-title>span{font-size:clamp(20px,8.2cqi,34px)}
+.cab-tag{margin:10px 0 0;min-height:14px;font-family:var(--font-world);font-weight:600;font-size:11px;line-height:14px;letter-spacing:.3em;padding-left:.3em;color:var(--chrome-200)}
+/* Screen: a picture of the game in play */
+.cab-screen{position:relative;aspect-ratio:16/9;overflow:hidden;background:var(--ink)}
+.cab-screen img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .3s ease}
+.cab:hover .cab-screen img{transform:scale(1.03)}
+.cab-screen.no-art{background:linear-gradient(to bottom,var(--sky-0) 0 40%,var(--sky-1) 40% 62%,var(--sky-2) 62% 78%,var(--sky-3) 78% 88%,var(--sky-4) 88% 94%,var(--sky-5) 94%)}
+.cab-chips{position:absolute;left:10px;top:10px;right:10px;display:flex;gap:6px;align-items:center}
+.cab-chips .rk-chip{color:var(--ui-text)}
+/* Control panel: what it's about, how to play it, and the button */
+.cab-body{flex:1;display:flex;flex-direction:column;gap:14px;padding:18px var(--space-5) var(--space-5)}
+.cab-blurb{margin:0;font-size:15px;line-height:22px;color:var(--ui-text-2)}
+.cab-modes{margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.cab-modes .rk-label{margin-right:4px}
+.mode{padding:2px 10px;border-radius:var(--radius-pill);border:1px solid var(--ui-glass-border);background:var(--ui-kbd-fill);font-size:12px;line-height:18px;font-weight:500;color:var(--ui-text-2)}
+.cab-ctl{display:flex;gap:10px;align-items:flex-start;font-size:12px;line-height:22px;font-weight:500;color:var(--ui-text-2)}
+.cab-ctl>.icon{width:16px;height:16px;margin-top:3px;color:var(--ui-text-3)}
+.cab-ctl p{margin:0}
+.cab-keys{display:flex;flex-wrap:wrap;gap:6px 14px}
+.key{display:inline-flex;align-items:center;gap:4px}
+.key .rk-kbd{min-width:22px}
+.cab-foot{margin-top:auto;padding-top:4px;display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}
+.cab-best{margin:0;display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--ui-text-2)}
+.cab-best[hidden]{display:none}
+.cab-best .rk-num{font-size:16px}
+.cab-play{margin-left:auto;min-width:128px;text-decoration:none}
+.cab-play::after{content:"";position:absolute;inset:0}   /* the whole card is the link */
+.cab:hover .cab-play{background:var(--aqua-light);border-color:var(--aqua-light)}
+
+/* ---------- How to play ---------- */
+.tips{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:var(--space-4)}
+.tip{padding:var(--space-5);display:flex;flex-direction:column;gap:10px}
+.tip .icon{width:24px;height:24px;color:var(--aqua)}
+.tip h3{margin:0;font-size:17px;line-height:24px;font-weight:600}
+.tip p{margin:0;font-size:14px;line-height:21px;color:var(--ui-text-2)}
+
+/* ---------- Footer ---------- */
+.foot{border-top:1px solid var(--ui-glass-border);padding:28px var(--space-5) 40px;text-align:center;font-size:13px;line-height:20px;color:var(--ui-text-3)}
+.foot p{margin:0 0 6px}
+.foot a{color:var(--ui-text-2)}
+
+@media (max-width:560px){
+  .hero{padding-bottom:96px}
+  .hero .rk-tagline::before,.hero .rk-tagline::after{width:32px}
+  .hero-panel{padding:var(--space-5)}
+  main{padding:0 var(--space-4) 56px}
+}
+/* Calm: no movement for players who ask for less (their system setting, or Reduce motion in any game's settings) */
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.tw{animation:none}.cab,.cab-screen img{transition:none}.cab:hover{transform:none}.cab:hover .cab-screen img{transform:none}}
+.calm{scroll-behavior:auto}.calm .tw{animation:none}.calm .cab,.calm .cab-screen img{transition:none}.calm .cab:hover{transform:none}.calm .cab:hover .cab-screen img{transform:none}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <svg class="scene" viewBox="0 0 1600 640" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <defs>
+      <radialGradient id="sunglow">
+        <stop offset="0" style="stop-color:var(--amber);stop-opacity:.42"/>
+        <stop offset="1" style="stop-color:var(--amber);stop-opacity:0"/>
+      </radialGradient>
+      <clipPath id="sundisc"><circle cx="1130" cy="468" r="112"/></clipPath>
+    </defs>
+    <rect class="s0" width="1600" height="220"/>
+    <rect class="s1" y="220" width="1600" height="100"/>
+    <rect class="s2" y="320" width="1600" height="70"/>
+    <rect class="s3" y="390" width="1600" height="45"/>
+    <rect class="s4" y="435" width="1600" height="30"/>
+    <rect class="s5" y="465" width="1600" height="20"/>
+    <rect class="s6" y="485" width="1600" height="155"/>
+    <g class="stars"><circle class="tw t0" cx="673" cy="85" r="1.4"/><circle cx="1343" cy="32" r="1"/><circle cx="1107" cy="56" r="1.2"/><circle cx="1203" cy="37" r="1.6"/><circle class="tw t1" cx="449" cy="27" r="1"/><circle cx="898" cy="222" r="1"/><circle cx="502" cy="54" r="1.6"/><circle cx="879" cy="38" r="1.6"/><circle class="tw t2" cx="263" cy="122" r="2"/><circle cx="1294" cy="306" r="1"/><circle cx="1191" cy="307" r="1.4"/><circle cx="111" cy="121" r="1"/><circle class="tw t0" cx="1150" cy="76" r="1.2"/><circle cx="868" cy="81" r="1.6"/><circle cx="251" cy="300" r="1.2"/><circle cx="1157" cy="100" r="1"/><circle class="tw t1" cx="1201" cy="300" r="2"/><circle cx="394" cy="198" r="1"/><circle cx="1131" cy="40" r="1.6"/><circle cx="132" cy="324" r="1"/><circle class="tw t2" cx="1026" cy="280" r="1.4"/><circle cx="653" cy="246" r="1.6"/><circle cx="938" cy="193" r="1.2"/><circle cx="518" cy="100" r="2"/><circle class="tw t0" cx="509" cy="49" r="1.6"/><circle cx="624" cy="276" r="1.4"/><circle cx="713" cy="237" r="1.2"/><circle cx="1257" cy="45" r="1"/><circle class="tw t1" cx="1058" cy="222" r="1"/><circle cx="1560" cy="183" r="1"/><circle cx="1011" cy="223" r="1"/><circle cx="1378" cy="47" r="1.6"/><circle class="tw t2" cx="1183" cy="168" r="1.2"/><circle cx="1433" cy="187" r="1.6"/><circle cx="1027" cy="304" r="1.4"/><circle cx="150" cy="55" r="1.2"/><circle class="tw t0" cx="980" cy="41" r="1"/><circle cx="1507" cy="166" r="2"/><circle cx="1193" cy="236" r="1.2"/><circle cx="1477" cy="205" r="2"/><circle class="tw t1" cx="720" cy="19" r="1.4"/><circle cx="737" cy="94" r="1.6"/><circle cx="249" cy="260" r="1"/><circle cx="456" cy="155" r="1"/></g>
+    <circle cx="1130" cy="468" r="260" fill="url(#sunglow)"/>
+    <g clip-path="url(#sundisc)">
+      <rect class="sun1" x="1010" y="340" width="240" height="62"/>
+      <rect class="sun2" x="1010" y="402" width="240" height="44"/>
+      <rect class="sun3" x="1010" y="446" width="240" height="150"/>
+    </g>
+    <polygon class="far" points="0,640 0,452 80,420 170,450 260,392 360,446 450,410 560,462 650,428 740,472 800,450 860,472 950,424 1040,458 1130,404 1240,452 1330,416 1420,456 1510,400 1600,440 1600,640"/>
+    <polygon class="near" points="0,640 0,520 110,484 230,526 340,476 470,530 580,496 700,540 820,502 930,538 1050,490 1170,532 1280,486 1400,528 1500,496 1600,522 1600,640"/>
+    <rect class="ground" y="590" width="1600" height="50"/>
+  </svg>
+  <h1 class="rk-logo hero-logo"><span>TWISTED</span><span>RETRO FIT</span></h1>
+  <p class="rk-tagline">A BROWSER ARCADE</p>
+  <div class="rk-panel hero-panel">
+    <p>{{COUNT}} original arcade games, free to play in your browser on a computer, or on a phone turned sideways.</p>
+    <a class="rk-btn is-primary" href="#games">Choose a game</a>
+  </div>
+</header>
+
+<main>
+  <section id="games" aria-labelledby="games-title">
+    <div class="section-head"><h2 class="rk-tagline" id="games-title">{{COUNT_CAPS}} GAMES</h2></div>
+    <div class="grid">
+{{GAMES}}
+    </div>
+  </section>
+
+  <section class="howto" aria-labelledby="howto-title">
+    <div class="section-head"><h2 class="rk-tagline" id="howto-title">HOW TO PLAY</h2></div>
+    <div class="tips">
+      <div class="rk-panel tip">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M8 14h8"/></svg>
+        <h3>On a computer</h3>
+        <p>Play with the keyboard: each game's card shows its keys. P or Esc pauses.</p>
+      </div>
+      <div class="rk-panel tip">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="16" rx="2"/><path d="M3 15a9 9 0 0 0 9 7"/><polyline points="9,19 12,22 9,24"/></svg>
+        <h3>On a phone</h3>
+        <p>Turn your phone sideways and play with your thumbs. The touch controls are on each card too.</p>
+      </div>
+      <div class="rk-panel tip">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4"/><path d="M16 6h3a3 3 0 0 1-3 4"/><line x1="12" y1="13" x2="12" y2="17"/><line x1="8" y1="20" x2="16" y2="20"/></svg>
+        <h3>High scores</h3>
+        <p>Kept in this browser on this device, with your initials. Your best shows on each card. Settings such as volume carry over to every game.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Twisted Retro Fit. Every game is built on Retro Kit {{KIT_VERSION}}, drawn in shapes and played in your browser.</p>
+  <p>Typefaces: <a href="licences/Bungee-OFL.txt">Bungee</a>, <a href="licences/ChakraPetch-OFL.txt">Chakra Petch</a>, <a href="licences/Geist-OFL.txt">Geist</a> and <a href="licences/GeistMono-OFL.txt">Geist Mono</a>, under the SIL Open Font License.</p>
+</footer>
+
+<script>
+/* Show the player's best score on each card, and follow the games' own settings (Reduce motion, Solid panels).
+   The games save these in this browser; the keys are the kit's (retrokit.scores.<game>[.<mode>], retrokit.settings). */
+(function () {
+  function read(key) {
+    try { return JSON.parse(window.localStorage.getItem(key)); } catch (e) { return null; }
+  }
+  var settings = read('retrokit.settings') || {};
+  if (settings.reduceMotion) document.documentElement.classList.add('calm');
+  if (settings.solid) document.body.classList.add('rk-solid');
+  var cards = document.querySelectorAll('[data-scores]');
+  for (var c = 0; c < cards.length; c++) {
+    var best = null;
+    var keys = cards[c].getAttribute('data-scores').split(' ');
+    for (var k = 0; k < keys.length; k++) {
+      var table = read(keys[k]);
+      if (!Array.isArray(table)) continue;
+      for (var r = 0; r < table.length; r++) {
+        var row = table[r];
+        if (row && typeof row.s === 'number' && row.s > 0 && (!best || row.s > best.s)) best = row;
+      }
+    }
+    if (!best) continue;
+    var el = cards[c].querySelector('.cab-best');
+    el.querySelector('.rk-num').textContent = best.s.toLocaleString('en-GB');
+    el.querySelector('.cab-initials').textContent = String(best.i || '').slice(0, 3);
+    el.hidden = false;
+  }
+})();
+</script>
+</body>
+</html>

@@ -12,3 +12,6 @@ __pycache__/
 
 # Built games: kit/build.py makes them from games/, so they are not kept in git
 dist/
+
+# Built website: site/build.py makes it (GitHub builds its own copy when publishing)
+_site/
