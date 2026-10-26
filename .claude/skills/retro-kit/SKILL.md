@@ -5,7 +5,7 @@ description: Make, change or fix a browser arcade game in the Retro Games folder
 
 # Retro Kit
 
-Every game in this folder is built on Retro Kit (`kit/`). The kit already provides everything games share: the title screen, menus, a choice of game modes, HUD, pause, game over, initials entry, high scores, settings, the phone layout and rotate prompt, keyboard and touch input, sound, music, sprites, backdrops and the build. A game supplies only its rules and its art. Never rebuild what the kit does.
+Every game in this folder is built on Retro Kit (`kit/`). The kit already provides everything games share: the title screen, menus, a choice of game modes, HUD, pause, game over, initials entry, high scores, settings, the phone layout and rotate prompt, full screen, keyboard and touch input, sound, music, sprites, backdrops and the build. A game supplies only its rules and its art. Never rebuild what the kit does.
 
 Before writing any code, read both files beside this one:
 - [reference.md](reference.md): the full API: config, hooks, `rk` functions, game modes, input, sprites, sound, music.

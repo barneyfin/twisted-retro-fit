@@ -86,6 +86,8 @@ html,body{margin:0;height:100%;background:var(--ink);overflow:hidden}
 .rk-btn.is-selected:not(.is-primary){background:var(--ui-glass-highlight);box-shadow:var(--shadow-focus)}
 .rk-ibtn{box-sizing:border-box;width:var(--tap-min);height:var(--tap-min);padding:0;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:50%;border:1px solid var(--ui-glass-border);background:var(--ui-glass-chip);-webkit-backdrop-filter:blur(var(--blur-chip));backdrop-filter:blur(var(--blur-chip));box-shadow:var(--shadow-chip);color:var(--ui-text);cursor:pointer}
 .rk-panel .rk-ibtn{background:var(--ui-kbd-fill);-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none}
+.rk-ibtn[hidden]{display:none}
+a.rk-ibtn{text-decoration:none}
 .rk-ibtn svg,.rk-item svg,.rk-btn svg{width:var(--icon-size);height:var(--icon-size);flex-shrink:0}
 .rk-kbd{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:var(--radius-kbd);border:1px solid var(--ui-kbd-border);background:var(--ui-kbd-fill);font-family:var(--font-mono);font-size:11px;line-height:14px;font-weight:500;color:var(--ui-text)}
 .rk-heading{font-family:var(--font-ui);font-size:22px;line-height:28px;font-weight:600;color:var(--ui-text);margin:0}
@@ -162,6 +164,7 @@ html,body{margin:0;height:100%;background:var(--ink);overflow:hidden}
 .rk-topbar .rk-tb-cell.is-end{justify-content:flex-end;align-items:center;gap:14px}
 .rk-topbar .rk-num{font-size:18px}
 .rk-dot{display:block;width:8px;height:8px;border-radius:50%;background:var(--aqua)}
+.rk-bar-btns{display:flex;align-items:center;gap:var(--space-2)}
 
 /* Dialogs */
 .rk-dialog-layer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:var(--space-4);box-sizing:border-box}

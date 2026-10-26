@@ -1,0 +1,14 @@
+<!-- Twisted Retro Fit's app icon: the browser-tab icon's banded sun, drawn full-bleed for a phone's home screen
+     (the phone rounds the corners itself). Colours repeat ink, sun-100, amber and heat from kit/retro-kit.css.
+     The sun sits inside the middle 80% so Android's round crop keeps all of it. The PNGs beside this file are
+     drawn from it: if it changes, ask Claude Code to redraw them. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#07070c"/>
+  <clipPath id="sun"><circle cx="256" cy="272" r="160"/></clipPath>
+  <g clip-path="url(#sun)">
+    <rect y="112" width="512" height="96" fill="#fff4d6"/>
+    <rect y="208" width="512" height="80" fill="#ffb547"/>
+    <rect y="288" width="512" height="144" fill="#f2683a"/>
+  </g>
+  <rect x="48" y="336" width="416" height="32" fill="#07070c"/>
+</svg>
