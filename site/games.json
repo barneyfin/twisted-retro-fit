@@ -1,6 +1,13 @@
 {
   "games": [
     {
+      "id": "seam-fever",
+      "genre": "Platformer",
+      "new": true,
+      "blurb": "Guide a little mining robot through twelve caverns. Pick up every glimmer to open the lift, and get there before your air runs out.",
+      "picture": "A chrome mining robot jumps between steel ledges in a red rock cavern, past fire vents, amber crystals and a horned red imp."
+    },
+    {
       "id": "stompoids",
       "genre": "City smasher",
       "new": true,

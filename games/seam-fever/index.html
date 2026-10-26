@@ -1,0 +1,1725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seam Fever</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files (and the fonts) into dist/<game>.html. Keep data-rk-inline. -->
+<link rel="stylesheet" href="../../kit/retro-kit.css" data-rk-inline>
+<script src="../../kit/retro-kit.js" data-rk-inline></script>
+<script src="music.js" data-rk-inline></script>
+</head>
+<body>
+<script>
+/* SEAM FEVER — a Retro Kit game. Rules for this file: .claude/skills/retro-kit/SKILL.md
+   A single-screen cavern platformer in the spirit of the early-80s home-computer classics. Guide a little
+   chrome mining robot through twelve caverns, one screen each. Pick up every glimmer (the amber crystals)
+   and the lift opens: reach it before the air runs out. Jumps are fixed arcs, so choose the direction
+   before you leave the ground: there is no steering in the air. A fall that is too long breaks the miner,
+   and so does touching anything red.
+   Each cavern adds one thing:
+      1 Pithead          ledges, spikes and a runaway cart
+      2 Timber gallery   crumbling ledges (they grow back after a while)
+      3 Belt works       conveyor belts: you cannot walk against them
+      4 Glass grotto     guardians that rise and fall
+      5 Drip cellar      dripstones that drop when you pass underneath
+      6 Switch vault     a lever that opens a gate
+      7 Vent hall        fire vents
+      8 Kite cavern      guardians that swoop
+      9 Piston press     rams that slam down
+     10 Mushroom deep    all of it at once
+     11 Cinder run       a long climb on little air
+     12 The furnace      the furnace golem
+   After the twelfth the set repeats, deeper: guardians and traps faster, less air. An extra life every
+   10,000 points. Glimmers already picked up stay picked up when a life is lost.
+   The soundtrack is Barney's own MP3, kept in music.js. The kit plays it: see the music option, at the bottom. */
+
+/* ---------- Playfield layout (world pixels; the world is 320 x 180) ---------- */
+const W = 320;
+const H = 180;
+const T = 10;                   // one tile: a cavern is 32 tiles across and 18 down
+const COLS = 32;
+const ROWS = 18;
+const PW = 8;                   // the miner's box (its sprite is 10 wide: boots and lamp stick out a pixel)
+const PH = 18;
+const WALK = 1.2;               // pixels per update (72 a second); belts carry the miner at the same pace
+const JUMP_V = 3.3;             // a jump rises 34 pixels: enough to reach a ledge three tiles up
+const GRAVITY = 0.16;
+const FALL_FAST = 3.4;          // the fastest the miner falls
+const SAFE_FALL = 70;           // fall further than this (seven tiles) and the miner breaks
+const COYOTE = 4;               // updates after walking off a ledge when a jump still works
+const BUFFER = 6;               // updates a jump press is remembered while the miner is still in the air
+const CRUMBLE = 30;             // updates of standing on a crumbling ledge before it gives way
+const REGROW = 420;             // updates before a crumbled ledge grows back (7 seconds)
+const DRIP_REACH = 16;          // a dripstone lets go when the miner passes this close underneath
+const STICK = 14;               // touch: how far the finger can lead the point it pressed down on
+const FLICK = 9;                // touch: drag up this far to jump
+const GLIMMER_PTS = 100;
+const AIR_PTS = 20;             // points for each second of air left when the miner reaches the lift
+const LIFE_EVERY = 10000;
+const INV = 50;                 // updates the miner is protected (and blinks) after coming back
+
+/* ---------- How each kind of cavern looks ----------
+   wall: the three tones of a solid block (light top, body, dark foot). ledge: the same for the thin
+   ledges the miner can jump up through. mark: the detail on wall blocks; ledgeMark: on ledges.
+   spike: the art of the floor and ceiling spikes. Crumbling ledges, belts, vents and gates look the same
+   in every cavern, so they are learnt once. */
+const LOOKS = {
+  pithead: { wall: ['sky-3', 'sky-2', 'sky-1'], ledge: ['sky-5', 'sky-4', 'sky-3'], mark: 'crack', ledgeMark: 'studs', spike: 'shards' },
+  timber: { wall: ['sky-4', 'sky-3', 'sky-2'], ledge: ['heat-light', 'heat', 'heat-dark'], mark: 'crack', ledgeMark: 'seams', spike: 'thorns' },
+  works: { wall: ['chrome-300', 'chrome-400', 'hill-near'], ledge: ['chrome-200', 'chrome-300', 'chrome-400'], mark: 'rivet', ledgeMark: 'holes', spike: 'shards' },
+  glass: { wall: ['sky-5', 'sky-4', 'sky-3'], ledge: ['chrome-200', 'sky-5', 'sky-4'], mark: 'facet', ledgeMark: 'studs', spike: 'shards' },
+  fungus: { wall: ['sky-3', 'sky-2', 'hill-near'], ledge: ['sky-4', 'sky-3', 'sky-2'], mark: 'moss', ledgeMark: 'studs', spike: 'thorns' },
+  ember: { wall: ['heat', 'heat-dark', 'red-dark'], ledge: ['chrome-300', 'chrome-400', 'hill-near'], mark: 'vein', ledgeMark: 'holes', spike: 'coals' },
+};
+
+/* ---------- The caverns ----------
+   Each map is 18 rows of 32 tiles:
+     .  open                  #  rock (solid)            =  ledge: stand on it, jump up through it
+     ~  crumbling ledge       <  >  belt: carries the miner that way
+     ^  spikes on the floor   v  spikes hanging from the ceiling
+     *  glimmer               S  the miner's start (the lower of the two tiles it fills)
+     E  the lift (the top-left of its 2 x 2 tiles)
+     L  lever                 B  gate: solid until the lever is pulled
+     d  dripstone (hangs under rock, drops when the miner passes)
+     f  vent: a ledge that spouts fire        p  piston: a ram that slams down to the floor below
+   air: seconds of air. guards: the guardians, in tiles. h: [from, to] walks along a row (standing on the
+   floor under that row); v: [from, to] rises and falls in a column; swoop: how far (pixels) it dips and
+   rises as it flies along a row. speed in pixels per update, at: where it starts along its path (0 to 1),
+   dir: -1 to start the other way. vent and ram: their timings in updates (step: how far apart in time
+   neighbouring ones are). */
+const CAVERNS = [
+  { // 1: learn to walk and jump. Climb the ledges, then out through the roof to the lift at the pithead.
+    name: 'Pithead', look: 'pithead', air: 100, seed: 11,
+    map: [
+      '................................',
+      '................................',
+      '................................',
+      '...E............................',
+      '................................',
+      '#########################.....##',
+      '#..*...........................#',
+      '#..............................#',
+      '#=======..........*.....=====..#',
+      '#..............................#',
+      '#..............................#',
+      '#.....=====.......======.......#',
+      '#...........*..................#',
+      '#..............................#',
+      '#==.......====..........====...#',
+      '#...............*..............#',
+      '#S.....^..............^....*...#',
+      '################################',
+    ],
+    guards: [{ art: 'rattler', h: [9, 20], row: 16, speed: 0.45 }],
+  },
+  { // 2: crumbling ledges. The lift stands on solid ground between two of them.
+    name: 'Timber gallery', look: 'timber', air: 95, seed: 23,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#..*..........E...........*....#',
+      '#..............................#',
+      '#=====.......~==~.......=====..#',
+      '#..............................#',
+      '#..............................#',
+      '#.....~~~~~.........~~~~~......#',
+      '#..............................#',
+      '#.............*................#',
+      '#===.......=========.......====#',
+      '#..............................#',
+      '#..............................#',
+      '#......=====..........=====....#',
+      '#..*.......................*...#',
+      '#S...............^.............#',
+      '################################',
+    ],
+    guards: [
+      { art: 'grub', h: [11, 19], row: 10, speed: 0.4 },
+      { art: 'grub', h: [5, 15], row: 16, speed: 0.5, at: 0.6 },
+    ],
+  },
+  { // 3: belts. The one along the floor carries you towards spikes: jump in time. Belts lead to the lift.
+    name: 'Belt works', look: 'works', air: 90, seed: 37,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#.*...........E............*...#',
+      '#..............................#',
+      '#=====....>>>>====......=======#',
+      '#..............................#',
+      '#..............................#',
+      '#...<<<<<<<.........>>>>>>>....#',
+      '#..............................#',
+      '#..............*...............#',
+      '#===......==========......====.#',
+      '#..............................#',
+      '#..............................#',
+      '#....=====......====....=====..#',
+      '#..............................#',
+      '#S.........*.........^......*..#',
+      '########>>>>>>>>>>>>############',
+    ],
+    guards: [
+      { art: 'crab', h: [10, 19], row: 10, speed: 0.5 },
+      { art: 'crab', h: [5, 9], row: 13, speed: 0.35, at: 1 },
+    ],
+  },
+  { // 4: bores rise and fall through the gaps between ledges: wait for one to pass before you jump.
+    name: 'Glass grotto', look: 'glass', air: 90, seed: 41,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..*...........................#',
+      '#..........................E...#',
+      '#..............................#',
+      '#=====...====....====...=======#',
+      '#..............*...............#',
+      '#..............................#',
+      '#....====....====....====......#',
+      '#..............................#',
+      '#..........*.......*...........#',
+      '#===....====....====....====...#',
+      '#..............................#',
+      '#..............................#',
+      '#....====....====....====......#',
+      '#..............................#',
+      '#S...........^.......^.....*...#',
+      '################################',
+    ],
+    guards: [
+      { art: 'bore', v: [4, 16], col: 12, speed: 0.6 },
+      { art: 'bore', v: [6, 16], col: 20, speed: 0.75, at: 0.5 },
+      { art: 'bore', v: [1, 9], col: 7, speed: 0.5, at: 1 },
+    ],
+  },
+  { // 5: dripstones along the bottom passage let go as you pass beneath. Keep walking.
+    name: 'Drip cellar', look: 'fungus', air: 90, seed: 53,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..*..............E............#',
+      '#..............................#',
+      '#======....=========.....======#',
+      '#..............................#',
+      '#..............*...............#',
+      '#....=====...=======...=====...#',
+      '#..............................#',
+      '#..*.......................*...#',
+      '#=====.....==========.....=====#',
+      '#..............................#',
+      '#..............................#',
+      '#.....####################.....#',
+      '#===....d....d....d....d....===#',
+      '#..............................#',
+      '#S...*........*........*.......#',
+      '################################',
+    ],
+    guards: [
+      { art: 'slug', h: [11, 20], row: 9, speed: 0.35 },
+      { art: 'slug', h: [6, 25], row: 12, speed: 0.45, at: 0.5 },
+    ],
+  },
+  { // 6: the lift is locked in behind a gate. Pull the lever at the top to open it.
+    name: 'Switch vault', look: 'works', air: 95, seed: 67,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#.L..........*.............*...#',
+      '#..............................#',
+      '#======....=========....=======#',
+      '#..............................#',
+      '#..............................#',
+      '#...=====.....=====....======..#',
+      '#..............................#',
+      '#.*........................*...#',
+      '#=====.....=========......=====#',
+      '#..............................#',
+      '#......................#########',
+      '#....=====.............#.......#',
+      '#......................B...E...#',
+      '#S.......^.........*...B.......#',
+      '################################',
+    ],
+    guards: [
+      { art: 'warden', h: [11, 19], row: 10, speed: 0.5 },
+      { art: 'warden', h: [10, 22], row: 16, speed: 0.55, at: 0.5 },
+    ],
+  },
+  { // 7: fire vents, in the ledges and along the floor. Watch them sputter, then cross.
+    name: 'Vent hall', look: 'ember', air: 90, seed: 71,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..*.........................*.#',
+      '#..............E...............#',
+      '#..............................#',
+      '#======.....========.....======#',
+      '#..............................#',
+      '#..............................#',
+      '#...==f==.....==ff==....===f==.#',
+      '#..............................#',
+      '#.*.........*.........*........#',
+      '#=f===.....=====f====.....=f===#',
+      '#..............................#',
+      '#..............................#',
+      '#.....==f==...........==f==....#',
+      '#..............................#',
+      '#S...........*.................#',
+      '####=fff=###=fff=###=fff=#######',
+    ],
+    guards: [
+      { art: 'imp', h: [11, 20], row: 10, speed: 0.45 },
+      { art: 'imp', h: [25, 30], row: 16, speed: 0.4 },
+    ],
+  },
+  { // 8: kites swoop across the open middle of the cavern. Jump when they have passed.
+    name: 'Kite cavern', look: 'glass', air: 90, seed: 83,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#.*..........................E.#',
+      '#..............................#',
+      '#=====......=======.......=====#',
+      '#..............................#',
+      '#..............*...............#',
+      '#.....=====..........=====.....#',
+      '#..............................#',
+      '#..*.......................*...#',
+      '#=====.....==========.....=====#',
+      '#..............................#',
+      '#..............................#',
+      '#......=====..........=====....#',
+      '#..............................#',
+      '#S..........*......^...........#',
+      '################################',
+    ],
+    guards: [
+      { art: 'kite', h: [1, 30], row: 12, swoop: 12, speed: 0.7 },
+      { art: 'kite', h: [1, 30], row: 6, swoop: 10, speed: 0.8, at: 0.6, dir: -1, phase: 2 },
+    ],
+  },
+  { // 9: rams slam down across the bottom passage. Pass under each one while it is up.
+    name: 'Piston press', look: 'works', air: 95, seed: 97,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..*.....................*.....#',
+      '#.............E................#',
+      '#..............................#',
+      '#======....==========....======#',
+      '#..............................#',
+      '#..............................#',
+      '#....========......========....#',
+      '#..............................#',
+      '#..........................*...#',
+      '#...####p####p####p####p####...#',
+      '#..............................#',
+      '#..............................#',
+      '#==.........................==.#',
+      '#..............................#',
+      '#S....*....*.........*....*....#',
+      '################################',
+    ],
+    guards: [
+      { art: 'cog', h: [5, 12], row: 7, speed: 0.6 },
+      { art: 'cog', h: [4, 27], row: 10, speed: 0.5, at: 0.5 },
+    ],
+    ram: { wait: 90, hold: 24, step: 40 },
+  },
+  { // 10: crumbling ledges, belts that carry you away from the lift, dripstones and jellies.
+    name: 'Mushroom deep', look: 'fungus', air: 85, seed: 101,
+    map: [
+      '################################',
+      '#..............................#',
+      '#.*..........................*.#',
+      '#............E.................#',
+      '#..............................#',
+      '#====~~~..<<<==>>>....~~~======#',
+      '#..............................#',
+      '#..............................#',
+      '#...=====..##########..=====...#',
+      '#.............d....d...........#',
+      '#..*.......................*...#',
+      '#=========............=========#',
+      '#..............................#',
+      '#..............................#',
+      '#.....=====>>>>....<<<<=====...#',
+      '#..............................#',
+      '#S........^....*.....^.........#',
+      '################################',
+    ],
+    guards: [
+      { art: 'jelly', v: [10, 15], col: 16, speed: 0.5 },
+      { art: 'jelly', v: [1, 7], col: 20, speed: 0.6, at: 0.5 },
+    ],
+  },
+  { // 11: a long climb on little air, over vents, belts and crumbling ledges.
+    name: 'Cinder run', look: 'ember', air: 60, seed: 113,
+    map: [
+      '################################',
+      '#..............................#',
+      '#.........................*....#',
+      '#............................E.#',
+      '#..............................#',
+      '#.............~~~~~~~....======#',
+      '#..............................#',
+      '#..*...........................#',
+      '#=====....==f==.....>>>>.......#',
+      '#..............................#',
+      '#..............................#',
+      '#......~~~~.....=====f=====....#',
+      '#..............................#',
+      '#.........................*....#',
+      '#==f==.....<<<<<..........=====#',
+      '#..............................#',
+      '#S.......*.......^^......*.....#',
+      '###==f==####==f==#####==f==#####',
+    ],
+    guards: [
+      { art: 'beetle', h: [16, 26], row: 10, speed: 0.55 },
+      { art: 'beetle', h: [19, 30], row: 16, speed: 0.6, at: 0.5 },
+    ],
+  },
+  { // 12: the furnace golem walks the floor. Rams, vents and crumbling ledges above.
+    name: 'The furnace', look: 'ember', air: 90, seed: 127,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..*........................*..#',
+      '#..............E...............#',
+      '#..............................#',
+      '#=====....~~~======~~~....=====#',
+      '#..............................#',
+      '#..............................#',
+      '#..==f==...####p##p####...==f==#',
+      '#..............................#',
+      '#.*.............*............*.#',
+      '#=====....============....=====#',
+      '#..............................#',
+      '#..............................#',
+      '#====......................====#',
+      '#..............................#',
+      '#S.........*........*..........#',
+      '################################',
+    ],
+    guards: [
+      { art: 'golem', h: [5, 26], row: 16, speed: 0.45 },
+      { art: 'kite', h: [6, 25], row: 6, swoop: 8, speed: 0.6 },
+    ],
+    ram: { wait: 100, hold: 24, step: 50 },
+  },
+];
+
+/* ---------- Helpers ---------- */
+
+// A small seeded random number generator, so the scenery is the same every time.
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function hit(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+// How much faster things are on each trip round the twelve caverns, and how much less air there is.
+function lapFast(lap) { return Math.min(1.5, 1 + 0.12 * lap); }
+function lapAir(lap) { return Math.max(0.6, 1 - 0.1 * lap); }
+
+/* ---------- Art: the miner ----------
+   A little chrome mining robot: a domed helmet with an ink visor, a tank of air (aqua) on its back,
+   and two jointed legs. It faces right; drawing it with flip turns it round. */
+const MINER_BODY = [
+  { rect: [0.2, 7.4, 2.6, 5.4], r: 1.1, fill: 'aqua', band: [0.3, 0.7] },
+  { rect: [1.6, 6.8, 6.8, 6.8], r: 2, fill: 'chrome', band: [0.32, 0.74] },
+  { rect: [3.4, 9.2, 3.4, 1.1], r: 0.55, fill: 'aqua' },
+  { path: 'M1.2 7 L1.2 4.2 C1.2 1.8 3 0.4 5.2 0.4 C7.4 0.4 9 1.8 9 4.2 L9 7 Z', box: [1.2, 0.4, 7.8, 6.6], fill: 'chrome', band: [0.36, 0.76] },
+  { rect: [4.6, 3, 4.8, 2.6], r: 1.1, fill: 'ink' },
+  { rect: [5.7, 3.5, 1.8, 0.8], r: 0.4, fill: 'aqua-light' },
+  { rect: [2.2, 0, 2.6, 1.4], r: 0.6, fill: 'aqua' },
+];
+
+// legs: [hip x, knee x, knee y, foot x, foot y] for each leg; arm: where the hand is
+function minerFrame(legs, arm) {
+  return [
+    ...legs.map((l) => ({ line: [l[0], 13, l[1], l[2], l[3], l[4]], width: 1.6, fill: 'chrome-300' })),
+    ...legs.map((l) => ({ rect: [l[3] - 1.1, l[4] - 0.7, 2.9, 1.6], r: 0.7, fill: 'chrome-400' })),
+    ...MINER_BODY,
+    { line: [5, 8.6, arm[0], arm[1]], width: 1.3, fill: 'chrome-400' },
+  ];
+}
+
+const MINER = {
+  size: [10, 18],
+  frames: [
+    minerFrame([[3.8, 3.6, 15, 3.4, 17.1], [6.2, 6.4, 15, 6.6, 17.1]], [4.6, 12.2]),        // standing
+    minerFrame([[3.8, 3, 15.2, 1.8, 17.1], [6.2, 7.4, 15, 8.2, 17.1]], [3, 11.8]),          // walking
+    minerFrame([[3.8, 4.4, 15.4, 4.2, 17.1], [6.2, 7.2, 14.6, 5.8, 16.6]], [4.4, 12.2]),
+    minerFrame([[3.8, 5.6, 15, 7.4, 17.1], [6.2, 4.6, 15.2, 2.6, 17.1]], [7, 11.8]),
+    minerFrame([[3.8, 5, 14.6, 4.4, 16.6], [6.2, 6.2, 15.4, 5.8, 17.1]], [5.2, 12.2]),
+    minerFrame([[3.8, 2.4, 14.8, 3.2, 16.4], [6.2, 8, 14.4, 7.2, 16]], [7.6, 8.6]),          // in the air
+  ],
+};
+
+/* ---------- Art: things to pick up, the lift, the lever and the gate ---------- */
+
+// A glimmer: an amber crystal that turns slowly (it is thinner when seen edge-on).
+function glimmerFrame(w) {
+  return [
+    { poly: [4, 0, 4 + w, 4, 4, 8, 4 - w, 4], fill: 'amber', band: [0.36, 0.7] },
+    { poly: [4, 1.3, 4 + w * 0.45, 3.3, 4, 4.2, 4 - w * 0.45, 3.3], fill: 'sun-100' },
+  ];
+}
+const GLIMMER = { size: [8, 8], frames: [glimmerFrame(4), glimmerFrame(3), glimmerFrame(1.5), glimmerFrame(3)] };
+
+// The lift: a cage between two chrome posts. Shut, it shows bars and a red lamp; open, an aqua light.
+const LIFT_FRAME = [
+  { rect: [0, 0, 20, 3.2], r: 1, fill: 'chrome', band: [0.35, 0.7] },
+  { rect: [0, 2.4, 2.6, 17.6], fill: 'chrome', dir: 'right' },
+  { rect: [17.4, 2.4, 2.6, 17.6], fill: 'chrome', dir: 'right' },
+];
+const LIFT_SHUT = {
+  size: [20, 20],
+  shapes: [
+    { rect: [1, 2.6, 18, 17.4], fill: 'ink' },
+    ...[5, 8.4, 11.6, 15].map((x) => ({ line: [x, 3.4, x, 19.6], width: 1, fill: 'chrome-300' })),
+    { rect: [2.6, 10.4, 14.8, 1.4], fill: 'chrome-400' },
+    ...LIFT_FRAME,
+    { circle: [10, 1.6, 1.1], fill: 'red' },
+  ],
+};
+const LIFT_OPEN = {
+  size: [20, 20],
+  shapes: [
+    { rect: [1, 2.6, 18, 17.4], fill: ['aqua-light', 0.3, 'aqua', 0.78, 'aqua-dark'] },
+    ...[5, 8.4, 11.6, 15].map((x) => ({ line: [x, 3.4, x, 5.2], width: 1, fill: 'chrome-300' })),
+    ...LIFT_FRAME,
+    { circle: [10, 1.6, 1.1], fill: 'aqua-light' },
+  ],
+};
+
+function leverFrame(tipX) {
+  return [
+    { line: [5, 7.4, tipX, 2], width: 1.2, fill: 'chrome-300' },
+    { circle: [tipX, 2, 1.6], fill: 'amber', dir: 'diag' },
+    { rect: [1, 7, 8, 3], r: 1, fill: 'chrome', band: [0.4, 0.75] },
+    { circle: [5, 7.6, 1.1], fill: 'chrome-400' },
+  ];
+}
+const LEVER = { size: [10, 10], frames: [leverFrame(2), leverFrame(8)] };
+
+const GATE = {
+  size: [10, 10],
+  shapes: [
+    { rect: [0.4, 0, 9.2, 10], fill: 'hill-near' },
+    ...[1.2, 4.2, 7.2].map((x) => ({ rect: [x, 0, 1.6, 10], fill: 'chrome', dir: 'right' })),
+    { rect: [0.4, 4.3, 9.2, 1.4], fill: 'chrome-400' },
+  ],
+};
+
+// A crumbling ledge: sandy, and it loses a little more of itself at each stage.
+const CRUMBLE_HOLES = [[2, 4.4, 1.2], [7.4, 0.3, 1.1], [5, 4.6, 1.3], [1, 0.4, 0.9], [8.8, 4.3, 1.2], [3.6, 0.2, 1], [6.2, 2.4, 1.1], [9.6, 1.2, 0.8], [0.3, 3, 0.9], [4.4, 1.6, 1]];
+function crumbleFrame(k) {
+  const sink = k * 0.35;
+  return [
+    { rect: [0, 0.2 + sink, 10, 4 - sink], r: 1.2, fill: ['heat-light', 0.26, 'amber-dark', 0.72, 'heat-dark'] },
+    { circle: [2.6, 2.2 + sink, 0.45], fill: 'heat-light' },
+    { circle: [6.4, 1.8 + sink, 0.4], fill: 'heat-light' },
+    { circle: [8.4, 2.8 + sink, 0.4], fill: 'heat-dark' },
+    { line: [4.2, 0.6 + sink, 4.8, 2.2 + sink, 4.2, 3.6], width: 0.5, fill: 'heat-dark' },
+    ...CRUMBLE_HOLES.slice(0, k * 2).map((h) => ({ circle: h, fill: 'ink', erase: true })),
+  ];
+}
+const CRUMBLE_ART = { size: [10, 5], frames: [0, 1, 2, 3, 4].map(crumbleFrame) };
+
+/* ---------- Art: traps ---------- */
+
+// A dripstone: a red stone fang. Frames 1 and 2 are it growing back.
+function dripFrame(k) {
+  return [{ poly: [3 - 3 * k, 0, 3 + 3 * k, 0, 3 + 1.3 * k, 5 * k, 3, 10 * k, 3 - 1.3 * k, 5 * k], fill: ['red-light', 0.25, 'red', 0.65, 'red-dark'] }];
+}
+const DRIP = { size: [6, 10], frames: [dripFrame(1), dripFrame(0.65), dripFrame(0.35)] };
+
+// Fire from a vent: hot at the root, licking up two tiles. lean sways its tip.
+function flameFrame(lean, tall) {
+  const top = 20 - tall;
+  return [
+    { path: 'M0.6 20 C0 ' + (top + tall * 0.7) + ' ' + (2 + lean) + ' ' + (top + tall * 0.45) + ' ' + (4 + lean) + ' ' + top + ' C' + (6 + lean) + ' ' + (top + tall * 0.4) + ' 8 ' + (top + tall * 0.65) + ' 7.4 20 Z',
+      box: [0, top, 8, tall], fill: ['heat', 0.4, 'amber', 0.8, 'amber-light'] },
+    { path: 'M2.4 20 C2 ' + (top + tall * 0.8) + ' ' + (3.4 + lean * 0.6) + ' ' + (top + tall * 0.6) + ' ' + (4 + lean * 0.5) + ' ' + (top + tall * 0.35) + ' C' + (4.8 + lean * 0.5) + ' ' + (top + tall * 0.6) + ' 6 ' + (top + tall * 0.8) + ' 5.6 20 Z',
+      box: [2, top + tall * 0.35, 4, tall * 0.65], fill: 'sun-100' },
+  ];
+}
+const FLAME = { size: [8, 20], outline: false, frames: [flameFrame(0, 20), flameFrame(-0.9, 19), flameFrame(0.9, 19.5)] };
+const SPUTTER = { size: [8, 20], outline: false, frames: [flameFrame(0, 4), flameFrame(-0.6, 6), flameFrame(0.6, 3)] };
+
+// A piston's ram: a red block with teeth along its foot.
+const RAM = {
+  size: [12, 7],
+  shapes: [
+    { poly: [0.5, 4.6, 2, 7, 3.5, 4.6, 5, 7, 6.5, 4.6, 8, 7, 9.5, 4.6, 11, 7, 11.5, 4.6], fill: 'red-dark' },
+    { rect: [0, 0, 12, 5], r: 1, fill: 'red', band: [0.3, 0.7] },
+    { circle: [2.4, 2.4, 0.7], fill: 'red-light' },
+    { circle: [9.6, 2.4, 0.7], fill: 'red-light' },
+  ],
+};
+
+/* ---------- Art: the guardians ----------
+   Every cavern has its own. They all face right (flip turns them round), and all are red: red always
+   means "do not touch". inset: how far inside its box a guardian's hit box sits, so near misses are fair. */
+
+// 1 Rattler: a runaway mine cart with eyes peering over its rim. Its wheels turn.
+function cartFrame(k) {
+  return [
+    { poly: [0.4, 2.8, 13.6, 2.8, 12.2, 8.4, 1.8, 8.4], fill: 'red', band: [0.3, 0.72] },
+    { rect: [3.2, 5.2, 7.6, 1], r: 0.5, fill: 'red-dark' },
+    { rect: [0, 2.2, 14, 1.6], r: 0.7, fill: 'red-light' },
+    { ellipse: [5, 2.3, 1.7, 1.5], fill: 'sun-100' },
+    { ellipse: [9.2, 2.3, 1.7, 1.5], fill: 'sun-100' },
+    { circle: [5.6, 2.6, 0.75], fill: 'ink' },
+    { circle: [9.8, 2.6, 0.75], fill: 'ink' },
+    { line: [3.4, 0.5, 6.4, 1.2], width: 0.7, fill: 'ink' },
+    { line: [7.8, 1.2, 10.8, 0.5], width: 0.7, fill: 'ink' },
+    { circle: [3.8, 8.4, 1.6], fill: 'red-dark' },
+    { circle: [10.2, 8.4, 1.6], fill: 'red-dark' },
+    k ? { line: [3.8, 7, 3.8, 9.8], width: 0.6, fill: 'heat-light' } : { line: [2.4, 8.4, 5.2, 8.4], width: 0.6, fill: 'heat-light' },
+    k ? { line: [10.2, 7, 10.2, 9.8], width: 0.6, fill: 'heat-light' } : { line: [8.8, 8.4, 11.6, 8.4], width: 0.6, fill: 'heat-light' },
+  ];
+}
+
+// 2 Gnawgrub: a fat segmented grub that inches along, humping its back.
+function grubFrame(hump) {
+  return [
+    { circle: [2.4 + hump * 0.4, 5.8, 2], fill: 'red', band: [0.3, 0.7] },
+    { circle: [5.3, 5 - hump * 1.4, 2.5], fill: 'red', band: [0.3, 0.7] },
+    { circle: [8.6, 4.6 - hump * 0.3, 2.8], fill: 'red', band: [0.3, 0.7] },
+    { circle: [11.6, 4.6, 2.4], fill: 'red', dir: 'diag' },
+    { circle: [12.4, 3.8, 0.95], fill: 'sun-100' },
+    { circle: [12.75, 3.9, 0.45], fill: 'ink' },
+    { line: [13.4, 5.4, 14, 6.6, 13, 7.3], width: 0.6, fill: 'ink' },
+  ];
+}
+
+// 3 Clamper: a crab with eyes on stalks and two big round claws. It scuttles on four legs.
+function crabFrame(k) {
+  const s = k ? 0.8 : -0.8;
+  const claw = (x, notch) => [{ circle: [x, 4.4, 1.9], fill: 'red', dir: 'diag' }, { poly: notch, fill: 'ink', erase: true }];
+  return [
+    { line: [3.6, 7.4, 2.4 + s, 9.8], width: 0.8, fill: 'red-dark' },
+    { line: [5.4, 8.2, 4.8 - s, 9.8], width: 0.8, fill: 'red-dark' },
+    { line: [8.6, 8.2, 9.2 + s, 9.8], width: 0.8, fill: 'red-dark' },
+    { line: [10.4, 7.4, 11.6 - s, 9.8], width: 0.8, fill: 'red-dark' },
+    { ellipse: [7, 6, 4.6, 2.8], fill: 'red', band: [0.3, 0.7] },
+    { line: [5.6, 4, 5, 1.5], width: 0.7, fill: 'red-dark' },
+    { line: [8.4, 4, 9, 1.5], width: 0.7, fill: 'red-dark' },
+    { circle: [5, 1.4, 1.1], fill: 'sun-100' },
+    { circle: [9, 1.4, 1.1], fill: 'sun-100' },
+    { circle: [5.3, 1.5, 0.5], fill: 'ink' },
+    { circle: [9.3, 1.5, 0.5], fill: 'ink' },
+    ...claw(1.9, [-0.2, 3.4, 1.8, 4.4, -0.2, 5]),
+    ...claw(12.1, [14.2, 3.4, 12.2, 4.4, 14.2, 5]),
+  ];
+}
+
+// 4 Bore: a hovering drill with one eye. Its grooves wind round as it turns.
+function boreFrame(k) {
+  const o = k * 1.1;
+  return [
+    { poly: [1.6, 6.6, 8.4, 6.6, 5, 14], fill: 'heat', band: [0.3, 0.7] },
+    { line: [2.2, 7.6 + o, 7.8, 7 + o], width: 0.55, fill: 'heat-dark' },
+    { line: [3.1, 9.8 + o, 6.9, 9.2 + o], width: 0.55, fill: 'heat-dark' },
+    { line: [4, 12 + o * 0.5, 6, 11.6 + o * 0.5], width: 0.55, fill: 'heat-dark' },
+    { rect: [0.6, 0, 8.8, 6.4], r: 2.2, fill: 'red', band: [0.3, 0.72] },
+    { rect: [1.2, 5.6, 7.6, 1.4], r: 0.6, fill: 'red-dark' },
+    { circle: [5, 3.1, 1.7], fill: 'sun-100' },
+    { circle: [5, 3.5, 0.8], fill: 'ink' },
+  ];
+}
+
+// 5 Lampslug: a slug with a spiral shell and two eye stalks that bob.
+function slugFrame(k) {
+  const b = k ? 0.6 : 0;
+  return [
+    { path: 'M0 10 C0 7.6 2 6.4 5 6.4 L10 6.4 C12.4 6.4 13.6 8 14 10 Z', box: [0, 6.4, 14, 3.6], fill: 'red', band: [0.35, 0.7] },
+    { line: [10.8, 7, 11.8 - b, 3.2 + b], width: 0.7, fill: 'red' },
+    { line: [12.2, 7.2, 13.4 - b * 0.5, 3.8 + b], width: 0.7, fill: 'red' },
+    { circle: [11.8 - b, 3 + b, 0.95], fill: 'sun-100' },
+    { circle: [13.4 - b * 0.5, 3.6 + b, 0.8], fill: 'sun-100' },
+    { circle: [12 - b, 3.1 + b, 0.45], fill: 'ink' },
+    { circle: [13.6 - b * 0.5, 3.7 + b, 0.4], fill: 'ink' },
+    { circle: [6, 5.2 + b * 0.3, 3.8], fill: 'heat', dir: 'diag' },
+    { path: 'M6 5.2 m-1.1 0 a1.1 1.1 0 1 1 2.2 0 a2.1 2.1 0 1 1 -4.2 0 a3 3 0 0 1 3 -3', box: [2.9, 2.2, 6.2, 5.2], stroke: 0.6, fill: 'heat-dark', outline: false },
+  ];
+}
+
+// 6 Warden: a boxy sentry on treads with one big eye that looks from side to side.
+function wardenFrame(k) {
+  return [
+    { rect: [0, 10, 12, 4], r: 2, fill: 'red-dark' },
+    ...[2.2, 6, 9.8].map((x) => ({ circle: [x + (k ? 0.6 : 0), 12, 0.9], fill: 'heat-dark' })),
+    { rect: [1.4, 3, 9.2, 7.6], r: 1.8, fill: 'red', band: [0.3, 0.72] },
+    { circle: [6, 6.6, 2.8], fill: 'ink' },
+    { circle: [6.4, 6.6, 2], fill: 'sun-100' },
+    { circle: [k ? 7.4 : 5.8, 6.6, 0.9], fill: 'ink' },
+    { line: [6, 3, 6, 1.2], width: 0.7, fill: 'red-dark' },
+    { circle: [6, 1, 0.9], fill: 'heat-light' },
+  ];
+}
+
+// 7 Cinderkin: a round imp with two horns and a flame for hair. It waddles.
+function impFrame(k) {
+  return [
+    { ellipse: [3.8, 11.2 - (k ? 0.6 : 0), 1.6, 0.8], fill: 'red-dark' },
+    { ellipse: [8.2, 11.2 - (k ? 0 : 0.6), 1.6, 0.8], fill: 'red-dark' },
+    { path: 'M4.4 4 C4.6 2 5.6 1.6 6 0 C6.6 1.6 7.6 2.4 7.6 4 Z', box: [4.4, 0, 3.2, 4], fill: ['amber', 0.5, 'heat'] },
+    { poly: [2.6, 4.6, 1.2, 0.8, 4.2, 3.4], fill: 'red-dark' },
+    { poly: [9.4, 4.6, 10.8, 0.8, 7.8, 3.4], fill: 'red-dark' },
+    { circle: [6, 7.4, 4.2], fill: 'red', dir: 'diag' },
+    { ellipse: [4.6, 7, 1, 1.2], fill: 'sun-100' },
+    { ellipse: [7.6, 7, 1, 1.2], fill: 'sun-100' },
+    { circle: [5, 7.2, 0.5], fill: 'ink' },
+    { circle: [8, 7.2, 0.5], fill: 'ink' },
+    { line: [4.6, 9.3, 6, 9.9, 7.4, 9.3], width: 0.6, fill: 'ink' },
+  ];
+}
+
+// 8 Swoopkite: a diamond kite with one eye and a streaming tail.
+function kiteFrame(k) {
+  const t = k ? 1.4 : -1.4;
+  return [
+    { line: [7, 9.4, 7 + t, 10.6, 7 - t * 0.6, 11.4, 7 + t * 0.4, 12], width: 0.7, fill: 'heat', outline: false },
+    { poly: [7, 0.4, 13.6, 5, 7, 9.6, 0.4, 5], fill: 'red', band: [0.35, 0.65] },
+    { line: [7, 0.8, 7, 9.2], width: 0.5, fill: 'red-dark' },
+    { line: [0.9, 5, 13.1, 5], width: 0.5, fill: 'red-dark' },
+    { circle: [7, 5, 1.9], fill: 'sun-100' },
+    { circle: [7.7, 5.2, 0.85], fill: 'ink' },
+  ];
+}
+
+// 9 Cog: a rolling gear with an eye at its hub. Three frames turn it a third of a tooth each.
+function cogFrame(rot) {
+  const pts = [];
+  for (let j = 0; j < 8; j++) {
+    const a = (j * 45 + rot) * Math.PI / 180;
+    for (const [da, r] of [[-17, 4.4], [-10, 6], [10, 6], [17, 4.4]]) {
+      const b = a + da * Math.PI / 180;
+      pts.push(Math.round((6 + Math.cos(b) * r) * 100) / 100, Math.round((6 + Math.sin(b) * r) * 100) / 100);
+    }
+  }
+  return [
+    { poly: pts, fill: 'red', dir: 'diag' },
+    { circle: [6, 6, 2.7], fill: 'heat', dir: 'diag' },
+    { circle: [6, 6, 1.5], fill: 'sun-100' },
+    { circle: [6.6, 6, 0.75], fill: 'ink' },
+  ];
+}
+
+// 10 Bobjelly: a one-eyed jelly that bobs up and down, trailing its tentacles.
+function jellyFrame(k) {
+  const s = k ? 0.9 : -0.9;
+  return [
+    ...[2.2, 4.7, 7.3, 9.8].map((x, i) => ({ line: [x, 7.6, x + (i % 2 ? s : -s), 10.6, x, 13.6], width: 0.9, fill: 'red' })),
+    { path: 'M0.6 7.6 C0.6 2.6 3 0.4 6 0.4 C9 0.4 11.4 2.6 11.4 7.6 Z', box: [0.6, 0.4, 10.8, 7.2], fill: ['red-light', 0.3, 'red', 0.8, 'red-dark'] },
+    { rect: [0.4, 6.8, 11.2, 1.6], r: 0.8, fill: 'red-dark' },
+    { circle: [6, 4, 2.1], fill: 'sun-100' },
+    { circle: [6, 4.6, 1], fill: 'ink' },
+  ];
+}
+
+// 11 Hornback: a beetle with one horn, spotted shell and six scurrying legs.
+function beetleFrame(k) {
+  const s = k ? 1 : -1;
+  return [
+    ...[3.6, 7, 10.2].map((x, i) => ({ line: [x, 6.8, x + (i % 2 ? -s : s), 9], width: 0.7, fill: 'red-dark' })),
+    { path: 'M1.4 7.2 C1.4 3 4 1.2 7.2 1.2 C10.4 1.2 12 3.6 12 7.2 Z', box: [1.4, 1.2, 10.6, 6], fill: 'red', band: [0.3, 0.7] },
+    { circle: [5, 3.6, 0.8], fill: 'red-dark' },
+    { circle: [8.4, 3, 0.7], fill: 'red-dark' },
+    { circle: [8.6, 5.4, 0.6], fill: 'red-dark' },
+    { circle: [12.3, 5.4, 1.8], fill: 'red-dark' },
+    { poly: [12.4, 4, 14, 0.6, 13.8, 4.6], fill: 'heat-light' },
+    { circle: [13, 5, 0.6], fill: 'sun-100' },
+  ];
+}
+
+// 12 Furnace golem: a walking boiler with smokestack horns and a glowing grate for a mouth.
+function golemFrame(k) {
+  return [
+    { rect: [3.6, 21 - (k ? 1.4 : 0), 5.6, 7], r: 1.4, fill: 'red-dark' },
+    { rect: [12.8, 21 - (k ? 0 : 1.4), 5.6, 7], r: 1.4, fill: 'red-dark' },
+    { rect: [3, 0.4, 4, 6.4], r: 1, fill: 'red-dark' },
+    { rect: [15, 0.4, 4, 6.4], r: 1, fill: 'red-dark' },
+    { rect: [2.4, 0, 5.2, 1.6], r: 0.6, fill: 'heat-dark' },
+    { rect: [14.4, 0, 5.2, 1.6], r: 0.6, fill: 'heat-dark' },
+    { ellipse: [1.2, 14.6, 1.6, 4.2], fill: 'red-dark' },
+    { ellipse: [20.8, 14.6, 1.6, 4.2], fill: 'red-dark' },
+    { rect: [1, 5, 20, 17.4], r: 3.4, fill: 'red', band: [0.25, 0.76] },
+    ...[5, 9, 13, 17].map((x) => ({ circle: [x, 6.8, 0.6], fill: 'red-light' })),
+    { poly: [4.4, 8.4, 9.4, 9.4, 9, 10.8, 4.4, 10], fill: 'sun-100' },
+    { poly: [17.6, 8.4, 12.6, 9.4, 13, 10.8, 17.6, 10], fill: 'sun-100' },
+    { rect: [5.4, 12.6, 11.2, 7], r: 1.4, fill: ['sun-100', 0.3, 'amber', 0.7, 'heat'] },
+    ...[8.2, 11, 13.8].map((x) => ({ line: [x, 12.8, x, 19.4], width: 0.8, fill: 'ink' })),
+  ];
+}
+
+const GUARDS = {
+  rattler: { size: [14, 10], fps: 8, frames: [cartFrame(0), cartFrame(1)] },
+  grub: { size: [14, 8], fps: 4, frames: [grubFrame(0), grubFrame(1)] },
+  crab: { size: [14, 10], fps: 7, frames: [crabFrame(0), crabFrame(1)] },
+  bore: { size: [10, 14], fps: 9, frames: [boreFrame(0), boreFrame(1)] },
+  slug: { size: [14, 10], fps: 3, frames: [slugFrame(0), slugFrame(1)] },
+  warden: { size: [12, 14], fps: 3, frames: [wardenFrame(0), wardenFrame(1)] },
+  imp: { size: [12, 12], fps: 6, frames: [impFrame(0), impFrame(1)] },
+  kite: { size: [14, 12], fps: 5, frames: [kiteFrame(0), kiteFrame(1)] },
+  cog: { size: [12, 12], fps: 10, frames: [cogFrame(0), cogFrame(15), cogFrame(30)] },
+  jelly: { size: [12, 14], fps: 4, frames: [jellyFrame(0), jellyFrame(1)] },
+  beetle: { size: [14, 9], fps: 8, frames: [beetleFrame(0), beetleFrame(1)] },
+  golem: { size: [22, 28], fps: 3, inset: 3, frames: [golemFrame(0), golemFrame(1)] },
+};
+
+/* ---------- Art: the cavern itself ----------
+   Each cavern is two big sprites made once: its backdrop (no outline: distant rock, scenery) and its
+   tiles (rock blocks, ledges, spikes, belts: all with the kit's ink outline). Things that move or change
+   (crumbling ledges, belts' arrows, the gate, fire) are drawn on top every frame. */
+
+// Spikes, sitting on the floor of their tile (or hanging from its ceiling when down is true).
+function spikeShapes(kind, x, y, down) {
+  const f = (py) => (down ? y + 10 - py : y + py);
+  const out = [];
+  if (kind === 'thorns') {
+    out.push({ poly: [0.8, 10, 1.4, 6, 0, 5.2, 2.2, 5, 2.4, 2.4, 4, 4.2, 5, 1, 6, 4.2, 7.6, 2.4, 7.8, 5, 10, 5.2, 8.6, 6, 9.2, 10].map((v, i) => (i % 2 ? f(v) : x + v)), fill: 'red', band: [0.35, 0.7] });
+  } else if (kind === 'coals') {
+    for (const [cx, cy, r] of [[2.4, 8.2, 2.1], [7.6, 8.2, 2.1], [5, 7.2, 2.5]]) out.push({ circle: [x + cx, f(cy), r], fill: ['heat-light', 0.3, 'red', 0.7, 'red-dark'], dir: 'diag' });
+    out.push({ line: [x + 3.8, f(6.6), x + 5, f(7.6), x + 6.2, f(6.8)], width: 0.5, fill: 'sun-100' });
+  } else {
+    for (const p of [[1, 10, 2.5, 3.4, 4, 10], [3.4, 10, 5.2, 1.4, 7, 10], [6, 10, 7.8, 4.4, 9.2, 10]]) {
+      out.push({ poly: p.map((v, i) => (i % 2 ? f(v) : x + v)), fill: ['red-light', 0.3, 'red', 0.7, 'red-dark'] });
+    }
+  }
+  return out;
+}
+
+// One rock block, with its look's detail on some of them.
+function wallShapes(look, x, y, c, r, openAbove) {
+  const [l, b, d] = look.wall;
+  const out = [{ rect: [x + 0.25, y + 0.25, T - 0.5, T - 0.5], r: 1.2, fill: [l, 0.2, b, 0.76, d] }];
+  const n = (c * 7 + r * 13) % 5;
+  if (look.mark === 'crack' && n === 0) out.push({ line: [x + 2.4, y + 3, x + 4.4, y + 5, x + 3.6, y + 7.4], width: 0.5, fill: d });
+  if (look.mark === 'rivet') for (const [px, py] of [[2, 2], [8, 2], [2, 8], [8, 8]]) out.push({ circle: [x + px, y + py, 0.55], fill: l });
+  if (look.mark === 'facet' && n < 2) out.push({ poly: [x + 1.6, y + 1.6, x + 5.4, y + 1.6, x + 1.6, y + 5.4], fill: 'chrome-200', alpha: 0.5 });
+  if (look.mark === 'moss' && openAbove) out.push({ path: 'M' + x + ' ' + (y + 0.3) + ' L' + (x + 10) + ' ' + (y + 0.3) + ' L' + (x + 10) + ' ' + (y + 2) + ' C' + (x + 8) + ' ' + (y + 3.6) + ' ' + (x + 6.5) + ' ' + (y + 1.6) + ' ' + (x + 5) + ' ' + (y + 3) + ' C' + (x + 3.5) + ' ' + (y + 4.2) + ' ' + (x + 1.6) + ' ' + (y + 1.8) + ' ' + x + ' ' + (y + 2.6) + ' Z', box: [x, y, 10, 4.2], fill: 'hill-far' });
+  if (look.mark === 'vein' && n < 2) out.push({ line: [x + 1.6, y + 6.4, x + 4, y + 4.6, x + 6.2, y + 5.6, x + 8.4, y + 3.2], width: 0.55, fill: 'heat-light' });
+  return out;
+}
+
+// A run of ledge from column c0 to c1 (inclusive) on row r.
+function ledgeShapes(look, c0, c1, r) {
+  const [l, b, d] = look.ledge;
+  const x = c0 * T;
+  const y = r * T;
+  const len = (c1 - c0 + 1) * T;
+  const out = [{ rect: [x, y, len, 4.2], r: 1.2, fill: [l, 0.3, b, 0.72, d] }];
+  for (let c = c0; c <= c1; c++) {
+    const cx = c * T + 5;
+    if (look.ledgeMark === 'holes') out.push({ circle: [cx, y + 2.2, 0.9], fill: 'ink' });
+    if (look.ledgeMark === 'studs') out.push({ circle: [cx, y + 2.2, 0.6], fill: d });
+    if (look.ledgeMark === 'seams' && c > c0) out.push({ line: [c * T, y + 0.9, c * T, y + 3.4], width: 0.5, fill: d });
+  }
+  return out;
+}
+
+// A run of belt: a grey band between two rollers. Its arrows are drawn every frame (drawBelts).
+function beltShapes(c0, c1, r) {
+  const x = c0 * T;
+  const y = r * T;
+  const len = (c1 - c0 + 1) * T;
+  return [
+    { rect: [x, y + 0.2, len, 4.6], r: 2.3, fill: 'chrome-400' },
+    { rect: [x + 1.2, y + 1.4, len - 2.4, 2.2], r: 1.1, fill: 'ink' },
+    { circle: [x + 2.3, y + 2.5, 1.7], fill: 'chrome', dir: 'diag' },
+    { circle: [x + len - 2.3, y + 2.5, 1.7], fill: 'chrome', dir: 'diag' },
+  ];
+}
+
+function paintTiles(cav) {
+  const look = LOOKS[cav.def.look];
+  const map = cav.def.map;
+  const s = [];
+  const at = (c, r) => (r < 0 || r >= ROWS || c < 0 || c >= COLS ? '.' : map[r][c]);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const ch = map[r][c];
+      const x = c * T;
+      const y = r * T;
+      if (ch === '#') s.push(...wallShapes(look, x, y, c, r, at(c, r - 1) !== '#'));
+      else if (ch === '^') s.push(...spikeShapes(look.spike, x, y, false));
+      else if (ch === 'v') s.push(...spikeShapes(look.spike, x, y, true));
+      else if (ch === 'd') s.push({ ellipse: [x + 5, y + 0.6, 3.4, 1.6], fill: look.wall[1] });
+      else if (ch === 'f') {
+        s.push({ rect: [x, y, T, 4.2], r: 1, fill: ['chrome-300', 0.3, 'chrome-400'] });
+        s.push({ rect: [x + 1.6, y + 1.3, 6.8, 0.7], r: 0.35, fill: 'ink' }, { rect: [x + 1.6, y + 2.6, 6.8, 0.7], r: 0.35, fill: 'ink' });
+      } else if (ch === 'p') {
+        s.push({ rect: [x - 1, y + 0.4, 12, 6], r: 1, fill: 'chrome', band: [0.35, 0.7] });
+        s.push({ rect: [x + 3, y + 6, 4, 4], fill: 'chrome-400' });
+        s.push({ circle: [x + 1.4, y + 3.4, 0.6], fill: 'chrome-200' }, { circle: [x + 8.6, y + 3.4, 0.6], fill: 'chrome-200' });
+      }
+    }
+    // runs of ledge and of belt along this row
+    for (let c = 0; c < COLS; c++) {
+      const ch = map[r][c];
+      if (ch !== '=' && ch !== '<' && ch !== '>') continue;
+      let e = c;
+      while (e + 1 < COLS && map[r][e + 1] === ch) e++;
+      s.push(...(ch === '=' ? ledgeShapes(look, c, e, r) : beltShapes(c, e, r)));
+      c = e;
+    }
+  }
+  return { size: [W, H], shapes: s };
+}
+
+/* Backdrops: distant rock and scenery in dark tones, so everything the miner meets stands out. */
+function bandShapes(list) {
+  return list.map((b, i) => {
+    const y1 = i + 1 < list.length ? list[i + 1][0] : H;
+    return { rect: [-1, b[0], W + 2, y1 - b[0]], fill: b[1] };
+  });
+}
+
+// Boulders: a lighter rim showing at the top left of each one.
+function boulders(rnd, n, y0, y1, rim, body) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const x = rnd() * W;
+    const y = y0 + rnd() * (y1 - y0);
+    const rx = 6 + rnd() * 14;
+    const ry = rx * (0.45 + rnd() * 0.25);
+    out.push({ ellipse: [x, y, rx, ry], fill: rim }, { ellipse: [x + 0.8, y + 1, rx, ry], fill: body });
+  }
+  return out;
+}
+
+// A pit headframe (the tower over a mine shaft) in silhouette, centred on x, standing on the ground at y.
+function headframe(x, y, tone) {
+  return [
+    { line: [x - 11, y, x - 2, y - 32], width: 1.4, fill: tone },
+    { line: [x + 11, y, x + 2, y - 32], width: 1.4, fill: tone },
+    { line: [x - 8.6, y - 8, x + 8.6, y - 8, x - 6.4, y - 16, x + 6.4, y - 16, x - 4.2, y - 24, x + 4.2, y - 24], width: 0.7, fill: tone },
+    { line: [x + 11, y, x + 22, y - 20, x + 3, y - 30], width: 1, fill: tone },
+    { rect: [x - 5, y - 33.4, 10, 1.6], fill: tone },
+    { circle: [x, y - 37, 4.8], stroke: 1.1, fill: tone },
+    { line: [x - 4.4, y - 37, x + 4.4, y - 37], width: 0.6, fill: tone },
+    { line: [x, y - 41.4, x, y - 32.6], width: 0.6, fill: tone },
+  ];
+}
+
+function paintBack(cav) {
+  const look = cav.def.look;
+  const rnd = rng(cav.def.seed || cav.i * 97 + 13);
+  const s = [];
+  if (look === 'pithead') {
+    // dusk above ground, the mine below
+    s.push(...bandShapes([[0, 'sky-1'], [8, 'sky-2'], [15, 'sky-3'], [22, 'sky-4'], [28, 'sky-5'], [33, 'sky-6'], [37, 'hill-near'], [40, 'ink'], [54, 'sky-0'], [118, 'sky-1'], [156, 'sky-0']]));
+    for (let i = 0; i < 14; i++) s.push({ circle: [Math.floor(rnd() * W) + 0.5, Math.floor(rnd() * 14) + 1.5, 0.5], fill: i % 4 ? 'chrome-400' : 'chrome-300' });
+    s.push({ circle: [262, 38, 11], fill: ['sun-100', 0.3, 'amber'] });
+    s.push({ poly: [-1, 37, 20, 32, 44, 35, 70, 30, 96, 34, 130, 31, 160, 35, 190, 29, 222, 33, 250, 31, 280, 34, 300, 30, 321, 33, 321, 41, -1, 41], fill: 'hill-far' });
+    const lift = cav.lift || { x: 30, y: 20 };
+    s.push(...headframe(lift.x + 10, lift.y + 20, 'hill-near'));
+    s.push(...headframe(196, 36, 'hill-far').map((p) => Object.assign({}, p, { alpha: 0.9 })));
+    s.push(...boulders(rnd, 26, 60, 168, 'sky-1', 'hill-near'));
+  } else if (look === 'timber') {
+    s.push(...bandShapes([[0, 'ink'], [16, 'sky-0'], [64, 'sky-1'], [132, 'sky-0'], [168, 'ink']]));
+    s.push(...boulders(rnd, 22, 20, 170, 'sky-2', 'hill-near'));
+    for (let x = 22 + rnd() * 20; x < W; x += 58 + rnd() * 16) {
+      s.push({ rect: [x, 0, 4, H], fill: 'hill-far' }, { rect: [x, 0, 1, H], fill: 'sky-2' });
+      for (let y = 34 + rnd() * 20; y < H - 20; y += 52 + rnd() * 20) {
+        s.push({ rect: [x - 7, y, 18, 3], fill: 'hill-far' }, { rect: [x - 7, y, 18, 0.8], fill: 'sky-2' });
+        s.push({ line: [x + 9, y + 3, x + 9, y + 7], width: 0.4, fill: 'sky-2' }, { circle: [x + 9, y + 8.2, 1.1], fill: 'amber-dark' }, { circle: [x + 9, y + 8.6, 0.6], fill: 'sun-100' });
+      }
+    }
+  } else if (look === 'works') {
+    s.push(...bandShapes([[0, 'sky-0'], [30, 'sky-1'], [150, 'sky-0']]));
+    for (let i = 0; i < 3; i++) {
+      const cx = 40 + i * 120 + rnd() * 30;
+      const cy = 50 + rnd() * 80;
+      const r = 18 + rnd() * 10;
+      const teeth = [];
+      for (let j = 0; j < 24; j++) {
+        const a = j / 24 * Math.PI * 2;
+        const rr = j % 2 ? r : r + 4;
+        teeth.push(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+      }
+      s.push({ poly: teeth, fill: 'hill-far' }, { circle: [cx, cy, r * 0.45], fill: 'sky-1' }, { circle: [cx, cy, r * 0.2], fill: 'hill-far' });
+    }
+    for (const y of [24, 92 + Math.floor(rnd() * 20)]) {
+      s.push({ rect: [-1, y, W + 2, 5], r: 2.5, fill: ['sky-3', 0.3, 'sky-2', 0.7, 'hill-far'] });
+      for (let x = 16 + rnd() * 30; x < W; x += 46) s.push({ rect: [x, y - 1, 4, 7], r: 1, fill: 'sky-3' });
+    }
+    for (let x = 60 + rnd() * 40; x < W; x += 110) s.push({ rect: [x, 0, 5, H], r: 2.5, fill: ['sky-2', 0.4, 'hill-far'], dir: 'right' });
+  } else if (look === 'glass') {
+    s.push(...bandShapes([[0, 'ink'], [24, 'sky-0'], [70, 'sky-1'], [132, 'sky-2']]));
+    const spire = (x, base, h, w, up) => {
+      const tip = up ? base - h : base + h;
+      return [
+        { poly: [x - w, base, x, tip, x + w, base], fill: 'sky-3' },
+        { poly: [x, base, x, tip, x + w, base], fill: 'sky-2' },
+        { line: [x - w * 0.5, base + (tip - base) * 0.5, x, tip], width: 0.5, fill: 'sky-4' },
+      ];
+    };
+    for (let i = 0; i < 16; i++) s.push(...spire(rnd() * W, H + 1, 30 + rnd() * 60, 5 + rnd() * 8, true));
+    for (let i = 0; i < 12; i++) s.push(...spire(rnd() * W, -1, 14 + rnd() * 36, 4 + rnd() * 6, false));
+  } else if (look === 'fungus') {
+    s.push(...bandShapes([[0, 'ink'], [44, 'hill-near'], [120, 'sky-0'], [160, 'hill-near']]));
+    for (let i = 0; i < 20; i++) {
+      const x = rnd() * W;
+      const len = 10 + rnd() * 40;
+      s.push({ line: [x, -1, x + 2, len * 0.4, x - 1, len * 0.75, x + 1, len], width: 0.9, fill: 'hill-far' });
+    }
+    for (let i = 0; i < 9; i++) {
+      const x = 10 + rnd() * 300;
+      const h = 16 + rnd() * 40;
+      const w = 8 + rnd() * 12;
+      s.push({ rect: [x - 1.5, H - h, 3, h], fill: 'hill-far' });
+      s.push({ ellipse: [x, H - h, w, w * 0.45], fill: 'sky-2' });
+      s.push({ circle: [x - w * 0.4, H - h - 1, 1.2], fill: 'sky-3' }, { circle: [x + w * 0.3, H - h - 2, 1], fill: 'sky-3' });
+    }
+  } else {
+    // ember: dark rock with cracks that glow
+    s.push(...bandShapes([[0, 'ink'], [60, 'sky-0'], [140, 'hill-near'], [166, 'heat-dark']]));
+    s.push(...boulders(rnd, 16, 20, 160, 'sky-1', 'hill-near'));
+    for (let i = 0; i < 12; i++) {
+      let x = rnd() * W;
+      let y = rnd() * 150;
+      const pts = [x, y];
+      for (let j = 0; j < 4; j++) { x += 4 + rnd() * 8; y += (rnd() - 0.4) * 10; pts.push(x, y); }
+      s.push({ line: pts, width: 0.9, fill: 'red-dark' });
+    }
+  }
+  return { size: [W, H], outline: false, shapes: s };
+}
+
+/* ---------- Building a cavern ---------- */
+
+const TILE_KEEP = '#=~<>fpB';     // the map letters that are part of the rock and ledges
+
+function buildCavern(def, i, lap) {
+  const cav = {
+    def: def, i: i, lap: lap, fast: lapFast(lap), open: false, liftOpen: false,
+    start: null, lift: null, lever: null, glimmers: [], spikes: [], drips: [], vents: [], rams: [], gates: [], belts: [], guards: [],
+  };
+  def.map.forEach((row, r) => {
+    for (let c = 0; c < COLS; c++) {
+      const ch = row[c];
+      const x = c * T;
+      const y = r * T;
+      if (ch === 'S') cav.start = { x: x + 1, y: y + T - PH };
+      else if (ch === 'E') cav.lift = { x: x, y: y };
+      else if (ch === '*') cav.glimmers.push({ x: x + 1, y: y + 1, w: 8, h: 8, taken: false, n: cav.glimmers.length });
+      else if (ch === '^') cav.spikes.push({ x: x + 1.5, y: y + 4.5, w: 7, h: 5.5 });
+      else if (ch === 'v') cav.spikes.push({ x: x + 1.5, y: y, w: 7, h: 5.5 });
+      else if (ch === 'L') cav.lever = { x: x, y: y, w: T, h: T };
+      else if (ch === 'd') cav.drips.push({ x: x + 2, y0: y });
+      else if (ch === 'f') cav.vents.push({ x: x, y: y, n: cav.vents.length });
+      else if (ch === 'p') cav.rams.push({ x: x, c: c, r: r, n: cav.rams.length });
+      else if (ch === 'B') cav.gates.push({ x: x, y: y });
+      if ((ch === '<' || ch === '>') && row[c - 1] !== ch) {
+        let e = c;
+        while (row[e + 1] === ch) e++;
+        cav.belts.push({ x: x, y: y, len: (e - c + 1) * T, dir: ch === '>' ? 1 : -1 });
+      }
+    }
+  });
+  resetThings(cav);
+  return cav;
+}
+
+// Puts back everything that moves or breaks: crumbled ledges, dripstones, rams and the guardians.
+// Glimmers taken and the lever stay as they are.
+function resetThings(cav) {
+  cav.tiles = cav.def.map.map((row) => row.split('').map((ch) => (TILE_KEEP.indexOf(ch) >= 0 ? ch : '.')));
+  cav.decay = {};
+  cav.gone = [];
+  cav.tick = 0;
+  for (const d of cav.drips) { d.state = 'hang'; d.y = d.y0; d.t = 0; d.vy = 0; }
+  const ram = Object.assign({ wait: 90, hold: 24, step: 40 }, cav.def.ram);
+  for (const p of cav.rams) {
+    let r = p.r + 1;
+    while (r < ROWS && !surface(cav, p.c, r)) r++;
+    p.yMin = (p.r + 1) * T;
+    p.yMax = r * T - 7;
+    p.y = p.yMin;
+    p.state = 'wait';
+    p.t = (30 + p.n * ram.step) / cav.fast;
+    p.vy = 0;
+  }
+  cav.guards = (cav.def.guards || []).map((spec) => makeGuard(spec, cav.fast));
+}
+
+function makeGuard(spec, fast) {
+  const art = GUARDS[spec.art];
+  const w = art.size[0];
+  const h = art.size[1];
+  const q = { art: spec.art, w: w, h: h, inset: art.inset || 1.5, v: spec.speed * fast * (spec.dir || 1), kind: 'h' };
+  const at = spec.at || 0;
+  if (spec.v) {
+    q.kind = 'v';
+    q.x = spec.col * T + (T - w) / 2;
+    q.a = spec.v[0] * T;
+    q.b = spec.v[1] * T + T - h;
+    q.y = q.a + (q.b - q.a) * at;
+  } else {
+    q.a = spec.h[0] * T;
+    q.b = spec.h[1] * T + T - w;
+    q.x = q.a + (q.b - q.a) * at;
+    q.y = (spec.row + 1) * T - h;
+    if (spec.swoop) {
+      q.kind = 's';
+      q.base = spec.row * T + (T - h) / 2;
+      q.amp = spec.swoop;
+      q.phase = spec.phase || 0;
+      q.swing = (spec.swing || 0.045) * fast;
+      q.y = q.base + Math.sin(q.phase) * q.amp;
+    }
+  }
+  return q;
+}
+
+/* ---------- Tiles and movement ---------- */
+
+// The tile at a column and row. Off the left and right edges counts as rock; above and below, open.
+function tile(cav, c, r) {
+  if (c < 0 || c >= COLS) return '#';
+  if (r < 0 || r >= ROWS) return '.';
+  return cav.tiles[r][c];
+}
+
+function solid(cav, c, r) {
+  const t = tile(cav, c, r);
+  return t === '#' || t === 'p' || (t === 'B' && !cav.open);
+}
+
+// Can the miner stand on top of this tile?
+function surface(cav, c, r) {
+  const t = tile(cav, c, r);
+  return t === '=' || t === '~' || t === '<' || t === '>' || t === 'f' || solid(cav, c, r);
+}
+
+// The tiles the miner is standing on (none while it is in the air). A foot needs a pixel of ledge.
+function footing(cav, m) {
+  const feet = m.y + PH;
+  const r = Math.round(feet / T);
+  if (Math.abs(feet - r * T) > 0.01) return [];
+  const out = [];
+  for (let c = Math.floor((m.x + 1) / T); c <= Math.floor((m.x + PW - 1) / T); c++) if (surface(cav, c, r)) out.push([c, r]);
+  return out;
+}
+
+// Moves the miner across by m.vx, stopping at rock and at the screen's edges.
+function slide(cav, m) {
+  if (!m.vx) return;
+  let nx = m.x + m.vx;
+  const r0 = Math.floor(m.y / T);
+  const r1 = Math.floor((m.y + PH - 0.001) / T);
+  const c = m.vx > 0 ? Math.floor((nx + PW - 0.001) / T) : Math.floor(nx / T);
+  for (let r = r0; r <= r1; r++) {
+    if (!solid(cav, c, r)) continue;
+    nx = m.vx > 0 ? c * T - PW : (c + 1) * T;
+    m.vx = 0;
+    break;
+  }
+  m.x = nx;
+}
+
+// One update of the miner's movement: walking, riding belts, jumping, falling, landing.
+// dir is -1, 0 or 1; jump is true when a jump should start now if it can. Returns what happened.
+// Kept free of everything else in the game, so the cavern checker can run it too.
+function moveMiner(cav, m, dir, jump) {
+  const ev = { jumped: false, landed: false, fall: 0 };
+  if (!m.air) {
+    let belt = 0;
+    for (const [c, r] of footing(cav, m)) {
+      const t = tile(cav, c, r);
+      if (t === '<') belt = -1;
+      if (t === '>') belt = 1;
+    }
+    let vx = dir * WALK;
+    if (belt) vx = dir === -belt ? 0 : belt * WALK;      // a belt carries the miner; pushing against it only holds still
+    if (dir) m.face = dir;
+    m.vx = vx;
+    m.walking = dir !== 0 && vx !== 0;
+    if (!jump) {
+      slide(cav, m);
+      if (m.walking) m.walk += 1;
+      if (!footing(cav, m).length) {                      // walked off the edge: drop straight down
+        m.air = true; m.vy = 0; m.vx = 0; m.top = m.y; m.coyote = COYOTE;
+      }
+      return ev;
+    }
+    m.air = true; m.vy = -JUMP_V; m.top = m.y; m.coyote = 0;
+    ev.jumped = true;
+  } else if (jump && m.coyote > 0) {
+    m.vy = -JUMP_V; m.vx = dir * WALK; m.top = m.y; m.coyote = 0;
+    if (dir) m.face = dir;
+    ev.jumped = true;
+  }
+  if (m.coyote > 0) m.coyote--;
+  m.walking = false;
+  m.vy = Math.min(m.vy + GRAVITY, FALL_FAST);
+  slide(cav, m);
+  let ny = m.y + m.vy;
+  if (m.vy < 0) {
+    // the head meets rock (or the top of the screen): stop rising
+    if (ny < 0) { ny = 0; m.vy = 0; }
+    const r = Math.floor(ny / T);
+    for (let c = Math.floor(m.x / T); c <= Math.floor((m.x + PW - 0.001) / T); c++) {
+      if (solid(cav, c, r)) { ny = (r + 1) * T; m.vy = 0; break; }
+    }
+  } else {
+    // the feet pass the top of a tile row: land if there is something to stand on there
+    const f0 = m.y + PH;
+    const r = Math.ceil(f0 / T - 1e-6);
+    if (r * T <= ny + PH + 1e-6) {
+      for (let c = Math.floor((m.x + 1) / T); c <= Math.floor((m.x + PW - 1) / T); c++) {
+        if (!surface(cav, c, r)) continue;
+        ny = r * T - PH;
+        m.air = false; m.vy = 0; m.vx = 0;
+        ev.landed = true;
+        ev.fall = ny - m.top;
+        break;
+      }
+    }
+  }
+  m.y = ny;
+  if (m.air) m.top = Math.min(m.top, m.y);
+  return ev;
+}
+
+function newMiner(cav) {
+  return { x: cav.start.x, y: cav.start.y, vx: 0, vy: 0, air: false, top: cav.start.y, coyote: 0, buf: 0, face: 1, walk: 0, walking: false, inv: 0 };
+}
+
+function minerBox(m) {
+  return { x: m.x, y: m.y, w: PW, h: PH };
+}
+
+/* ---------- Controls ----------
+   Keys: left and right walk, Space or up jumps. Touch: a stick that floats: press anywhere and drag
+   left or right from that point to walk; drag up (a flick) to jump. A tap jumps too, and the kit counts a
+   tap by a second finger, so one thumb can walk while the other jumps. */
+function readControls(g, rk) {
+  const inp = rk.input;
+  const p = inp.pointer;
+  let dir = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+  let jump = inp.pressed.fire || inp.pressed.up || inp.tap;
+  if (p.pressed) { g.stick = { x: p.x, y: p.y }; g.flicked = false; }
+  if (p.down && g.stick) {
+    let ox = p.x - g.stick.x;
+    let oy = p.y - g.stick.y;
+    const len = Math.hypot(ox, oy);
+    if (len > STICK) {                        // the pressed point trails the finger, so turning round needs no long drag back
+      g.stick.x = p.x - ox / len * STICK;
+      g.stick.y = p.y - oy / len * STICK;
+      ox = p.x - g.stick.x;
+      oy = p.y - g.stick.y;
+    }
+    if (Math.abs(ox) > 4) dir = ox > 0 ? 1 : -1;
+    if (oy < -FLICK && !g.flicked) { jump = true; g.flicked = true; }
+    if (oy > -FLICK / 2) g.flicked = false;
+  } else if (!p.down) {
+    g.stick = null;
+  }
+  return { dir: dir, jump: jump };
+}
+
+/* ---------- Sound ---------- */
+
+// Plays a sound at most once every few updates, so a burst of the same thing does not become a buzz.
+function play(g, rk, name, fn) {
+  if (g.cool[name] > 0) return;
+  g.cool[name] = 6;
+  if (fn) fn(); else rk.sfx(name);
+}
+
+const SOUND = {
+  jump: (rk) => rk.sfx.tone({ f: 330, to: 620, dur: 0.09, type: 'square', vol: 0.07 }),
+  land: (rk) => rk.sfx.noise({ dur: 0.05, from: 600, to: 120, vol: 0.08 }),
+  crumble: (rk) => rk.sfx.noise({ dur: 0.12, from: 900, to: 200, vol: 0.12 }),
+  smash: (rk) => rk.sfx.noise({ dur: 0.14, from: 1800, to: 300, vol: 0.14 }),
+  slam: (rk) => { rk.sfx.noise({ dur: 0.12, from: 500, to: 60, vol: 0.16 }); rk.sfx.tone({ f: 110, to: 55, dur: 0.08, type: 'square', vol: 0.06 }); },
+  whoosh: (rk) => rk.sfx.noise({ dur: 0.18, from: 300, to: 1400, vol: 0.08 }),
+  lever: (rk) => rk.sfx.tone({ f: 260, to: 520, dur: 0.12, type: 'square', vol: 0.09 }),
+  gasp: (rk) => rk.sfx.tone({ f: 880, dur: 0.05, type: 'square', vol: 0.06 }),
+  count: (rk, k) => rk.sfx.tone({ f: 520 + k * 6, dur: 0.03, type: 'square', vol: 0.05 }),
+};
+
+/* ---------- Particles ---------- */
+function burst(g, x, y, colours, count, power, lift) {
+  for (let i = 0; i < count && g.parts.length < 260; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.random() * power;
+    g.parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - (lift == null ? 0.5 : lift), life: 20 + Math.random() * 20, colour: colours[i % colours.length] });
+  }
+}
+
+/* ---------- The game's flow ---------- */
+
+function award(g, rk, n, x, y, colour) {
+  rk.addScore(n, x, y, colour);
+  if (rk.score >= g.nextLife) {
+    g.nextLife += LIFE_EVERY;
+    rk.addLife(1);
+    rk.popup('1UP', g.miner.x + PW / 2, g.miner.y - 8, 'aqua');
+  }
+}
+
+// A cavern from the top: build it, fill the air, put the miner at its start.
+function startCavern(g, rk) {
+  const i = (g.level - 1) % CAVERNS.length;
+  const lap = Math.floor((g.level - 1) / CAVERNS.length);
+  g.cav = buildCavern(CAVERNS[i], i, lap);
+  g.airMax = CAVERNS[i].air * lapAir(lap);
+  g.air = g.airMax;
+  g.miner = newMiner(g.cav);
+  g.bonus = false;
+  g.dead = false;
+  g.ready = 70;
+  g.parts = [];
+  g.gasp = -1;
+  rk.hud.set('level', g.level);
+  rk.hud.set('cavern', CAVERNS[i].name);
+  rk.hud.set('air', 1);
+  rk.banner('CAVERN ' + g.level, 1.4);
+}
+
+// After a lost life: the same cavern, with its traps and guardians back where they began.
+function respawn(g, rk) {
+  resetThings(g.cav);
+  g.air = g.airMax;
+  g.miner = newMiner(g.cav);
+  g.miner.inv = INV;
+  g.dead = false;
+  g.ready = 20;
+  g.gasp = -1;
+  rk.hud.set('air', 1);
+}
+
+function kill(g, rk, why) {
+  if (g.dead) return;
+  g.dead = true;
+  g.deadT = 0;
+  const m = g.miner;
+  burst(g, m.x + PW / 2, m.y + PH / 2, ['chrome-200', 'chrome-300', 'aqua', 'aqua-light'], 28, 1.8);
+  rk.sfx('explosion');
+  rk.shake(3, 0.25);
+  if (why === 'air') rk.banner('NO AIR', 1.2);
+  if (rk.loseLife() > 0) rk.after(1.3, () => { if (!rk.ending) respawn(g, rk); });
+}
+
+// What hurts the miner this update, if anything. Spikes always; moving things not while it blinks.
+function harm(g) {
+  const m = g.miner;
+  const cav = g.cav;
+  const box = { x: m.x + 1, y: m.y + 2, w: PW - 2, h: PH - 3 };
+  for (const s of cav.spikes) if (hit(box, s)) return 'spike';
+  if (m.inv > 0) return null;
+  for (const d of cav.drips) if ((d.state === 'hang' || d.state === 'shake' || d.state === 'fall') && hit(box, { x: d.x + 1, y: d.y, w: 4, h: 9 })) return 'drip';
+  for (const v of cav.vents) if (ventState(cav, v) === 'on' && hit(box, { x: v.x + 2, y: v.y - 19, w: 6, h: 19 })) return 'fire';
+  for (const p of cav.rams) {
+    if (hit(box, { x: p.x - 0.5, y: p.y, w: 11, h: 7 })) return 'ram';
+    if (p.y > p.yMin && hit(box, { x: p.x + 3.5, y: p.yMin, w: 3, h: p.y - p.yMin })) return 'ram';
+  }
+  for (const q of cav.guards) if (hit(box, { x: q.x + q.inset, y: q.y + q.inset, w: q.w - q.inset * 2, h: q.h - q.inset * 2 })) return 'guard';
+  return null;
+}
+
+function ventTiming(cav) {
+  return Object.assign({ off: 100, warn: 36, on: 56, step: 46 }, cav.def.vent);
+}
+
+// A vent is 'off', 'warn' (sputtering: about to fire) or 'on'.
+function ventState(cav, v) {
+  const t = ventTiming(cav);
+  const period = (t.off + t.warn + t.on) / cav.fast;
+  const k = (cav.tick + v.n * t.step) % period;
+  if (k < t.off / cav.fast) return 'off';
+  if (k < (t.off + t.warn) / cav.fast) return 'warn';
+  return 'on';
+}
+
+function stepGuards(cav) {
+  for (const q of cav.guards) {
+    if (q.kind === 'v') {
+      q.y += q.v;
+      if (q.y < q.a) { q.y = q.a; q.v = Math.abs(q.v); }
+      else if (q.y > q.b) { q.y = q.b; q.v = -Math.abs(q.v); }
+      continue;
+    }
+    q.x += q.v;
+    if (q.x < q.a) { q.x = q.a; q.v = Math.abs(q.v); }
+    else if (q.x > q.b) { q.x = q.b; q.v = -Math.abs(q.v); }
+    if (q.kind === 's') { q.phase += q.swing; q.y = q.base + Math.sin(q.phase) * q.amp; }
+  }
+}
+
+function stepDrips(g, rk) {
+  const cav = g.cav;
+  const m = g.miner;
+  for (const d of cav.drips) {
+    if (d.state === 'hang') {
+      if (!g.dead && Math.abs(m.x + PW / 2 - (d.x + 3)) < DRIP_REACH && m.y > d.y0) { d.state = 'shake'; d.t = 26 / cav.fast; }
+    } else if (d.state === 'shake') {
+      if (--d.t <= 0) { d.state = 'fall'; d.vy = 0; }
+    } else if (d.state === 'fall') {
+      d.vy = Math.min(d.vy + 0.22, 4.5);
+      d.y += d.vy;
+      const r = Math.floor((d.y + 10) / T);
+      const c = Math.floor((d.x + 3) / T);
+      if (d.y > H || (r > Math.floor(d.y0 / T) && surface(cav, c, r))) {
+        if (d.y <= H) d.y = r * T - 10;
+        d.state = 'gone';
+        d.t = 150;
+        burst(g, d.x + 3, d.y + 10, ['red-light', 'red', 'red-dark'], 10, 1.1, 0.8);
+        play(g, rk, 'smash', () => SOUND.smash(rk));
+      }
+    } else if (d.state === 'gone') {
+      if (--d.t <= 0) { d.state = 'grow'; d.t = 48; d.y = d.y0; }
+    } else if (--d.t <= 0) {
+      d.state = 'hang';
+    }
+  }
+}
+
+function stepRams(g, rk) {
+  const cav = g.cav;
+  const ram = Object.assign({ wait: 90, hold: 24, step: 40 }, cav.def.ram);
+  for (const p of cav.rams) {
+    if (p.state === 'wait') {
+      if (--p.t <= 0) { p.state = 'drop'; p.vy = 0; }
+    } else if (p.state === 'drop') {
+      p.vy = Math.min(p.vy + 0.45 * cav.fast, 6);
+      p.y += p.vy;
+      if (p.y >= p.yMax) {
+        p.y = p.yMax;
+        p.state = 'hold';
+        p.t = ram.hold / cav.fast;
+        burst(g, p.x + 5, p.yMax + 7, ['chrome-300', 'chrome-400'], 6, 0.9, 0.6);
+        play(g, rk, 'slam', () => SOUND.slam(rk));
+      }
+    } else if (p.state === 'hold') {
+      if (--p.t <= 0) p.state = 'lift';
+    } else {
+      p.y -= 0.75 * cav.fast;
+      if (p.y <= p.yMin) { p.y = p.yMin; p.state = 'wait'; p.t = ram.wait / cav.fast; }
+    }
+  }
+}
+
+// Crumbling ledges wear away under the miner's feet, and grow back a while after they go.
+function stepCrumbles(g, rk) {
+  const cav = g.cav;
+  const m = g.miner;
+  if (!m.air) {
+    for (const [c, r] of footing(cav, m)) {
+      if (cav.tiles[r][c] !== '~') continue;
+      const k = r * COLS + c;
+      cav.decay[k] = (cav.decay[k] || 0) + 1;
+      if (cav.decay[k] % 6 === 0) burst(g, c * T + 2 + Math.random() * 6, r * T + 4, ['amber-dark', 'heat-dark'], 1, 0.3, -0.2);
+      if (cav.decay[k] >= CRUMBLE) {
+        cav.tiles[r][c] = '.';
+        cav.gone.push({ c: c, r: r, t: REGROW });
+        burst(g, c * T + 5, r * T + 3, ['amber-dark', 'heat-dark', 'heat-light'], 8, 0.8, 0);
+        play(g, rk, 'crumble', () => SOUND.crumble(rk));
+      }
+    }
+  }
+  const box = minerBox(m);
+  cav.gone = cav.gone.filter((q) => {
+    if (--q.t > 0) return true;
+    if (hit(box, { x: q.c * T, y: q.r * T, w: T, h: T })) { q.t = 30; return true; }
+    cav.tiles[q.r][q.c] = '~';
+    cav.decay[q.r * COLS + q.c] = 0;
+    return false;
+  });
+}
+
+function pickups(g, rk) {
+  const cav = g.cav;
+  const box = minerBox(g.miner);
+  for (const gl of cav.glimmers) {
+    if (gl.taken || !hit(box, gl)) continue;
+    gl.taken = true;
+    award(g, rk, GLIMMER_PTS, gl.x + 4, gl.y, 'amber');
+    play(g, rk, 'blip');
+    burst(g, gl.x + 4, gl.y + 4, ['amber-light', 'amber', 'sun-100'], 10, 1, 0.3);
+    if (cav.glimmers.every((q) => q.taken)) {
+      cav.liftOpen = true;
+      rk.sfx('pickup');
+      rk.banner('LIFT OPEN', 1.2);
+      if (cav.lift) burst(g, cav.lift.x + 10, cav.lift.y + 10, ['aqua-light', 'aqua'], 14, 1.2, 0.3);
+    }
+  }
+  if (cav.lever && !cav.open && hit(box, cav.lever)) {
+    cav.open = true;
+    g.gateFade = 30;
+    SOUND.lever(rk);
+    rk.banner('GATE OPEN', 1.2);
+    for (const q of cav.gates) burst(g, q.x + 5, q.y + 5, ['chrome-200', 'chrome-300'], 4, 0.7, 0.2);
+  }
+}
+
+// In the lift: the air left counts down into points, then the next cavern.
+function countAir(g, rk) {
+  if (g.air <= 0) return;
+  const take = Math.min(g.air, 1);
+  g.air -= take;
+  g.bonusAcc += take * AIR_PTS;
+  const pts = Math.floor(g.bonusAcc);
+  if (pts > 0) { g.bonusAcc -= pts; award(g, rk, pts); }
+  rk.hud.set('air', g.air / g.airMax);
+  g.bonusN++;
+  if (g.bonusN % 3 === 0) SOUND.count(rk, g.bonusN % 60);
+  if (g.air <= 0) {
+    g.air = 0;
+    rk.after(0.9, () => {
+      if (rk.ending) return;
+      g.level++;
+      startCavern(g, rk);
+    });
+  }
+}
+
+function enterLift(g, rk) {
+  const lift = g.cav.lift;
+  g.bonus = true;
+  g.bonusAcc = 0;
+  g.bonusN = 0;
+  rk.sfx('pickup');
+  const total = Math.floor(g.air * AIR_PTS);
+  if (total > 0) rk.popup(String(total), lift.x + 10, lift.y - 4, 'amber');
+}
+
+/* ---------- Drawing ---------- */
+
+// Things in the scenery that move: sparks rising in the hot caverns, glints in the glass ones,
+// spores in the deep, stars over the pithead.
+function drawLiving(rk, cav) {
+  const t = rk.time;
+  const look = cav.def.look;
+  if (look === 'ember') {
+    for (let i = 0; i < 14; i++) {
+      const y = H - ((t * (10 + (i % 4) * 3) + i * 37) % (H + 10));
+      const x = (i * 53 + Math.sin(t * 0.8 + i) * 6) % W;
+      rk.circle(x, y, 0.6, i % 3 ? 'heat' : 'amber', 0.8);
+    }
+  } else if (look === 'glass') {
+    for (let i = 0; i < 8; i++) {
+      const k = (t * 0.5 + i * 0.37) % 1;
+      if (k > 0.3) continue;
+      rk.circle((i * 89 + 31) % W, (i * 47 + 20) % 150 + 10, 0.7 * (1 - Math.abs(k - 0.15) / 0.15), 'chrome-200');
+    }
+  } else if (look === 'fungus') {
+    for (let i = 0; i < 12; i++) {
+      const y = ((t * (3 + (i % 3)) + i * 23) % (H + 10)) - 5;
+      const x = (i * 71 + Math.sin(t * 0.6 + i * 2) * 8 + W) % W;
+      rk.circle(x, y, 0.6, 'sky-4', 0.7);
+    }
+  } else if (look === 'pithead') {
+    for (let i = 0; i < 4; i++) {
+      const k = (t * 0.35 + i * 0.25) % 1;
+      if (k < 0.15) rk.circle((i * 97 + 40) % W, 3 + i * 3, 0.65, 'chrome-200');
+    }
+  }
+}
+
+function drawBelts(rk, cav) {
+  const shift = (rk.time * 60 * WALK) % 5;
+  for (const b of cav.belts) {
+    for (let x = 3; x < b.len - 3; x += 5) {
+      const px = b.dir > 0 ? x + shift : x + 5 - shift;
+      if (px < 2.6 || px > b.len - 2.6) continue;
+      const cx = b.x + px;
+      const tip = b.dir * 0.8;
+      rk.shape({ line: [cx - tip, b.y + 1.7, cx + tip, b.y + 2.5, cx - tip, b.y + 3.3], width: 0.6, fill: 'chrome-200' });
+    }
+  }
+}
+
+function drawGuard(rk, q) {
+  const art = GUARDS[q.art];
+  const frame = Math.floor(rk.time * art.fps + q.a * 0.37) % art.frames.length;
+  rk.draw(q.art, q.x, q.y, frame, { flip: q.kind !== 'v' && q.v < 0 });
+}
+
+function drawCavern(rk, g) {
+  const cav = g.cav;
+  rk.draw('back' + cav.i, 0, 0);
+  drawLiving(rk, cav);
+  rk.draw('tiles' + cav.i, 0, 0);
+  drawBelts(rk, cav);
+
+  // crumbling ledges, worn by how long the miner has stood on them
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (cav.tiles[r][c] !== '~') continue;
+      const k = Math.min(4, Math.floor((cav.decay[r * COLS + c] || 0) / CRUMBLE * 5));
+      rk.draw('crumble', c * T, r * T, k);
+    }
+  }
+  // the gate, fading as it opens
+  if (!cav.open || g.gateFade > 0) for (const q of cav.gates) rk.draw('gate', q.x, q.y, 0, { alpha: cav.open ? g.gateFade / 30 : 1 });
+  if (cav.lever) rk.draw('lever', cav.lever.x, cav.lever.y, cav.open ? 1 : 0);
+
+  if (cav.lift) {
+    if (cav.liftOpen) rk.glow(cav.lift.x + 10, cav.lift.y + 11, 18, 'aqua', 0.3 + 0.08 * Math.sin(rk.time * 4));
+    rk.draw(cav.liftOpen ? 'liftOpen' : 'liftShut', cav.lift.x, cav.lift.y);
+  }
+  for (const gl of cav.glimmers) {
+    if (gl.taken) continue;
+    rk.glow(gl.x + 4, gl.y + 4, 8, 'amber', 0.3);
+    rk.draw('glimmer', gl.x, gl.y, (Math.floor(rk.time * 7) + gl.n) % 4);
+  }
+
+  for (const v of cav.vents) {
+    const st = ventState(cav, v);
+    if (st === 'off') continue;
+    const f = Math.floor(rk.time * 12 + v.n) % 3;
+    if (st === 'on') rk.glow(v.x + 5, v.y - 8, 12, 'heat', 0.4);
+    rk.draw(st === 'on' ? 'flame' : 'sputter', v.x + 1, v.y - 20, f);
+  }
+  for (const p of cav.rams) {
+    if (p.y > p.yMin) {
+      rk.rect(p.x + 3.5, p.yMin, 3, p.y - p.yMin, 'chrome-300');
+      rk.rect(p.x + 3.5, p.yMin, 1, p.y - p.yMin, 'chrome-200');
+      rk.rect(p.x + 6, p.yMin, 0.5, p.y - p.yMin, 'chrome-400');
+    }
+    rk.draw('ram', p.x - 1, p.y);
+  }
+  for (const d of cav.drips) {
+    if (d.state === 'gone') continue;
+    if (d.state === 'grow') { rk.draw('drip', d.x, d.y0, d.t > 24 ? 2 : 1); continue; }
+    const wob = d.state === 'shake' ? (Math.floor(d.t / 3) % 2 ? 0.5 : -0.5) : 0;
+    rk.draw('drip', d.x + wob, d.y, 0);
+  }
+  for (const q of cav.guards) {
+    if (q.art === 'golem') rk.glow(q.x + 11, q.y + 16, 14, 'heat', 0.35);
+    drawGuard(rk, q);
+  }
+}
+
+function drawMiner(rk, g) {
+  const m = g.miner;
+  if (g.bonus) return;                                  // inside the lift
+  if (g.dead) { if (g.deadT < 5) rk.draw('miner', m.x - 1, m.y, 5, { flip: m.face < 0, flash: true }); return; }
+  if (m.inv > 0 && m.inv % 20 >= 10) return;            // blinking after coming back: 3 times a second
+  const frame = m.air ? 5 : m.walking ? 1 + Math.floor(m.walk / 5) % 4 : 0;
+  rk.draw('miner', m.x - 1, m.y, frame, { flip: m.face < 0 });
+}
+
+/* ---------- The game ---------- */
+RetroKit.game({
+  id: 'seam-fever',
+  title: 'SEAM FEVER',
+  tagline: 'TWELVE CAVERNS DOWN',
+  lives: 4,
+  livesIcon: 'dot',
+  hud: ['score', { id: 'air', label: 'Air', type: 'meter', low: 0.25, full: 'Full' }, 'best', 'lives', 'level', { id: 'cavern', label: 'Cavern', type: 'text' }],
+  phoneMid: 'air',              // phones show three things: the air left matters more than the cavern number
+  keys: [['←', '→', 'Walk'], ['Space', '↑', 'Jump'], ['P', 'Pause']],
+  touch: 'Drag to walk · Flick up or tap to jump',
+  music: { data: window.SEAM_FEVER_MUSIC, level: 0.35 },     // level: how loud the track is against the sound effects (1 = the file's full level)
+
+  sprites: Object.assign({
+    miner: MINER,
+    glimmer: GLIMMER,
+    liftShut: LIFT_SHUT,
+    liftOpen: LIFT_OPEN,
+    lever: LEVER,
+    gate: GATE,
+    crumble: CRUMBLE_ART,
+    drip: DRIP,
+    flame: FLAME,
+    sputter: SPUTTER,
+    ram: RAM,
+  }, GUARDS),
+
+  // Every cavern's backdrop and rock, made once as shapes (the kit draws each the first time it shows).
+  init(rk) {
+    CAVERNS.forEach((def, i) => {
+      const cav = buildCavern(def, i, 0);
+      rk.makeSprite(paintBack(cav), 'back' + i);
+      rk.makeSprite(paintTiles(cav), 'tiles' + i);
+    });
+    const floor = [];
+    for (let c = 0; c < COLS; c++) floor.push(...wallShapes(LOOKS.pithead, c * T, 0, c, 17, true));
+    rk.makeSprite({ size: [W, T], shapes: floor }, 'titleFloor');
+  },
+
+  start(rk) {
+    const g = { level: 1, cool: {}, parts: [], stick: null, flicked: false, nextLife: LIFE_EVERY, gateFade: 0 };
+    startCavern(g, rk);
+    return g;
+  },
+
+  update(g, rk) {
+    for (const k in g.cool) if (g.cool[k] > 0) g.cool[k]--;
+    for (const pt of g.parts) { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.07; pt.life--; }
+    g.parts = g.parts.filter((pt) => pt.life > 0);
+    if (g.gateFade > 0) g.gateFade--;
+    const cav = g.cav;
+    if (g.bonus) { countAir(g, rk); return; }
+    if (g.ready > 0) { g.ready--; return; }             // a moment to look before the cavern starts
+    if (g.dead) { g.deadT++; stepGuards(cav); return; }
+    if (rk.ending) return;
+
+    cav.tick++;
+    g.air = Math.max(0, g.air - 1 / 60);
+    rk.hud.set('air', g.air / g.airMax);
+    if (g.air < 10 && Math.ceil(g.air) !== g.gasp) { g.gasp = Math.ceil(g.air); SOUND.gasp(rk); }
+    if (g.air <= 0) { kill(g, rk, 'air'); return; }
+
+    const m = g.miner;
+    const ctl = readControls(g, rk);
+    if (ctl.jump) m.buf = BUFFER; else if (m.buf > 0) m.buf--;
+    const ev = moveMiner(cav, m, ctl.dir, m.buf > 0 && (!m.air || m.coyote > 0));
+    if (ev.jumped) { m.buf = 0; play(g, rk, 'jump', () => SOUND.jump(rk)); }
+    if (ev.landed) {
+      if (ev.fall > SAFE_FALL) { kill(g, rk, 'fall'); return; }
+      if (ev.fall > 12) play(g, rk, 'land', () => SOUND.land(rk));
+    }
+    if (m.y > H) { kill(g, rk, 'fall'); return; }
+    if (m.inv > 0) m.inv--;
+
+    stepCrumbles(g, rk);
+    stepGuards(cav);
+    stepDrips(g, rk);
+    stepRams(g, rk);
+    for (const v of cav.vents) if (ventState(cav, v) === 'on' && ventState(Object.assign({}, cav, { tick: cav.tick - 1 }), v) !== 'on') play(g, rk, 'whoosh', () => SOUND.whoosh(rk));
+    pickups(g, rk);
+    const why = harm(g);
+    if (why) { kill(g, rk, why); return; }
+    if (cav.liftOpen && cav.lift && hit(minerBox(m), { x: cav.lift.x + 5, y: cav.lift.y + 8, w: 10, h: 12 })) enterLift(g, rk);
+  },
+
+  draw(ctx, g, rk) {
+    drawCavern(rk, g);
+    drawMiner(rk, g);
+    for (const pt of g.parts) rk.circle(pt.x, pt.y, 0.6, pt.colour, pt.life > 10 ? 1 : pt.life / 10);
+  },
+
+  // The title: the pithead at dusk, with the miner and a runaway cart on the rock along the bottom.
+  drawTitle(ctx, rk) {
+    rk.draw('back0', 0, 0);
+    rk.draw('titleFloor', 0, 170);
+    rk.draw('miner', 40, 152, 0);
+    rk.draw('rattler', 262, 160, Math.floor(rk.t * 8) % 2, { flip: true });
+  },
+});
+</script>
+</body>
+</html>
