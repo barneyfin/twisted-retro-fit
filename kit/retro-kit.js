@@ -1,14 +1,15 @@
-/* Retro Kit 2.1 — runtime
+/* Retro Kit 2.2 — runtime
    One file, no dependencies. Exposes window.RetroKit. Pair it with retro-kit.css.
    It owns everything every game shares: the canvas (drawn at the screen's real resolution; games work in
    a 320 x 180 world), shape art, the game loop, keyboard and touch input (up to two fingers at once),
    every screen outside play (title, mode choice, pause, game over, initials, high scores, settings,
-   rotate), the HUD, sprites, backdrops, glow, pop-ups, banners, screen shake, sound, music and saved data.
+   rotate), the HUD, full screen, the way back to the arcade, sprites, backdrops, glow, pop-ups, banners,
+   screen shake, sound, music and saved data.
    A game supplies only its own rules and art: see .claude/skills/retro-kit/SKILL.md. */
 (function () {
   'use strict';
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
   const W = 320;
   const H = 180;
   const STEP = 1 / 60;
@@ -77,6 +78,9 @@
     pause: SVG('<line x1="9" y1="6" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="18"/>', 2.5),
     restart: SVG('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><polyline points="4,4 4,9 9,9"/>'),
     exit: SVG('<path d="M14 4h5v16h-5"/><polyline points="9,8 5,12 9,16"/><line x1="5" y1="12" x2="15" y2="12"/>'),
+    fullscreen: SVG('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
+    fullscreenExit: SVG('<path d="M9 4v5H4M15 4v5h5M15 20v-5h5M9 20v-5H4"/>'),
+    back: SVG('<line x1="19" y1="12" x2="5" y2="12"/><polyline points="11,6 5,12 11,18"/>'),
     drag: SVG('<path d="M4 12h16M7 8l-4 4 4 4M17 8l4 4-4 4"/>'),
     rotate: SVG('<rect x="7" y="2" width="10" height="16" rx="2"/><path d="M3 15a9 9 0 0 0 9 7"/><polyline points="9,19 12,22 9,24"/>'),
     chevUp: '<svg width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3,8 8,3 13,8"/></svg>',
@@ -1189,6 +1193,45 @@
       b.addEventListener('click', () => pause());
       return b;
     }
+
+    /* ----- Full screen: hides the browser's bars, where the browser allows it ----- */
+    const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+    const fsAllowed = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+    const mqFilled = window.matchMedia('(display-mode: fullscreen)');   // an installed app (or F11) already fills the screen
+    function toggleFullscreen() {
+      if (fsElement()) {
+        Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document)).catch(() => {});
+        return;
+      }
+      const r = document.documentElement;
+      Promise.resolve(r.requestFullscreen ? r.requestFullscreen({ navigationUI: 'hide' }) : r.webkitRequestFullscreen()).then(() => {
+        // Hold a phone's game sideways while it fills the screen (browsers allow this only in full screen)
+        if (touch && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+      }, () => {});
+    }
+    function syncFullscreenButton(b) {
+      const on = !!fsElement();
+      b.hidden = !on && (!fsAllowed || mqFilled.matches);   // never a button that cannot work
+      b.innerHTML = on ? ICON.fullscreenExit : ICON.fullscreen;
+      b.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    function fullscreenButton() {
+      const b = el('button', 'rk-ibtn');
+      b.dataset.act = 'fullscreen';
+      b.addEventListener('click', () => { toggleFullscreen(); b.blur(); });   // blur: Space and Enter belong to the game
+      syncFullscreenButton(b);
+      return b;
+    }
+    const syncFullscreen = () => root.querySelectorAll('[data-act="fullscreen"]').forEach(syncFullscreenButton);
+    const onFullscreenChange = () => {
+      syncFullscreen();
+      if (!fsElement() && state.screen === 'play') pause();   // left full screen mid-play: the jump in size never costs a life
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    if (mqFilled.addEventListener) mqFilled.addEventListener('change', syncFullscreen);
+    else if (mqFilled.addListener) mqFilled.addListener(syncFullscreen);
     function buildHud() {
       barSlot.innerHTML = '';
       if (!touch) {
@@ -1201,7 +1244,9 @@
           hudNodes[it.id] = n;
           panel.append(n.root);
         });
-        panel.append(pauseButton());
+        const btns = el('div', 'rk-bar-btns');
+        btns.append(fullscreenButton(), pauseButton());
+        panel.append(btns);
         hud.append(panel);
         barSlot.append(hud);
       } else {
@@ -1220,7 +1265,9 @@
         if (first) hudNodes[first.id] = c1;
         if (mid) hudNodes[mid.id] = c2;
         if (lives) { const ln = statNode(lives, true); hudNodes[lives.id] = ln; c3.append(ln.lives); }
-        c3.append(pauseButton());
+        const btns = el('div', 'rk-bar-btns');
+        btns.append(fullscreenButton(), pauseButton());
+        c3.append(btns);
         panel.append(c1.root, c2.root, c3);
         bar.append(panel);
         barSlot.append(bar);
@@ -1676,6 +1723,9 @@
     }
 
     /* ----- Title screen ----- */
+    // The arcade website marks each game page it serves with its own address; a game file opened on its own has none
+    const arcadeMeta = document.querySelector('meta[name="retrokit-arcade"]');
+    const arcadeHref = arcadeMeta ? arcadeMeta.getAttribute('content') : '';
     function buildTitle() {
       const best = bestScore();
       titleScreen.innerHTML = '';
@@ -1691,8 +1741,16 @@
       const gearBtn = el('button', 'rk-ibtn', ICON.gear);
       gearBtn.setAttribute('aria-label', 'Settings');
       gearBtn.addEventListener('click', () => openSettings('title'));
-      actions.append(soundBtn, gearBtn);
-      top.append(chip, actions);
+      actions.append(soundBtn, fullscreenButton(), gearBtn);
+      const lead = el('div', 'rk-title-actions');
+      if (arcadeHref) {
+        const back = el('a', 'rk-ibtn', ICON.back);
+        back.href = arcadeHref;
+        back.setAttribute('aria-label', 'Back to arcade');
+        lead.append(back);
+      }
+      lead.append(chip);
+      top.append(lead, actions);
 
       const center = el('div', 'rk-title-center');
       const lockup = el('div', 'rk-lockup' + (title.replace(/\n/g, '').length > 12 && title.indexOf('\n') < 0 ? ' is-long' : ''), '<div class="rk-logo"><span></span></div><div class="rk-tagline"></div>');

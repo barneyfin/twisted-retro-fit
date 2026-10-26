@@ -3,9 +3,12 @@
 
 Builds every game listed in site/games.json (with kit/build.py) and puts the whole website in _site/:
     _site/index.html          the front page: site/index.html with a card for each game
-    _site/play/<name>.html    each built game
+    _site/play/<name>.html    each built game, marked as the arcade's (see arcade_game)
     _site/art/<name>.webp     the picture on each game's card (from site/art/)
     _site/licences/           the typefaces' licences
+    _site/manifest.webmanifest, _site/icons/
+                              what a phone needs to add the arcade to its home screen as an app that opens
+                              with no browser bars (from site/; the icons are drawn from site/icons/icon.svg)
 
 Run it from the Retro Games folder:
     python site/build.py
@@ -105,6 +108,30 @@ def read_config(name):
     return {"title": title, "tagline": field("tagline"), "touch": field("touch"), "keys": keys, "modes": modes}
 
 
+def home_screen_tags(base):
+    """The tags that let a phone add the arcade to its home screen as an app with no browser bars (an iPhone
+    reads the apple- ones, Android the manifest). base is the way from the page up to the site's top folder."""
+    return ('<link rel="manifest" href="' + base + 'manifest.webmanifest">\n'
+            '<link rel="apple-touch-icon" href="' + base + 'icons/apple-touch-icon.png">\n'
+            '<meta name="mobile-web-app-capable" content="yes">\n'
+            '<meta name="apple-mobile-web-app-capable" content="yes">\n'
+            '<meta name="apple-mobile-web-app-title" content="Retro Fit">\n'
+            '<meta name="apple-mobile-web-app-status-bar-style" content="black">')
+
+
+def arcade_game(name):
+    """dist/<name>.html as the arcade serves it. It gains the home-screen tags, so the app opens from a game
+    page too, and the arcade's address, which tells the kit to show a Back to arcade button on the title
+    screen. The game files in dist/ stay as they are: offline, on their own, with no way back to show."""
+    page = (ROOT / "dist" / (name + ".html")).read_text(encoding="utf-8")
+    head_end = page.find("</head>")
+    if head_end < 0:
+        fail("dist/" + name + ".html has no </head>")
+    tags = ('<meta name="retrokit-arcade" content="../index.html">\n' + home_screen_tags("../") + "\n"
+            '<meta name="theme-color" content="#07070c">\n')
+    return page[:head_end] + tags + page[head_end:]
+
+
 def find_art(name):
     for ext in ART_TYPES:
         path = SITE / "art" / (name + ext)
@@ -196,7 +223,8 @@ def main():
     count = len(listed)
     word = WORDS[count] if count < len(WORDS) else str(count)
     for marker, value in (("{{GAMES}}", "\n".join(cards)), ("{{COUNT}}", word), ("{{COUNT_CAPS}}", word.upper()),
-                          ("{{COUNT_LOWER}}", word.lower()), ("{{KIT_VERSION}}", version.group(1) if version else "")):
+                          ("{{COUNT_LOWER}}", word.lower()), ("{{KIT_VERSION}}", version.group(1) if version else ""),
+                          ("{{HOME_SCREEN}}", home_screen_tags(""))):
         page = page.replace(marker, value)
 
     if OUT.exists():
@@ -205,8 +233,10 @@ def main():
     (OUT / "art").mkdir()
     (OUT / "licences").mkdir()
     (OUT / "index.html").write_text(page, encoding="utf-8", newline="\n")
+    shutil.copyfile(SITE / "manifest.webmanifest", OUT / "manifest.webmanifest")
+    shutil.copytree(SITE / "icons", OUT / "icons", ignore=shutil.ignore_patterns("*.svg"))
     for name in names:
-        shutil.copyfile(ROOT / "dist" / (name + ".html"), OUT / "play" / (name + ".html"))
+        (OUT / "play" / (name + ".html")).write_text(arcade_game(name), encoding="utf-8", newline="")
         art = find_art(name)
         if art:
             shutil.copyfile(art, OUT / "art" / art.name)

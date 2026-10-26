@@ -1,4 +1,4 @@
-# Retro Kit API reference (kit 2.1)
+# Retro Kit API reference (kit 2.2)
 
 A game is one call: `RetroKit.game(config)`. The kit calls your hooks and hands every hook `rk`, the toolbox.
 
@@ -246,6 +246,13 @@ if (g.bricks.every(b => b.dead) && !g.clearing) {
 Keep helper functions (like `buildLevel`) as plain functions inside the same `<script>`, above `RetroKit.game(...)`.
 
 **Smooth movement on screen** — keep positions as floats in state; drawing uses them as they are. Never round positions in state.
+
+## Full screen and the arcade
+
+A game does nothing for these; the kit does it all.
+
+- **Full screen.** Wherever the browser allows it, the kit puts a full-screen button on the title screen (between sound and settings) and in the HUD and phone top bar (beside pause). It hides the browser's bars, holds a phone sideways while full screen, and pauses the game if full screen ends during play. Where the browser cannot go full screen, or the game already fills the screen (an installed home-screen app), the button is left out. The playfield's size on screen changes when it goes in or out, so never read the window's size in a game: work in world pixels.
+- **The arcade.** The website (`site/build.py`) marks its copy of each game with `<meta name="retrokit-arcade" content="../index.html">`; when the kit finds it, the title screen gets a Back to arcade button at the top left. Never add that tag to a game's `index.html`.
 
 ## Title screen
 

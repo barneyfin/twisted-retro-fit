@@ -51,6 +51,8 @@ That builds every game on the page and puts the whole website in `_site\` (not k
 
 After that, commit and push as usual and the site updates itself a minute or two later.
 
+**Full screen and the home screen.** Every game has a full-screen button (title screen and in-play bar) wherever the browser allows it: on Android it hides the address bar and holds the phone sideways. Players can also add the arcade to a phone's home screen (iPhone: Share, then Add to Home Screen; Android: the browser's menu, then Add to Home screen or Install app), and it then opens like an app with no browser bars. On the website each game's title screen also has a Back to arcade button (top left), because an app on the home screen has no browser Back button. The game files in `dist\` have neither the home-screen tags nor that button: the website build adds them to its own copies.
+
 **Add a new game to the site.** Add an entry to `site\games.json` (its folder name, a genre, a one- or two-sentence blurb, and a description of its picture for screen readers) and a 16:9 picture of it in play at `site\art\<name>.webp`. The card's name, tagline, controls and modes are read from the game itself. A game not in `games.json` is not on the site; the build prints a note about it.
 
 ## What's where
@@ -58,7 +60,7 @@ After that, commit and push as usual and the site updates itself a minute or two
 | Path | What |
 |---|---|
 | `kit\retro-kit.css` | The look: colours, fonts, glass interface |
-| `kit\retro-kit.js` | The game shell: screens, game modes, controls, sound, music, sprites, saving |
+| `kit\retro-kit.js` | The game shell: screens, game modes, controls, full screen, sound, music, sprites, saving |
 | `kit\build.py` | Turns a game's source into one playable file |
 | `kit\template.html` | Starting point for a new game |
 | `kit\fonts\`, `kit\licences\` | The four typefaces and their licences (SIL Open Font License: free to embed in games) |
@@ -69,6 +71,7 @@ After that, commit and push as usual and the site updates itself a minute or two
 | `site\index.html` | The website's front page (the build adds a card for each game) |
 | `site\games.json` | Which games are on the website, in what order, with a blurb for each |
 | `site\art\` | The picture on each game's card |
+| `site\manifest.webmanifest`, `site\icons\` | What a phone needs to add the arcade to its home screen as an app: its name, how it opens (full screen) and its icon (`icon.svg`, with the PNGs drawn from it) |
 | `site\build.py` | Builds the games and the website into `_site\` |
 | `.github\workflows\publish-site.yml` | Tells GitHub to build and publish the website on every push to `main` |
 | `.claude\skills\retro-kit\` | Instructions Claude Code follows for every game |
