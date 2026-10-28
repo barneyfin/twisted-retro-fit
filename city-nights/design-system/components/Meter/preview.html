@@ -1,0 +1,57 @@
+<!-- @dsCard group="Play" height=420 width=980 subtitle="A 1280 by 720 window (--k 1.1) and a phone held sideways (--k 0.596, labels at 10px)" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Meter</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{display:flex;gap:20px;width:980px;height:420px}
+.desk,.phone{position:relative;overflow:hidden;height:420px}
+.desk{width:560px}
+.phone{width:400px;height:390px;align-self:flex-end}
+.desk img,.phone img{position:absolute;left:0;bottom:0;width:auto;height:100%}
+.desk img{height:720px}
+.phone img{height:390px}
+.desk .cn-meter{position:absolute;left:14px;bottom:14px}
+.desk .cn-caption{position:absolute;left:21px;top:56px}
+.phone .cn-meter{position:absolute;left:7.7px;bottom:7.7px}
+.phone .cn-caption{position:absolute;left:11.6px;top:188px}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="desk">
+    <img src="/_blob/8ea4e078544762a0d0cac5604bfc5cd1" alt="">
+    <div class="cn-caption" aria-hidden="true"><span class="zh">油麻地</span><span class="en">Yau Ma Tei</span></div>
+    <div class="cn-meter" style="--k:1.1">
+      <div class="cn-meter-face">
+        <div class="cn-meter-head"><span class="zh">的士</span><span class="en">TAXI METER</span></div>
+        <div class="cn-meter-dial">
+          <div class="cn-meter-row is-fare"><div class="cn-meter-lab"><span class="zh">車資</span><span class="en">FARE  HK$</span></div><div data-cn-digits=" 23.40" data-h="44"></div></div>
+          <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">時間</span><span class="en">TIME</span></div><div data-cn-digits="45" data-h="30.8"></div></div>
+          <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">速度</span><span class="en">KM/H</span></div><div data-cn-digits=" 62" data-h="30.8"></div></div>
+        </div>
+      </div>
+      <span class="cn-sr">Fare HK$23.40, time 45, speed 62 km/h</span>
+    </div>
+  </div>
+  <div class="phone">
+    <img src="/_blob/856230b9bedf955881fe8e770385f29f" alt="">
+    <div class="cn-caption is-phone" aria-hidden="true"><span class="zh">油麻地</span><span class="en">Yau Ma Tei</span></div>
+    <div class="cn-meter" style="--k:0.596;--lab:0.909">
+      <div class="cn-meter-face">
+        <div class="cn-meter-head"><span class="zh">的士</span><span class="en">TAXI METER</span></div>
+        <div class="cn-meter-dial">
+          <div class="cn-meter-row is-fare"><div class="cn-meter-lab"><span class="zh">車資</span><span class="en">FARE  HK$</span></div><div data-cn-digits=" 23.40" data-h="23.8"></div></div>
+          <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">時間</span><span class="en">TIME</span></div><div data-cn-digits="45" data-h="16.7"></div></div>
+          <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">速度</span><span class="en">KM/H</span></div><div data-cn-digits=" 62" data-h="16.7"></div></div>
+        </div>
+      </div>
+      <span class="cn-sr">Fare HK$23.40, time 45, speed 62 km/h</span>
+    </div>
+  </div>
+</div>
+<script>CityNights.mountDigits();</script>
+</body>
+</html>

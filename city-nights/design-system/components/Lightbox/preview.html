@@ -1,0 +1,29 @@
+<!-- @dsCard group="Lightbox" height=400 width=640 subtitle="An empty high-score table: case, face, header, inset, primary button" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lightbox</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:640px;height:400px;overflow:hidden}
+.stage img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 70%}
+.wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/0e50e8888a463c1175004694b5ad4c8b" alt="">
+  <div class="cn-scrim"></div>
+  <div class="wrap">
+    <div class="cn-ui cn-lightbox" role="dialog" aria-labelledby="hs-title" style="width:420px">
+      <div class="cn-face">
+        <h2 class="cn-header" id="hs-title"><span class="zh" lang="zh-Hant">高分榜</span><span class="en">High scores</span></h2>
+        <div class="cn-scores-wrap"><p class="cn-scores-empty">No fares yet. Be the first.</p></div>
+        <div class="cn-btns"><button class="cn-btn is-primary" type="button">Back<span class="cn-kbd">Esc</span></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

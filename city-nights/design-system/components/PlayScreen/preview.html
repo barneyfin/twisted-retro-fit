@@ -1,0 +1,38 @@
+<!-- @dsCard group="Screens" height=720 width=1280 subtitle="A 1280 by 720 window in Yau Ma Tei" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PlayScreen</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:1280px;height:720px;overflow:hidden}
+.stage>img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+.stage .cn-meter{position:absolute;left:14px;bottom:14px}
+.stage .cn-caption{position:absolute;left:21px;top:350px}
+.tiles{position:absolute;right:24px;top:24px}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/8ea4e078544762a0d0cac5604bfc5cd1" alt="The taxi driving up a wet Yau Ma Tei street under lit signs">
+  <div class="cn-caption" aria-hidden="true"><span class="zh">油麻地</span><span class="en">Yau Ma Tei</span></div>
+  <div class="cn-meter" style="--k:1.1">
+    <div class="cn-meter-face">
+      <div class="cn-meter-head"><span class="zh">的士</span><span class="en">TAXI METER</span></div>
+      <div class="cn-meter-dial">
+        <div class="cn-meter-row is-fare"><div class="cn-meter-lab"><span class="zh">車資</span><span class="en">FARE  HK$</span></div><div data-cn-digits=" 23.40" data-h="44"></div></div>
+        <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">時間</span><span class="en">TIME</span></div><div data-cn-digits="45" data-h="30.8"></div></div>
+        <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">速度</span><span class="en">KM/H</span></div><div data-cn-digits=" 62" data-h="30.8"></div></div>
+      </div>
+    </div>
+    <span class="cn-sr">Yau Ma Tei. Fare HK$23.40, time 45, speed 62 km/h</span>
+  </div>
+  <div class="cn-ui cn-tiles tiles">
+    <button class="cn-tile" type="button" aria-label="Full screen" aria-pressed="false"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></span></button>
+    <button class="cn-tile" type="button" aria-label="Pause"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5.5v13M15 5.5v13"/></svg></span></button>
+  </div>
+</div>
+<script>CityNights.mountDigits();</script>
+</body>
+</html>

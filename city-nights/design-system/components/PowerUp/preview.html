@@ -1,0 +1,41 @@
+<!-- @dsCard group="World" height=560 width=960 subtitle="The five sign tokens, then three of them on the road in Yau Ma Tei at three distances" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PowerUp</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:960px;height:560px;overflow:hidden;background:var(--night-black)}
+.row{position:absolute;left:30px;top:22px;width:900px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.cell{display:flex;flex-direction:column;align-items:center;gap:4px}
+.cell .cn-powerup{--s:104px;margin:14px 0 6px}
+.name{font:600 17px/22px var(--font-ui);color:var(--night-text)}
+.mean{font:500 14px/20px var(--font-ui);color:var(--meter-label)}
+.road{position:absolute;left:0;top:300px;width:960px;height:260px;overflow:hidden}
+.road img{position:absolute;left:0;top:-200px;width:960px;height:540px;object-fit:cover}
+.road .cn-powerup{position:absolute}
+.road .near{--s:78px;left:200px;top:86px}
+.road .mid{--s:50px;left:612px;top:52px}
+.road .far{--s:26px;left:514px;top:6px}
+</style>
+</head>
+<body>
+<div class="stage cn-ui">
+  <div class="row">
+    <div class="cell"><div class="cn-powerup is-time is-bobbing" aria-hidden="true"><div class="cn-token"><span class="face"><span class="zh">時</span></span></div><span class="pool"></span></div><span class="name">More time</span><span class="mean">時 · time</span></div>
+    <div class="cell"><div class="cn-powerup is-fare is-bobbing" aria-hidden="true"><div class="cn-token"><span class="face"><span class="zh">錢</span></span></div><span class="pool"></span></div><span class="name">Fare bonus</span><span class="mean">錢 · money</span></div>
+    <div class="cell"><div class="cn-powerup is-speed is-bobbing" aria-hidden="true"><div class="cn-token"><span class="face"><span class="zh">快</span></span></div><span class="pool"></span></div><span class="name">Speed boost</span><span class="mean">快 · fast</span></div>
+    <div class="cell"><div class="cn-powerup is-shield is-bobbing" aria-hidden="true"><div class="cn-token"><span class="face"><span class="zh">保</span></span></div><span class="pool"></span></div><span class="name">Shield</span><span class="mean">保 · protect</span></div>
+    <div class="cell"><div class="cn-powerup is-double is-bobbing" aria-hidden="true"><div class="cn-token"><span class="face"><span class="zh">雙</span></span></div><span class="pool"></span></div><span class="name">Double fare</span><span class="mean">雙 · double</span></div>
+  </div>
+  <div class="road">
+    <img src="/_blob/8ea4e078544762a0d0cac5604bfc5cd1" alt="The road ahead of the taxi in Yau Ma Tei, with power-up signs hovering over it">
+    <div class="cn-powerup is-time near" aria-hidden="true"><div class="cn-token"><span class="face"><span class="zh">時</span></span></div><span class="pool"></span></div>
+    <div class="cn-powerup is-speed mid" aria-hidden="true"><div class="cn-token"><span class="face"><span class="zh">快</span></span></div><span class="pool"></span></div>
+    <div class="cn-powerup is-fare far" aria-hidden="true"><div class="cn-token"><span class="face"><span class="zh">錢</span></span></div><span class="pool"></span></div>
+  </div>
+</div>
+<script>/* static apart from the slow bob */</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!-- @dsCard group="Lightbox" height=340 width=640 subtitle="Selected item as the red band, with its keycap; plain items" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MenuPanel</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:640px;height:340px;overflow:hidden}
+.stage img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 60%}
+.wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/8ea4e078544762a0d0cac5604bfc5cd1" alt="">
+  <div class="cn-scrim"></div>
+  <div class="wrap">
+    <div class="cn-ui cn-lightbox" style="width:380px">
+      <div class="cn-face" style="padding-top:12px">
+        <div class="cn-menu" role="menu" aria-label="Paused">
+          <button class="cn-item is-selected" type="button" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Resume<span class="cn-kbd">Esc</span></button>
+          <button class="cn-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></svg>Restart</button>
+          <button class="cn-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</button>
+          <button class="cn-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 5H5v14h5"/><path d="M14 8l4 4-4 4"/><path d="M18 12H9"/></svg>Quit to menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

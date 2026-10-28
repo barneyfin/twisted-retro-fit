@@ -1,0 +1,45 @@
+<!-- @dsCard group="Screens" height=540 width=960 subtitle="Over the frozen street in Mong Kok, the meter dimmed beneath" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PauseOverlay</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:960px;height:540px;overflow:hidden}
+.stage>img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+.stage .cn-meter{position:absolute;left:10.5px;bottom:10.5px}
+.wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/0e50e8888a463c1175004694b5ad4c8b" alt="">
+  <div class="cn-meter" style="--k:0.825" aria-hidden="true">
+    <div class="cn-meter-face">
+      <div class="cn-meter-head"><span class="zh">的士</span><span class="en">TAXI METER</span></div>
+      <div class="cn-meter-dial">
+        <div class="cn-meter-row is-fare"><div class="cn-meter-lab"><span class="zh">車資</span><span class="en">FARE  HK$</span></div><div data-cn-digits=" 57.80" data-h="33"></div></div>
+        <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">時間</span><span class="en">TIME</span></div><div data-cn-digits="31" data-h="23.1"></div></div>
+        <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">速度</span><span class="en">KM/H</span></div><div data-cn-digits=" 48" data-h="23.1"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="cn-ui wrap">
+    <div class="cn-scrim"></div>
+    <div class="cn-lightbox" role="dialog" aria-modal="true" aria-labelledby="pause-title" style="position:relative;width:380px">
+      <div class="cn-face">
+        <h2 class="cn-header" id="pause-title"><span class="zh" lang="zh-Hant">暫停</span><span class="en">Paused</span></h2>
+        <div class="cn-menu" role="menu" aria-label="Paused">
+          <button class="cn-item is-selected" type="button" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Resume<span class="cn-kbd">Esc</span></button>
+          <button class="cn-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></svg>Restart</button>
+          <button class="cn-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</button>
+          <button class="cn-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 5H5v14h5"/><path d="M14 8l4 4-4 4"/><path d="M18 12H9"/></svg>Quit to menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>CityNights.mountDigits();</script>
+</body>
+</html>

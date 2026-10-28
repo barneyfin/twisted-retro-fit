@@ -1,0 +1,52 @@
+<!-- @dsCard group="Screens" height=540 width=960 subtitle="Opened from the title screen" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SettingsPanel</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:960px;height:540px;overflow:hidden}
+.stage>img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+.wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.vol{display:flex;flex-direction:column;gap:4px}
+.vol .top{display:flex;justify-content:space-between;align-items:baseline}
+.pic{display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/021468c5262ea54acc813a22b783cfb6" alt="">
+  <div class="cn-ui wrap">
+    <div class="cn-scrim"></div>
+    <div class="cn-lightbox" role="dialog" aria-modal="true" aria-labelledby="set-title" style="position:relative;width:480px">
+      <div class="cn-face" style="gap:16px">
+        <h2 class="cn-header" id="set-title"><span class="zh" lang="zh-Hant">設定</span><span class="en">Settings</span></h2>
+        <div class="vol">
+          <div class="top"><label class="cn-setting-name" for="vol">Volume</label><span class="cn-value" style="font-size:15px">80%</span></div>
+          <input class="cn-slider" id="vol" type="range" min="0" max="100" value="80" style="--v:80%">
+        </div>
+        <div class="cn-setting">
+          <div><div class="cn-setting-name" id="fx-l">Effects</div><p class="cn-note">Glow around lights and signs.</p></div>
+          <button class="cn-switch" type="button" role="switch" aria-checked="true" aria-labelledby="fx-l"></button>
+        </div>
+        <div class="cn-setting">
+          <div><div class="cn-setting-name" id="rm-l">Reduce motion</div><p class="cn-note">Less sway and roll from the taxi on corners.</p></div>
+          <button class="cn-switch" type="button" role="switch" aria-checked="false" aria-labelledby="rm-l"></button>
+        </div>
+        <div class="pic">
+          <div><div class="cn-setting-name" id="pic-l">Picture</div><p class="cn-note">Automatic picks the most detail your device can run smoothly.</p></div>
+          <div class="cn-segments" role="group" aria-labelledby="pic-l">
+            <button type="button" aria-pressed="true">Automatic</button>
+            <button type="button" aria-pressed="false">Best</button>
+            <button type="button" aria-pressed="false">Faster</button>
+            <button type="button" aria-pressed="false">Fastest</button>
+          </div>
+        </div>
+        <button class="cn-btn is-primary" type="button" style="flex:none">Done<span class="cn-kbd">Esc</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!-- @dsCard group="World" height=440 width=960 subtitle="Lightbox, neon and vertical signs from the street's list, drawn in HTML for reference" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Signs</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:960px;height:440px;overflow:hidden;background:linear-gradient(180deg,var(--sky-top),var(--sky-mid) 60%,var(--sky-low));display:flex;gap:18px;padding:30px 22px;box-sizing:border-box}
+.col{display:flex;flex-direction:column;gap:26px;align-items:flex-start}
+.is-neon{--core-c:color-mix(in srgb,var(--tube-c) 20%,#ffffff)}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="col">
+    <div class="cn-sign is-box" style="--face-c:var(--face-cream);--glow-c:var(--face-cream);--ink-c:var(--ink-red)"><span class="face"></span><span class="zh">好運茶餐廳</span><span class="en">LUCKY CAFE</span></div>
+    <div class="cn-sign is-box" style="--face-c:var(--face-green);--glow-c:var(--face-green);--ink-c:var(--ink-cream)"><span class="face"></span><span class="zh">星光冰室</span><span class="en">STARLIGHT ICE CAFE</span></div>
+    <div class="cn-sign is-box" style="--face-c:var(--face-red);--glow-c:var(--face-red);--ink-c:var(--ink-yellow)"><span class="face"></span><span class="zh">金城鐘錶</span><span class="en">GOLDEN CITY WATCH CO.</span></div>
+  </div>
+  <div class="col">
+    <div class="cn-sign is-neon" style="--tube-c:var(--tube-teal);--tube2-c:var(--tube-red)"><span class="tube"></span><span class="zh">明月酒店</span><span class="en">BRIGHT MOON HOTEL</span></div>
+    <div class="cn-sign is-neon" style="--tube-c:var(--tube-pink);--tube2-c:var(--tube-violet)"><span class="tube"></span><span class="zh">原子桑拿</span><span class="en">ATOMIC SAUNA</span></div>
+    <div class="cn-sign is-neon" style="--tube-c:var(--tube-yellow);--tube2-c:var(--tube-red)"><span class="tube"></span><span class="zh">好味麵家</span><span class="en">HO MEI NOODLE</span></div>
+  </div>
+  <div class="col">
+    <div class="cn-sign is-box" style="--face-c:var(--face-white);--glow-c:var(--face-white);--ink-c:var(--ink-blue)"><span class="face"></span><span class="zh">利源找換</span><span class="en">MONEY EXCHANGE</span></div>
+    <div class="cn-sign is-box" style="--face-c:var(--face-yellow);--glow-c:var(--face-yellow);--ink-c:var(--ink-black)"><span class="face"></span><span class="zh">時裝</span><span class="en">FASHION</span></div>
+    <div class="cn-sign is-box" style="--face-c:var(--face-teal);--glow-c:var(--face-teal);--ink-c:var(--ink-white)"><span class="face"></span><span class="zh">新潔洗衣</span><span class="en">LAUNDRY</span></div>
+  </div>
+  <div class="col" style="flex-direction:row;gap:14px">
+    <div class="cn-sign is-box is-vert" style="--face-c:var(--face-yellow);--glow-c:var(--face-yellow);--ink-c:var(--ink-red)"><span class="face"></span><span class="zh"><span>祥</span><span>記</span><span>粥</span><span>麵</span></span></div>
+    <div class="cn-sign is-neon is-vert" style="--tube-c:var(--tube-green);--tube2-c:var(--tube-green)"><span class="tube"></span><span class="zh"><span>長</span><span>春</span><span>藥</span><span>行</span></span></div>
+  </div>
+</div>
+</body>
+</html>

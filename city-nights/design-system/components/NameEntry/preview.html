@@ -1,0 +1,38 @@
+<!-- @dsCard group="Screens" height=540 width=960 subtitle="Second letter selected; the third still empty" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NameEntry</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:960px;height:540px;overflow:hidden}
+.stage>img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+.wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/0e50e8888a463c1175004694b5ad4c8b" alt="">
+  <div class="cn-ui wrap">
+    <div class="cn-scrim"></div>
+    <div class="cn-lightbox" role="dialog" aria-modal="true" aria-labelledby="ne-title" style="position:relative;width:400px">
+      <div class="cn-face is-centred">
+        <h2 class="cn-header" id="ne-title"><span class="zh" lang="zh-Hant">新紀錄</span><span class="en">New best</span></h2>
+        <p class="cn-body">Enter your initials</p>
+        <div class="cn-slots" role="group" aria-label="Initials">
+          <div class="cn-slot-col"><svg class="chev" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l6-6 6 6"/></svg><div class="cn-slot">B</div><svg class="chev" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5l6 6 6-6"/></svg></div>
+          <div class="cn-slot-col is-selected" aria-current="true"><svg class="chev" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l6-6 6 6"/></svg><div class="cn-slot">A</div><svg class="chev" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5l6 6 6-6"/></svg></div>
+          <div class="cn-slot-col"><svg class="chev" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l6-6 6 6"/></svg><div class="cn-slot is-empty">·</div><svg class="chev" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5l6 6 6-6"/></svg></div>
+        </div>
+        <div class="cn-keys">
+          <span class="cn-kbd">↑</span><span class="cn-kbd">↓</span><span class="act">Letter</span>
+          <span class="cn-kbd">←</span><span class="cn-kbd">→</span><span class="act">Move</span>
+          <span class="cn-kbd">Enter</span><span class="act">Save</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

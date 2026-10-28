@@ -1,0 +1,33 @@
+<!-- @dsCard group="Lightbox" height=150 width=640 subtitle="In play (lightbox), on a phone (44px), on the title screen (neon)" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>IconTile</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:640px;height:150px;overflow:hidden}
+.stage img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:80% 10%}
+.row{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/8ea4e078544762a0d0cac5604bfc5cd1" alt="">
+  <div class="row">
+    <div class="cn-ui cn-tiles">
+      <button class="cn-tile" type="button" aria-label="Full screen" aria-pressed="false"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></span></button>
+      <button class="cn-tile" type="button" aria-label="Pause"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5.5v13M15 5.5v13"/></svg></span></button>
+    </div>
+    <div class="cn-ui cn-tiles">
+      <button class="cn-tile is-phone" type="button" aria-label="Full screen" aria-pressed="false"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></span></button>
+      <button class="cn-tile is-phone" type="button" aria-label="Pause"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5.5v13M15 5.5v13"/></svg></span></button>
+    </div>
+    <div class="cn-ui cn-tiles">
+      <button class="cn-tile is-neon" type="button" aria-label="Sound on" aria-pressed="true"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></span></button>
+      <button class="cn-tile is-neon" type="button" aria-label="Full screen" aria-pressed="false"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></span></button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

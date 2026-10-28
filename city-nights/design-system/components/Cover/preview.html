@@ -1,0 +1,53 @@
+<!-- @dsCard height=340 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>City Nights</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.cover{position:relative;width:960px;height:340px;overflow:hidden;background:var(--night-black)}
+.cover svg{position:absolute;left:0;top:0}
+.b-cream{fill:var(--lightbox-mid)}
+.b-red{fill:var(--taxi-red)}
+.b-sodium{fill:var(--sodium)}
+.b-teal{fill:var(--tube-teal)}
+.seg-on{fill:var(--digit-on)}
+.seg-off{fill:var(--digit-off)}
+.r{rx:var(--radius-face)}
+.text{position:absolute;left:40px;bottom:32px;max-width:440px;display:flex;flex-direction:column;gap:20px}
+.name{margin:0;font:700 120px/0.95 var(--font-display);color:var(--night-text)}
+.tag{margin:0;font:500 14px/20px var(--font-ui);color:var(--meter-label)}
+</style>
+</head>
+<body>
+<div class="cover">
+  <svg aria-hidden="true" width="960" height="340" viewBox="0 0 960 340">
+    <!--
+      blocks: lightbox-mid 200x156, taxi-red 120x132, sodium 112x196, tube-teal 120x36; corners radius-face (8px); sides in multiples of space-1 (4px)
+      arrangement: signs hanging from the top edge, staggered, the sodium one bleeding off the right, like the wall of signs over the street
+      pattern: one oversized seven-segment 4 in digit-on with its unlit segments in digit-off: "Numbers are seven-segment digits, not a font" (README, Type); the meter's proportions (0.52 wide, 0.12 thick, slant 0.08), clipped by the bottom edge
+      steps: gaps space-4 (14px) and space-5 (18px) rounded to 16 and 20; radius-face 8px; digit height 176px
+    -->
+    <rect class="b-cream r" x="512" y="-12" width="200" height="156"></rect>
+    <rect class="b-red r" x="728" y="-12" width="120" height="132"></rect>
+    <rect class="b-sodium r" x="864" y="-12" width="112" height="196"></rect>
+    <rect class="b-teal r" x="512" y="164" width="120" height="36"></rect>
+    <g transform="translate(676 176) skewX(-4.6)">
+      <rect class="seg-off" x="16.9" y="0" width="57.8" height="21.1"></rect>
+      <rect class="seg-on" x="70.4" y="16.9" width="21.1" height="62.7"></rect>
+      <rect class="seg-on" x="70.4" y="96.4" width="21.1" height="62.7"></rect>
+      <rect class="seg-off" x="16.9" y="154.9" width="57.8" height="21.1"></rect>
+      <rect class="seg-off" x="0" y="96.4" width="21.1" height="62.7"></rect>
+      <rect class="seg-on" x="0" y="16.9" width="21.1" height="62.7"></rect>
+      <rect class="seg-on" x="16.9" y="77.4" width="57.8" height="21.1"></rect>
+    </g>
+  </svg>
+  <div class="text">
+    <h1 class="name">City Nights</h1>
+    <p class="tag">A Hong Kong street at night, lit by its lightbox and neon signs.</p>
+  </div>
+</div>
+<script>/* static cover */</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!-- @dsCard group="Numbers" height=250 width=780 subtitle="Every glyph; the five sizes in use" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Digits</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{width:780px;height:250px;display:flex;flex-direction:column;justify-content:center;gap:18px;padding:0 20px;box-sizing:border-box}
+.panel{display:flex;align-items:flex-end;gap:14px;padding:16px 16px;border-radius:5px;background:var(--meter-face);box-shadow:0 0 0 1px var(--meter-rule)}
+.sz{display:flex;flex-direction:column;gap:6px}
+.sz small{white-space:nowrap;font:600 12px/16px var(--font-ui);letter-spacing:1px;color:var(--meter-label)}
+</style>
+</head>
+<body>
+<div class="stage cn-ui">
+  <div class="panel"><div data-cn-digits="0123456789-. " data-h="40"></div></div>
+  <div class="panel">
+    <div class="sz"><div data-cn-digits="412.80" data-h="64"></div><small>64 · FINAL FARE</small></div>
+    <div class="sz"><div data-cn-digits=" 23.40" data-h="44"></div><small>44 · METER</small></div>
+    <div class="sz"><div data-cn-digits="45" data-h="30.8"></div><small>30.8</small></div>
+    <div class="sz"><div data-cn-digits="386.40" data-h="30"></div><small>30 · BEST</small></div>
+    <div class="sz"><div data-cn-digits="219.30" data-h="18"></div><small>18 · TABLE</small></div>
+  </div>
+</div>
+<script>CityNights.mountDigits();</script>
+</body>
+</html>

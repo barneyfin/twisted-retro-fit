@@ -1,0 +1,26 @@
+<!-- @dsCard group="Neon" height=320 width=640 subtitle="Title screen only: unlit items, the selected item lit teal" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TitleMenu</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:640px;height:320px;overflow:hidden}
+.stage img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:20% 55%}
+.menu{position:absolute;left:48px;top:50px}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/021468c5262ea54acc813a22b783cfb6" alt="">
+  <div class="cn-title-shade"></div>
+  <nav class="cn-ui cn-neon cn-title-menu menu" aria-label="Main menu">
+    <span class="cn-tube" aria-hidden="true"></span>
+    <button class="cn-titem is-selected" type="button" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Start game<span class="cn-kbd">Enter</span></button>
+    <button class="cn-titem" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4"/><path d="M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4"/><path d="M8.5 20h7"/></svg>High scores</button>
+    <button class="cn-titem" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</button>
+  </nav>
+</div>
+</body>
+</html>

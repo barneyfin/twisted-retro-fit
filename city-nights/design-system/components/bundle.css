@@ -1,0 +1,243 @@
+/* City Nights: the Interface layer. Lit signs over the street.
+   Every colour, radius and shadow is a token from tokens.json (var(--name)); sizes are CSS px unless marked.
+   Lightbox = every panel during and after play. Neon = the title screen only. */
+
+.cn-ui{font-family:var(--font-ui);color:var(--panel-ink);-webkit-font-smoothing:antialiased;box-sizing:border-box}
+.cn-ui *,.cn-ui *::before,.cn-ui *::after{box-sizing:border-box}
+:where(.cn-ui) button{font:inherit;color:inherit}
+.cn-ui :focus-visible{outline:2px solid var(--focus-dark);outline-offset:2px}
+.cn-lightbox :focus-visible{outline-color:var(--focus-light)}
+.cn-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- screen grounds ---------- */
+.cn-scrim{position:absolute;inset:0;background:var(--scrim)}
+.cn-title-shade{position:absolute;inset:0;background:linear-gradient(90deg,var(--title-shade) 0%,rgba(6,5,4,.5) 40%,rgba(6,5,4,.12) 75%)}
+
+/* ---------- lightbox panel ---------- */
+.cn-lightbox{padding:5px;background:var(--case);border-radius:var(--radius-case);box-shadow:var(--shadow-lightbox)}
+.cn-face{display:flex;flex-direction:column;gap:var(--space-4);padding:6px var(--space-5) var(--space-5);border-radius:var(--radius-face);
+  background:linear-gradient(180deg,var(--lightbox-top) 0%,var(--lightbox-mid) 35%,var(--lightbox-low) 100%);
+  outline:1px solid var(--lightbox-line);outline-offset:-3px;color:var(--panel-ink)}
+.cn-face.is-centred{align-items:center;text-align:center}
+.cn-header{margin:0 -4px;align-self:stretch;min-height:54px;display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);border-bottom:1px solid var(--rule-red);color:var(--heading-red)}
+.cn-header .zh{font:900 32px/38px var(--font-zh-serif)}
+.cn-header .en{font:700 22px/26px var(--font-display);letter-spacing:3px;text-transform:uppercase}
+.cn-body{margin:0;font:500 17px/22px var(--font-ui);color:var(--panel-ink)}
+.cn-note{margin:0;font:500 14px/20px var(--font-ui);color:var(--panel-ink-2)}
+.cn-label{font:600 13px/18px var(--font-ui);letter-spacing:1.2px;text-transform:uppercase;color:var(--panel-ink-2)}
+.cn-value{font:600 17px/22px var(--font-ui);font-variant-numeric:tabular-nums;color:var(--panel-ink)}
+
+/* menu items on a lightbox: the selected one is the lit red band */
+.cn-menu{display:flex;flex-direction:column;gap:var(--space-1)}
+.cn-item{display:flex;align-items:center;gap:var(--space-3);width:100%;height:var(--item-height);padding:0 14px;border:none;border-radius:var(--radius-item);
+  background:transparent;color:var(--panel-ink);font:600 20px/28px var(--font-ui);text-align:left;cursor:pointer}
+.cn-item svg{width:22px;height:22px;flex:none}
+.cn-item:hover{background:var(--segment-ground)}
+.cn-item.is-selected{background:var(--band-red);color:var(--on-band);box-shadow:var(--shadow-band)}
+.cn-item:disabled{opacity:.45;cursor:default}
+.cn-item .cn-kbd{margin-left:auto}
+
+/* buttons */
+.cn-btns{display:flex;gap:10px}
+.cn-btn{display:flex;align-items:center;justify-content:center;gap:var(--space-3);height:var(--item-height);padding:0 18px;border:none;border-radius:var(--radius-item);
+  background:transparent;color:var(--panel-ink);font:600 20px/28px var(--font-ui);cursor:pointer;box-shadow:inset 0 0 0 1.5px var(--outline-ink)}
+.cn-btn.is-primary{background:var(--band-red);color:var(--on-band);box-shadow:var(--shadow-band)}
+.cn-btns .cn-btn.is-primary{flex:1}
+
+/* keycaps: on the lightbox face, on the red band, on the dark plaque */
+.cn-kbd{display:inline-block;padding:1px 8px;border:1px solid var(--kbd-line);border-bottom-width:2px;border-radius:var(--radius-kbd);
+  background:var(--kbd-fill);color:var(--panel-ink);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.is-selected .cn-kbd,.is-primary .cn-kbd{padding:2px 8px;border:1px solid var(--on-band);border-radius:var(--radius-kbd);background:transparent;color:var(--on-band)}
+.cn-plaque .cn-kbd{border-color:var(--kbd-dark-line);background:var(--kbd-dark-fill);color:var(--night-text)}
+.cn-keys{display:flex;align-items:center;gap:6px;font:500 14px/20px var(--font-ui)}
+.cn-keys .act{margin-right:var(--space-4)}
+.cn-keys .act:last-child{margin-right:0}
+
+/* settings rows */
+.cn-setting{display:flex;justify-content:space-between;align-items:center;gap:20px}
+.cn-setting-name{font:600 18px/24px var(--font-ui);color:var(--panel-ink)}
+.cn-switch{position:relative;flex:none;width:56px;height:32px;padding:0;border:none;border-radius:var(--radius-switch);background:var(--switch-off);cursor:pointer;box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
+.cn-switch::after{content:"";position:absolute;left:4px;top:4px;width:24px;height:24px;border-radius:12px;background:var(--knob-off)}
+.cn-switch[aria-checked="true"]{background:var(--band-red);box-shadow:var(--shadow-band)}
+.cn-switch[aria-checked="true"]::after{left:28px;background:var(--knob-on)}
+.cn-slider{-webkit-appearance:none;appearance:none;width:100%;height:28px;margin:0;background:transparent;cursor:pointer}
+.cn-slider::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--band-red) 0,var(--band-red) var(--v,50%),var(--switch-off) var(--v,50%),var(--switch-off) 100%)}
+.cn-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;margin-top:-8px;border-radius:50%;background:var(--knob-on);border:2px solid var(--ink-red);box-shadow:0 0 8px var(--lightbox-glow)}
+.cn-slider::-moz-range-track{height:8px;border-radius:4px;background:var(--switch-off)}
+.cn-slider::-moz-range-progress{height:8px;border-radius:4px;background:var(--band-red)}
+.cn-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--knob-on);border:2px solid var(--ink-red);box-shadow:0 0 8px var(--lightbox-glow)}
+.cn-segments{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:var(--space-1);padding:4px;border-radius:var(--radius-face);background:var(--segment-ground);box-shadow:inset 0 0 0 1px var(--outline-ink)}
+.cn-segments button{height:var(--tap-min);border:none;border-radius:var(--radius-item);background:transparent;color:var(--panel-ink);font:600 16px/22px var(--font-ui);cursor:pointer}
+.cn-segments button[aria-pressed="true"]{background:var(--band-red);color:var(--on-band);box-shadow:var(--shadow-band)}
+
+/* dark insets: wherever a number is shown */
+.cn-inset{display:flex;flex-direction:column;gap:10px;padding:12px 18px 16px;border-radius:5px;background:var(--meter-face);color:var(--meter-label)}
+.cn-inset-label{display:flex;align-items:baseline;gap:7px;color:var(--meter-label)}
+.cn-inset-label .zh{font:700 15px/18px var(--font-zh-sans)}
+.cn-inset-label .en{font:600 13px/18px var(--font-ui);letter-spacing:1.2px;white-space:pre}
+
+/* the New best badge: a small yellow lightbox */
+.cn-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;padding:4px 12px 5px;border-radius:var(--radius-item);
+  background:var(--face-yellow) linear-gradient(180deg,rgba(0,0,0,.06) 0%,rgba(255,255,255,.22) 40%,rgba(0,0,0,.08) 100%);color:var(--ink-black);box-shadow:var(--shadow-badge)}
+.cn-badge .zh{font:900 18px/24px var(--font-zh-serif)}
+.cn-badge .en{font:700 15px/24px var(--font-display);letter-spacing:2px;text-transform:uppercase}
+
+/* high scores */
+.cn-scores{width:100%;border-collapse:collapse;color:var(--night-text)}
+.cn-scores-wrap{padding:8px 0;border-radius:5px;background:var(--meter-face)}
+.cn-scores tr{height:30px}
+.cn-scores td{padding:0}
+.cn-scores td.rank{width:44px;padding-left:12px;font:600 15px/30px var(--font-ui);font-variant-numeric:tabular-nums;color:var(--meter-dim)}
+.cn-scores td.who{font:600 20px/30px var(--font-display);letter-spacing:2px;color:var(--night-text)}
+.cn-scores td.fare{padding-right:12px}
+.cn-scores td.fare .cn-digits{justify-content:flex-end}
+.cn-scores tr.is-new{background:var(--row-new);box-shadow:inset 0 0 0 1px var(--row-new-line)}
+.cn-scores tr.is-new td.rank{color:var(--rank-new)}
+.cn-scores-empty{margin:0;padding:12px 16px;font:500 17px/22px var(--font-ui);color:var(--meter-label)}
+
+/* initials */
+.cn-slots{display:flex;gap:14px;align-items:center}
+.cn-slot-col{display:flex;flex-direction:column;align-items:center;gap:4px}
+.cn-slot-col .chev{width:20px;height:16px;color:var(--ink-red);visibility:hidden}
+.cn-slot-col.is-selected .chev{visibility:visible}
+.cn-slot{width:72px;height:92px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-item);background:var(--meter-face);box-shadow:inset 0 0 0 1px var(--meter-rule);
+  font:700 60px/64px var(--font-display);color:var(--digit-on);text-shadow:0 0 10px var(--digit-glow)}
+.cn-slot-col.is-selected .cn-slot{box-shadow:inset 0 0 0 2px var(--digit-on),0 0 14px var(--digit-glow)}
+.cn-slot.is-empty{color:var(--meter-dim);text-shadow:none}
+
+/* ---------- seven-segment digits (CityNights.digits builds these) ---------- */
+.cn-digits{display:flex;align-items:flex-start}
+.cn-digit{position:relative;flex:none;transform:skewX(-4.6deg)}
+.cn-seg{position:absolute;background:var(--digit-off)}
+.cn-seg.is-on{background:var(--digit-on);box-shadow:0 0 var(--glow,5px) var(--digit-glow)}
+
+/* ---------- neon: the title screen ---------- */
+.cn-neon{position:relative;background:var(--neon-board);border-radius:var(--radius-case);box-shadow:var(--shadow-board)}
+.cn-tube{position:absolute;inset:7px;border:1.5px solid var(--tube-yellow);border-radius:7px;box-shadow:var(--shadow-tube-yellow);pointer-events:none}
+.cn-tube.is-pink{inset:9px;border:2.5px solid var(--tube-pink);border-radius:8px;box-shadow:var(--shadow-tube-pink)}
+.cn-tube.is-teal{border:2px solid var(--tube-teal);border-radius:6px;box-shadow:var(--shadow-tube-teal)}
+.cn-lit-pink{color:var(--tube-core-pink);-webkit-text-stroke:1.5px var(--tube-pink);text-shadow:0 0 .07em var(--tube-pink),0 0 .22em var(--tube-pink),0 0 .52em rgba(255,69,168,.7)}
+.cn-lit-teal{color:var(--tube-core-teal);-webkit-text-stroke:1px var(--tube-teal);text-shadow:0 0 .12em var(--tube-teal),0 0 .4em var(--tube-teal),0 0 .85em rgba(63,242,223,.7)}
+.cn-lit-yellow{color:var(--tube-core-yellow);text-shadow:0 0 .18em var(--tube-yellow),0 0 .55em var(--tube-yellow),0 0 1.1em rgba(255,213,46,.6)}
+
+.cn-logo{display:flex;gap:14px;align-items:stretch}
+.cn-vsign{position:relative;width:74px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:16px 0;border-radius:var(--radius-tile)}
+.cn-vsign span{font:700 40px/50px var(--font-zh-sans)}
+.cn-logo-board{position:relative;padding:30px 44px 32px 40px;border-radius:var(--radius-board)}
+.cn-logo-name{margin:0;display:flex;flex-direction:column;align-items:flex-start;font-family:var(--font-display);font-weight:700;text-transform:uppercase}
+.cn-logo-name .top{font-size:56px;line-height:64px;letter-spacing:.24em}
+.cn-logo-name .main{font-size:116px;line-height:108px;letter-spacing:.02em}
+
+.cn-title-menu{position:relative;width:var(--menu-width);display:flex;flex-direction:column;gap:6px;padding:20px 18px}
+.cn-titem{position:relative;display:flex;align-items:center;gap:var(--space-3);width:100%;height:var(--item-height);padding:0 14px;border:2px solid transparent;border-radius:8px;
+  background:transparent;color:var(--neon-unlit);font:600 20px/28px var(--font-ui);text-align:left;cursor:pointer}
+.cn-titem svg{width:22px;height:22px;flex:none}
+.cn-titem.is-selected{border-color:var(--tube-teal);background:rgba(63,242,223,.07);color:var(--tube-core-teal);box-shadow:var(--shadow-tube-teal);text-shadow:0 0 4px var(--tube-teal),0 0 12px var(--tube-teal)}
+.cn-titem.is-selected svg{filter:drop-shadow(0 0 3px var(--tube-teal))}
+.cn-titem .cn-kbd{margin-left:auto;padding:2px 8px;border:1px solid var(--tube-teal);background:transparent;color:var(--tube-core-teal);text-shadow:none}
+
+/* ---------- icon tiles ---------- */
+.cn-tiles{display:flex;gap:var(--space-2)}
+.cn-tile{width:48px;height:48px;padding:3px;border:none;border-radius:var(--radius-tile);background:var(--case);cursor:pointer;box-shadow:var(--shadow-tile)}
+.cn-tile>span{display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:7px;color:var(--ink-red);
+  background:linear-gradient(180deg,var(--lightbox-top) 0%,var(--lightbox-mid) 35%,var(--lightbox-low) 100%)}
+.cn-tile svg{width:24px;height:24px}
+.cn-tile.is-phone{width:var(--tap-min);height:var(--tap-min)}
+.cn-tile.is-phone svg{width:22px;height:22px}
+.cn-tile.is-neon{position:relative;padding:0;background:var(--neon-board);box-shadow:var(--shadow-board);color:var(--tube-teal)}
+.cn-tile.is-neon>span{background:none;color:var(--tube-teal);border:1.5px solid var(--tube-teal);border-radius:7px;box-shadow:var(--shadow-tube-teal);margin:4px;width:auto;height:calc(100% - 8px)}
+.cn-tile.is-neon svg{filter:drop-shadow(0 0 3px var(--tube-teal))}
+
+/* ---------- plaques: keyboard hints, touch hint, best fare ---------- */
+.cn-plaque{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:6px;background:var(--plaque);color:var(--meter-label);box-shadow:0 0 0 1px var(--meter-rule)}
+.cn-touch-hint{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);
+  font:500 13px/18px var(--font-ui);color:var(--night-text);white-space:nowrap}
+.cn-touch-hint svg{width:16px;height:16px;flex:none}
+.cn-best{display:inline-flex;align-items:center;gap:14px;padding:9px 14px 9px 16px;border-radius:6px;background:var(--meter-face);box-shadow:0 0 0 1px var(--meter-rule),0 10px 26px rgba(0,0,0,.5)}
+.cn-best .lab{display:flex;align-items:baseline;gap:6px;color:var(--meter-label)}
+.cn-best .lab .zh{font:700 15px/20px var(--font-zh-sans)}
+.cn-best .lab .en{font:600 13px/20px var(--font-ui);letter-spacing:1px;white-space:pre}
+
+/* ---------- the taxi meter, as HTML for previews and mock-ups ----------
+   The game draws it on its own small canvas over the picture. Sizes are picture px x --k:
+   --k = picture scale x meter-scale (1280-wide desktop: 1.333 x 0.825 = 1.1; 844x390 phone: 0.722 x 0.825 = 0.596).
+   --lab = the label scale, at least phone-label-min / 11 picture px on phones. */
+.cn-meter{--k:1.1;--lab:var(--k);display:inline-block;padding:calc(4px*var(--k));background:var(--case);border-radius:calc(10px*var(--k));box-shadow:0 0 calc(20px*var(--k)) var(--lightbox-glow)}
+.cn-meter-face{position:relative;width:calc(228px*var(--k));height:calc(242px*var(--k));border-radius:calc(7px*var(--k));
+  background:linear-gradient(180deg,var(--lightbox-top) 0%,var(--lightbox-mid) 35%,var(--lightbox-low) 100%);outline:1px solid var(--lightbox-line);outline-offset:calc(-2.5px*var(--k))}
+.cn-meter-head{position:absolute;left:calc(14px*var(--k));right:calc(14px*var(--k));top:calc(3px*var(--k));height:calc(36px*var(--k));display:flex;justify-content:space-between;align-items:center;color:var(--ink-red)}
+.cn-meter-head .zh{font:900 calc(23px*var(--k))/1.2 var(--font-zh-serif)}
+.cn-meter-head .en{font:700 calc(16px*var(--k))/1.2 var(--font-display);letter-spacing:calc(2.5px*var(--k))}
+.cn-meter-dial{position:absolute;left:calc(9px*var(--k));top:calc(43px*var(--k));width:calc(210px*var(--k));height:calc(190px*var(--k));padding-top:calc(8px*var(--k));
+  display:flex;flex-direction:column;border-radius:calc(4px*var(--k));background:var(--meter-face)}
+.cn-meter-row{margin:0 calc(14px*var(--k));padding:0 calc(4px*var(--k));display:flex;justify-content:space-between;align-items:center;height:calc(50px*var(--k));border-bottom:1px solid var(--meter-rule)}
+.cn-meter-row:last-child{border-bottom:none}
+.cn-meter-row.is-fare{height:calc(80px*var(--k));flex-direction:column;align-items:stretch;justify-content:flex-start;gap:calc(8px*var(--k));padding-top:calc(5px*var(--k))}
+.cn-meter-row.is-fare .cn-digits{justify-content:flex-end}
+.cn-meter-lab{display:flex;align-items:baseline;gap:calc(6px*var(--lab));color:var(--meter-label)}
+.cn-meter-lab .zh{font:700 calc(13px*var(--lab))/1.2 var(--font-zh-sans)}
+.cn-meter-lab .en{font:600 calc(11px*var(--lab))/1.2 var(--font-ui);letter-spacing:calc(1px*var(--lab));white-space:pre}
+
+/* the district, Chinese over English, like a film subtitle */
+.cn-caption{display:flex;flex-direction:column;gap:2px;color:var(--caption);
+  text-shadow:-2px -2px 0 var(--caption-outline),2px -2px 0 var(--caption-outline),-2px 2px 0 var(--caption-outline),2px 2px 0 var(--caption-outline),0 0 8px var(--caption-outline)}
+.cn-caption .zh{font:700 37px/40px var(--font-zh-sans)}
+.cn-caption .en{font:500 24px/26px var(--font-ui)}
+.cn-caption.is-phone .zh{font-size:20px;line-height:22px}
+.cn-caption.is-phone .en{font-size:13px;line-height:15px}
+
+/* ---------- World: sign styles, drawn in HTML for reference (the game draws them on canvas) ---------- */
+.cn-sign{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:14px 26px 12px;border-radius:8px;background:var(--case)}
+.cn-sign.is-box{box-shadow:0 0 26px var(--glow-c,var(--lightbox-glow))}
+.cn-sign.is-box>.face{position:absolute;inset:6px;border-radius:5px;background:var(--face-c);outline:1px solid rgba(255,255,255,.45);outline-offset:-3px}
+.cn-sign.is-box>.face::after{content:"";position:absolute;inset:0;border-radius:5px;background:linear-gradient(180deg,rgba(0,0,0,.06),rgba(255,255,255,.22) 45%,rgba(0,0,0,.1))}
+.cn-sign .zh,.cn-sign .en{position:relative;white-space:nowrap}
+.cn-sign.is-box .zh{font:900 44px/52px var(--font-zh-serif);color:var(--ink-c)}
+.cn-sign.is-box .en{font:700 15px/18px var(--font-display);letter-spacing:.08em;color:var(--ink-c)}
+.cn-sign.is-neon{background:var(--neon-board)}
+.cn-sign.is-neon>.tube{position:absolute;inset:6px;border:1.5px solid var(--tube-c);border-radius:5px;box-shadow:0 0 10px var(--tube-c)}
+.cn-sign.is-neon .zh{font:700 40px/50px var(--font-zh-sans);color:var(--core-c,#fff);-webkit-text-stroke:1px var(--tube-c);text-shadow:0 0 6px var(--tube-c),0 0 18px var(--tube-c)}
+.cn-sign.is-neon .en{font:700 14px/18px var(--font-display);letter-spacing:.1em;color:var(--tube2-c);text-shadow:0 0 5px var(--tube2-c),0 0 12px var(--tube2-c)}
+.cn-sign.is-vert{padding:16px 14px}
+.cn-sign.is-vert .zh{display:flex;flex-direction:column;align-items:center;line-height:1.15}
+
+/* ---------- World: the crash pop, a neon burst lit right over the crash (the game draws it on the meter's canvas) ---------- */
+.cn-pop{--c1:var(--tube-red);--c1core:var(--tube-core-red);--c2:var(--tube-yellow);--c2core:var(--tube-core-yellow);position:absolute;width:480px;height:300px;rotate:var(--tilt,-5deg)}
+.cn-pop svg{position:absolute;left:0;top:0;width:480px;height:300px;overflow:visible;filter:drop-shadow(0 0 8px var(--c1)) drop-shadow(0 0 24px var(--c1))}
+.cn-pop .board{fill:var(--neon-board);stroke:var(--c1);stroke-width:6;stroke-linejoin:round}
+.cn-pop .core{fill:none;stroke:var(--c1core);stroke-width:2;stroke-linejoin:round}
+.cn-pop .crack{fill:none;stroke:var(--c1);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+.cn-pop .crack-core{fill:none;stroke:var(--c1core);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.cn-pop .word{position:absolute;left:0;right:0;top:92px;text-align:center;transform:skewX(-8deg);white-space:nowrap;font:700 108px/116px var(--font-display);letter-spacing:.02em;text-transform:uppercase;
+  color:var(--c2core);-webkit-text-stroke:2px var(--c2);text-shadow:0 0 6px var(--c2),0 0 18px var(--c2),0 0 40px var(--c2),0 6px 0 var(--case)}
+.cn-pop .tag{position:absolute;right:26px;top:2px;width:64px;height:64px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--neon-board);border:3px solid var(--c2);
+  box-shadow:0 0 10px var(--c2);font:700 34px/1 var(--font-zh-sans);color:var(--c2core);text-shadow:0 0 6px var(--c2),0 0 14px var(--c2)}
+.cn-pop.is-smash{--c1:var(--tube-yellow);--c1core:var(--tube-core-yellow);--c2:var(--tube-red);--c2core:var(--tube-core-red);--tilt:4deg}
+.cn-pop.is-smash .board,.cn-pop.is-smash .core{stroke-linejoin:miter;stroke-miterlimit:8}
+.cn-pop.is-smash .tag{right:auto;left:30px;top:10px}
+.cn-pop.is-bang{--c1:var(--tube-teal);--c1core:var(--tube-core-teal);--c2:var(--tube-pink);--c2core:var(--tube-core-pink);--tilt:-3deg}
+.cn-pop.is-bang .word{font-size:112px;letter-spacing:.03em}
+.cn-pop.is-bang .tag{right:40px;top:18px}
+.cn-pop.is-playing{animation:cn-pop var(--pop-time,1s) ease-out both}
+@keyframes cn-pop{0%{scale:.55;opacity:0}12%{scale:1.08;opacity:1}20%{scale:1}68%{opacity:1}74%{opacity:.5}80%{opacity:1}100%{scale:1;opacity:0}}
+@keyframes cn-pop-fade{0%{opacity:0}12%{opacity:1}70%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.cn-pop.is-playing{animation-name:cn-pop-fade}}
+
+/* ---------- World: power-ups, small lightbox signs hovering over the road on their own pool of light ---------- */
+.cn-powerup{--s:136px;--face-c:var(--face-green);--ink-c:var(--ink-cream);position:relative;display:inline-flex;flex-direction:column;align-items:center}
+.cn-powerup.is-time{--face-c:var(--face-green);--ink-c:var(--ink-cream)}
+.cn-powerup.is-fare{--face-c:var(--face-yellow);--ink-c:var(--ink-black)}
+.cn-powerup.is-speed{--face-c:var(--face-red);--ink-c:var(--ink-yellow)}
+.cn-powerup.is-shield{--face-c:var(--face-blue);--ink-c:var(--ink-white)}
+.cn-powerup.is-double{--face-c:var(--face-cream);--ink-c:var(--ink-red)}
+.cn-token{width:var(--s);height:var(--s);box-sizing:border-box;padding:calc(var(--s)*.037);border-radius:calc(var(--s)*.088);background:var(--case);
+  box-shadow:0 0 calc(var(--s)*.21) color-mix(in srgb,var(--face-c) 80%,transparent)}
+.cn-token>.face{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:calc(var(--s)*.06);background:var(--face-c);
+  outline:1px solid rgba(255,255,255,.45);outline-offset:calc(var(--s)*-.035)}
+.cn-token>.face::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(0,0,0,.06),rgba(255,255,255,.22) 45%,rgba(0,0,0,.1))}
+.cn-token .zh{position:relative;font:900 calc(var(--s)*.59)/1 var(--font-zh-serif);color:var(--ink-c)}
+.cn-powerup>.pool{width:calc(var(--s)*1.25);height:calc(var(--s)*.28);margin-top:calc(var(--s)*.34);border-radius:50%;
+  background:radial-gradient(ellipse at center,color-mix(in srgb,var(--face-c) 60%,transparent) 0%,transparent 70%)}
+.cn-powerup.is-bobbing>.cn-token{animation:cn-bob 1.6s ease-in-out infinite alternate}
+@keyframes cn-bob{from{translate:0 0}to{translate:0 calc(var(--s)*-.06)}}
+@media (prefers-reduced-motion:reduce){.cn-powerup.is-bobbing>.cn-token{animation:none}}

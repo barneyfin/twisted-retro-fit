@@ -1,0 +1,47 @@
+<!-- @dsCard group="Screens" height=540 width=960 subtitle="After a new best: the new row lit, Play again and Menu" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HighScores</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:960px;height:540px;overflow:hidden}
+.stage>img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+.wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.cn-face{gap:12px}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img src="/_blob/0e50e8888a463c1175004694b5ad4c8b" alt="">
+  <div class="cn-ui wrap">
+    <div class="cn-scrim"></div>
+    <div class="cn-lightbox" role="dialog" aria-modal="true" aria-labelledby="hs-title" style="position:relative;width:420px">
+      <div class="cn-face">
+        <h2 class="cn-header" id="hs-title"><span class="zh" lang="zh-Hant">高分榜</span><span class="en">High scores</span></h2>
+        <div class="cn-scores-wrap">
+          <table class="cn-scores">
+            <caption class="cn-sr">Top ten fares, newest lit</caption>
+            <tbody>
+              <tr class="is-new"><td class="rank">1</td><td class="who">BAR</td><td class="fare"><span class="cn-sr">HK$412.80</span><div data-cn-digits="412.80" data-h="18"></div></td></tr>
+              <tr><td class="rank">2</td><td class="who">KIT</td><td class="fare"><span class="cn-sr">HK$386.40</span><div data-cn-digits="386.40" data-h="18"></div></td></tr>
+              <tr><td class="rank">3</td><td class="who">MAN</td><td class="fare"><span class="cn-sr">HK$351.20</span><div data-cn-digits="351.20" data-h="18"></div></td></tr>
+              <tr><td class="rank">4</td><td class="who">WAI</td><td class="fare"><span class="cn-sr">HK$322.90</span><div data-cn-digits="322.90" data-h="18"></div></td></tr>
+              <tr><td class="rank">5</td><td class="who">LAU</td><td class="fare"><span class="cn-sr">HK$298.50</span><div data-cn-digits="298.50" data-h="18"></div></td></tr>
+              <tr><td class="rank">6</td><td class="who">TAM</td><td class="fare"><span class="cn-sr">HK$276.10</span><div data-cn-digits="276.10" data-h="18"></div></td></tr>
+              <tr><td class="rank">7</td><td class="who">CHU</td><td class="fare"><span class="cn-sr">HK$241.70</span><div data-cn-digits="241.70" data-h="18"></div></td></tr>
+              <tr><td class="rank">8</td><td class="who">YIP</td><td class="fare"><span class="cn-sr">HK$219.30</span><div data-cn-digits="219.30" data-h="18"></div></td></tr>
+              <tr><td class="rank">9</td><td class="who">SZE</td><td class="fare"><span class="cn-sr">HK$188.60</span><div data-cn-digits="188.60" data-h="18"></div></td></tr>
+              <tr><td class="rank">10</td><td class="who">HO.</td><td class="fare"><span class="cn-sr">HK$152.00</span><div data-cn-digits="152.00" data-h="18"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cn-btns"><button class="cn-btn is-primary" type="button">Play again<span class="cn-kbd">Enter</span></button><button class="cn-btn" type="button" style="width:120px">Menu</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>CityNights.mountDigits();</script>
+</body>
+</html>
