@@ -16,7 +16,7 @@ Each kit has these parts, built in this order:
    - a build script that turns a game into one file and warns about anything that breaks the rules
 3. **A Claude Code skill**: `SKILL.md` (rules and checklist), `design.md` (look and feel) and `reference.md` (the API). A fresh Claude with nothing but the skill must be able to build a correct game.
 4. **A test page** that shows every drawing part, with a frame-rate readout.
-5. **Games**: `games/<name>/index.html` is a game's source; `dist/<name>.html` is the built, playable file (generated, never edited by hand, not kept in git).
+5. **Games**: `games/<name>/index.html` is a game's source; `dist/<name>.html` is the built, playable file (generated, never edited by hand, not kept in git). A kit with its own folder keeps its games there (City Nights: `city-nights/games/<name>/index.html`).
 
 Retro Kit's split between World (the playfield) and Interface (glass panels around it) is Retro Kit's own choice. A new kit decides its own layers in its PRD.
 
@@ -48,11 +48,12 @@ Retro Kit's split between World (the playfield) and Interface (glass panels arou
 
 These are Barney's to decide. Raise them when they become relevant; don't settle them alone.
 
-- **Folder layout** once there are two kits: one repo per kit, or one arcade repo with a folder per kit. This includes whether "Retro Games" moves or is renamed (and so where this file ends up).
-- **Shared core**: does the next kit reuse Retro Kit's game shell and build with a new look, or start fresh? Raise this before the second kit's PRD.
-- **Settings and high scores**: shared across kits, or kept per kit.
+None are open at the moment.
 
 ## Decided
 
 - **The arcade's name**: Twisted Retro Fit (Barney, 2026-10-25).
 - **Arcade front page**: a website in `site/` with a card for every game, published to GitHub Pages from this public repository by a GitHub Action on every push to `main` (Barney, 2026-10-25).
+- **Folder layout**: one repo, Retro Games, with each kit in its own place: Retro Kit in `kit/` and `games/`, City Nights in `city-nights/`. The repo keeps its name for now (Barney, 2026-10-28).
+- **Shared core**: City Nights starts from a copy of Retro Kit's game shell and build, restyled, with its own drawing. A core shared by every kit is revisited when a third kit is planned (Barney, 2026-10-28).
+- **Settings and high scores**: settings are shared across the whole arcade; high scores are kept per game, in Retro Kit's format, so the website shows every game's best (Barney, 2026-10-28).
