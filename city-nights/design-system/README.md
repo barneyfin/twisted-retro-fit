@@ -32,7 +32,7 @@ Neon is kept to the title screen on purpose. Pause, settings, game over, initial
 - **Numbers** sit in dark insets of `meter-face`: lit segments `digit-on` with `digit-glow`, unlit `digit-off`, labels `meter-label`, ranks and empty slots `meter-dim`.
 - **Neon title**: boards `neon-board`; lit lettering in a tube's core colour (`tube-core-teal`, `tube-core-pink`, `tube-core-yellow`) with the tube's colour as its edge and glow; unselected items `neon-unlit`.
 - **Reward** is the yellow sign: the New best badge is a small `face-yellow` lightbox lettered in `ink-black`.
-- **Power-ups** are small lightbox signs, each a face with its ink: 時 `face-green`, 錢 `face-yellow`, 快 `face-red`, 保 `face-blue`, 雙 `face-cream`. The **crash pop** pairs two tubes: CRASH! `tube-red` and `tube-yellow`, SMASH! `tube-yellow` and `tube-red`, BANG! `tube-teal` and `tube-pink`.
+- **Power-ups** are small lightbox signs, each a face with its ink: 時 `face-green`, 錢 `face-yellow`, 快 `face-red`, 保 `face-blue`, 雙 `face-cream`. The **crash pop** is a smoke cloud on `neon-board` in a `face-cream` tube over a `sodium` halo; each word has its own lit face and edge tube: CRASH! yellow (`pop-crash-light`, `tube-yellow`, `pop-crash-deep`) edged `tube-red`; SMASH! red (`pop-smash-light`, `tube-red`, `pop-smash-deep`) edged `tube-yellow`; BANG! pink (`pop-bang-light`, `tube-pink`, `pop-bang-deep`) edged `tube-teal`.
 - Over the street, dialogs sit on `scrim`; the title's logo and menu sit on `title-shade`, fading to 12% three quarters across. Light text over the street sits on `plaque` or carries the `caption-outline`.
 - No hex values in games: games name these tokens.
 
@@ -41,6 +41,7 @@ Neon is kept to the title screen on purpose. Pause, settings, game over, initial
 - **Antonio** (`display`) is the sign face: the logo (`logo-xl`, `logo-top`), English on signs (`sign-en`), header English (`header-en`), initials (`slot`, `initials`), the meter's TAXI METER.
 - **Noto Serif TC Black** (`zh-serif`) is the lightbox signs' Chinese and the headers' Chinese (`header-zh`, `badge-zh`, `meter-title-zh`). **Noto Sans TC Bold** (`zh-sans`) is neon tube Chinese (`sign-zh-neon`), the meter's row labels and the district caption.
 - **IBM Plex Sans Condensed** (`ui`) is everything a player reads in a panel: `menu`, `setting`, `body`, `note`, `hint`, `kbd`, `label`, `value`.
+- **Bangers** (`comic`) is the crash pop's letters (`pop-word`) and nothing else: the one comic face, kept to the one comic moment.
 - No pixel or dot-matrix faces. Numbers are seven-segment digits (`CityNights.digits`), not a font.
 - The fonts are files in this system (`fonts/`). The two Chinese fonts are cut down to the characters on the word list; a new Chinese word means cutting them again from the full Noto fonts. Games embed the fonts; never link a font service from a game.
 
@@ -65,8 +66,8 @@ Neon is kept to the title screen on purpose. Pause, settings, game over, initial
 
 ### Crash pop
 
-- When the taxi hits another vehicle, a comic-book word lights up as a neon sign right over both of them (CrashPop): CRASH! in a jagged burst, SMASH! in a shattered pane, BANG! in a cloud, each with its Chinese sound-word (轟, 啪, 砰) on a small round tag. The kit picks one at random, never the same twice running.
-- The burst is a `neon-board` inside a tube outline; the word is `display` at 108px (on a 720-line window), skewed, glowing, with a hard comic drop beneath. It springs in, holds, dips once like a tube catching and is gone within `pop-time` (1 s). Under Reduce motion it only fades.
+- When the taxi hits another vehicle, a comic-book word lights up as a neon sign right over both of them (CrashPop): a cloud of smoke lit in a cream tube, with the word in big comic letters on a rising curve and its Chinese sound-word on a small round tag. Each word tells its own crash in neon debris: **CRASH!** parts fly off (a wheel, a spring, nuts and a bolt), **SMASH!** glass breaks (shards, cracks, a broken headlamp), **BANG!** something bursts (flames behind the smoke, shock rings, a hubcap, sparks). Tags 轟, 啪 and 砰. The kit picks one at random, never the same twice running.
+- It fills `pop-box` (1080 × 700 on a 720-line window, about four-fifths of a 16:9 window's width), centred on the crash point and kept inside the picture. The drawings are data in `CityNights.crashPop`, drawn by `CityNights.drawCrashPop` with Canvas 2D: no image files. It springs in, holds, dips once like a tube catching and is gone within `pop-time` (1 s); if the game freezes for longer after a crash, the frozen street shows for the rest. Under Reduce motion it only fades.
 
 ### Power-ups
 

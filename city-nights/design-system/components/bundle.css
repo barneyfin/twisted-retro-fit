@@ -201,23 +201,9 @@
 .cn-sign.is-vert{padding:16px 14px}
 .cn-sign.is-vert .zh{display:flex;flex-direction:column;align-items:center;line-height:1.15}
 
-/* ---------- World: the crash pop, a neon burst lit right over the crash (the game draws it on the meter's canvas) ---------- */
-.cn-pop{--c1:var(--tube-red);--c1core:var(--tube-core-red);--c2:var(--tube-yellow);--c2core:var(--tube-core-yellow);position:absolute;width:480px;height:300px;rotate:var(--tilt,-5deg)}
-.cn-pop svg{position:absolute;left:0;top:0;width:480px;height:300px;overflow:visible;filter:drop-shadow(0 0 8px var(--c1)) drop-shadow(0 0 24px var(--c1))}
-.cn-pop .board{fill:var(--neon-board);stroke:var(--c1);stroke-width:6;stroke-linejoin:round}
-.cn-pop .core{fill:none;stroke:var(--c1core);stroke-width:2;stroke-linejoin:round}
-.cn-pop .crack{fill:none;stroke:var(--c1);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
-.cn-pop .crack-core{fill:none;stroke:var(--c1core);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.cn-pop .word{position:absolute;left:0;right:0;top:92px;text-align:center;transform:skewX(-8deg);white-space:nowrap;font:700 108px/116px var(--font-display);letter-spacing:.02em;text-transform:uppercase;
-  color:var(--c2core);-webkit-text-stroke:2px var(--c2);text-shadow:0 0 6px var(--c2),0 0 18px var(--c2),0 0 40px var(--c2),0 6px 0 var(--case)}
-.cn-pop .tag{position:absolute;right:26px;top:2px;width:64px;height:64px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--neon-board);border:3px solid var(--c2);
-  box-shadow:0 0 10px var(--c2);font:700 34px/1 var(--font-zh-sans);color:var(--c2core);text-shadow:0 0 6px var(--c2),0 0 14px var(--c2)}
-.cn-pop.is-smash{--c1:var(--tube-yellow);--c1core:var(--tube-core-yellow);--c2:var(--tube-red);--c2core:var(--tube-core-red);--tilt:4deg}
-.cn-pop.is-smash .board,.cn-pop.is-smash .core{stroke-linejoin:miter;stroke-miterlimit:8}
-.cn-pop.is-smash .tag{right:auto;left:30px;top:10px}
-.cn-pop.is-bang{--c1:var(--tube-teal);--c1core:var(--tube-core-teal);--c2:var(--tube-pink);--c2core:var(--tube-core-pink);--tilt:-3deg}
-.cn-pop.is-bang .word{font-size:112px;letter-spacing:.03em}
-.cn-pop.is-bang .tag{right:40px;top:18px}
+/* ---------- World: the crash pop, a smoke cloud lit in neon right over the crash. CityNights.drawCrashPop draws it on a canvas;
+   .cn-pop is that canvas's box, and .is-playing runs its one-second life ---------- */
+.cn-pop{position:absolute;display:block;transform-origin:50% 50%;pointer-events:none}
 .cn-pop.is-playing{animation:cn-pop var(--pop-time,1s) ease-out both}
 @keyframes cn-pop{0%{scale:.55;opacity:0}12%{scale:1.08;opacity:1}20%{scale:1}68%{opacity:1}74%{opacity:.5}80%{opacity:1}100%{scale:1;opacity:0}}
 @keyframes cn-pop-fade{0%{opacity:0}12%{opacity:1}70%{opacity:1}100%{opacity:0}}
