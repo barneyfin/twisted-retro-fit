@@ -56,6 +56,17 @@ Close any other copy of the page first (two copies fight over the graphics chip)
 
 The check waits until Automatic (below) has finished timing the picture. To run it again, press 2, or tap through the scenes back to it.
 
+Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips during the last 3 seconds of the check, while each frame is drawn eight times; the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
+
+### Results, 29 October 2026 (kit 0.4, Mong Kok, Chrome 156)
+
+| Device | Frame rate | Time to draw a frame | Picture | Targets |
+|---|---|---|---|---|
+| Computer, RTX 5080 | 60 fps | under 2.1 ms | 1632 × 810, 4× smoothing | pass |
+| Pixel 11 Pro XL | 60 fps | about 3.2 ms | 1944 × 810, 4× smoothing | pass |
+
+Both match the speed test (computer under 2.1 ms, Pixel about 3.1 ms), and Automatic kept Best on both. In both runs the slowest 1 frame in 20 came 17 ms after the one before, one refresh of a 60 Hz screen.
+
 ## Picture: Automatic, Best, Faster, Fastest
 
 Under Settings. **Best** is 4× edge smoothing at full sharpness (up to 1.5 canvas pixels for each pixel of the 540-line picture, on sharp screens). **Faster** turns edge smoothing off. **Fastest** also draws at ordinary sharpness, one canvas pixel per picture pixel.
