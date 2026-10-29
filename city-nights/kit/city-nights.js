@@ -1,17 +1,18 @@
-/* City Nights 0.3 — runtime
+/* City Nights 0.4 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
    It owns everything every game shares: the World (the street drawn with WebGL2 into a 540-line picture that fills
    the window, its people and its life, the taxi and its motion, traffic and power-ups where the game puts them,
-   glow, grain and fog, the meter and the district caption, the crash pop), the game loop, keyboard and touch input
-   (up to two fingers at once), every screen outside play (title, mode choice, pause, game over, initials, high
-   scores, settings, rotate), the WebGL2 check, full screen, the way back to the arcade, sound, music and saved data.
+   glow, grain and fog, the meter and the district caption, the crash pop, the Picture setting's timing), the game
+   loop, keyboard and touch input (up to two fingers at once), every screen outside play (title, mode choice, pause,
+   game over, initials, high scores, settings, rotate), the WebGL2 check, full screen, the way back to the arcade,
+   sound, music and saved data.
    The tools draw; a game decides what happens: see city-nights/kit/template.html. */
 (function () {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -2048,6 +2049,11 @@
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       if (T.extra){ gl.deleteFramebuffer(T.extra.f); gl.deleteTexture(T.extra.t); T.extra = null; }
     }
+    // an off-screen copy of the picture, for the extra drawings while the test page times a frame
+    function extraTarget(){
+      if (!T.extra){ const t = tex2D(PW, PH, gl.LINEAR), f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null); T.extra = { t, f }; }
+      return T.extra.f;
+    }
 
     /* ================================================================ the batches drawn each frame (in screen units) */
     const dyn = new Rec(8192), ranges = {};
@@ -2388,7 +2394,8 @@
     // m: the fare (HK$), the time and the km/h (numbers, or null for unlit places), the district, and the caption's fade (0 to 1)
     function drawHUD(m){
       const dist = DISTRICTS[m.d], a = clamp(m.a, 0, 1);
-      const fare = (Math.round((+m.fare || 0) * 100) / 100).toFixed(2);
+      // six places, so the meter holds at 999.99 (a seventh place is for a game's rules to decide: the Meter README)
+      const fare = Math.min(999.99, Math.round((+m.fare || 0) * 100) / 100).toFixed(2);
       const time = m.time == null ? '  ' : String(clamp(Math.ceil(m.time), 0, 99)).padStart(2, '0'), kmh = m.kmh == null ? '   ' : String(clamp(Math.round(m.kmh), 0, 999));
       const key = fare + '|' + time + '|' + kmh + '|' + m.d + '|' + a.toFixed(2);
       if (key === hudKey) return;
@@ -2473,7 +2480,7 @@
     const wrapU = u => (u % TRACK + TRACK) % TRACK;
     const api = {
       taxi: { z: 0, x: 0, speed: 0 }, cars: [], tokens: [],
-      lanes: LANES.slice(), length: TRACK / UPM,
+      lanes: LANES.slice(), length: TRACK / UPM, width: ROAD * 2 / UPM,
       traffic: (n, seed) => makeTraffic(n == null ? 16 : n, seed).map(c => ({ z: c.z / UPM, x: c.x, speed: c.speed / UPM, kind: c.kind, tone: c.tone })),
       gap: (from, to) => { const L = TRACK / UPM; return (((to - from) % L) + L) % L; },
       size: kind => { const v = VEH[kind] || VEH.taxi; return { width: v.W, length: v.L }; },
@@ -2661,16 +2668,32 @@
     function meterNow(fare){
       return { fare, time: meter.time, kmh: meter.speed != null ? meter.speed : run.speed / UPM * 3.6, d: Math.max(0, run.cap.d), a: run.cap.t / 0.6 };
     }
+    // the graphics chip's name, as the browser reports it (for the test page's speed check)
+    let chip = null;
+    function chipName(){
+      if (chip == null){ const dbg = gl.getExtension('WEBGL_debug_renderer_info'); chip = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)).replace(/\s+/g, ' ').trim(); }
+      return chip;
+    }
+    // the test page times a frame the speed test's way: each frame of the run is drawn `repeat` times over, the extra
+    // ones off screen, so the device can't keep up with the screen and the gap between frames shows what one costs
+    let repeat = 1;
     return {
       get ready(){ return built; },
       build, resize, setSmoothing,
       setEffects(on){ effects = !!on; },
       setReduceMotion(on){ reduceMotion = !!on; },
+      get repeat(){ return repeat; },
+      set repeat(n){ repeat = clamp(Math.round(+n) || 1, 1, 8); },
+      info(){ return { width: PW, height: PH, smoothing: built ? samples : 0, sharpness: RS, chip: built ? chipName() : '' }; },
       // the title's street: its own life and the slow drive, then the picture
       title(dt){ ambientStep(dt); demoStep(dt); renderGL(demo); clearPop(); },
       reset, step,
       // the run as it stands: the street, then the meter, the caption and the crash pop over it
-      draw(fare){ const st = runScene(); if (popAsk) startPop(st); renderGL(st); drawHUD(meterNow(fare)); drawPop(); },
+      draw(fare){
+        const st = runScene(); if (popAsk) startPop(st);
+        for (let k = 1; k < repeat; k++) renderGL(st, extraTarget());
+        renderGL(st); drawHUD(meterNow(fare)); drawPop();
+      },
       api, meter
     };
   }
@@ -2855,10 +2878,43 @@
       errorEl.textContent = 'The graphics chip was reset by the browser. Reload the page to carry on.';
       errorEl.hidden = false;
     });
-    // Picture: Best is 4x edge smoothing at full sharpness, Faster has no smoothing, Fastest also ordinary sharpness.
-    // Automatic starts as Best; timing the first seconds of play and stepping down comes in step 3d.
-    const pictureSmoothing = () => (own.picture === 'faster' || own.picture === 'fastest' ? 0 : 4);
-    const pictureSharp = () => (own.picture === 'fastest' ? 1 : MAX_SHARP);
+    /* Picture: Best is 4x edge smoothing at full sharpness, Faster has no smoothing, Fastest also ordinary sharpness.
+       Automatic starts at Best and times the first seconds of play, once a visit: after a second to settle, two
+       seconds of frames. If they come more than 17.5 ms apart on average (fewer than about 57 a second; a 60 Hz
+       screen's frames are 16.7 ms apart, so a device that keeps up never trips it), edge smoothing goes off and it
+       times again; if they are still more than 25 ms apart (fewer than 40 a second), it draws at ordinary sharpness. */
+    const LEVELS = ['best', 'faster', 'fastest'];
+    const auto = { level: 0, phase: 'wait', t: 0, n: 0, sum: 0 };   // phase: wait (for play), settle, time, done
+    const pictureLevel = () => (own.picture === 'auto' ? LEVELS[auto.level] : own.picture);
+    const pictureSmoothing = () => (pictureLevel() === 'best' ? 4 : 0);
+    const pictureSharp = () => (pictureLevel() === 'fastest' ? 1 : MAX_SHARP);
+    function applyPicture() {
+      street.setSmoothing(pictureSmoothing());
+      if (street.ready && !sizeT) applySize();
+      dirty = true;
+    }
+    // gap: seconds since the last frame
+    function timePicture(gap) {
+      if (own.picture !== 'auto' || auto.phase === 'done' || state.screen !== 'play' || !street.ready || street.repeat > 1) return;
+      if (auto.phase === 'wait') { auto.phase = 'settle'; auto.t = 0; return; }
+      if (gap > 0.25) return;   // a hitch (the window resized, the tab hidden), not the drawing
+      auto.t += gap;
+      if (auto.phase === 'settle') {
+        if (auto.t >= 1) Object.assign(auto, { phase: 'time', t: 0, n: 0, sum: 0 });
+        return;
+      }
+      auto.n++;
+      auto.sum += gap;
+      if (auto.t < 2) return;
+      const ms = auto.sum / auto.n * 1000;
+      if (ms > (auto.level ? 25 : 17.5) && auto.level < 2) {
+        auto.level++;
+        Object.assign(auto, { phase: auto.level < 2 ? 'settle' : 'done', t: 0 });
+        applyPicture();
+      } else auto.phase = 'done';
+    }
+    // frames a second, counted over each half second of real time
+    const fpsCount = { n: 0, t: 0, fps: 0 };
 
     /* ----- Game state ----- */
     const state = {
@@ -3091,9 +3147,7 @@
       // Effects: the glow round lights and signs; Reduce motion: the taxi's sway and roll; Picture: smoothing and sharpness
       street.setEffects(settings.effects);
       street.setReduceMotion(settings.reduceMotion);
-      street.setSmoothing(pictureSmoothing());
-      if (street.ready && !sizeT) applySize();
-      dirty = true;
+      applyPicture();
       const sb = titleScreen.querySelector('[data-act="sound"]');
       if (sb) {
         sb.firstChild.innerHTML = settings.muted ? ICON.soundOff : ICON.sound;
@@ -3760,8 +3814,13 @@
     let speed = 1;
     function frame(now) {
       requestAnimationFrame(frame);
-      const dt = Math.min(0.25, Math.max(0, (now - lastFrame) / 1000)) * speed;
+      const gap = Math.max(0, (now - lastFrame) / 1000);
+      const dt = Math.min(0.25, gap) * speed;
       lastFrame = now;
+      fpsCount.n++;
+      fpsCount.t += gap;
+      if (fpsCount.t >= 0.5) { fpsCount.fps = fpsCount.n / fpsCount.t; fpsCount.n = 0; fpsCount.t = 0; }
+      timePicture(gap);
       state.t += dt;
       root.classList.toggle('cn-paused', state.inGame && state.screen !== 'play');
       if (state.screen === 'play' && touch && mqPortrait.matches) pause();   // also checked here, in case the turn's event never came
@@ -3796,13 +3855,31 @@
          street.tokens   [{ z, x, kind }]: power-ups; kind is 'time', 'fare', 'speed', 'shield' or 'double'
          street.traffic(n, seed)  n cars spread along the street, each with a speed (metres a second) for the game to use
          street.length   one lap of the street in metres (560: Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok); z wraps round
+         street.width    the road's width in metres, kerb to kerb (10: x = -1 to 1)
          street.gap(from, to)     metres forward from z = from to z = to, round the lap
          street.size(kind)        { width, length } of a vehicle in metres; z is its rear
          street.district(z)       { index, zh, en } of the district at z; the caption follows the taxi by itself
          street.crash(z, x)       lights the crash pop (CRASH!, SMASH! or BANG!) over the point where two vehicles meet
          meter.time, meter.speed  the meter's TIME (two places) and KM/H (left as null: the taxi's own speed); FARE is the fare */
       street: street.api,
-      meter: street.meter
+      meter: street.meter,
+      /* The picture, for the test page: the Picture setting ('auto', 'best', 'faster' or 'fastest') and the level in
+         use (Automatic's choice), whether Automatic is still timing, frames a second (over the last half second), the
+         canvas in pixels, edge smoothing (4 or 0), canvas pixels per picture pixel, and the graphics chip's name.
+         repeat (1 to 8) draws each frame of a run that many times over, the extra ones off screen, to time a frame. */
+      picture: {
+        get setting() { return own.picture; },
+        get level() { return pictureLevel(); },
+        get deciding() { return own.picture === 'auto' && auto.phase !== 'done'; },
+        get fps() { return fpsCount.fps; },
+        get width() { return street.info().width; },
+        get height() { return street.info().height; },
+        get smoothing() { return street.info().smoothing; },
+        get sharpness() { return street.info().sharpness; },
+        get chip() { return street.info().chip; },
+        get repeat() { return street.repeat; },
+        set repeat(n) { street.repeat = n; }
+      }
     };
 
     /* ----- Boot ----- */
@@ -3836,7 +3913,7 @@
       setFare: (hk) => { state.cents = toCents(hk); },
       pause: pause, resume: resume, quit: quitToTitle,
       showGameOver: showGameOver, openSettings: openSettings, openScores: openScores, openModes: openModes,
-      layout: layout, music: music, view: V, street: street,
+      layout: layout, music: music, view: V, street: street, auto: auto,
       get dirty() { return dirty; }, set dirty(v) { dirty = !!v; }
     };
     return api;

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>City Nights Sampler</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files, the fonts and their licences into dist/<game>.html. Keep data-cn-inline. -->
+<link rel="stylesheet" href="../../kit/city-nights.css" data-cn-inline>
+<script src="../../kit/city-nights.js" data-cn-inline></script>
+<style>
+/* the test page's readout, top left over the picture, on the kit's dark plaque */
+.cs-readout{position:absolute;top:var(--space-6);left:var(--space-6);display:block;max-width:min(430px,calc(100% - 160px));padding:8px 12px;font:500 13px/18px var(--font-ui);pointer-events:none}
+.cn-touch .cs-readout{top:calc(var(--edge-phone) + env(safe-area-inset-top,0px));left:calc(var(--edge-phone) + env(safe-area-inset-left,0px));font-size:12px;line-height:16px;padding:6px 10px}
+.cs-readout b{font-weight:600;color:var(--night-text)}
+.cs-readout div+div{margin-top:2px}
+</style>
+</head>
+<body>
+<script>
+/* CITY NIGHTS SAMPLER — not a game: the City Nights kit's test page. It shows every drawing part of the kit, one
+   scene at a time, with a frame-rate readout, so a change to the kit can be checked by eye on a computer and on a
+   phone before any game is rebuilt. Every screen is reached the usual way: the title, pause and settings (Esc),
+   and game over, initials and high scores when Drive's TIME runs out.
+   Scenes: 1 Drive (the four districts, traffic, the meter and caption, steering and braking), 2 Mong Kok (the speed
+   check: the speed test's measurement, run by itself), 3 Power-ups (all five), 4 Crash (each vehicle, and the crash
+   pop), 5 Vehicles (every vehicle and colour). Keys 1-5 change scene; on a phone, tap for the next one. */
+
+const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles'];
+const NOTES = [
+  'All four districts, traffic, the meter and the caption. ← → steer, ↓ brakes. TIME runs out at 00 and the run ends.',
+  '',
+  'The five power-ups hovering over the road, near and far.',
+  'The taxi runs into each vehicle in turn: the crash pop and the brake lights.',
+  'Every vehicle in every colour, keeping pace with the taxi.'
+];
+const TOKENS = ['time', 'fare', 'speed', 'shield', 'double'];
+const LINEUP = [   // Vehicles: metres ahead of the taxi, lane (0 left, 1 middle, 2 right), kind, colour; staggered so none hides another
+  [8, 0, 'sedan', 0], [8, 2, 'sedan', 1], [14, 1, 'taxi', 0],
+  [19, 0, 'van', 0], [19, 2, 'van', 1], [25, 1, 'sedan', 2],
+  [30, 0, 'minibus', 0], [30, 2, 'minibus', 1], [37, 1, 'van', 2]
+];
+const CRASHERS = [['taxi', 0], ['sedan', 1], ['van', 2], ['minibus', 0]];
+const MONG_KOK = 420.5;   // metres: just inside Mong Kok (420 to 560), where the speed test began
+
+/* The speed check, as the speed test ran it: the street drives through Mong Kok at 68 km/h and every gap between
+   frames is recorded (the frame rate); then each frame is drawn eight times over, seven of them off screen, so the
+   device can't keep up with the screen, and the gap divided by eight is the time to draw one frame. */
+const LOADN = 8;
+const CHECK = { settle: 0.7, fps: 3.5, rest: 0.4, load: 2.5 };
+const fmt = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d) : '–');
+const median = (a) => { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+const pct = (a, p) => { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
+function browserName() {
+  const u = navigator.userAgent, m = (re) => re.exec(u);
+  const b = m(/Edg\/(\d+)/) ? 'Edge ' + m(/Edg\/(\d+)/)[1] : m(/CriOS\/(\d+)/) ? 'Chrome ' + m(/CriOS\/(\d+)/)[1] : m(/Chrome\/(\d+)/) ? 'Chrome ' + m(/Chrome\/(\d+)/)[1]
+    : m(/Firefox\/(\d+)/) ? 'Firefox ' + m(/Firefox\/(\d+)/)[1] : m(/Version\/([\d.]+).*Safari/) ? 'Safari ' + m(/Version\/([\d.]+)/)[1] : 'a browser';
+  const os = m(/Android [\d.]+/) ? m(/Android [\d.]+/)[0] : /iPhone|iPad/.test(u) ? 'iOS' : /Windows NT/.test(u) ? 'Windows' : /Mac OS X/.test(u) ? 'macOS' : /CrOS/.test(u) ? 'ChromeOS' : /Linux/.test(u) ? 'Linux' : '';
+  return b + (os ? ' on ' + os : '');
+}
+
+let readout = null;   // the plaque's three lines
+
+CityNights.game({
+  id: 'cn-sampler',
+  title: ['City Nights', 'Sampler'],
+  zh: '的士',
+  keys: [['1', '5', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
+  touch: 'Drag to steer · Tap for the next scene',
+
+  start(cn) {
+    // the readout goes on the play layer, which the kit makes afresh for each run
+    const box = document.createElement('div');
+    box.className = 'cn-plaque cs-readout';
+    readout = [0, 1, 2].map(() => box.appendChild(document.createElement('div')));
+    document.querySelector('.cn-play').append(box);
+    const g = { scene: -1, time: 60, traffic: cn.street.traffic(12), crash: { i: 0, wait: 0 }, check: null, result: null, last: 0, shown: '' };
+    setScene(g, cn, 0);
+    return g;
+  },
+
+  update(g, cn) {
+    const taxi = cn.street.taxi, dt = 1 / 60, n = SCENES.length;
+    for (let i = 0; i < n; i++) if (cn.input.keyPressed('Digit' + (i + 1)) || cn.input.keyPressed('Numpad' + (i + 1))) setScene(g, cn, i);
+    if (cn.input.tap) setScene(g, cn, (g.scene + 1) % n);
+    // steering, in every scene
+    if (cn.input.left) taxi.x -= 1.4 * dt;
+    if (cn.input.right) taxi.x += 1.4 * dt;
+    if (cn.input.pointer.down) taxi.x += cn.input.pointer.dx / cn.W * 2;
+    taxi.x = cn.clamp(taxi.x, -0.85, 0.85);
+
+    // the taxi's speed, then it moves, then what the scene puts round it
+    const scene = SCENES[g.scene], c = g.crash;
+    taxi.speed = scene === 'Drive' ? (cn.input.down ? 4 : 16) : scene === 'Mong Kok' ? (cn.input.down ? 4 : 19)
+      : scene === 'Power-ups' ? 5 : scene === 'Vehicles' ? 6 : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
+    taxi.z += taxi.speed * dt;
+    if (scene === 'Drive' || scene === 'Mong Kok') {
+      for (const car of cn.street.cars) car.z += car.speed * dt;
+      if (scene === 'Drive') {
+        g.time = Math.max(0, g.time - dt);
+        cn.meter.time = g.time;
+        if (g.time === 0 && !cn.ending) cn.gameOver();
+      }
+    } else if (scene === 'Power-ups') {
+      cn.street.tokens.forEach((t, i) => { t.z = taxi.z + (i < 5 ? 12 : 24); });
+    } else if (scene === 'Vehicles') {
+      cn.street.cars.forEach((car, i) => { car.z = taxi.z + LINEUP[i][0]; });
+    } else if (c.wait > 0) {
+      c.wait -= dt;
+      if (c.wait <= 0) { c.i = (c.i + 1) % CRASHERS.length; placeCrasher(g, cn); }
+    } else {
+      // the taxi's front against the vehicle's rear (z is a vehicle's rear), and whether they overlap side to side
+      const car = cn.street.cars[0], L = cn.street.size('taxi'), S = cn.street.size(car.kind);
+      const ahead = cn.street.gap(taxi.z + L.length, car.z);
+      const side = Math.abs(taxi.x - car.x) * cn.street.width / 2 < (L.width + S.width) / 2;
+      const reached = ahead < 0.2 || ahead > cn.street.length - S.length;
+      if (reached && side) {
+        cn.street.crash(car.z, (taxi.x + car.x) / 2);
+        cn.sfx('hit');
+        c.wait = 1.2;
+      } else if (reached) placeCrasher(g, cn);   // steered past it
+    }
+    if (scene !== 'Crash') cn.addFare(taxi.speed * dt * 0.02);
+  },
+
+  // called once a frame during play: the speed check's timing and the readout
+  draw(g, cn) {
+    const now = performance.now(), real = g.last ? (now - g.last) / 1000 : 0;
+    g.last = now;
+    if (g.check) runCheck(g, cn, real);
+    showReadout(g, cn);
+  }
+});
+
+function setScene(g, cn, i) {
+  const st = cn.street, taxi = st.taxi;
+  if (g.check) stopCheck(g, cn);
+  g.scene = i;
+  g.result = null;
+  st.tokens = [];
+  cn.meter.time = null;
+  const scene = SCENES[i];
+  if (scene === 'Drive' || scene === 'Mong Kok') {
+    st.cars = g.traffic;
+    if (scene === 'Mong Kok') {
+      g.check = { phase: 'wait', t: 0, prev: '', frames: [], load: [] };
+      jumpTo(cn, MONG_KOK);
+    }
+  } else if (scene === 'Power-ups') {
+    st.tokens = TOKENS.map((k, n) => ({ z: 0, x: -0.8 + n * 0.4, kind: k })).concat(TOKENS.map((k, n) => ({ z: 0, x: 0.6 - n * 0.3, kind: k })));
+  } else if (scene === 'Crash') {
+    taxi.x = 0;
+    g.crash = { i: 0, wait: 0 };
+    placeCrasher(g, cn);
+  } else {
+    st.cars = LINEUP.map((v) => ({ z: 0, x: st.lanes[v[1]], kind: v[2], tone: v[3] }));
+  }
+}
+// moves the taxi to z (metres), taking the traffic with it so the street ahead looks the same
+function jumpTo(cn, z) {
+  const st = cn.street, d = z - st.taxi.z;
+  st.taxi.z = z;
+  for (const car of st.cars) car.z += d;
+}
+function placeCrasher(g, cn) {
+  const v = CRASHERS[g.crash.i];
+  cn.street.cars = [{ z: cn.street.taxi.z + 30, x: cn.street.lanes[1], kind: v[0], tone: v[1] }];
+}
+
+/* ----- the speed check ----- */
+function runCheck(g, cn, real) {
+  const c = g.check;
+  if (cn.screen !== 'play') { stopCheck(g, cn, 'The check stopped when the game paused. Press 2 to run it again.'); return; }
+  if (c.phase === 'wait') {
+    // Automatic times the first seconds of play first; the check starts from the edge of Mong Kok once it has
+    if (cn.picture.deciding) return;
+    c.phase = 'settle';
+    jumpTo(cn, MONG_KOK);
+    return;
+  }
+  // the gap recorded belongs to the frame drawn before it, so each one is filed under the part that frame was drawn in
+  if (c.prev === 'fps') c.frames.push(real * 1000);
+  else if (c.prev === 'load') c.load.push(real * 1000);
+  c.prev = c.phase;
+  c.t += real;
+  const T1 = CHECK.settle, T2 = T1 + CHECK.fps, T3 = T2 + CHECK.rest, T4 = T3 + CHECK.load;
+  c.phase = c.t < T1 ? 'settle' : c.t < T2 ? 'fps' : c.t < T3 ? 'rest' : (c.t < T4 || c.load.length < 4) && c.t < T4 + 6 ? 'load' : 'end';
+  cn.picture.repeat = c.phase === 'load' ? LOADN : 1;
+  if (c.phase === 'end') finishCheck(g, cn);
+}
+function stopCheck(g, cn, why) {
+  g.check = null;
+  cn.picture.repeat = 1;
+  if (why) g.result = [why, ''];
+}
+function finishCheck(g, cn) {
+  const c = g.check, p = cn.picture;
+  stopCheck(g, cn);
+  const tot = c.frames.reduce((a, b) => a + b, 0), avg = c.frames.length / (tot / 1000), slow = pct(c.frames, 0.95), cost = median(c.load) / LOADN;
+  // if the device kept up with the screen even while drawing each frame eight times, the true time is shorter still
+  const sat = median(c.load) > median(c.frames) * 1.3;
+  const phone = avg >= 29.5 && cost <= 25 ? 'pass' : 'below', computer = avg >= 58 ? 'pass' : 'below';
+  g.result = [
+    '<b>' + fmt(avg) + ' fps</b> in Mong Kok, each frame drawn in ' + (sat ? 'about ' : 'under ') + '<b>' + fmt(cost, 1) + ' ms</b>; slowest 1 in 20 came ' + fmt(slow) + ' ms apart.',
+    'Phone target (30 fps, 25 ms): <b>' + phone + '</b> · Computer target (60 fps): <b>' + computer + '</b> · ' + p.width + ' × ' + p.height + ', ' + (p.smoothing ? p.smoothing + '× smoothing' : 'no smoothing') + ' · ' + browserName() + ' · ' + (p.chip || 'unknown chip')
+  ];
+}
+
+/* ----- the readout: scene and frame rate, what the scene shows, and the picture ----- */
+function showReadout(g, cn) {
+  if (!readout) return;
+  const p = cn.picture, scene = SCENES[g.scene];
+  const picName = { auto: 'Automatic', best: 'Best', faster: 'Faster', fastest: 'Fastest' };
+  const pic = 'Picture: ' + picName[p.setting] + (p.setting === 'auto' ? (p.deciding ? ' (timing…)' : ' (' + picName[p.level] + ')') : '') +
+    ' · ' + p.width + ' × ' + p.height + ', ' + (p.smoothing ? p.smoothing + '× smoothing' : 'no smoothing');
+  let note = cn.touch ? NOTES[g.scene].replace('← → steer, ↓ brakes', 'Drag to steer') : NOTES[g.scene], extra = pic;
+  if (scene === 'Mong Kok') {
+    const c = g.check;
+    if (g.result) { note = g.result[0]; extra = g.result[1] || pic; }
+    else if (!c || c.phase === 'wait') note = 'Speed check: waiting for Automatic to finish timing the picture…';
+    else if (c.phase === 'load' || c.phase === 'rest') note = 'Speed check: timing a frame. The picture slows down on purpose.';
+    else note = 'Speed check: measuring every frame. Leave the page alone for about 7 seconds.';
+  }
+  const lines = ['<b>' + (g.scene + 1) + ' ' + scene + '</b> · ' + (p.fps ? Math.round(p.fps) : '…') + ' fps', note, extra];
+  const key = lines.join('|');
+  if (key === g.shown) return;
+  g.shown = key;
+  lines.forEach((t, i) => { readout[i].innerHTML = t; });
+}
+</script>
+</body>
+</html>
