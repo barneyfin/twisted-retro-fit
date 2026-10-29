@@ -14,8 +14,9 @@
    made from the template builds with no warnings. Copy the template, not this file, to start a game.
    The kit's rules: ARCADE.md and city-nights/design-system/README.md.
    Build:  python city-nights/kit/build.py <name>   (the game is finished only when it builds with no warnings)
-   Kit 0.2 is the game shell over a plain dark backdrop; the drawing tools (the street, the meter) come in
-   step 3c, and draw may change then. What cn offers is listed in city-nights/kit/city-nights.js under "Public API". */
+   The kit draws the street every frame: the game moves the taxi, the traffic and the power-ups on it (cn.street),
+   and sets the meter's time (cn.meter); the fare is the score. Everything cn offers is listed in
+   city-nights/kit/city-nights.js under "Public API". This template only drives up the street. */
 CityNights.game({
   id: 'cn-empty',                 // the folder name: lowercase-with-hyphens; high scores are saved under it
   title: ['Empty', 'Game'],       // an invented name: a short first line, then the main line, in sentence case
@@ -24,18 +25,25 @@ CityNights.game({
   keys: [['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],   // keyboard hints: keys as printed, then the action
   touch: 'Drag to steer',         // the phone's touch hint: one line, two actions at most, joined by ' · '
 
-  // New game: build and return this game's state. The fare (the score) starts at HK$0.00.
+  // New game: build and return this game's state. The kit has put the taxi at the start of Tsim Sha Tsui with
+  // the street empty and the fare at HK$0.00.
   start(cn) {
+    cn.street.cars = cn.street.traffic(12);   // other traffic, spread along the street in its lanes
     return {};
   },
 
   // Rules: called 60 times a second during play. cn.input has the keys and touches; cn.addFare(2.5) adds
   // HK$2.50 to the fare; cn.gameOver() ends the run (game over, then initials if the fare makes the top ten).
   update(g, cn) {
-  },
-
-  // Picture: called every frame.
-  draw(g, cn) {
+    const taxi = cn.street.taxi, dt = 1 / 60;
+    taxi.speed = cn.input.down ? 4 : 16;                       // metres a second; slowing lights the brake lamps
+    taxi.z += taxi.speed * dt;
+    if (cn.input.left) taxi.x -= 1.4 * dt;
+    if (cn.input.right) taxi.x += 1.4 * dt;
+    if (cn.input.pointer.down) taxi.x += cn.input.pointer.dx / cn.W * 2;   // drag to steer
+    taxi.x = cn.clamp(taxi.x, -0.85, 0.85);
+    for (const car of cn.street.cars) car.z += car.speed * dt;
+    cn.addFare(taxi.speed * dt * 0.02);
   },
 });
 </script>

@@ -166,6 +166,11 @@ html,body{margin:0;height:100%;background:var(--night-black);overflow:hidden}
 .cn-ui [hidden]{display:none!important}
 .cn-stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:hidden}
 .cn-world{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* the meter and caption (bottom left; the script sets their place as parts of the picture) and the crash pop, over the
+   picture during a run only */
+.cn-hud{position:absolute;left:0;pointer-events:none}
+.cn-popc{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cn-root:not(.cn-in-game) .cn-hud,.cn-root:not(.cn-in-game) .cn-popc{display:none}
 .cn-play,.cn-title-screen{position:absolute;inset:0}
 .cn-error{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:5;max-width:90%;color:var(--night-text);font:500 14px/20px var(--font-ui)}
 .cn-hidden-input{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;font-size:16px;pointer-events:none}
