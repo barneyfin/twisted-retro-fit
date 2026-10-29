@@ -1,4 +1,4 @@
-/* City Nights 0.6 — runtime
+/* City Nights 0.6.1 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.6.0';
+  const VERSION = '0.6.1';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -3018,16 +3018,16 @@
           g.fillStyle = on ? shade('lamp-amber', 0.45) : shade('lamp-amber', -0.5); g.beginPath(); g.arc(lp.x, lp.y, rad, 0, Math.PI * 2); g.fill();
           if (on) { var gl = g.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, rad * 7); gl.addColorStop(0, rgba(amber, 0.75)); gl.addColorStop(1, rgba(amber, 0)); g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = gl; g.fillRect(lp.x - rad * 7, lp.y - rad * 7, rad * 14, rad * 14); g.restore(); }
         }
-        // the sign on its stand, ahead of the barriers: face-yellow, ink-black lettering
-        var sx = x - (n * bw) / 2 + 0.35, sd = d - 1.2, l1 = pt(sd, sx - 0.04, 0), l2 = pt(sd, sx + 0.04, 1.05), r1 = pt(sd, sx + 0.86, 0);
+        // the sign on its stand, ahead of the barriers: 1.45 m by 0.7 m, face-yellow, ink-black lettering
+        var sx = x - (n * bw) / 2 + 0.35, sd = d - 1.2, l1 = pt(sd, sx - 0.04, 0), l2 = pt(sd, sx + 0.04, 1.05), r1 = pt(sd, sx + 1.21, 0);
         if (l1 && l2 && r1) { g.fillStyle = col('case'); g.fillRect(l1.x - 1, l2.y, 2, l1.y - l2.y); g.fillRect(r1.x - 1, l2.y, 2, l1.y - l2.y); }
-        var tl = pt(sd, sx - 0.1, 1.55), br = pt(sd, sx + 1.0, 0.85);
+        var tl = pt(sd, sx - 0.1, 1.55), br = pt(sd, sx + 1.35, 0.85);
         if (tl && br) {
           var w = br.x - tl.x, h = br.y - tl.y;
           g.fillStyle = col('case'); g.fillRect(tl.x - w * 0.04, tl.y - h * 0.06, w * 1.08, h * 1.12);
           var sg = g.createLinearGradient(0, tl.y, 0, br.y); sg.addColorStop(0, shade('face-yellow', 0.35)); sg.addColorStop(1, shade('face-yellow', -0.1)); g.fillStyle = sg; g.fillRect(tl.x, tl.y, w, h);
           g.fillStyle = col('ink-black'); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-          g.font = '900 ' + h * 0.46 + 'px "Noto Serif TC", serif'; g.fillText('道路工程', tl.x + w / 2, tl.y + h * 0.56);
+          g.font = '900 ' + Math.min(h * 0.46, w * 0.88 / 4) + 'px "Noto Serif TC", serif'; g.fillText('道路工程', tl.x + w / 2, tl.y + h * 0.56);   // four characters, never wider than the face
           g.font = '700 ' + h * 0.26 + 'px Antonio, sans-serif'; if ('letterSpacing' in g) g.letterSpacing = (h * 0.03) + 'px'; g.fillText('ROAD WORKS', tl.x + w / 2, tl.y + h * 0.9); if ('letterSpacing' in g) g.letterSpacing = '0px';
           var yl = g.createRadialGradient(tl.x + w / 2, tl.y + h / 2, 0, tl.x + w / 2, tl.y + h / 2, w); yl.addColorStop(0, rgba(col('face-yellow'), 0.28)); yl.addColorStop(1, rgba(col('face-yellow'), 0));
           g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = yl; g.fillRect(tl.x - w / 2, tl.y - w / 2, w * 2, h + w); g.restore();
