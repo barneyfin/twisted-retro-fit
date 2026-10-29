@@ -40,23 +40,25 @@ The template, as it is, drives up the street through traffic: a working game to 
 | 1 Drive | All four districts (Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok), the signs, people and traffic, the meter and the district caption. Steer with ← →, brake with ↓. TIME counts down, and at 00 the run ends: game over, initials and high scores follow. |
 | 2 Mong Kok | The speed check (below). |
 | 3 Power-ups | The five power-up signs (時 錢 快 保 雙), near and far. |
-| 4 Crash | The taxi runs into each kind of vehicle in turn: the crash pop (CRASH!, SMASH! or BANG!) and the brake lights. |
+| 4 Crash | The taxi runs into each kind of vehicle in turn: the crash pop and the brake lights. The words come in turn, CRASH!, SMASH!, BANG!, then one the kit picks at random (as a game gets it); press C, S or B to choose the next word, R for a random one. The plaque shows how long the crash pop's three words took to draw. |
 | 5 Vehicles | Every vehicle in every colour, keeping pace with the taxi. |
 
 Pause (Esc, or the pause tile) and Settings work as in any game, so every screen can be seen. After changing anything in `kit\`, rebuild every City Nights game and look through this page before anything else.
 
 ## The speed check
 
-Scene 2 repeats the speed test's Mong Kok measurement, now on the finished kit. It starts by itself: the taxi goes to the edge of Mong Kok and drives through it at 68 km/h for about 7 seconds. For the first part every frame is timed (the frame rate); for the last 3 seconds each frame is drawn eight times over, so the picture slows down on purpose while it works out how long one frame takes to draw. Leave the page alone until the plaque shows the result.
+Scene 2 repeats the speed test's Mong Kok measurement, now on the finished kit. It starts by itself: the taxi goes to the edge of Mong Kok and drives through it at 68 km/h for about 14 seconds. For the first part every frame is timed (the frame rate); for the next 3 seconds each frame is drawn eight times over, so the picture slows down on purpose while it works out how long one frame takes to draw. Then it does both again with a crash pop lit all the while (a new one each second), to show that a pop doesn't slow play down. Leave the page alone until the plaque shows the result.
 
-Close any other copy of the page first (two copies fight over the graphics chip), and use Chrome. The result names the frame rate, the time to draw a frame, whether each target passes, the picture size and smoothing, the browser and the graphics chip. The targets, as in the speed test:
+Close any other copy of the page first (two copies fight over the graphics chip), and use Chrome. The result names the frame rate and the time to draw a frame, without and with a crash pop; whether each target passes (on both runs); how long the crash pop's three words took to draw; the picture size and smoothing, the browser and the graphics chip. The targets, as in the speed test:
 
 - **Phone**: at least 30 frames a second, and each frame drawn in 25 ms or less.
 - **Computer**: 60 frames a second.
 
+The crash pop's words are slow to draw (each has up to 15 glows), so the kit draws all three once, while the title screen shows and again after the window changes size, and each pop just shows the finished picture. The time it reports is that drawing: on a slow device the title's street pauses for that long once, and a resize during play costs the same pause.
+
 The check waits until Automatic (below) has finished timing the picture. To run it again, press 2, or tap through the scenes back to it.
 
-Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips during the last 3 seconds of the check, while each frame is drawn eight times; the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
+Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips while each frame is drawn eight times (twice in the check, 3 seconds each); the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
 
 ### Results, 29 October 2026 (kit 0.4, Mong Kok, Chrome 156)
 
@@ -66,6 +68,8 @@ Check that the result names the device's own graphics chip. "Microsoft Basic Ren
 | Pixel 11 Pro XL | 60 fps | about 3.2 ms | 1944 × 810, 4× smoothing | pass |
 
 Both match the speed test (computer under 2.1 ms, Pixel about 3.1 ms), and Automatic kept Best on both. In both runs the slowest 1 frame in 20 came 17 ms after the one before, one refresh of a 60 Hz screen.
+
+Kit 0.5 (the smoke-cloud crash pop) added the run with a crash pop lit and the words' drawing time; neither has been measured on these devices yet.
 
 ## Picture: Automatic, Best, Faster, Fastest
 
@@ -81,10 +85,10 @@ Under Settings. **Best** is 4× edge smoothing at full sharpness (up to 1.5 canv
 | `design-system\` | A copy of the approved design system (the spec): tokens, components, the word list, the fonts |
 | `speed-test\` | Phase 1's WebGL2 speed test, kept as it is |
 | `kit\city-nights.css` | The look: colours, fonts, lightbox and neon signs |
-| `kit\city-nights.js` | The kit: the street and everything on it, the game shell, sound, saving, the Picture setting |
+| `kit\city-nights.js` | The kit: the street and everything on it, the game shell, sound, saving, the Picture setting. The crash pop's drawings and the code that draws them are copied unchanged from the design system (`design-system\components\bundle.js`) |
 | `kit\build.py` | Turns a game's source into one playable file, and checks it against the rules |
 | `kit\template.html` | Starting point for a new game |
-| `kit\fonts\`, `kit\licences\` | The five font files and their licences (SIL Open Font License: free to embed in games). `fonts\characters.txt` lists the Chinese characters the fonts hold, for the build's check |
+| `kit\fonts\`, `kit\licences\` | The six font files and their licences (SIL Open Font License: free to embed in games); Bangers is for the crash pop's letters only. `fonts\characters.txt` lists the Chinese characters the fonts hold, for the build's check |
 | `games\cn-sampler\` | The test page |
 | `games\cn-empty\` | The template as a game, to prove the template builds |
 | `..\dist\<name>.html` | The built games, shared with Retro Kit's (not kept in git) |
