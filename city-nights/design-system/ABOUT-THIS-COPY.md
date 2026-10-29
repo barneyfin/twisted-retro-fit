@@ -1,6 +1,6 @@
 # About this copy
 
-This folder is a copy of the approved City Nights design system, version 8 (29 October 2026): https://claude.ai/artifact/4DhkqfUBGEBm3Qj2DeprsM. The artifact is the spec; this copy is here so Claude Code can read it while building the kit. Version 6 changed the crash pop to the smoke cloud (see `../HANDOVER-crash-pop.md`); version 8 added the street's obstacles, animals, passengers and stop bay (see `../HANDOVER-street-pieces.md`).
+This folder is a copy of the approved City Nights design system, version 9 (29 October 2026): https://claude.ai/artifact/4DhkqfUBGEBm3Qj2DeprsM. The artifact is the spec; this copy is here so Claude Code can read it while building the kit. Version 6 changed the crash pop to the smoke cloud (see `../HANDOVER-crash-pop.md`); version 8 added the street's obstacles, animals, passengers and stop bay (see `../HANDOVER-street-pieces.md`); version 9 widened the roadworks sign to 1.45 m so 道路工程 fits.
 
 - **Don't edit these files.** Change the design system first (in Barney's Claude app project), then refresh this copy from it.
 - `README.md` is the rulebook. `words.md` is the word list. `tokens.json` holds every token; `tokens.css` is the same tokens as CSS custom properties, generated from it.
