@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>City Nights game</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files, the fonts and their licences into dist/<game>.html. Keep data-cn-inline. -->
+<link rel="stylesheet" href="../../kit/city-nights.css" data-cn-inline>
+<script src="../../kit/city-nights.js" data-cn-inline></script>
+</head>
+<body>
+<script>
+/* CN EMPTY — the empty City Nights game: a straight copy of kit/template.html, kept to prove a new game
+   made from the template builds with no warnings. Copy the template, not this file, to start a game.
+   The kit's rules: ARCADE.md and city-nights/design-system/README.md.
+   Build:  python city-nights/kit/build.py <name>   (the game is finished only when it builds with no warnings)
+   Kit 0.1 is the skeleton: it shows a holding card. The game shell (step 3b) and the drawing tools (3c)
+   will run start, update and draw; their options may still change in those steps. */
+CityNights.game({
+  id: 'cn-empty',                 // the folder name: lowercase-with-hyphens; high scores are saved under it
+  title: ['Empty', 'Game'],       // an invented name: a short first line, then the main line, in sentence case
+  zh: '',                         // the Chinese name for the title's vertical neon sign, 2 to 4 characters,
+                                  //   each word on the design system's word list first (city-nights/design-system/words.md)
+  keys: [['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],   // keyboard hints: keys as printed, then the action
+  touch: 'Drag to steer',         // the phone's touch hint: one line, two actions at most, joined by ' · '
+
+  // New game: build and return this game's state.
+  start(cn) {
+    return {};
+  },
+
+  // Rules: called for every step of play.
+  update(g, cn) {
+  },
+
+  // Picture: called every frame.
+  draw(g, cn) {
+  },
+});
+</script>
+</body>
+</html>
