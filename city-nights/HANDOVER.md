@@ -2,6 +2,8 @@
 
 This note hands the City Nights kit to Claude Code for phase 3, the code kit and test page. Phases 1 and 2 were done in Barney's Claude app project, *Browser Arcade*, where the design work stays. Read this whole note before writing any code. Written 28 October 2026.
 
+**Phase 3 is finished.** Read "Where phase 3 ended" at the end of this note first: some details above (the design system's version, the next commit message number) are out of date.
+
 ## What City Nights is
 
 The arcade's second style kit: a real Hong Kong street at night, after Barney's own photo series *Hong Kong City Nights*. Warm amber streets, a wall of lightbox and neon signs overhead, HDR grain and halos, ghosted people, traffic in places. Gritty and real, not cyberpunk. Games look into the screen. The pilot game is **Grunge City Rider**, a taxi game (phase 4).
@@ -87,3 +89,35 @@ Retro Kit's `kit/` and `games/` are not touched (PRD criterion 7). `site/build.p
 ## Still open (not phase 3)
 
 PRD question 4 (Grunge City Rider's gameplay, including what the power-ups do), 6 (the game that proves the skill), 7 (a city sound bed), 8 (a Cantonese reader checks `words.md` before the kit is final).
+
+## Where phase 3 ended (29 October 2026, written by Claude Code)
+
+**State**
+- Kit 0.6.1 holds everything in steps 3a to 3d, plus three later changes, each with its own note: the smoke-cloud crash pop (design system v6, `HANDOVER-crash-pop.md`), the obstacles, animals, passengers and stop bay (v8, `HANDOVER-street-pieces.md`) and the wider roadworks sign (v9). The copy in `design-system/` is now version 9, not 4. The crash pop's and the street pieces' drawing code is copied from the design system word for word; keep it that way.
+- The speed check passes on Barney's computer and Pixel with the crash pop and the street pieces on screen (60 fps; under 2.1 ms and about 3.2 ms a frame). The results are in `README.md`.
+- The build has no warnings and the console is clean. `README.md` covers playing, building, the test page (six scenes), the speed check and the Picture setting. The "Public API" comment in `kit/city-nights.js` lists everything a game can use.
+- Barney has checked the crash pop and the street pieces in the test page.
+- Commit messages: CM22 was the last; use CM23 next.
+
+**Decided in Claude Code, not yet in the design system** (to take to the Claude app project)
+- Automatic picture: edge smoothing goes off when frames come more than 17.5 ms apart, not the 16 ms of the `auto-smoothing-off` token. A 60 Hz screen's frames are 16.7 ms apart, so at 16 ms every device that keeps up would trip it.
+- Animals bolt at 5 m/s (boar, dog, cat) or 3 m/s (chickens), and are gone 1.2 m past the kerb.
+- Contact shadow sizes for the dog, cat, chickens and crate (the design system gives only the boar's and the passenger's), and the chickens' places round their crate.
+- Picture is saved under `citynights.settings`. High scores are saved under `retrokit.scores.<game id>`, with the fare in whole cents.
+- The meter holds at HK$999.99 (six places); a seventh place is for the game's rules.
+
+**Known differences from the design system's previews** (accepted for now)
+- Eyeshine, the roadworks lamps and the sign's glow are drawn into the same pictures as the bodies and barriers. So they take the traffic's grain, and their halos lie over the street rather than adding light to it.
+- At a distance the pieces are softer than in the previews, because the graphics chip shrinks pictures smoothly, as it does the people and cars.
+- The bay's light and the passenger's pool of light take the road's grain.
+- The kit places the roadworks' cones itself, where `roadworks()` puts them; if the design system moves them, the kit must follow.
+- Safari before version 18 ignores canvas blur, so the oil's sheen and the bay's glow are sharper there.
+
+**For phase 4**
+- PRD question 4 decides Grunge City Rider's gameplay:
+  - what each obstacle and power-up does, and the near-miss penalty;
+  - the crash freeze (the kit's pop lasts 1 s; a longer freeze is the game's);
+  - how stopping in a bay is judged and shown, and the passenger getting in;
+  - whether the meter needs a seventh place for the fare.
+- `site/build.py` learns City Nights games in phase 4, including showing a score stored in cents as a fare.
+- Still open: PRD questions 6, 7 and 8.
