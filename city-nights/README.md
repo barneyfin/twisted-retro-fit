@@ -70,7 +70,16 @@ Check that the result names the device's own graphics chip. "Microsoft Basic Ren
 
 Both match the speed test (computer under 2.1 ms, Pixel about 3.1 ms), and Automatic kept Best on both. In both runs the slowest 1 frame in 20 came 17 ms after the one before, one refresh of a 60 Hz screen.
 
-Kit 0.5 (the smoke-cloud crash pop) added the run with a crash pop lit and the words' drawing time, and kit 0.6 the run with street pieces; none of these has been measured on these devices yet.
+### Results, 29 October 2026 (kit 0.6, Mong Kok, Chrome 156)
+
+Kit 0.5 added the run with a crash pop lit and the words' drawing time; kit 0.6 added the run with street pieces.
+
+| Device | Street alone | With a crash pop | With street pieces | Crash pop words drawn | Picture | Targets |
+|---|---|---|---|---|---|---|
+| Computer, RTX 5080 | 60 fps, under 2.1 ms | 60 fps, under 2.1 ms | 60 fps, under 2.1 ms | 38 ms, 2859 × 1853 each | 1632 × 810, 4× smoothing | pass |
+| Pixel 11 Pro XL | 60 fps, about 3.2 ms | 60 fps, about 3.2 ms | 60 fps, about 3.2 ms | 100 ms, 1089 × 706 each | 1944 × 810, 4× smoothing | pass |
+
+Neither the crash pop nor the street pieces changed the time to draw a frame on either device, and both match kit 0.4's results. The slowest 1 frame in 20 came 17 ms (computer) and 18 ms (Pixel) after the one before. Drawing the crash pop's words is a one-off pause while the title screen shows: about two frames on the computer, six on the Pixel.
 
 ## Picture: Automatic, Best, Faster, Fastest
 
