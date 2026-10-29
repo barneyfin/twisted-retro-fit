@@ -63,3 +63,12 @@ Every Chinese word City Nights shows. A Cantonese reader checks this list before
 | 快 | Power-up, Speed boost | Fast. |
 | 保 | Power-up, Shield | Protect, keep safe. |
 | 雙 | Power-up, Double fare | Double, a pair. |
+
+## Obstacles and the stop bay
+
+| Word | Where | Meaning |
+| --- | --- | --- |
+| 道路工程 | Roadworks sign, ROAD WORKS | Road works (dou6 lou6 gung1 cing4). |
+| 易碎 | Spilt cargo boxes | Fragile (ji6 seoi3), as printed on boxes. |
+| 上客 | Pick-up bay, PICK-UP | Pick up passengers (soeng5 haak3). |
+| 落客 | Drop-off bay, DROP-OFF | Drop off passengers (lok6 haak3), as on Hong Kong drop-off signs. |

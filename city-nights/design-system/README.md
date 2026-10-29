@@ -4,7 +4,7 @@ City Nights is the look of a set of browser games in Barney's arcade, Twisted Re
 
 Every screen has two layers.
 
-- **World**: the street, drawn with WebGL into a 540-line picture (`picture-height`) that fills the window: sky, buildings, shop fronts, signs, people, traffic, the player's taxi, power-ups, the crash pop, glow, fog, vignette and grain. Everything is drawn in code; there are no image files.
+- **World**: the street, drawn with WebGL into a 540-line picture (`picture-height`) that fills the window: sky, buildings, shop fronts, signs, people, traffic, the player's taxi, power-ups, obstacles, animals, passengers and the stop bay, the crash pop, glow, fog, vignette and grain. Everything is drawn in code; there are no image files.
 - **Interface**: everything a player reads or presses, made as lit signs. **Lightbox** panels (a cream lit face in a dark case, lettered in red) for everything during and after play. **Neon** (tube lettering on a dark board) for the title screen only, where the menu joins the street's wall of signs.
 
 The two meet in three places, all part of the picture rather than over it: the taxi meter (bottom left), the district caption above it, and the title screen's logo. The meter and caption are drawn on their own small canvas over the picture and scale with it; panels are HTML at fixed CSS sizes.
@@ -15,7 +15,7 @@ Neon is kept to the title screen on purpose. Pause, settings, game over, initial
 
 - **Interface copy is sentence case**: "Start game", "High scores", "Reduce motion", "Quit to menu". Buttons are verbs; never "OK".
 - **Sign headers are bilingual**, like the street's signs: the Chinese word left in `header-zh`, the English right in `header-en`, uppercase by `text-transform` (write "Paused" in source, it shows PAUSED). One header per panel: 暫停 PAUSED, 設定 SETTINGS, 遊戲結束 GAME OVER, 新紀錄 NEW BEST, 高分榜 HIGH SCORES, 橫放手機 ROTATE.
-- **Chinese**: traditional characters as Hong Kong uses them; real, everyday words; every business name invented. Chinese appears on signs, in headers, on the meter, the caption, the badge, the power-ups and the crash pop's tag. Menu items, settings and body text are English only. Every Chinese word is on the word list (the Word list section) for a Cantonese reader to check before the kit is final.
+- **Chinese**: traditional characters as Hong Kong uses them; real, everyday words; every business name invented. Chinese appears on signs, in headers, on the meter, the caption, the badge, the power-ups, the crash pop's tag, the roadworks sign, the cargo boxes and the stop bay. Menu items, settings and body text are English only. Every Chinese word is on the word list (the Word list section) for a Cantonese reader to check before the kit is final.
 - **English on signs** is uppercase and plain, with some quirky names in the spirit of "Cyber Sauna" (原子桑拿 ATOMIC SAUNA). Nothing rude, nothing that mocks, no nightclub signs: players include teens.
 - **The score is the fare.** In text it is `HK$412.80`: no space, two decimals, comma thousands from HK$1,000.00. On the meter and in every dark inset it is red seven-segment digits padded to fixed places with unlit 8s (` 23.40`), never text.
 - **Controls are named, not described**: a keycap ("Enter", "Esc", "↑") then the action in `hint` ("Select"). Phones get the touch hint instead.
@@ -33,6 +33,7 @@ Neon is kept to the title screen on purpose. Pause, settings, game over, initial
 - **Neon title**: boards `neon-board`; lit lettering in a tube's core colour (`tube-core-teal`, `tube-core-pink`, `tube-core-yellow`) with the tube's colour as its edge and glow; unselected items `neon-unlit`.
 - **Reward** is the yellow sign: the New best badge is a small `face-yellow` lightbox lettered in `ink-black`.
 - **Power-ups** are small lightbox signs, each a face with its ink: 時 `face-green`, 錢 `face-yellow`, 快 `face-red`, 保 `face-blue`, 雙 `face-cream`. The **crash pop** is a smoke cloud on `neon-board` in a `face-cream` tube over a `sodium` halo; each word has its own lit face and edge tube: CRASH! yellow (`pop-crash-light`, `tube-yellow`, `pop-crash-deep`) edged `tube-red`; SMASH! red (`pop-smash-light`, `tube-red`, `pop-smash-deep`) edged `tube-yellow`; BANG! pink (`pop-bang-light`, `tube-pink`, `pop-bang-deep`) edged `tube-teal`.
+- **The stop bay** is `tube-teal` for pick-up (上客 PICK-UP) and `tube-pink` for drop-off (落客 DROP-OFF), lettered in the tube's core colour. **Obstacles** use the sign faces where they can (`face-red` and `face-white` barriers, a `face-yellow` sign) and their own tokens otherwise (`cone-orange`, `lamp-amber`, `cardboard`, `oil-dark`, `pothole-lip`). **Animals** are `animal-dark` with `figure-rim`, and eyeshine in `eyeshine-amber`, `eyeshine-gold` or `eyeshine-green`. **Passengers** are the only people in colour (`coat-red`, `coat-blue`, `coat-olive`).
 - Over the street, dialogs sit on `scrim`; the title's logo and menu sit on `title-shade`, fading to 12% three quarters across. Light text over the street sits on `plaque` or carries the `caption-outline`.
 - No hex values in games: games name these tokens.
 
@@ -74,6 +75,16 @@ Neon is kept to the title screen on purpose. Pause, settings, game over, initial
 - Small lightbox signs hovering over the road on their own pool of light, one Chinese character each (PowerUp): 時 More time, 錢 Fare bonus, 快 Speed boost, 保 Shield, 雙 Double fare. What each does is settled with the gameplay; the names are placeholders until then.
 - They are told apart by colour first and the character close up, scale with distance like the cars, bob slowly and never flash.
 
+### Obstacles, animals and passengers
+
+- All true size (Barney, 29 October 2026), all drawn in code by `CityNights.street` (Canvas 2D, colours by token name), placed in the street's own perspective through the game's projection. The parts: Obstacle, Animal, Passenger, StopZone.
+- **Obstacles** (Obstacle): an oil slick, a flooded pothole, roadworks closing a lane (cones, red-and-white barriers with amber lamps, a 道路工程 ROAD WORKS sign) and spilt cargo (boxes marked 易碎, oranges rolling).
+- **Animals** (Animal): a wild boar, a stray dog, a street cat and market chickens by their crate; dark shapes lit warm from behind, eyes shining in the taxi's headlights. **They always escape unhurt**: they bolt for the kerb, and there is never a crash pop (Barney, 29 October 2026).
+- **Passengers** (Passenger): the one person in the street drawn sharp and in colour, at the kerb with an arm up, in a warm pool of light; three kinds (plain, with a suitcase, with shopping).
+- **The stop bay** (StopZone): a painted bay 3 m by 10 m in the kerbside lane on the left (Hong Kong drives on the left), teal for pick-up, pink for drop-off.
+- In this camera anything in the taxi's own lane closer than about 20 m is behind the taxi, so these are first seen further up the road; their colour and light (eyeshine, amber lamps, sheen, the bay's glow) make them readable from there.
+- What each one does, and how stopping in a bay is judged, are Grunge City Rider's gameplay (PRD question 4).
+
 ### Grain, glow and fog
 
 - Grain is part of the look and fades in and out across the picture (the Grain section has every level): strongest on buildings and pavements, light on the road round the taxi, none on signs and lights. Levels are the same in every district.
@@ -96,7 +107,7 @@ Neon is kept to the title screen on purpose. Pause, settings, game over, initial
 ### Motion and safety
 
 - Panels fade and rise 8px over 160 ms; under Reduce motion they only fade. Reduce motion also cuts the taxi's sway and roll on corners.
-- The whole screen never flashes, and nothing bigger than a character flashes more than 3 times a second. The crash pop dips once in its second of life, and power-ups never flash. A flickering neon sign (原子桑拿 ATOMIC SAUNA) dips to half brightness for 0.07–0.13 s, at least 0.45 s apart: under twice a second.
+- The whole screen never flashes, and nothing bigger than a character flashes more than 3 times a second. The crash pop dips once in its second of life, and power-ups never flash. Roadworks lamps take turns, each lit once a second (`lamp-time`); eyeshine and the stop bay are steady. A waiting passenger swaps between two arm poses every `wave-time` (0.4 s), and holds still under Reduce motion. A flickering neon sign (原子桑拿 ATOMIC SAUNA) dips to half brightness for 0.07–0.13 s, at least 0.45 s apart: under twice a second.
 - Interface text is at least 4.5:1 on its ground; the pairs are in each colour's note.
 
 ## Iconography

@@ -1,0 +1,70 @@
+<!-- @dsCard group="World" height=600 width=960 subtitle="On the street, then the four drawn live, standing and bolting (each at its own size)" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>preview</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:960px;overflow:hidden;background:var(--night-black)}
+.stage img,.stage canvas{position:absolute;display:block}
+.tag{position:absolute;padding:5px 10px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);color:var(--night-text);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.zh{font-family:var(--font-zh-sans);font-weight:700}
+
+</style>
+</head>
+<body>
+<div class="stage" style="height:600px">
+  <img src="/_blob/ad871ab1e0df85d5ada11ef04b7f393a" alt="On the street: a wild boar in the left-hand lane with amber eyeshine, chickens loose on the right" style="left:0px;top:0px;width:480px;height:270px">
+  <img src="/_blob/c45b649ab4446a159f4026b7275015f0" alt="On the street: a stray dog bolting for the kerb, a street cat in the right-hand lane" style="left:480px;top:0px;width:480px;height:270px">
+  <canvas id="c" style="left:0;top:270px;width:960px;height:330px"></canvas>
+  <span class="tag" style="left:10px;top:10px">On the street</span>
+  <span class="tag" style="left:10px;top:280px">Standing in the road</span>
+  <span class="tag" style="left:10px;top:438px">Bolting: they always get away</span>
+  <span class="tag" style="left:150px;top:280px">Wild boar · 1.4 m</span>
+  <span class="tag" style="left:390px;top:280px">Stray dog · 1 m</span>
+  <span class="tag" style="left:625px;top:280px">Street cat · 0.5 m</span>
+  <span class="tag" style="left:800px;top:280px">Chickens · 0.4 m</span>
+</div>
+<script>
+(function () {
+  var S = window.CityNights.street;
+  // the game's camera, simplified to a straight road: d metres ahead of the taxi's rear bumper, x across from the road's centre, y up
+  function cam(w, h, camX) {
+    var K = w / 2, D = 1 / Math.tan(50 * Math.PI / 180), HZ = h * 0.4, CH = 2.375, CAB = 3.54;
+    return function (d, x, y) { var z = d + CAB; if (z < 0.4) return null; var sc = D / z; return { x: w / 2 + sc * (x - (camX || 0)) * K, y: HZ + sc * (CH - (y || 0)) * K, s: sc * K }; };
+  }
+  function tok(n) { return getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim(); }
+  // a plain stretch of the street for the drawings to stand on: road, pavements, lane lines, a lamp's warm pool
+  function street(g, w, h, pt) {
+    var sky = g.createLinearGradient(0, 0, 0, h * 0.4); sky.addColorStop(0, tok('sky-top')); sky.addColorStop(1, tok('sky-low')); g.fillStyle = sky; g.fillRect(0, 0, w, h);
+    var q = function (d0, d1, x0, x1, fill) { var a = pt(d1, x0, 0), b = pt(d1, x1, 0), c = pt(d0, x1, 0), e = pt(d0, x0, 0); if (!a || !c) return; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.lineTo(c.x, c.y); g.lineTo(e.x, e.y); g.closePath(); g.fillStyle = fill; g.fill(); };
+    var rg = g.createLinearGradient(0, h * 0.4, 0, h); rg.addColorStop(0, tok('road-far')); rg.addColorStop(1, tok('road-near'));
+    var pg = g.createLinearGradient(0, h * 0.4, 0, h); pg.addColorStop(0, tok('pave-far')); pg.addColorStop(1, tok('kerb-brown'));
+    q(-3, 80, -9, -5, pg); q(-3, 80, 5, 9, pg); q(-3, 80, -5, 5, rg);
+    q(-3, 80, -5.05, -4.95, tok('kerb')); q(-3, 80, 4.95, 5.05, tok('kerb'));
+    q(-3, 80, -4.8, -4.7, tok('lane-yellow')); q(-3, 80, -4.6, -4.5, tok('lane-yellow')); q(-3, 80, 4.5, 4.6, tok('lane-yellow')); q(-3, 80, 4.7, 4.8, tok('lane-yellow'));
+    for (var d = -3; d < 80; d += 9) { q(d, d + 4.5, -1.74, -1.6, tok('lane-white')); q(d, d + 4.5, 1.6, 1.74, tok('lane-white')); }
+    var lp = g.createRadialGradient(w / 2, h * 0.62, 0, w / 2, h * 0.62, w * 0.6); lp.addColorStop(0, 'rgba(255,184,77,0.16)'); lp.addColorStop(1, 'rgba(255,184,77,0)');
+    g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = lp; g.fillRect(0, h * 0.4, w, h * 0.6); g.restore();
+  }
+  function canvasFor(id, w, h) { var c = document.getElementById(id), dpr = Math.min(window.devicePixelRatio || 1, 2); c.width = w * dpr; c.height = h * dpr; var g = c.getContext('2d'); g.scale(dpr, dpr); return g; }
+  // a pt that also scales for the canvas's pixel ratio is not needed: the context is scaled, s is in CSS pixels
+  var fontsReady = Promise.all([document.fonts.load('900 40px "Noto Serif TC"', '道路工程易碎'), document.fonts.load('700 40px "Noto Sans TC"', '上客落'), document.fonts.load('700 40px Antonio')]);
+  draw();
+  function draw() {
+    var g = canvasFor('c', 960, 330), cols = [200, 440, 670, 850], rows = [140, 300];
+    var bg = g.createLinearGradient(0, 0, 0, 330); bg.addColorStop(0, tok('night-black')); bg.addColorStop(1, tok('sky-mid')); g.fillStyle = bg; g.fillRect(0, 0, 960, 330);
+    var put = function (spr, x, y, k) { g.fillStyle = 'rgba(0,0,0,0.45)'; g.beginPath(); g.ellipse(x, y + 2, spr.c.width * k * 0.3, 5, 0, 0, Math.PI * 2); g.fill(); g.drawImage(spr.c, x - spr.ax * k, y - spr.ay * k, spr.c.width * k, spr.c.height * k); };
+    var floor = function (x, y) { var gr = g.createRadialGradient(x, y, 0, x, y, 120); gr.addColorStop(0, 'rgba(255,184,77,0.2)'); gr.addColorStop(1, 'rgba(255,184,77,0)'); g.fillStyle = gr; g.fillRect(x - 120, y - 60, 240, 100); };
+    rows.forEach(function (y, r) {
+      var run = r === 1;
+      [[S.boar(run), 0.62], [S.dog(run), 0.8], [S.cat(run), 1.1]].forEach(function (a, i) { floor(cols[i], y); put(a[0], cols[i], y, a[1]); });
+      floor(cols[3], y); if (!run) put(S.crate(), cols[3] + 45, y - 2, 0.62);
+      [[-40, 1], [10, -1], [55, 1]].forEach(function (q, j) { if (!run && j === 2) return; put(S.chicken(run, run ? (j % 2 ? -1 : 1) : q[1]), cols[3] + q[0] - (run ? 0 : 15), y + (j === 1 ? 6 : 0), 0.8); });
+    });
+  }
+})();
+</script>
+</body>
+</html>

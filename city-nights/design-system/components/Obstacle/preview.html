@@ -1,0 +1,66 @@
+<!-- @dsCard group="World" height=810 width=960 subtitle="On the street, then each drawn live by CityNights.street: oil slick, flooded pothole, roadworks, spilt cargo" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>preview</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;width:960px;overflow:hidden;background:var(--night-black)}
+.stage img,.stage canvas{position:absolute;display:block}
+.tag{position:absolute;padding:5px 10px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);color:var(--night-text);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.zh{font-family:var(--font-zh-sans);font-weight:700}
+
+</style>
+</head>
+<body>
+<div class="stage" style="height:810px">
+  <img src="/_blob/3bc73fd71ca440926a917a356a9d201c" alt="On the street: an oil slick in the right-hand lane, roadworks closing the left-hand lane ahead" style="left:0px;top:0px;width:480px;height:270px">
+  <img src="/_blob/6a714e6b92d16ebd59b82b9b636ea5c3" alt="On the street: a flooded pothole in the right-hand lane, spilt cargo across the left-hand lane" style="left:480px;top:0px;width:480px;height:270px">
+  <canvas id="c1" style="left:0;top:270px;width:480px;height:270px"></canvas>
+  <canvas id="c2" style="left:480px;top:270px;width:480px;height:270px"></canvas>
+  <canvas id="c3" style="left:0;top:540px;width:480px;height:270px"></canvas>
+  <canvas id="c4" style="left:480px;top:540px;width:480px;height:270px"></canvas>
+  <span class="tag" style="left:10px;top:10px">On the street</span>
+  <span class="tag" style="left:10px;top:280px">Oil slick · 2.8 × 6.5 m</span>
+  <span class="tag" style="left:490px;top:280px">Flooded pothole · 1.9 × 3.2 m</span>
+  <span class="tag" style="left:10px;top:550px">Roadworks · closes one lane, lamps take turns</span>
+  <span class="tag" style="left:490px;top:550px">Spilt cargo · about 2.6 m of a lane, <span class="zh">易碎</span></span>
+</div>
+<script>
+(function () {
+  var S = window.CityNights.street;
+  // the game's camera, simplified to a straight road: d metres ahead of the taxi's rear bumper, x across from the road's centre, y up
+  function cam(w, h, camX, zoom) {
+    zoom = zoom || 1; var K = w / 2 * zoom, D = 1 / Math.tan(50 * Math.PI / 180), HZ = h * (0.4 - 0.22 * (zoom - 1)), CH = 2.375, CAB = 3.54;
+    return function (d, x, y) { var z = d + CAB; if (z < 0.4) return null; var sc = D / z; return { x: w / 2 + sc * (x - (camX || 0)) * K, y: HZ + sc * (CH - (y || 0)) * K, s: sc * K }; };
+  }
+  function tok(n) { return getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim(); }
+  // a plain stretch of the street for the drawings to stand on: road, pavements, lane lines, a lamp's warm pool
+  function street(g, w, h, pt) {
+    var hz = pt(400, 0, 0).y, sky = g.createLinearGradient(0, 0, 0, hz); sky.addColorStop(0, tok('sky-top')); sky.addColorStop(1, tok('sky-low')); g.fillStyle = sky; g.fillRect(0, 0, w, h);
+    var q = function (d0, d1, x0, x1, fill) { var a = pt(d1, x0, 0), b = pt(d1, x1, 0), c = pt(d0, x1, 0), e = pt(d0, x0, 0); if (!a || !c) return; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.lineTo(c.x, c.y); g.lineTo(e.x, e.y); g.closePath(); g.fillStyle = fill; g.fill(); };
+    var rg = g.createLinearGradient(0, hz, 0, h); rg.addColorStop(0, tok('road-far')); rg.addColorStop(1, tok('road-near'));
+    var pg = g.createLinearGradient(0, hz, 0, h); pg.addColorStop(0, tok('pave-far')); pg.addColorStop(1, tok('kerb-brown'));
+    q(-3, 80, -9, -5, pg); q(-3, 80, 5, 9, pg); q(-3, 80, -5, 5, rg);
+    q(-3, 80, -5.05, -4.95, tok('kerb')); q(-3, 80, 4.95, 5.05, tok('kerb'));
+    q(-3, 80, -4.8, -4.7, tok('lane-yellow')); q(-3, 80, -4.6, -4.5, tok('lane-yellow')); q(-3, 80, 4.5, 4.6, tok('lane-yellow')); q(-3, 80, 4.7, 4.8, tok('lane-yellow'));
+    for (var d = -3; d < 80; d += 9) { q(d, d + 4.5, -1.74, -1.6, tok('lane-white')); q(d, d + 4.5, 1.6, 1.74, tok('lane-white')); }
+    var lp = g.createRadialGradient(w / 2, h * 0.62, 0, w / 2, h * 0.62, w * 0.6); lp.addColorStop(0, 'rgba(255,184,77,0.16)'); lp.addColorStop(1, 'rgba(255,184,77,0)');
+    g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = lp; g.fillRect(0, hz, w, h - hz); g.restore();
+  }
+  function canvasFor(id, w, h) { var c = document.getElementById(id), dpr = Math.min(window.devicePixelRatio || 1, 2); c.width = w * dpr; c.height = h * dpr; var g = c.getContext('2d'); g.scale(dpr, dpr); return g; }
+  // a pt that also scales for the canvas's pixel ratio is not needed: the context is scaled, s is in CSS pixels
+  var fontsReady = Promise.all([document.fonts.load('900 40px "Noto Serif TC"', '道路工程易碎'), document.fonts.load('700 40px "Noto Sans TC"', '上客落'), document.fonts.load('700 40px Antonio')]);
+  fontsReady.then(draw, draw);
+  function draw() {
+    var g, pt;
+    g = canvasFor('c1', 480, 270); pt = cam(480, 270, 0, 1.7); street(g, 480, 270, pt); S.decal(g, pt, S.oil(7), 1.5, 8, -1.4, 1.4, 0.95);
+    g = canvasFor('c2', 480, 270); pt = cam(480, 270, 0, 1.7); street(g, 480, 270, pt); S.decal(g, pt, S.pothole(), 1.5, 4.7, -0.95, 0.95, 1);
+    g = canvasFor('c3', 480, 270); pt = cam(480, 270, -1.0, 1.7); street(g, 480, 270, pt); S.roadworks(g, pt, 10, -3.33, { camX: -1.0, lampsA: true });
+    g = canvasFor('c4', 480, 270); pt = cam(480, 270, 0, 1.7); street(g, 480, 270, pt); S.cargo(g, pt, 3.5, 0, { camX: 0 });
+  }
+})();
+</script>
+</body>
+</html>
