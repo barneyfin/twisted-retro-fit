@@ -1,8 +1,8 @@
-/* City Nights 0.1 — stylesheet
-   The tokens and fonts of the City Nights design system, and (from step 3b) the game shell's layout and panels.
-   Two layers: the World (the street, drawn with WebGL) and the Interface (lit signs: lightbox panels, and
-   neon on the title screen). Games never edit this file. Change the design system first, then this file.
-   Step 3a, the skeleton: tokens, fonts, the page and a holding card. The shell comes in step 3b. */
+/* City Nights 0.2 — stylesheet
+   The tokens and fonts of the City Nights design system, its interface (lit signs), and the game shell's layout.
+   Two layers: the World (the street, drawn with WebGL from step 3c) and the Interface (lightbox panels, and neon
+   on the title screen). Games never edit this file. Change the design system first, then this file.
+   Copied from Retro Kit's shell (kit/retro-kit.css) for the layout, restyled from city-nights/design-system. */
 
 
 /* ---------- Tokens and fonts ----------
@@ -154,24 +154,263 @@
 @font-face { font-family: "Noto Serif TC"; src: url("fonts/NotoSerifTC-Black-CityNights.woff2") format("woff2"); font-weight: 900; font-display: block; }
 
 
-/* ---------- Page ---------- */
-html,body{margin:0;min-height:100%;background:var(--night-black)}
-body{color:var(--night-text);font-family:var(--font-ui);-webkit-font-smoothing:antialiased}
+
+/* ---------- Page and shell ----------
+   The root fills the window. The stage is the picture: 540 lines tall, its width following the window (960 at 16:9,
+   1170 on a 2.17:1 phone), scaled to fill; beyond 4:3 or 2.4:1 the rest is night-black letterbox. The title screen
+   and the play tiles sit on the stage; dialogs and the rotate notice cover the whole window. */
+html,body{margin:0;height:100%;background:var(--night-black);overflow:hidden}
+.cn-root{position:fixed;inset:0;overflow:hidden;background:var(--night-black);outline:none;
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.cn-root.cn-loading{visibility:hidden}
+.cn-ui [hidden]{display:none!important}
+.cn-stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:hidden}
+.cn-world{position:absolute;inset:0;width:100%;height:100%;display:block}
+.cn-play,.cn-title-screen{position:absolute;inset:0}
+.cn-error{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:5;max-width:90%;color:var(--night-text);font:500 14px/20px var(--font-ui)}
+.cn-hidden-input{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;font-size:16px;pointer-events:none}
 
 
-/* ---------- Holding card (step 3a only: the shell replaces it in 3b) ----------
-   Names the game in each of the kit's five font files, so a built game shows its fonts are inside it. */
-.cn-holding{box-sizing:border-box;min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:var(--space-4);
-  padding:var(--space-6) max(var(--space-6),env(safe-area-inset-right,0px)) var(--space-6) max(var(--space-6),env(safe-area-inset-left,0px))}
-.cn-holding p{margin:0}
-.cn-holding-kit{font:600 13px/18px var(--font-ui);letter-spacing:1.2px;text-transform:uppercase;color:var(--meter-label)}
-.cn-holding-name{margin:0;display:flex;flex-direction:column;font-family:var(--font-display);font-weight:700;text-transform:uppercase;color:var(--night-text)}
-.cn-holding-name .top{font-size:28px;line-height:34px;letter-spacing:0.24em}
-.cn-holding-name .main{font-size:58px;line-height:58px;letter-spacing:0.02em}
-.cn-holding-fonts{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-2) var(--space-6);font:500 17px/22px var(--font-ui);color:var(--meter-label)}
-.cn-holding-fonts b{font-weight:inherit;color:var(--night-text)}
-.cn-holding-fonts .display{font-family:var(--font-display);font-weight:700;letter-spacing:0.08em}
-.cn-holding-fonts .ui-600{font-weight:600}
-.cn-holding-fonts .zh-serif{font-family:var(--font-zh-serif);font-weight:900;font-size:22px}
-.cn-holding-fonts .zh-sans{font-family:var(--font-zh-sans);font-weight:700;font-size:22px}
-.cn-holding-note{max-width:56ch;font:500 14px/20px var(--font-ui);color:var(--meter-label)}
+/* ---------- Interface ----------
+   From the design system's components/bundle.css: lit signs over the street. Every colour, radius and shadow is a
+   token. Lightbox = every panel during and after play. Neon = the title screen only. */
+.cn-ui{font-family:var(--font-ui);color:var(--panel-ink);-webkit-font-smoothing:antialiased;box-sizing:border-box}
+.cn-ui *,.cn-ui *::before,.cn-ui *::after{box-sizing:border-box}
+:where(.cn-ui) button{font:inherit;color:inherit}
+.cn-ui :focus-visible{outline:2px solid var(--focus-dark);outline-offset:2px}
+.cn-lightbox :focus-visible{outline-color:var(--focus-light)}
+.cn-ui .cn-item.is-selected:focus-visible,.cn-ui .cn-titem.is-selected:focus-visible{outline:none}   /* the lit band or tube already marks it */
+.cn-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* screen grounds */
+.cn-scrim{position:absolute;inset:0;background:var(--scrim)}
+.cn-title-shade{position:absolute;inset:0;background:linear-gradient(90deg,var(--title-shade) 0%,rgba(6,5,4,.5) 40%,rgba(6,5,4,.12) 75%)}
+
+/* lightbox panel */
+.cn-lightbox{padding:5px;background:var(--case);border-radius:var(--radius-case);box-shadow:var(--shadow-lightbox)}
+.cn-face{display:flex;flex-direction:column;gap:var(--space-4);padding:6px var(--space-5) var(--space-5);border-radius:var(--radius-face);
+  background:linear-gradient(180deg,var(--lightbox-top) 0%,var(--lightbox-mid) 35%,var(--lightbox-low) 100%);
+  outline:1px solid var(--lightbox-line);outline-offset:-3px;color:var(--panel-ink)}
+.cn-face.is-centred{align-items:center;text-align:center}
+.cn-face.is-headless{padding-top:12px}
+.cn-header{flex:none;margin:0 -4px;align-self:stretch;min-height:54px;display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);border-bottom:1px solid var(--rule-red);color:var(--heading-red)}
+.cn-header .zh{font:900 32px/38px var(--font-zh-serif)}
+.cn-header .en{font:700 22px/26px var(--font-display);letter-spacing:3px;text-transform:uppercase}
+.cn-body{margin:0;font:500 17px/22px var(--font-ui);color:var(--panel-ink)}
+.cn-note{margin:0;font:500 14px/20px var(--font-ui);color:var(--panel-ink-2)}
+.cn-label{font:600 13px/18px var(--font-ui);letter-spacing:1.2px;text-transform:uppercase;color:var(--panel-ink-2)}
+.cn-value{font:600 17px/22px var(--font-ui);font-variant-numeric:tabular-nums;color:var(--panel-ink)}
+
+/* menu items on a lightbox: the selected one is the lit red band, and only it shows its keycap */
+.cn-menu{display:flex;flex-direction:column;gap:var(--space-1)}
+.cn-item{display:flex;align-items:center;gap:var(--space-3);width:100%;height:var(--item-height);padding:0 14px;border:none;border-radius:var(--radius-item);
+  background:transparent;color:var(--panel-ink);font:600 20px/28px var(--font-ui);text-align:left;cursor:pointer}
+.cn-item svg{width:22px;height:22px;flex:none}
+.cn-item:hover{background:var(--segment-ground)}
+.cn-item.is-selected{background:var(--band-red);color:var(--on-band);box-shadow:var(--shadow-band)}
+.cn-item:disabled{opacity:.45;cursor:default}
+.cn-item .cn-kbd{margin-left:auto}
+.cn-item.has-note{height:auto;min-height:var(--item-height);padding:8px 14px}
+.cn-item-text{display:flex;flex-direction:column}
+.cn-item.is-selected .cn-note{color:var(--on-band)}
+
+/* buttons */
+.cn-btns{flex:none;display:flex;gap:10px}
+.cn-btn{flex:none;display:flex;align-items:center;justify-content:center;gap:var(--space-3);height:var(--item-height);padding:0 18px;border:none;border-radius:var(--radius-item);
+  background:transparent;color:var(--panel-ink);font:600 20px/28px var(--font-ui);cursor:pointer;box-shadow:inset 0 0 0 1.5px var(--outline-ink)}
+.cn-btn.is-primary{background:var(--band-red);color:var(--on-band);box-shadow:var(--shadow-band)}
+.cn-btns .cn-btn{min-width:120px}
+.cn-btns .cn-btn.is-primary{flex:1}
+.cn-root:not(.cn-touch) .cn-btn.is-selected{outline:2px solid var(--focus-light);outline-offset:2px}   /* chosen with the keyboard */
+
+/* keycaps: on the lightbox face, on the red band, on the neon menu, on the dark plaque */
+.cn-kbd{display:inline-block;padding:1px 8px;border:1px solid var(--kbd-line);border-bottom-width:2px;border-radius:var(--radius-kbd);
+  background:var(--kbd-fill);color:var(--panel-ink);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.is-selected .cn-kbd,.is-primary .cn-kbd{padding:2px 8px;border:1px solid var(--on-band);border-radius:var(--radius-kbd);background:transparent;color:var(--on-band)}
+.cn-plaque .cn-kbd{border-color:var(--kbd-dark-line);background:var(--kbd-dark-fill);color:var(--night-text)}
+.cn-keys{display:flex;align-items:center;gap:6px;font:500 14px/20px var(--font-ui)}
+.cn-keys .act{margin-right:var(--space-4)}
+.cn-keys .act:last-child{margin-right:0}
+.cn-item .cn-kbd,.cn-titem .cn-kbd{display:none}
+.cn-item.is-selected .cn-kbd,.cn-titem.is-selected .cn-kbd{display:inline-block}
+.cn-touch .cn-kbd,.cn-touch .cn-item.is-selected .cn-kbd,.cn-touch .cn-titem.is-selected .cn-kbd,.cn-touch .cn-keys{display:none}   /* phones get the touch hint */
+
+/* settings rows: the row chosen with the keyboard gets the hover ground */
+.cn-row{margin:-6px -8px;padding:6px 8px;border-radius:var(--radius-item)}
+.cn-root:not(.cn-touch) .cn-row.is-selected{background:var(--segment-ground)}
+.cn-setting{display:flex;justify-content:space-between;align-items:center;gap:20px;min-height:var(--tap-min);cursor:pointer}
+.cn-setting-name{font:600 18px/24px var(--font-ui);color:var(--panel-ink)}
+.cn-vol{display:flex;flex-direction:column;gap:4px}
+.cn-vol .top{display:flex;justify-content:space-between;align-items:baseline}
+.cn-vol .cn-value{font-size:15px}
+.cn-pic{display:flex;flex-direction:column;gap:8px}
+.cn-switch{position:relative;flex:none;width:56px;height:32px;padding:0;border:none;border-radius:var(--radius-switch);background:var(--switch-off);cursor:pointer;box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
+.cn-switch::after{content:"";position:absolute;left:4px;top:4px;width:24px;height:24px;border-radius:12px;background:var(--knob-off)}
+.cn-switch[aria-checked="true"]{background:var(--band-red);box-shadow:var(--shadow-band)}
+.cn-switch[aria-checked="true"]::after{left:28px;background:var(--knob-on)}
+.cn-slider{-webkit-appearance:none;appearance:none;width:100%;height:28px;margin:0;background:transparent;cursor:pointer}
+.cn-slider::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--band-red) 0,var(--band-red) var(--v,50%),var(--switch-off) var(--v,50%),var(--switch-off) 100%)}
+.cn-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;margin-top:-8px;border-radius:50%;background:var(--knob-on);border:2px solid var(--ink-red);box-shadow:0 0 8px var(--lightbox-glow)}
+.cn-slider::-moz-range-track{height:8px;border-radius:4px;background:var(--switch-off)}
+.cn-slider::-moz-range-progress{height:8px;border-radius:4px;background:var(--band-red)}
+.cn-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--knob-on);border:2px solid var(--ink-red);box-shadow:0 0 8px var(--lightbox-glow)}
+.cn-segments{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:var(--space-1);padding:4px;border-radius:var(--radius-face);background:var(--segment-ground);box-shadow:inset 0 0 0 1px var(--outline-ink)}
+.cn-segments button{height:var(--tap-min);border:none;border-radius:var(--radius-item);background:transparent;color:var(--panel-ink);font:600 16px/22px var(--font-ui);cursor:pointer}
+.cn-segments button[aria-pressed="true"],.cn-segments button[aria-selected="true"]{background:var(--band-red);color:var(--on-band);box-shadow:var(--shadow-band)}
+.cn-tabs{flex:none}
+
+/* dark insets: wherever a number is shown */
+.cn-inset{display:flex;flex-direction:column;gap:10px;padding:12px 18px 16px;border-radius:5px;background:var(--meter-face);color:var(--meter-label)}
+.cn-inset-label{display:flex;align-items:baseline;gap:7px;color:var(--meter-label)}
+.cn-inset-label .zh{font:700 15px/18px var(--font-zh-sans)}
+.cn-inset-label .en{font:600 13px/18px var(--font-ui);letter-spacing:1.2px;white-space:pre}
+.cn-inset .cn-digits{justify-content:flex-end}
+.cn-best-line{display:flex;gap:10px;align-items:baseline}
+
+/* the New best badge: a small yellow lightbox */
+.cn-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;padding:4px 12px 5px;border-radius:var(--radius-item);
+  background:var(--face-yellow) linear-gradient(180deg,rgba(0,0,0,.06) 0%,rgba(255,255,255,.22) 40%,rgba(0,0,0,.08) 100%);color:var(--ink-black);box-shadow:var(--shadow-badge)}
+.cn-badge .zh{font:900 18px/24px var(--font-zh-serif)}
+.cn-badge .en{font:700 15px/24px var(--font-display);letter-spacing:2px;text-transform:uppercase}
+
+/* high scores */
+.cn-scores{width:100%;border-collapse:collapse;color:var(--night-text)}
+.cn-scores-wrap{padding:8px 0;border-radius:5px;background:var(--meter-face)}
+.cn-scores tr{height:30px}
+.cn-scores td{padding:0}
+.cn-scores td.rank{width:44px;padding-left:12px;font:600 15px/30px var(--font-ui);font-variant-numeric:tabular-nums;color:var(--meter-dim)}
+.cn-scores td.who{font:600 20px/30px var(--font-display);letter-spacing:2px;color:var(--night-text)}
+.cn-scores td.fare{padding-right:12px}
+.cn-scores td.fare .cn-digits{justify-content:flex-end}
+.cn-scores tr.is-new{background:var(--row-new);box-shadow:inset 0 0 0 1px var(--row-new-line)}
+.cn-scores tr.is-new td.rank{color:var(--rank-new)}
+.cn-scores-empty{margin:0;padding:12px 16px;font:500 17px/22px var(--font-ui);color:var(--meter-label)}
+
+/* initials */
+.cn-slots{display:flex;gap:14px;align-items:center}
+.cn-slot-col{display:flex;flex-direction:column;align-items:center;gap:4px}
+.cn-slot-col .chev{width:20px;height:16px;color:var(--ink-red);visibility:hidden}
+.cn-slot-col.is-selected .chev{visibility:visible}
+.cn-touch .cn-slot-col .chev{display:none}
+.cn-slot{width:72px;height:92px;padding:0;border:none;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-item);background:var(--meter-face);box-shadow:inset 0 0 0 1px var(--meter-rule);
+  font:700 60px/64px var(--font-display);color:var(--digit-on);text-shadow:0 0 10px var(--digit-glow);cursor:pointer}
+.cn-slot-col.is-selected .cn-slot{box-shadow:inset 0 0 0 2px var(--digit-on),0 0 14px var(--digit-glow)}
+.cn-slot.is-empty{color:var(--meter-dim);text-shadow:none}
+
+/* seven-segment digits (CityNights.digits builds these) */
+.cn-digits{display:flex;align-items:flex-start}
+.cn-digit{position:relative;flex:none;transform:skewX(-4.6deg)}
+.cn-seg{position:absolute;background:var(--digit-off)}
+.cn-seg.is-on{background:var(--digit-on);box-shadow:0 0 var(--glow,5px) var(--digit-glow)}
+
+/* neon: the title screen */
+.cn-neon{position:relative;background:var(--neon-board);border-radius:var(--radius-case);box-shadow:var(--shadow-board)}
+.cn-tube{position:absolute;inset:7px;border:1.5px solid var(--tube-yellow);border-radius:7px;box-shadow:var(--shadow-tube-yellow);pointer-events:none}
+.cn-tube.is-pink{inset:9px;border:2.5px solid var(--tube-pink);border-radius:8px;box-shadow:var(--shadow-tube-pink)}
+.cn-tube.is-teal{border:2px solid var(--tube-teal);border-radius:6px;box-shadow:var(--shadow-tube-teal)}
+.cn-lit-pink{color:var(--tube-core-pink);-webkit-text-stroke:1.5px var(--tube-pink);text-shadow:0 0 .07em var(--tube-pink),0 0 .22em var(--tube-pink),0 0 .52em rgba(255,69,168,.7)}
+.cn-lit-teal{color:var(--tube-core-teal);-webkit-text-stroke:1px var(--tube-teal);text-shadow:0 0 .12em var(--tube-teal),0 0 .4em var(--tube-teal),0 0 .85em rgba(63,242,223,.7)}
+.cn-lit-yellow{color:var(--tube-core-yellow);text-shadow:0 0 .18em var(--tube-yellow),0 0 .55em var(--tube-yellow),0 0 1.1em rgba(255,213,46,.6)}
+
+.cn-logo{display:flex;gap:14px;align-items:stretch}
+.cn-vsign{position:relative;width:74px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:16px 0;border-radius:var(--radius-tile)}
+.cn-vsign span{font:700 40px/50px var(--font-zh-sans)}
+.cn-logo-board{position:relative;padding:30px 44px 32px 40px;border-radius:var(--radius-board)}
+.cn-logo-name{margin:0;display:flex;flex-direction:column;align-items:flex-start;font-family:var(--font-display);font-weight:700;text-transform:uppercase;white-space:nowrap}
+.cn-logo-name .top{font-size:56px;line-height:64px;letter-spacing:.24em}
+.cn-logo-name .main{font-size:116px;line-height:108px;letter-spacing:.02em}
+
+.cn-title-menu{position:relative;width:var(--menu-width);max-width:100%;display:flex;flex-direction:column;gap:6px;padding:20px 18px}
+.cn-titem{position:relative;display:flex;align-items:center;gap:var(--space-3);width:100%;height:var(--item-height);padding:0 14px;border:2px solid transparent;border-radius:8px;
+  background:transparent;color:var(--neon-unlit);font:600 20px/28px var(--font-ui);text-align:left;cursor:pointer}
+.cn-titem svg{width:22px;height:22px;flex:none}
+.cn-titem.is-selected{border-color:var(--tube-teal);background:rgba(63,242,223,.07);color:var(--tube-core-teal);box-shadow:var(--shadow-tube-teal);text-shadow:0 0 4px var(--tube-teal),0 0 12px var(--tube-teal)}
+.cn-titem.is-selected svg{filter:drop-shadow(0 0 3px var(--tube-teal))}
+.cn-titem .cn-kbd{margin-left:auto;padding:2px 8px;border:1px solid var(--tube-teal);background:transparent;color:var(--tube-core-teal);text-shadow:none}
+
+/* icon tiles */
+.cn-tiles{display:flex;gap:var(--space-2)}
+.cn-tile{display:inline-block;width:48px;height:48px;padding:3px;border:none;border-radius:var(--radius-tile);background:var(--case);cursor:pointer;box-shadow:var(--shadow-tile)}
+.cn-tile>span{display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:7px;color:var(--ink-red);
+  background:linear-gradient(180deg,var(--lightbox-top) 0%,var(--lightbox-mid) 35%,var(--lightbox-low) 100%)}
+.cn-tile svg{width:24px;height:24px}
+.cn-tile.is-neon{position:relative;padding:0;background:var(--neon-board);box-shadow:var(--shadow-board);color:var(--tube-teal)}
+.cn-tile.is-neon>span{background:none;color:var(--tube-teal);border:1.5px solid var(--tube-teal);border-radius:7px;box-shadow:var(--shadow-tube-teal);margin:4px;width:auto;height:calc(100% - 8px)}
+.cn-tile.is-neon svg{filter:drop-shadow(0 0 3px var(--tube-teal))}
+.cn-touch .cn-tile{width:var(--tap-min);height:var(--tap-min)}
+.cn-touch .cn-tile svg{width:22px;height:22px}
+
+/* plaques: keyboard hints, touch hint, best fare */
+.cn-plaque{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:6px;background:var(--plaque);color:var(--meter-label);box-shadow:0 0 0 1px var(--meter-rule)}
+.cn-touch-hint{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);
+  font:500 13px/18px var(--font-ui);color:var(--night-text);white-space:nowrap}
+.cn-touch-hint svg{width:16px;height:16px;flex:none}
+.cn-best{display:inline-flex;align-items:center;gap:14px;padding:9px 14px 9px 16px;border-radius:6px;background:var(--meter-face);box-shadow:0 0 0 1px var(--meter-rule),0 10px 26px rgba(0,0,0,.5)}
+.cn-best .lab{display:flex;align-items:baseline;gap:6px;color:var(--meter-label)}
+.cn-best .lab .zh{font:700 15px/20px var(--font-zh-sans)}
+.cn-best .lab .en{font:600 13px/20px var(--font-ui);letter-spacing:1px;white-space:pre}
+
+
+/* ---------- Title screen ----------
+   Desktop: the column starts 56px in and 52px down, parts 22px apart; neon tiles top right; key hints bottom left.
+   When the column is too tall for the window (a phone held sideways), it goes compact: the logo shrinks to fit
+   (the script sets its zoom), the menu keeps its full size and the best fare moves beside it (Barney, 29 October 2026). */
+.cn-title-screen{box-sizing:border-box;padding:52px var(--space-6) var(--space-6) 56px}
+.cn-title-col{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:22px}
+.cn-title-row{display:flex;flex-direction:column;align-items:flex-start;gap:22px}
+.cn-title-screen.is-compact .cn-title-col{gap:var(--space-4)}
+.cn-title-screen.is-compact .cn-title-row{flex-direction:row;align-items:center;gap:var(--space-4)}
+.cn-title-tiles{position:absolute;top:var(--space-6);right:var(--space-6)}
+.cn-title-screen .cn-title-back{position:absolute;top:var(--space-6);left:var(--space-6)}
+.cn-title-screen.has-back{padding-top:calc(var(--space-6) + 48px + var(--space-4))}
+.cn-title-hints{position:absolute;left:56px;bottom:var(--space-6)}
+.cn-touch .cn-title-screen{padding:calc(var(--edge-phone) + env(safe-area-inset-top,0px)) calc(var(--edge-phone) + env(safe-area-inset-right,0px))
+  calc(var(--edge-phone) + env(safe-area-inset-bottom,0px)) calc(var(--edge-phone) + env(safe-area-inset-left,0px))}
+.cn-touch .cn-title-screen.has-back{padding-top:calc(var(--edge-phone) + env(safe-area-inset-top,0px) + var(--tap-min) + var(--space-2))}
+.cn-touch .cn-title-tiles{top:calc(var(--edge-phone) + env(safe-area-inset-top,0px));right:calc(var(--edge-phone) + env(safe-area-inset-right,0px))}
+.cn-touch .cn-title-screen .cn-title-back{top:calc(var(--edge-phone) + env(safe-area-inset-top,0px));left:calc(var(--edge-phone) + env(safe-area-inset-left,0px))}
+
+/* A browser without WebGL2: the neon logo and one line, on the dark ground (Barney, 29 October 2026) */
+.cn-nogl{position:absolute;inset:0;box-sizing:border-box;padding:52px var(--space-6) var(--space-6) 56px;display:flex;flex-direction:column;align-items:flex-start;gap:22px}
+.cn-touch .cn-nogl{padding:calc(var(--edge-phone) + env(safe-area-inset-top,0px)) calc(var(--edge-phone) + env(safe-area-inset-right,0px))
+  calc(var(--edge-phone) + env(safe-area-inset-bottom,0px)) calc(var(--edge-phone) + env(safe-area-inset-left,0px));gap:var(--space-4)}
+.cn-nogl-msg{margin:0;max-width:30em;font:500 17px/24px var(--font-ui);color:var(--night-text)}
+
+
+/* ---------- Play ----------
+   Nothing over the picture but the tiles (full screen, then pause at the edge) and, on phones, the touch hint until
+   the first move. The meter and the district caption come with the drawing tools (step 3c). */
+.cn-play-tiles{position:absolute;top:var(--space-6);right:var(--space-6)}
+.cn-touch .cn-play-tiles{top:calc(var(--edge-phone) + env(safe-area-inset-top,0px));right:calc(var(--edge-phone) + env(safe-area-inset-right,0px))}
+.cn-play .cn-touch-hint{position:absolute;left:50%;bottom:calc(12px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);pointer-events:none}
+
+
+/* ---------- Dialogs ----------
+   A lightbox centred on the scrim. Panels keep their design sizes; on a short screen the header and the buttons
+   stay put and the part between them scrolls (Barney, 29 October 2026). */
+.cn-dialog-layer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:var(--space-4)}
+.cn-touch .cn-dialog-layer,.cn-rotate{padding:calc(var(--edge-phone) + env(safe-area-inset-top,0px)) calc(var(--edge-phone) + env(safe-area-inset-right,0px))
+  calc(var(--edge-phone) + env(safe-area-inset-bottom,0px)) calc(var(--edge-phone) + env(safe-area-inset-left,0px))}
+.cn-dialog-layer>.cn-lightbox{position:relative;max-width:100%;max-height:100%;display:flex;flex-direction:column;animation:cn-rise 160ms ease-out}
+.cn-dialog-layer .cn-face{flex:1 1 auto;min-height:0}
+.cn-scroll{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;gap:inherit;align-items:inherit;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;margin:-6px -8px;padding:6px 8px}   /* room for the rows' hover ground */
+.cn-scroll>*{flex:none}
+.cn-face.is-centred .cn-scroll,.cn-face.is-centred>.cn-btn{align-self:stretch}
+
+/* the rotate notice: a phone held upright */
+.cn-rotate{position:absolute;inset:0;display:none;align-items:center;justify-content:center}
+@media (orientation:portrait){.cn-touch .cn-rotate{display:flex}}
+.cn-rotate .cn-lightbox{position:relative;width:326px;max-width:100%}
+.cn-rotate .cn-face{gap:16px;padding-bottom:24px}
+.cn-rotate .cn-header .zh{font-size:28px;line-height:34px}
+.cn-rotate .cn-header .en{font-size:20px;letter-spacing:2.5px}
+.cn-rotate-pic{width:84px;height:84px;color:var(--ink-red)}
+.cn-rotate-title{margin:0;font:600 20px/26px var(--font-ui)}
+.cn-rotate .cn-note{font-size:16px;line-height:22px}
+
+
+/* ---------- Motion ----------
+   Panels fade and rise 8px over 160 ms; under Reduce motion they only fade. */
+@keyframes cn-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes cn-fade{from{opacity:0}to{opacity:1}}
+.cn-reduce-motion .cn-dialog-layer>.cn-lightbox{animation-name:cn-fade}

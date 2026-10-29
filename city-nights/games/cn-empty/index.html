@@ -14,8 +14,8 @@
    made from the template builds with no warnings. Copy the template, not this file, to start a game.
    The kit's rules: ARCADE.md and city-nights/design-system/README.md.
    Build:  python city-nights/kit/build.py <name>   (the game is finished only when it builds with no warnings)
-   Kit 0.1 is the skeleton: it shows a holding card. The game shell (step 3b) and the drawing tools (3c)
-   will run start, update and draw; their options may still change in those steps. */
+   Kit 0.2 is the game shell over a plain dark backdrop; the drawing tools (the street, the meter) come in
+   step 3c, and draw may change then. What cn offers is listed in city-nights/kit/city-nights.js under "Public API". */
 CityNights.game({
   id: 'cn-empty',                 // the folder name: lowercase-with-hyphens; high scores are saved under it
   title: ['Empty', 'Game'],       // an invented name: a short first line, then the main line, in sentence case
@@ -24,12 +24,13 @@ CityNights.game({
   keys: [['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],   // keyboard hints: keys as printed, then the action
   touch: 'Drag to steer',         // the phone's touch hint: one line, two actions at most, joined by ' · '
 
-  // New game: build and return this game's state.
+  // New game: build and return this game's state. The fare (the score) starts at HK$0.00.
   start(cn) {
     return {};
   },
 
-  // Rules: called for every step of play.
+  // Rules: called 60 times a second during play. cn.input has the keys and touches; cn.addFare(2.5) adds
+  // HK$2.50 to the fare; cn.gameOver() ends the run (game over, then initials if the fare makes the top ten).
   update(g, cn) {
   },
 
