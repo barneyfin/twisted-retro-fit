@@ -2,8 +2,8 @@
 # build.py warns about any Chinese character in a game or the kit that is not here. Made by build.py from the
 # fonts themselves; after new fonts are copied in, run:  python city-nights/kit/build.py --characters
 # Made from:
-#   NotoSansTC-Bold-CityNights.woff2 sha256 de1391f433c453ef8a7718b037edab1e6340ba30b11dc8719eadb526ffd0812c
-#   NotoSerifTC-Black-CityNights.woff2 sha256 ea98bec5739ee8819eceb6baf62a8621f6fbb4eae9311b18443db5efdf8b1ff8
-亮佐佳便保停健光冰分利原味咀商啪地城場士夜好子定室家尖市店度康廳快戲房手找押拿換
-放敦新旺明星春時暫更最月束桑榜機橫永沙油洗涼源滿潔火燒療發的眼砰祥箭粥紀結署興茶
-藥行街衣裝角記設警資足車轟速遊運酒金錄錢錶鏡鐘長間雙餐高麵麻
+#   NotoSansTC-Bold-CityNights.woff2 sha256 6fbec849db77613ecc29c97393192167fd177cd0797c2ac99e02062c3e2545ae
+#   NotoSerifTC-Black-CityNights.woff2 sha256 e46017618ac642ba43978b524b8ae0a2123a0f63b342da6084315dac62aa6a32
+上亮佐佳便保停健光冰分利原味咀商啪地城場士夜好子定客室家尖工市店度康廳快戲房手找
+押拿換放敦新旺明易星春時暫更最月束桑榜機橫永沙油洗涼源滿潔火燒療發的眼砰碎祥程箭
+粥紀結署興茶落藥行街衣裝角記設警資足路車轟速遊運道酒金錄錢錶鏡鐘長間雙餐高麵麻

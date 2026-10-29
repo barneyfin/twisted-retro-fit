@@ -22,18 +22,29 @@
    phone before any game is rebuilt. Every screen is reached the usual way: the title, pause and settings (Esc),
    and game over, initials and high scores when Drive's TIME runs out.
    Scenes: 1 Drive (the four districts, traffic, the meter and caption, steering and braking), 2 Mong Kok (the speed
-   check: the speed test's measurement, run by itself, then again with a crash pop lit), 3 Power-ups (all five),
-   4 Crash (each vehicle, and each crash pop word in turn, then a random one), 5 Vehicles (every vehicle and colour).
-   Keys 1-5 change scene; on a phone, tap for the next one. */
+   check: the speed test's measurement, run by itself, then again with a crash pop lit and with street pieces),
+   3 Power-ups (all five), 4 Crash (each vehicle, and each crash pop word in turn, then a random one), 5 Vehicles
+   (every vehicle and colour), 6 Street (the obstacles, the animals bolting, the passengers and the stop bays).
+   Keys 1-6 change scene; on a phone, tap for the next one. */
 
-const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles'];
+const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street'];
 const NOTES = [
   'All four districts, traffic, the meter and the caption. ← → steer, ↓ brakes. TIME runs out at 00 and the run ends.',
   '',
   'The five power-ups hovering over the road, near and far.',
   'The taxi runs into each vehicle in turn: the crash pop and the brake lights.',
-  'Every vehicle in every colour, keeping pace with the taxi.'
+  'Every vehicle in every colour, keeping pace with the taxi.',
+  'Roadworks, oil, spilt cargo and a pothole; the four animals, each bolting as the taxi comes; a passenger at the pick-up bay, then the drop-off bay. ↓ slows down.'
 ];
+// Street, laid out ahead of the taxi each lap: obstacles [kind, metres ahead, lane (0 left, 1 middle, 2 right)], animals in
+// the middle lane [kind, metres ahead, the way they face and bolt], then the pick-up bay and, once it is passed, the drop-off bay
+const STREET = [['roadworks', 26, 0], ['oil', 40, 1], ['cargo', 50, 2], ['pothole', 62, 1]];
+const ANIMALS = [['boar', 76, 1], ['dog', 90, -1], ['cat', 102, 1], ['chickens', 114, -1]];
+const STOPS = [['pickup', 126], ['dropoff', 156]];
+const PASSENGERS = [['plain', 'plain'], ['case', 'with a suitcase'], ['bags', 'with shopping']];   // one kind each lap
+const BOLT_AT = 26;   // metres between the taxi and an animal when it bolts
+// the speed check's third run: pieces kept this many metres ahead of the taxi as it drives, all on screen at once
+const CHECK_PIECES = { obstacles: [['roadworks', 30, 0], ['oil', 34, 1], ['cargo', 40, 2], ['pothole', 52, 1]], animals: [['chickens', 46, -0.2], ['boar', 58, 0.3]], stop: 20 };
 // Crash: the words in turn, then one the kit picks at random; C, S, B and R choose the next
 const POPS = [['crash', 'CRASH!', 'KeyC'], ['smash', 'SMASH!', 'KeyS'], ['bang', 'BANG!', 'KeyB'], ['random', 'a random one', 'KeyR']];
 const TOKENS = ['time', 'fare', 'speed', 'shield', 'double'];
@@ -48,12 +59,15 @@ const MONG_KOK = 420.5;   // metres: just inside Mong Kok (420 to 560), where th
 /* The speed check, as the speed test ran it: the street drives through Mong Kok at 68 km/h and every gap between
    frames is recorded (the frame rate); then each frame is drawn eight times over, seven of them off screen, so the
    device can't keep up with the screen, and the gap divided by eight is the time to draw one frame. Then the same
-   again with a crash pop lit all the while (a new one each second), to show a pop costs nothing to speak of. */
+   again with a crash pop lit all the while (a new one each second), and again with street pieces on screen, to show
+   what each costs. */
 const LOADN = 8;
-const CHECK = [   // the parts in order, and how long each lasts in seconds; pop: a crash pop is lit
-  { name: 'settle', t: 0.7 }, { name: 'fps', t: 3.5 }, { name: 'rest', t: 0.4 }, { name: 'load', t: 2.5 },
-  { name: 'rest', t: 0.6, pop: true }, { name: 'fps', t: 3.5, pop: true }, { name: 'rest', t: 0.4, pop: true }, { name: 'load', t: 2.5, pop: true }
+const CHECK = [   // the parts in order and how long each lasts in seconds; run 0 is the street alone, 1 with a crash pop, 2 with pieces
+  { name: 'settle', t: 0.7, run: 0 }, { name: 'fps', t: 3.5, run: 0 }, { name: 'rest', t: 0.4, run: 0 }, { name: 'load', t: 2.5, run: 0 },
+  { name: 'rest', t: 0.6, run: 1 }, { name: 'fps', t: 3.5, run: 1 }, { name: 'rest', t: 0.4, run: 1 }, { name: 'load', t: 2.5, run: 1 },
+  { name: 'rest', t: 0.6, run: 2 }, { name: 'fps', t: 3.5, run: 2 }, { name: 'rest', t: 0.4, run: 2 }, { name: 'load', t: 2.5, run: 2 }
 ];
+const RUN_NAMES = ['', ', with a crash pop lit', ', with street pieces'];
 const fmt = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d) : '–');
 const median = (a) => { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
 const pct = (a, p) => { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
@@ -71,7 +85,7 @@ CityNights.game({
   id: 'cn-sampler',
   title: ['City Nights', 'Sampler'],
   zh: '的士',
-  keys: [['1', '5', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
+  keys: [['1', '6', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
   touch: 'Drag to steer · Tap for the next scene',
 
   start(cn) {
@@ -98,7 +112,8 @@ CityNights.game({
     // the taxi's speed, then it moves, then what the scene puts round it
     const scene = SCENES[g.scene], c = g.crash;
     taxi.speed = scene === 'Drive' ? (cn.input.down ? 4 : 16) : scene === 'Mong Kok' ? (cn.input.down ? 4 : 19)
-      : scene === 'Power-ups' ? 5 : scene === 'Vehicles' ? 6 : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
+      : scene === 'Power-ups' ? 5 : scene === 'Vehicles' ? 6 : scene === 'Street' ? (cn.input.down ? 3 : 8)
+      : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
     taxi.z += taxi.speed * dt;
     if (scene === 'Drive' || scene === 'Mong Kok') {
       for (const car of cn.street.cars) car.z += car.speed * dt;
@@ -111,6 +126,13 @@ CityNights.game({
       cn.street.tokens.forEach((t, i) => { t.z = taxi.z + (i < 5 ? 12 : 24); });
     } else if (scene === 'Vehicles') {
       cn.street.cars.forEach((car, i) => { car.z = taxi.z + LINEUP[i][0]; });
+    } else if (scene === 'Street') {
+      // each animal bolts the way it faces as the taxi comes; past a bay, the next one, and after the drop-off a new lap
+      for (const an of cn.street.animals) if (!an.bolt && cn.street.gap(taxi.z, an.z) < BOLT_AT) an.bolt = an.face;
+      const bay = cn.street.stop;
+      if (bay && cn.street.gap(taxi.z, bay.z + 10) > cn.street.length / 2) {
+        if (g.lay.stop === 0) setStop(g, cn, 1); else layStreet(g, cn, g.lay.lap + 1);
+      }
     } else {
       POPS.forEach((p, i) => { if (cn.input.keyPressed(p[2])) c.pop = i; });
       if (c.wait > 0) {
@@ -149,13 +171,14 @@ function setScene(g, cn, i) {
   g.scene = i;
   g.result = null;
   st.tokens = [];
+  clearPieces(cn);
   cn.meter.time = null;
   const scene = SCENES[i];
   if (scene === 'Drive' || scene === 'Mong Kok') {
     st.cars = g.traffic;
     if (scene === 'Mong Kok') {
-      // i: the part of CHECK under way (-1 while waiting for Automatic); runs: the frames without a pop, then with one
-      g.check = { i: -1, t: 0, prev: null, popT: 0, runs: [{ fps: [], load: [] }, { fps: [], load: [] }] };
+      // i: the part of CHECK under way (-1 while waiting for Automatic); runs: the frames of each run
+      g.check = { i: -1, t: 0, prev: null, popT: 0, runs: [0, 1, 2].map(() => ({ fps: [], load: [] })) };
       jumpTo(cn, MONG_KOK);
     }
   } else if (scene === 'Power-ups') {
@@ -164,9 +187,30 @@ function setScene(g, cn, i) {
     taxi.x = 0;
     g.crash = { i: 0, wait: 0, pop: 0 };
     placeCrasher(g, cn);
+  } else if (scene === 'Street') {
+    st.cars = [];
+    layStreet(g, cn, 0);
   } else {
     st.cars = LINEUP.map((v) => ({ z: 0, x: st.lanes[v[1]], kind: v[2], tone: v[3] }));
   }
+}
+function clearPieces(cn) {
+  cn.street.obstacles = [];
+  cn.street.animals = [];
+  cn.street.stop = null;
+}
+// Street: a lap's pieces, laid out ahead of the taxi
+function layStreet(g, cn, lap) {
+  const st = cn.street, z = st.taxi.z;
+  g.lay = { z, lap, stop: 0 };
+  st.obstacles = STREET.map(([kind, d, lane]) => ({ kind, z: z + d, x: st.lanes[lane] }));
+  st.animals = ANIMALS.map(([kind, d, dir]) => ({ kind, z: z + d, x: 0, face: dir }));
+  setStop(g, cn, 0);
+}
+function setStop(g, cn, i) {
+  const [kind, d] = STOPS[i];
+  g.lay.stop = i;
+  cn.street.stop = { kind, z: g.lay.z + d, passenger: kind === 'pickup' ? PASSENGERS[g.lay.lap % PASSENGERS.length][0] : null, waiting: true };
 }
 // moves the taxi to z (metres), taking the traffic with it so the street ahead looks the same
 function jumpTo(cn, z) {
@@ -192,24 +236,38 @@ function runCheck(g, cn, real) {
     return;
   }
   // the gap recorded belongs to the frame drawn before it, so each one is filed under the part that frame was drawn in
-  if (c.prev.name === 'fps' || c.prev.name === 'load') c.runs[c.prev.pop ? 1 : 0][c.prev.name].push(real * 1000);
+  if (c.prev.name === 'fps' || c.prev.name === 'load') c.runs[c.prev.run][c.prev.name].push(real * 1000);
   // a part ends when its time is up; a load part also waits for at least 4 frames (for 6 seconds more at most)
   c.t += real;
   const part = CHECK[c.i];
-  if (c.t >= part.t && !(part.name === 'load' && c.runs[part.pop ? 1 : 0].load.length < 4 && c.t < part.t + 6)) { c.i++; c.t = 0; }
+  if (c.t >= part.t && !(part.name === 'load' && c.runs[part.run].load.length < 4 && c.t < part.t + 6)) {
+    c.i++; c.t = 0;
+    if (CHECK[c.i] && CHECK[c.i].run !== part.run) jumpTo(cn, MONG_KOK);   // each run drives through Mong Kok from its edge
+  }
   const now = CHECK[c.i];
   if (!now) { finishCheck(g, cn); return; }
   c.prev = now;
   cn.picture.repeat = now.name === 'load' ? LOADN : 1;
-  // a crash pop a few metres ahead, a new one each second (each lasts one), so one is always lit
-  if (now.pop) {
+  const st = cn.street, z = st.taxi.z;
+  if (now.run === 1) {
+    // a crash pop a few metres ahead, a new one each second (each lasts one), so one is always lit
     c.popT -= real;
-    if (c.popT <= 0) { cn.street.crash(cn.street.taxi.z + 14, cn.street.taxi.x); c.popT = 0.95; }
+    if (c.popT <= 0) { st.crash(z + 14, st.taxi.x); c.popT = 0.95; }
+  } else if (now.run === 2) {
+    // the pieces kept ahead of the taxi, all on screen at once
+    if (!st.stop) {
+      st.obstacles = CHECK_PIECES.obstacles.map(([kind, d, lane]) => ({ kind, z: z + d, x: st.lanes[lane], d }));
+      st.animals = CHECK_PIECES.animals.map(([kind, d, x]) => ({ kind, z: z + d, x, d }));
+      st.stop = { kind: 'pickup', z: z + CHECK_PIECES.stop, passenger: 'case', waiting: true };
+    }
+    for (const p of st.obstacles.concat(st.animals)) p.z = z + p.d;
+    st.stop.z = z + CHECK_PIECES.stop;
   }
 }
 function stopCheck(g, cn, why) {
   g.check = null;
   cn.picture.repeat = 1;
+  clearPieces(cn);
   if (why) g.result = [why, ''];
 }
 // a run's frame rate, the slowest 1 frame in 20, and the time to draw a frame; if the device kept up with the screen
@@ -219,12 +277,13 @@ function score(run) {
   return { avg: run.fps.length / (tot / 1000), slow: pct(run.fps, 0.95), cost: median(run.load) / LOADN, sat: median(run.load) > median(run.fps) * 1.3 };
 }
 function finishCheck(g, cn) {
-  const c = g.check, p = cn.picture, [a, b] = c.runs.map(score), both = [a, b];
+  const c = g.check, p = cn.picture, all = c.runs.map(score), [a, b, d] = all;
   stopCheck(g, cn);
-  const phone = both.every((r) => r.avg >= 29.5 && r.cost <= 25) ? 'pass' : 'below', computer = both.every((r) => r.avg >= 58) ? 'pass' : 'below';
+  const phone = all.every((r) => r.avg >= 29.5 && r.cost <= 25) ? 'pass' : 'below', computer = all.every((r) => r.avg >= 58) ? 'pass' : 'below';
   const ms = (r) => (r.sat ? 'about ' : 'under ') + '<b>' + fmt(r.cost, 1) + ' ms</b>';
   g.result = [
-    '<b>' + fmt(a.avg) + ' fps</b> in Mong Kok, each frame drawn in ' + ms(a) + '; slowest 1 in 20 came ' + fmt(a.slow) + ' ms apart. With a crash pop lit: <b>' + fmt(b.avg) + ' fps</b>, ' + ms(b) + '.',
+    '<b>' + fmt(a.avg) + ' fps</b> in Mong Kok, each frame drawn in ' + ms(a) + '; slowest 1 in 20 came ' + fmt(a.slow) + ' ms apart. With a crash pop lit: <b>' + fmt(b.avg) + ' fps</b>, ' + ms(b) +
+      '. With street pieces: <b>' + fmt(d.avg) + ' fps</b>, ' + ms(d) + '.',
     'Phone target (30 fps, 25 ms): <b>' + phone + '</b> · Computer target (60 fps): <b>' + computer + '</b> · ' + popMade(p) + ' · ' + p.width + ' × ' + p.height + ', ' + (p.smoothing ? p.smoothing + '× smoothing' : 'no smoothing') + ' · ' + browserName() + ' · ' + (p.chip || 'unknown chip')
   ];
 }
@@ -237,16 +296,18 @@ function showReadout(g, cn) {
   const picName = { auto: 'Automatic', best: 'Best', faster: 'Faster', fastest: 'Fastest' };
   const pic = 'Picture: ' + picName[p.setting] + (p.setting === 'auto' ? (p.deciding ? ' (timing…)' : ' (' + picName[p.level] + ')') : '') +
     ' · ' + p.width + ' × ' + p.height + ', ' + (p.smoothing ? p.smoothing + '× smoothing' : 'no smoothing');
-  let note = cn.touch ? NOTES[g.scene].replace('← → steer, ↓ brakes', 'Drag to steer') : NOTES[g.scene], extra = pic;
+  let note = cn.touch ? NOTES[g.scene].replace('← → steer, ↓ brakes', 'Drag to steer').replace(' ↓ slows down.', '') : NOTES[g.scene], extra = pic;
   if (scene === 'Mong Kok') {
     const c = g.check, part = c && CHECK[c.i];
     if (g.result) { note = g.result[0]; extra = g.result[1] || pic; }
     else if (!part) note = 'Speed check: waiting for Automatic to finish timing the picture…';
     else {
       const timing = part.name === 'load' || (part.name === 'rest' && CHECK[c.i - 1].name === 'fps');
-      note = 'Speed check' + (part.pop ? ', with a crash pop lit' : '') + ': ' + (timing ? 'timing a frame. The picture slows down on purpose.'
-        : 'measuring every frame. Leave the page alone for about ' + (part.pop ? 7 : 14) + ' seconds.');
+      note = 'Speed check' + RUN_NAMES[part.run] + ': ' + (timing ? 'timing a frame. The picture slows down on purpose.'
+        : 'measuring every frame. Leave the page alone for about ' + (21 - part.run * 7) + ' seconds.');
     }
+  } else if (scene === 'Street') {
+    note += ' Passenger: ' + PASSENGERS[g.lay.lap % PASSENGERS.length][1] + '.';
   } else if (scene === 'Crash') {
     const next = POPS[g.crash.pop][1];
     note += ' Next: ' + next + (cn.touch ? (next.endsWith('!') ? '' : '.') : ' (C, S or B for a word, R for a random one).');

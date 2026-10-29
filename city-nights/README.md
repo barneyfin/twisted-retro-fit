@@ -26,14 +26,14 @@ Until the City Nights skill is written (phase 5), start from the template:
 
 1. Copy `kit\template.html` to `games\<name>\index.html` (lowercase, hyphens, and not the name of a Retro Kit game).
 2. Change `id` to the folder name, give it a `title`, and if it has a Chinese name, check every word is on the word list (`design-system\words.md`) first. A new word goes to Barney's Claude app project, where the word list lives and the fonts are re-cut.
-3. Write the game's rules in `start()` and `update()`. The kit draws the street every frame; the game only moves what is on it (`cn.street`: the taxi, the traffic, the power-ups, a crash) and sets the meter's time (`cn.meter`). The fare is the score. Everything a game can use is listed in `kit\city-nights.js` under "Public API".
+3. Write the game's rules in `start()` and `update()`. The kit draws the street every frame; the game only moves what is on it (`cn.street`: the taxi, the traffic, the power-ups, obstacles, animals, the stop bay and its passenger, a crash) and sets the meter's time (`cn.meter`). The fare is the score. Everything a game can use is listed in `kit\city-nights.js` under "Public API".
 4. Build it with the command above.
 
 The template, as it is, drives up the street through traffic: a working game to start from.
 
 ## The test page
 
-`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **5** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate and the picture it is drawing.
+`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **6** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate and the picture it is drawing.
 
 | Scene | What it shows |
 |---|---|
@@ -42,14 +42,15 @@ The template, as it is, drives up the street through traffic: a working game to 
 | 3 Power-ups | The five power-up signs (時 錢 快 保 雙), near and far. |
 | 4 Crash | The taxi runs into each kind of vehicle in turn: the crash pop and the brake lights. The words come in turn, CRASH!, SMASH!, BANG!, then one the kit picks at random (as a game gets it); press C, S or B to choose the next word, R for a random one. The plaque shows how long the crash pop's three words took to draw. |
 | 5 Vehicles | Every vehicle in every colour, keeping pace with the taxi. |
+| 6 Street | The street's pieces, laid out ahead of the taxi each lap: roadworks closing the left lane, an oil slick, spilt cargo and a flooded pothole; the wild boar, the stray dog, the street cat and the market chickens, each bolting for the kerb as the taxi comes; a passenger waving at the pick-up bay (plain, with a suitcase, then with shopping, one each lap), then the drop-off bay. ↓ slows down. |
 
 Pause (Esc, or the pause tile) and Settings work as in any game, so every screen can be seen. After changing anything in `kit\`, rebuild every City Nights game and look through this page before anything else.
 
 ## The speed check
 
-Scene 2 repeats the speed test's Mong Kok measurement, now on the finished kit. It starts by itself: the taxi goes to the edge of Mong Kok and drives through it at 68 km/h for about 14 seconds. For the first part every frame is timed (the frame rate); for the next 3 seconds each frame is drawn eight times over, so the picture slows down on purpose while it works out how long one frame takes to draw. Then it does both again with a crash pop lit all the while (a new one each second), to show that a pop doesn't slow play down. Leave the page alone until the plaque shows the result.
+Scene 2 repeats the speed test's Mong Kok measurement, now on the finished kit. It starts by itself: the taxi goes to the edge of Mong Kok and drives through it at 68 km/h, three times, about 21 seconds in all. For the first part every frame is timed (the frame rate); for the next 3 seconds each frame is drawn eight times over, so the picture slows down on purpose while it works out how long one frame takes to draw. The second run does the same with a crash pop lit all the while (a new one each second), and the third with street pieces on screen: roadworks, oil, spilt cargo, a pothole, the chickens and the boar, and a passenger at the pick-up bay. Each run starts again from the edge of Mong Kok, so all three are measured on the same street. Leave the page alone until the plaque shows the result.
 
-Close any other copy of the page first (two copies fight over the graphics chip), and use Chrome. The result names the frame rate and the time to draw a frame, without and with a crash pop; whether each target passes (on both runs); how long the crash pop's three words took to draw; the picture size and smoothing, the browser and the graphics chip. The targets, as in the speed test:
+Close any other copy of the page first (two copies fight over the graphics chip), and use Chrome. The result names the frame rate and the time to draw a frame for each run (the street alone, with a crash pop, with street pieces); whether each target passes (on all three runs); how long the crash pop's three words took to draw; the picture size and smoothing, the browser and the graphics chip. The targets, as in the speed test:
 
 - **Phone**: at least 30 frames a second, and each frame drawn in 25 ms or less.
 - **Computer**: 60 frames a second.
@@ -58,7 +59,7 @@ The crash pop's words are slow to draw (each has up to 15 glows), so the kit dra
 
 The check waits until Automatic (below) has finished timing the picture. To run it again, press 2, or tap through the scenes back to it.
 
-Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips while each frame is drawn eight times (twice in the check, 3 seconds each); the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
+Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips while each frame is drawn eight times (three times in the check, 3 seconds each); the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
 
 ### Results, 29 October 2026 (kit 0.4, Mong Kok, Chrome 156)
 
@@ -69,7 +70,7 @@ Check that the result names the device's own graphics chip. "Microsoft Basic Ren
 
 Both match the speed test (computer under 2.1 ms, Pixel about 3.1 ms), and Automatic kept Best on both. In both runs the slowest 1 frame in 20 came 17 ms after the one before, one refresh of a 60 Hz screen.
 
-Kit 0.5 (the smoke-cloud crash pop) added the run with a crash pop lit and the words' drawing time; neither has been measured on these devices yet.
+Kit 0.5 (the smoke-cloud crash pop) added the run with a crash pop lit and the words' drawing time, and kit 0.6 the run with street pieces; none of these has been measured on these devices yet.
 
 ## Picture: Automatic, Best, Faster, Fastest
 
@@ -85,7 +86,7 @@ Under Settings. **Best** is 4× edge smoothing at full sharpness (up to 1.5 canv
 | `design-system\` | A copy of the approved design system (the spec): tokens, components, the word list, the fonts |
 | `speed-test\` | Phase 1's WebGL2 speed test, kept as it is |
 | `kit\city-nights.css` | The look: colours, fonts, lightbox and neon signs |
-| `kit\city-nights.js` | The kit: the street and everything on it, the game shell, sound, saving, the Picture setting. The crash pop's drawings and the code that draws them are copied unchanged from the design system (`design-system\components\bundle.js`) |
+| `kit\city-nights.js` | The kit: the street and everything on it, the game shell, sound, saving, the Picture setting. The crash pop's drawings, the street's pieces and the code that draws them are copied unchanged from the design system (`design-system\components\bundle.js`) |
 | `kit\build.py` | Turns a game's source into one playable file, and checks it against the rules |
 | `kit\template.html` | Starting point for a new game |
 | `kit\fonts\`, `kit\licences\` | The six font files and their licences (SIL Open Font License: free to embed in games); Bangers is for the crash pop's letters only. `fonts\characters.txt` lists the Chinese characters the fonts hold, for the build's check |
