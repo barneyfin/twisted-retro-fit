@@ -1,4 +1,4 @@
-/* City Nights 0.6.1 — runtime
+/* City Nights 0.7.0 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.6.1';
+  const VERSION = '0.7.0';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -400,6 +400,44 @@
      The World layer: the street drawn with WebGL2 (the City Nights speed test's, city-nights/speed-test/src), the meter
      and the district caption on their own small canvas, and the crash pop over the picture. makeStreet is given the
      canvases, the WebGL2 context and the kit's colours, and hands back the tools the shell and the game use. */
+
+  /* What the kit puts on the graphics chip, for the test page: every buffer, texture and render buffer the context is
+     given, in bytes, worked out from the sizes asked for (mipmaps add a third). It watches the context's own calls, so
+     nothing the kit allocates is missed; it is a count of what was asked for, not what the driver really uses. */
+  function countGPU(gl) {
+    const sizes = { buffer: new Map(), texture: new Map(), renderbuffer: new Map() };
+    const bound = { array: null, vao: null, unit: 0, rb: null }, vaoElem = new Map(), unitTex = [];
+    const BPP = { [gl.RGBA8]: 4, [gl.RGBA]: 4, [gl.RGBA16F]: 8, [gl.RGBA32F]: 16, [gl.R8]: 1, [gl.RG8]: 2, [gl.R16F]: 2, [gl.R32F]: 4, [gl.DEPTH_COMPONENT24]: 4, [gl.DEPTH24_STENCIL8]: 4, [gl.DEPTH_COMPONENT16]: 2 };
+    const bpp = (f) => BPP[f] || 4;
+    const texOf = (target) => (unitTex[bound.unit] || {})[target] || null;
+    const watch = (name, fn) => { const f = gl[name]; gl[name] = function () { fn.apply(null, arguments); return f.apply(gl, arguments); }; };
+    watch('bindBuffer', (t, b) => { if (t === gl.ARRAY_BUFFER) bound.array = b; else if (t === gl.ELEMENT_ARRAY_BUFFER) vaoElem.set(bound.vao, b); });
+    watch('bindVertexArray', (v) => { bound.vao = v; });
+    watch('bufferData', (t, d) => {
+      const b = t === gl.ARRAY_BUFFER ? bound.array : t === gl.ELEMENT_ARRAY_BUFFER ? vaoElem.get(bound.vao) : null;
+      if (b) sizes.buffer.set(b, typeof d === 'number' ? d : (d && d.byteLength) || 0);
+    });
+    watch('deleteBuffer', (b) => { sizes.buffer.delete(b); });
+    watch('activeTexture', (u) => { bound.unit = u - gl.TEXTURE0; });
+    watch('bindTexture', (t, x) => { (unitTex[bound.unit] = unitTex[bound.unit] || {})[t] = x; });
+    watch('texStorage2D', (t, lv, f, w, h) => { const x = texOf(t); if (x) sizes.texture.set(x, w * h * bpp(f) * (lv > 1 ? 4 / 3 : 1)); });
+    watch('texStorage3D', (t, lv, f, w, h, d) => { const x = texOf(t); if (x) sizes.texture.set(x, w * h * d * bpp(f) * (lv > 1 ? 4 / 3 : 1)); });
+    watch('texImage2D', function (t, level, f) {
+      const a = arguments, x = texOf(t); if (!x || level) return;
+      const src = a.length === 6 ? a[5] : null, w = src ? src.width : a[3], h = src ? src.height : a[4];
+      sizes.texture.set(x, (w || 0) * (h || 0) * bpp(f));
+    });
+    watch('generateMipmap', (t) => { const x = texOf(t); if (x && sizes.texture.has(x)) sizes.texture.set(x, sizes.texture.get(x) * 4 / 3); });
+    watch('deleteTexture', (x) => { sizes.texture.delete(x); });
+    watch('bindRenderbuffer', (t, r) => { bound.rb = r; });
+    watch('renderbufferStorage', (t, f, w, h) => { if (bound.rb) sizes.renderbuffer.set(bound.rb, w * h * bpp(f)); });
+    watch('renderbufferStorageMultisample', (t, s, f, w, h) => { if (bound.rb) sizes.renderbuffer.set(bound.rb, w * h * bpp(f) * Math.max(1, s)); });
+    watch('deleteRenderbuffer', (r) => { sizes.renderbuffer.delete(r); });
+    const mb = (m, only) => { let n = 0; m.forEach((v, k) => { if (!only || only.has(k)) n += v; }); return n / 1048576; };
+    // megabytes: buffers, textures and render buffers in all, and of the buffers those in `street` (the street's shapes)
+    return { mb: (street) => ({ buffers: mb(sizes.buffer), textures: mb(sizes.texture), renderbuffers: mb(sizes.renderbuffer), street: street ? mb(sizes.buffer, street) : 0 }) };
+  }
+
   function makeStreet(env) {
     /* ================================================================ the street, from the City Nights speed test (round 9, signed off 28 October 2026):
        helpers, the signs and words, the look, the track and its buildings, people, traffic, and the sign, figure and vehicle
@@ -497,11 +535,15 @@
 
     /* ================================================================ world */
     const ROAD = 2000, PAVE = 700, BLD = ROAD + PAVE, UPM = 400;
-    const SEG = 200, N_SEG = 1120, TRACK = SEG * N_SEG, DRAW = 175;
+    // each district is district-length, 3.7 km (Barney, 30 October 2026): 7,400 segments of half a metre, the street 14.8 km
+    const SEG = 200, DIST_M = 3700, DIST_LEN = DIST_M * UPM / SEG, N_SEG = DIST_LEN * DISTRICTS.length, TRACK = SEG * N_SEG, DRAW = 175;
+    // the street is planned whole when it is built, but its shapes are made a piece at a time as the taxi drives: CHUNK
+    // segments (25 m) to a piece, NCH pieces kept on the graphics chip, from the camera on (DRAW needs 5 of them at most)
+    const CHUNK = 50, NCH = 8, N_CHUNK = Math.ceil(N_SEG / CHUNK);
+    const TRAFFIC_SPAN = 560 * UPM;   // the stretch round the taxi that street.traffic and street.recycle keep the traffic in: the old street's lap
     const CAM_H = 950, DEPTH = 1 / Math.tan(50 * Math.PI / 180), PLAYER_Z = CAM_H * DEPTH;
     const HZ = 0.40, CAB_Y = 0.9, SHOP_H = 1000;
     const LANES = [-0.667, 0, 0.667];
-    const DIST_LEN = N_SEG / DISTRICTS.length;
     let segs = [], buildings = [];
 
     // what fills the ground floor, by district: Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok
@@ -531,10 +573,15 @@
       const r = rng(1979);
       const plan = [[90,0],[60,2.4],[70,0],[80,-3.2],[90,0],[50,1.6],[80,-1.8],[70,0],[60,3],[100,0],[70,-2.6],[60,0],[50,1.2],[70,-1.2],[120,0]];
       const curves = [];
-      plan.forEach(([n, c]) => { for (let k = 0; k < n; k++) curves.push(c ? c * Math.sin(Math.PI * k / n) : 0); });
-      while (curves.length < N_SEG) curves.push(0);
+      // the first 560 m bend as the old street did; after that the same bends again and again, each one a little
+      // sharper or gentler and to either side (from a stream of its own, so the rest of the street is picked as before)
+      const rc = rng(1980);
+      for (let lap = 0; curves.length < N_SEG; lap++) plan.forEach(([n, c]) => {
+        const k1 = lap && c ? (0.7 + 0.5 * rc()) * (rc() < 0.5 ? -1 : 1) : 1;
+        for (let k = 0; k < n; k++) curves.push(c ? c * k1 * Math.sin(Math.PI * k / n) : 0);
+      });
       curves.length = N_SEG;
-      segs = curves.map((c, i) => ({ i, curve: c, signs: [], lamp: 0, people: [], cable: 0, wall: [null, null], junc: false, cross: false, lights: 0 }));
+      segs = curves.map((c, i) => ({ i, curve: c, signs: [], lamp: 0, cable: 0, wall: [null, null], junc: false, cross: false, lights: 0 }));
       // side streets
       for (let i = 60; i < N_SEG - 12; i += 120 + Math.floor(r() * 50)){
         for (let k = 0; k < 7; k++) segs[i + k].junc = true;
@@ -628,7 +675,7 @@
     }
 
     // people walking along the pavements, and small groups waiting at the crossings
-    let peds = [];
+    let peds = [], viewPos = 0;   // viewPos: where the last picture was drawn from
     function buildPeople(){
       const r = rng(515); peds = [];
       for (let i = 0; i < N_SEG; i++){
@@ -640,6 +687,20 @@
         }
         if (segs[i].cross) for (let q = 0; q < 5; q++) peds.push({ z: i * SEG - 250 + r() * 350, side: q % 2 ? 1 : -1, off: 80 + r() * 300, v: Math.floor(r() * 6), hs: 0.9 + r() * 0.18, dir: 1, speed: 0, phase: 0 });
       }
+      // on a 15 km street only the people near the camera walk and are drawn: each keeps to the 30 m either side of
+      // where it started (z0), so they can be found by that, in order along the street
+      for (const p of peds){ p.z = (p.z + TRACK) % TRACK; p.z0 = p.z; }
+      peds.sort((a, b) => a.z0 - b.z0);
+    }
+    const PED_ROAM = 30 * UPM;
+    // fn(p) for each person who may be between from and to (street units, round the lap)
+    function pedsNear(from, to, fn){
+      const at = z => { let lo = 0, hi = peds.length; while (lo < hi){ const m = (lo + hi) >> 1; if (peds[m].z0 < z) lo = m + 1; else hi = m; } return lo; };
+      from -= PED_ROAM; to += PED_ROAM;
+      if (to - from >= TRACK){ for (const p of peds) fn(p); return; }
+      const a = ((from % TRACK) + TRACK) % TRACK, b = a + (to - from);
+      if (b <= TRACK){ for (let k = at(a), e = at(b); k < e; k++) fn(peds[k]); }
+      else { for (let k = at(a); k < peds.length; k++) fn(peds[k]); for (let k = 0, e = at(b - TRACK); k < e; k++) fn(peds[k]); }
     }
 
     let cars = [];
@@ -1280,7 +1341,7 @@
       // suspension: a slow float over the road, a quicker patter, and a little vibration; the body rolls to the
       // outside of a lane change, lifts at the back under braking and squats as it pulls away
       // Reduce motion: no roll, and the float, pitch and vibration eased right down
-      const p = st.pos, on = st.moving ? 1 : 0, calm = reduceMotion ? 0.35 : 1;
+      const p = st.trip || 0, on = st.moving ? 1 : 0, calm = reduceMotion ? 0.35 : 1;   // trip: how far it has driven, so a jump along the street doesn't jolt it
       const bob = on * calm * (Math.sin(p * 0.0021) * 0.75 + Math.sin(p * 0.0063 + 1.3) * 0.4 + Math.sin(p * 0.031) * 0.14);
       return { bob, roll: reduceMotion ? 0 : -clamp(st.lean, -1, 1) * 0.05, pitch: (-st.brake * 1.8 + st.accel * 0.9) * calm, vib: on * calm * Math.sin(p * 0.05) * 0.12 };
     }
@@ -1336,6 +1397,7 @@
     const canvas = env.canvas, hudC = env.hud, hctx = hudC.getContext('2d');
     let W = 960, H = 540, RS = 1, PW = 960, PH = 540, K = 480;
     const gl = env.gl;
+    const gpu = countGPU(gl);
     const cabGrain = true, cabRefl = true;
     const Z = { white: ZONES.white, sky: ZONES.sky, sign: 0, cars: ZONES.cars, cab: ZONES.cabSome };
 
@@ -1362,8 +1424,11 @@
        20 col   4 x uint8   normalised, straight alpha
        24 info  4 x uint8   integer: texture slot, level (or line minimum width x10), flags, furthest segment
        28 off   2 x int16   line half-width offset, in quarter world units */
+    // A recorder holds one piece of the street (CHUNK segments from segment c0): each vertex carries its segment's place
+    // in the piece, and segStart where each segment's triangles begin (the piece is recorded far to near)
     class Rec {
-      constructor(cap){ this.cap = cap || 4096; this.buf = new ArrayBuffer(this.cap * 32); this.views(); this.nv = 0; this.idx = new Uint32Array(this.cap * 2); this.ni = 0; this.segStart = new Int32Array(N_SEG); }
+      constructor(cap){ this.cap = cap || 4096; this.buf = new ArrayBuffer(this.cap * 32); this.views(); this.nv = 0; this.idx = new Uint32Array(this.cap * 2); this.ni = 0; this.c0 = 0; this.segStart = new Int32Array(CHUNK); }
+      reset(c0){ this.nv = 0; this.ni = 0; this.c0 = c0; this.segStart.fill(0); }
       views(){ this.f32 = new Float32Array(this.buf); this.u16 = new Uint16Array(this.buf); this.u8 = new Uint8Array(this.buf); this.i16 = new Int16Array(this.buf); }
       need(nv, ni){
         if (this.nv + nv > this.cap){ let c = this.cap; while (this.nv + nv > c) c *= 2; const nb = new ArrayBuffer(c * 32); new Uint8Array(nb).set(this.u8); this.buf = nb; this.cap = c; this.views(); }
@@ -1378,7 +1443,7 @@
         this.i16[h + 14] = ox || 0; this.i16[h + 15] = oy || 0;
         return k;
       }
-      begin(i){ this.seg = i; this.segStart[i] = this.ni; }
+      begin(i){ this.seg = i - this.c0; this.segStart[this.seg] = this.ni; }
       // four corners, each [t, across, up], in order round the edge; texture from s.uv (top-left, top-right, bottom-right, bottom-left) or uvs
       quad(P, s, uvs){
         this.need(4, 6);
@@ -1490,8 +1555,7 @@
       atlasPack();
     }
 
-    /* ================================================================ building the street, once */
-    const R = {};
+    /* ================================================================ building the street, a piece at a time */
     function band(Rq, wx, y0, y1, s, t0 = 0, t1 = 1){ Rq.quad([[t0, wx, y0], [t1, wx, y0], [t1, wx, y1], [t0, wx, y1]], s); }
     function emitRoad(Rd, Dc, i){
       const seg = segs[i], white = { lv: Z.white, fl: FL.LEV | FL.GND };
@@ -1771,27 +1835,75 @@
       for (let q = 0; q <= 20; q++){ const u = q / 20, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), d = u * u; pts.push([a * -BLD + d * BLD, a * c + b * (c - 380) + d * (c + 120)]); }
       Tq.line(pts, 11, 0.6, S(LOOK.pole, { mx: 140 }));
     }
+    // one segment's shapes, into the recorders R (the road, the decals on it, the buildings, and the signs, lamps and cables)
+    function emitSeg(R, i){
+      for (const k in R) R[k].begin(i);
+      const seg = segs[i];
+      emitRoad(R.road, R.decal, i);
+      if (seg.junc) emitJunction(R.bld, i);
+      for (let side = 0; side < 2; side++){ const wd = seg.wall[side]; if (wd && wd.k === 0 && segs[(i + N_SEG - 1) % N_SEG].junc) emitEndFace(R.bld, side ? 1 : -1, wd.b); }
+      emitSlice(R.bld, i, 0); emitSlice(R.bld, i, 1);
+      if (seg.lights) emitLights(R.bld, R.tr, i);
+      if (seg.lamp) emitLamp(R.bld, R.tr, i);
+      for (const s of seg.signs) emitSign(R.tr, s);
+      if (seg.cable) emitCable(R.tr, i);
+    }
+    /* The street's shapes, a piece at a time. A street 15 km long, made whole, would need about 275 MB of the graphics
+       chip, so only NCH pieces of CHUNK segments are kept there: the stretch from the camera on. The next piece ahead is
+       recorded a millisecond a frame while the taxi drives; a piece the picture needs at once (the first ones, or after
+       a jump) is recorded there and then. Each piece has its own buffers for the four kinds of shape. */
+    const REC_KEYS = ['road', 'decal', 'bld', 'tr'], PIECE_MS = 1;
+    const pieces = [];                          // NCH slots: { c: the piece's number along the street (-1: none), and per kind { vbo, ibo, vao, segStart, ni } }
+    const maker = { c: -1, i: 0, R: null };    // the piece being recorded, and its next segment (recorded far to near)
+    const streetBufs = new Set();               // the pieces' buffers, for the test page's count of graphics memory
+    const streetCost = { buildMs: 0, planMs: 0, firstMs: 0, readyAt: 0, shownAt: 0, pieceMs: 0, pieces: 0 };
     function buildStreet(){
-      R.road = new Rec(1 << 15); R.decal = new Rec(1 << 12); R.bld = new Rec(1 << 18); R.tr = new Rec(1 << 15);
-      for (let i = N_SEG - 1; i >= 0; i--){
-        for (const k in R) R[k].begin(i);
-        const seg = segs[i];
-        emitRoad(R.road, R.decal, i);
-        if (seg.junc) emitJunction(R.bld, i);
-        for (let side = 0; side < 2; side++){ const wd = seg.wall[side]; if (wd && wd.k === 0 && segs[(i + N_SEG - 1) % N_SEG].junc) emitEndFace(R.bld, side ? 1 : -1, wd.b); }
-        emitSlice(R.bld, i, 0); emitSlice(R.bld, i, 1);
-        if (seg.lights) emitLights(R.bld, R.tr, i);
-        if (seg.lamp) emitLamp(R.bld, R.tr, i);
-        for (const s of seg.signs) emitSign(R.tr, s);
-        if (seg.cable) emitCable(R.tr, i);
+      pieces.length = 0; streetBufs.clear();
+      for (let s = 0; s < NCH; s++){
+        const p = { c: -1 };
+        for (const k of REC_KEYS){
+          const vbo = gl.createBuffer(), ibo = gl.createBuffer();
+          p[k] = { vbo, ibo, vao: makeVAO(vbo, ibo), segStart: new Int32Array(CHUNK), ni: 0 };
+          gl.bindVertexArray(null); streetBufs.add(vbo); streetBufs.add(ibo);
+        }
+        pieces.push(p);
       }
-      for (const k in R){
-        const r = R[k];
-        r.vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, r.vbo); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(r.buf, 0, r.nv * 32), gl.STATIC_DRAW);
-        r.ibo = gl.createBuffer(); r.vao = makeVAO(r.vbo, r.ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, r.idx.subarray(0, r.ni), gl.STATIC_DRAW);
-        gl.bindVertexArray(null);
-        r.buf = null; r.views = null; r.f32 = r.u16 = r.u8 = r.i16 = null; r.idx = null;
+      maker.R = { road: new Rec(1 << 11), decal: new Rec(1 << 9), bld: new Rec(1 << 14), tr: new Rec(1 << 11) };
+      maker.c = -1;
+    }
+    const pieceAt = c => { for (const p of pieces) if (p.c === c) return p; return null; };
+    const pieceLen = c => Math.min(CHUNK, N_SEG - c * CHUNK);
+    function startPiece(c){ maker.c = c; maker.i = c * CHUNK + pieceLen(c) - 1; for (const k of REC_KEYS) maker.R[k].reset(c * CHUNK); }
+    // records the piece under way until performance.now() passes `until`; once it is whole, it goes to the graphics chip
+    // in a slot whose piece is not wanted (keep(c): whether piece c is one of those from the camera on)
+    function recordPiece(until, keep){
+      const c0 = maker.c * CHUNK, t0 = performance.now();
+      while (maker.i >= c0){ emitSeg(maker.R, maker.i--); if (performance.now() > until) break; }
+      streetCost.pieceMs += performance.now() - t0;
+      if (maker.i >= c0) return;
+      const slot = pieces.find(p => p.c < 0) || pieces.find(p => !keep(p.c)) || pieces[0];
+      for (const k of REC_KEYS){
+        const r = maker.R[k], d = slot[k];
+        gl.bindBuffer(gl.ARRAY_BUFFER, d.vbo); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(r.buf, 0, r.nv * 32), gl.DYNAMIC_DRAW);
+        gl.bindVertexArray(d.vao); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, r.idx.subarray(0, r.ni), gl.DYNAMIC_DRAW); gl.bindVertexArray(null);
+        d.segStart.set(r.segStart); d.ni = r.ni;
       }
+      slot.c = maker.c; maker.c = -1; streetCost.pieces++;
+    }
+    // before a picture from segment `base`: the pieces it needs, made now if they are missing; then, once a frame
+    // (ahead: the picture on screen), a millisecond of the next piece ahead that is not made yet
+    function streetPieces(base, ahead){
+      const c0 = Math.floor(base / CHUNK), need = Math.floor((base + DRAW - 1) / CHUNK) - c0 + 1;
+      const keep = c => ((c - c0) % N_CHUNK + N_CHUNK) % N_CHUNK < NCH;
+      for (let j = 0; j < need; j++){
+        const c = (c0 + j) % N_CHUNK; if (pieceAt(c)) continue;
+        if (maker.c !== c) startPiece(c);
+        recordPiece(Infinity, keep);
+      }
+      if (!ahead) return;
+      if (maker.c >= 0 && !keep(maker.c)) maker.c = -1;
+      if (maker.c < 0) for (let j = need; j < NCH; j++){ const c = (c0 + j) % N_CHUNK; if (!pieceAt(c)){ startPiece(c); break; } }
+      if (maker.c >= 0) recordPiece(performance.now() + PIECE_MS, keep);
     }
     function makeVAO(vbo, ibo){
       const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -2117,7 +2229,7 @@
       dynEnd('streaks');
       // people, far to near, each with the ghost copies the long exposure leaves
       pedList.length = 0;
-      for (const p of peds){ const rel = (p.z - st.pos + TRACK) % TRACK; if (rel < 1800 || rel > 95 * SEG) continue; pedList.push(p); p._rel = rel; }
+      pedsNear(st.pos, st.pos + 95 * SEG, p => { const rel = (p.z - st.pos + TRACK) % TRACK; if (rel < 1800 || rel > 95 * SEG) return; pedList.push(p); p._rel = rel; });
       pedList.sort((a, b) => b._rel - a._rel);
       dynBegin('peds');
       for (const p of pedList){
@@ -2245,12 +2357,18 @@
       gl.uniform3fv(p.u.uRoad0, GRAD[0]); gl.uniform3fv(p.u.uRoad1, GRAD[1]); gl.uniform3fv(p.u.uPave0, GRAD[2]); gl.uniform3fv(p.u.uPave1, GRAD[3]);
       gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uRS, RS); gl.uniform1f(p.u.uPH, PH); gl.uniform1f(p.u.uHz, H * HZ);
     }
-    function drawStatic(r, base){
-      gl.bindVertexArray(r.vao);
-      const segEnd = i => i > 0 ? r.segStart[i - 1] : r.ni, hi = base + DRAW - 1;
-      const draw = (a, b) => { if (b > a) gl.drawElements(gl.TRIANGLES, b - a, gl.UNSIGNED_INT, a * 4); };
-      if (hi < N_SEG) draw(r.segStart[hi], segEnd(base));
-      else { draw(r.segStart[hi - N_SEG], r.ni); draw(0, segEnd(base)); }
+    // one kind of shape (k: 'road', 'decal', 'bld' or 'tr') for the DRAW segments from `base` on, piece by piece, far to
+    // near; uBase tells the vertex shader where each piece starts against the camera
+    function drawStatic(k, base){
+      const c0 = Math.floor(base / CHUNK), last = base + DRAW - 1;
+      for (let j = Math.floor(last / CHUNK) - c0; j >= 0; j--){
+        const cu = c0 + j, p = pieceAt(cu % N_CHUNK); if (!p) continue;
+        const r = p[k], start = cu * CHUNK, a = Math.max(0, base - start), b = Math.min(pieceLen(cu % N_CHUNK) - 1, last - start);
+        const s0 = r.segStart[b], s1 = a > 0 ? r.segStart[a - 1] : r.ni;
+        if (b < a || s1 <= s0) continue;
+        gl.uniform1i(P.world.u.uBase, base - start);
+        gl.bindVertexArray(r.vao); gl.drawElements(gl.TRIANGLES, s1 - s0, gl.UNSIGNED_INT, s0 * 4);
+      }
     }
     function drawDyn(name){ const [q0, nq] = ranges[name]; if (nq) gl.drawElements(gl.TRIANGLES, nq * 6, gl.UNSIGNED_INT, q0 * 24); }
     function drawRuns(p){ for (const [q0, nq, mode] of runs){ if (!nq) continue; gl.uniform1i(p.u.uMode, mode); gl.drawElements(gl.TRIANGLES, nq * 6, gl.UNSIGNED_INT, q0 * 24); } gl.uniform1i(p.u.uMode, 0); }
@@ -2258,8 +2376,10 @@
     function fullscreen(p, fbo, w, h){ gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, w, h); gl.useProgram(p.p); gl.bindVertexArray(fullVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); }
     // out: the framebuffer the finished picture goes to (the screen when left out; an off-screen copy while timing a frame)
     function renderGL(st, out){
-      project(st);
       const base = Math.floor(st.pos / SEG) % N_SEG;
+      streetPieces(base, !out);
+      if (!out) viewPos = st.pos;
+      project(st);
       for (let n = 0; n < DRAW + 8; n++){ const b = B[n], o = n * 4; Bf[o] = b.ok ? b.scale : 0; Bf[o + 1] = b.sx; Bf[o + 2] = b.sy; Bf[o + 3] = b.ok ? 1 : 0; }
       bindT(1, gl.TEXTURE_2D, texB); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, DRAW + 8, 1, gl.RGBA, gl.FLOAT, Bf);
       buildDynamic(st);
@@ -2271,13 +2391,13 @@
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.ALWAYS); gl.depthMask(false);
       bindT(0, gl.TEXTURE_2D_ARRAY, atlas.tex); bindT(2, gl.TEXTURE_2D, T.skyline);
       const pd = P.dyn; gl.useProgram(pd.p); setMainUniforms(pd, st); gl.bindVertexArray(dynVAO); drawDyn('sky');
-      gl.depthMask(true); useWorld(st, base); drawStatic(R.road, base);
-      gl.depthMask(false); drawStatic(R.decal, base);
+      gl.depthMask(true); useWorld(st, base); drawStatic('road', base);
+      gl.depthMask(false); drawStatic('decal', base);
       gl.useProgram(pd.p); gl.bindVertexArray(dynVAO); drawDyn('ground'); drawDyn('streaks');
-      gl.depthMask(true); gl.useProgram(P.world.p); drawStatic(R.bld, base);
+      gl.depthMask(true); gl.useProgram(P.world.p); drawStatic('bld', base);
       gl.depthMask(false); gl.depthFunc(gl.LEQUAL);
       gl.useProgram(pd.p); gl.bindVertexArray(dynVAO); drawDyn('peds');
-      gl.useProgram(P.world.p); drawStatic(R.tr, base);
+      gl.useProgram(P.world.p); drawStatic('tr', base);
       gl.depthFunc(gl.ALWAYS); gl.useProgram(pd.p); gl.bindVertexArray(dynVAO);
       bindT(2, gl.TEXTURE_2D, T.cab[cabView(st).near].mirror);
       gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]); gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE); drawDyn('mirror');
@@ -2437,7 +2557,13 @@
     // the people, the flickering sign and the grain's clock: the street's own life, whatever the game does
     const amb = { flick: { on: 1, next: 0.6 }, grainT: 0, t: 0 };
     function ambientStep(dt){
-      for (const p of peds) if (p.speed){ p.z = (p.z + p.dir * p.speed * dt + TRACK) % TRACK; p.phase = (p.phase + p.speed * dt / 240) % 4; }
+      // the people walk where the camera can see them (from the last picture drawn), turning back 30 m from where they started
+      pedsNear(viewPos - 60 * UPM, viewPos + (DRAW + 40) * SEG, p => {
+        if (!p.speed) return;
+        p.z = (p.z + p.dir * p.speed * dt + TRACK) % TRACK; p.phase = (p.phase + p.speed * dt / 240) % 4;
+        const off = ((p.z - p.z0) % TRACK + TRACK * 1.5) % TRACK - TRACK / 2;
+        if (off * p.dir > PED_ROAM) p.dir = -p.dir;
+      });
       if (!reduceMotion){
         amb.flick.next -= dt;
         if (amb.flick.next <= 0){ if (amb.flick.on){ amb.flick.on = 0; amb.flick.next = 0.07 + Math.random() * 0.06; } else { amb.flick.on = 1; amb.flick.next = 0.45 + Math.random() * 1.8; } }
@@ -2445,23 +2571,35 @@
       amb.grainT += dt; amb.t += dt;
     }
 
-    // traffic spread along the street, each car in a lane at its own speed (the speed test's, in street units)
-    function makeTraffic(n, seed){
+    // traffic spread over the TRAFFIC_SPAN from z0 (street units), each car in a lane at its own speed (the speed test's)
+    function makeTraffic(n, seed, z0){
       const r = rng(seed || 808), list = [];
       for (let k = 0; k < n; k++){
         const p = r(), kind = p < 0.4 ? 'taxi' : p < 0.65 ? 'sedan' : p < 0.85 ? 'van' : 'minibus';
-        list.push({ z: (k / n) * TRACK + r() * 2000, x: LANES[k % 3], speed: 2600 + r() * 2400, kind, tone: Math.floor(r() * TONES[kind]) });
+        list.push({ z: ((z0 || 0) + (k / n) * TRAFFIC_SPAN + r() * 2000) % TRACK, x: LANES[k % 3], speed: 2600 + r() * 2400, kind, tone: Math.floor(r() * TONES[kind]) });
+      }
+      return list;
+    }
+    // keeps traffic in the TRAFFIC_SPAN round `at` (street units): a car more than an eighth of it behind goes round to the
+    // far end, and one beyond the far end comes back, as the old 560 m street's lap did
+    function recycle(list, at, unit){
+      const span = TRAFFIC_SPAN / unit, track = TRACK / unit, back = span / 8;
+      for (const c of list){
+        if (!c) continue;
+        const rel = (((+c.z || 0) - at) % track + track * 1.5) % track - track / 2;
+        if (rel < -back) c.z = (+c.z + span) % track; else if (rel > span - back) c.z = ((+c.z - span) % track + track) % track;
       }
       return list;
     }
 
     /* ---- the title's street: the speed test's drive, eased off to about 38 km/h, steering round the traffic itself */
     const DEMO_SPEED = 4200;
-    const demo = { pos: 30 * SEG, x: 0, tx: 0, speed: DEMO_SPEED, brake: 0, accel: 0, hold: 0, sky: 0, lean: 0, moving: true, cars: [], tokens: [] };
+    const demo = { pos: 30 * SEG, trip: 0, x: 0, tx: 0, speed: DEMO_SPEED, brake: 0, accel: 0, hold: 0, sky: 0, lean: 0, moving: true, cars: [], tokens: [] };
     function demoStep(dt){
       const st = demo, cars = st.cars;
-      st.pos = (st.pos + st.speed * dt) % TRACK;
+      st.pos = (st.pos + st.speed * dt) % TRACK; st.trip += st.speed * dt;
       for (const c of cars) c.z = (c.z + c.speed * dt) % TRACK;
+      recycle(cars, st.pos, 1);
       const pz = st.pos + PLAYER_Z;
       if (st.hold > 0) st.hold -= dt;
       else {
@@ -2490,18 +2628,22 @@
     const api = {
       taxi: { z: 0, x: 0, speed: 0 }, cars: [], tokens: [], obstacles: [], animals: [], stop: null,
       lanes: LANES.slice(), length: TRACK / UPM, width: ROAD * 2 / UPM,
-      traffic: (n, seed) => makeTraffic(n == null ? 16 : n, seed).map(c => ({ z: c.z / UPM, x: c.x, speed: c.speed / UPM, kind: c.kind, tone: c.tone })),
+      districts: DISTRICTS.map((d, i) => ({ index: i, zh: d.zh, en: d.en, z: i * DIST_M, length: DIST_M })),
+      traffic: (n, seed) => makeTraffic(n == null ? 16 : n, seed, wrapU((+api.taxi.z || 0) * UPM)).map(c => ({ z: c.z / UPM, x: c.x, speed: c.speed / UPM, kind: c.kind, tone: c.tone })),
+      recycle: list => recycle(Array.isArray(list) ? list : [], +api.taxi.z || 0, UPM),
+      place: o => { o = o || {}; if (o.z != null) api.taxi.z = +o.z || 0; if (o.x != null){ api.taxi.x = +o.x || 0; placed = true; } },
       gap: (from, to) => { const L = TRACK / UPM; return (((to - from) % L) + L) % L; },
       size: kind => { const p = PIECE_SIZE[kind]; if (p) return { width: p[0], length: p[1] }; const v = VEH[kind] || VEH.taxi; return { width: v.W, length: v.L }; },
       district: z => { const d = DISTRICTS[Math.floor(wrapU(z * UPM) / SEG / DIST_LEN) % DISTRICTS.length], i = DISTRICTS.indexOf(d); return { index: i, zh: d.zh, en: d.en }; },
       crash: (z, x) => { popAsk = { z: z * UPM, x: clamp(+x || 0, -1.2, 1.2) }; }
     };
     const meter = { time: null, speed: null };
-    const run = { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, moving: false, cars: [], tokens: [], pos: 0, cap: { d: -1, t: 0 } };
+    const run = { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, trip: 0, moving: false, cars: [], tokens: [], pos: 0, cap: { d: -1, t: 0 } };
+    let placed = false;   // street.place moved the taxi across: no lean from it
     function reset(){
       api.taxi = { z: 0, x: 0, speed: 0 }; api.cars = []; api.tokens = []; api.obstacles = []; api.animals = []; api.stop = null;
-      meter.time = null; meter.speed = null;
-      Object.assign(run, { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, moving: false, cap: { d: -1, t: 0 } });
+      meter.time = null; meter.speed = null; placed = false;
+      Object.assign(run, { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, trip: 0, moving: false, cap: { d: -1, t: 0 } });
       pop = null; popAsk = null; popLast = '';
       hudKey = ''; clearPop();
     }
@@ -2513,8 +2655,9 @@
       const want = tx.brake == null || tx.brake === false ? clamp((dec - 350) / 2000, 0, 1) : clamp(tx.brake === true ? 1 : +tx.brake || 0, 0, 1);
       run.brake = lerp(run.brake, want, Math.min(1, dt * 10));
       run.accel = lerp(run.accel, clamp(-dec / 1500, 0, 1), Math.min(1, dt * 4));
+      if (placed){ run.x = x; placed = false; }
       run.lean = lerp(run.lean, clamp((x - run.x) / dt * 0.6, -1, 1), Math.min(1, dt * 6));
-      run.x = x; run.speed = v; run.moving = v > 40;
+      run.x = x; run.speed = v; run.moving = v > 40; run.trip += v * dt;
       run.sky -= segs[Math.floor(zu / SEG) % N_SEG].curve * v * dt * 0.0000016;
       // the district caption fades in over 0.6 s when the taxi enters a district, and stays
       const d = Math.floor(zu / SEG / DIST_LEN) % DISTRICTS.length;
@@ -3339,11 +3482,15 @@
       samples = s; makeTargets();
     }
     function build(){
-      buildTrack(); buildPeople(); makeTiles();
-      demo.cars = makeTraffic(16).map(c => Object.assign(c, { speed: c.speed * DEMO_SPEED / 7600 }));
+      const t0 = performance.now();
+      buildTrack(); buildPeople(); streetCost.planMs = performance.now() - t0; makeTiles();
+      demo.cars = makeTraffic(16, 808, demo.pos).map(c => Object.assign(c, { speed: c.speed * DEMO_SPEED / 7600 }));
       buildSprites(); initGL(); buildAtlas(); buildStreet(); makeTargets(); makeSkylineTex(); bakeCab();
+      streetPieces(Math.floor(demo.pos / SEG) % N_SEG, false);   // the title's first stretch
+      streetCost.firstMs = streetCost.pieceMs;
       built = true;
       drawPopWords();
+      streetCost.buildMs = performance.now() - t0; streetCost.readyAt = performance.now();
     }
     // the meter's numbers this frame, and the caption's district and fade
     function meterNow(fare){
@@ -3367,18 +3514,23 @@
       get repeat(){ return repeat; },
       set repeat(n){ repeat = clamp(Math.round(+n) || 1, 1, 8); },
       info(){ return { width: PW, height: PH, smoothing: built ? samples : 0, sharpness: RS, chip: built ? chipName() : '' }; },
+      // the test page: what is on the graphics chip (MB), and how long the street took (ms; readyAt and shownAt since
+      // the page began opening)
+      memory(){ return gpu.mb(streetBufs); },
+      get cost(){ return Object.assign({}, streetCost); },
       // the test page: how long the crash pop's three words last took to draw, and the word the next pop shows
       get pop(){ return { ms: popMade.ms, width: popMade.width, height: popMade.height }; },
       get nextPop(){ return popNext; },
       set nextPop(w){ popNext = POP.words[w] ? w : null; },
       // the title's street: its own life and the slow drive, then the picture
-      title(dt){ ambientStep(dt); demoStep(dt); renderGL(demo); clearPop(); },
+      title(dt){ ambientStep(dt); demoStep(dt); renderGL(demo); clearPop(); if (!streetCost.shownAt) streetCost.shownAt = performance.now(); },
       reset, step,
       // the run as it stands: the street, then the meter, the caption and the crash pop over it
       draw(fare){
         const st = runScene(); if (popAsk) startPop(st);
         for (let k = 1; k < repeat; k++){ renderGL(st, extraTarget()); drawPop(); }
         renderGL(st); drawHUD(meterNow(fare)); drawPop();
+        if (!streetCost.shownAt) streetCost.shownAt = performance.now();
       },
       api, meter
     };
@@ -4552,8 +4704,15 @@
          street.stop     { z, kind, passenger, waiting } or null: the one stop bay, 10 m from z in the kerbside lane on the
                          left; kind 'pickup' or 'dropoff'; passenger 'plain', 'case', 'bags' or null, at the kerb level with
                          its middle, waving while waiting is true (held still under Reduce motion)
-         street.traffic(n, seed)  n cars spread along the street, each with a speed (metres a second) for the game to use
-         street.length   one lap of the street in metres (560: Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok); z wraps round
+         street.traffic(n, seed)  n cars spread over the 560 m from the taxi on, each with a speed (metres a second) for
+                         the game to use
+         street.recycle(cars)     keeps a list in the 560 m round the taxi: one more than 70 m behind goes round to the far
+                         end (and one past the far end comes back), so moving traffic keeps its density; returns the list
+         street.place({ z, x })   moves the taxi at once (to another lane, or to a district's start) with no sway, roll
+                         or bounce from the move; either may be left out
+         street.length   one lap of the street in metres (14,800: Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok, each
+                         3,700 m); z wraps round. The kit makes the street's shapes a piece at a time as the taxi drives
+         street.districts         [{ index, zh, en, z, length }]: each district, where it starts (z) and its length, in metres
          street.width    the road's width in metres, kerb to kerb (10: x = -1 to 1)
          street.gap(from, to)     metres forward from z = from to z = to, round the lap
          street.size(kind)        { width, length } in metres of a vehicle (z is its rear), an obstacle, an animal or 'bay'
@@ -4568,7 +4727,12 @@
          repeat (1 to 8) draws each frame of a run that many times over, the extra ones off screen, to time a frame.
          pop is { ms, width, height }: how long the crash pop's three words took to draw, the last time they were drawn
          (when the street was built, or after a resize), and each one's size in canvas pixels. nextPop ('crash', 'smash'
-         or 'bang') is the word the next crash pop shows, so the test page can show each; a game leaves it to the kit. */
+         or 'bang') is the word the next crash pop shows, so the test page can show each; a game leaves it to the kit.
+         memory is what the kit has put on the graphics chip, in MB: { buffers, textures, renderbuffers, street } (street:
+         the street's shapes, part of buffers). opening is { build, plan, first, ready, shown, pieces, pieceMs }: how
+         long building the street took (ms), and of that, planning the whole street and making its first pieces; when
+         Start game began to work and when the first street picture showed (ms since the page began opening); and how
+         many pieces of the street have been made so far and how long they took in all (ms). */
       picture: {
         get setting() { return own.picture; },
         get level() { return pictureLevel(); },
@@ -4583,7 +4747,9 @@
         set repeat(n) { street.repeat = n; },
         get pop() { return street.pop; },
         get nextPop() { return street.nextPop; },
-        set nextPop(w) { street.nextPop = w; }
+        set nextPop(w) { street.nextPop = w; },
+        get memory() { return street.memory(); },
+        get opening() { const c = street.cost; return { build: c.buildMs, plan: c.planMs, first: c.firstMs, ready: c.readyAt, shown: c.shownAt, pieces: c.pieces, pieceMs: c.pieceMs }; }
       }
     };
 
