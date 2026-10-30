@@ -215,7 +215,7 @@ html,body{margin:0;height:100%;background:var(--night-black);overflow:hidden}
 .cn-stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:hidden}
 .cn-world{position:absolute;inset:0;width:100%;height:100%;display:block}
 /* the meter, caption and receipt slip (bottom left; the script sets their place as parts of the picture), the marks that
-   belong to a place in the street (the pin, the taxi's badges and rings) and the crash pop, over the picture during a run only */
+   belong to a place in the street (the pin, the taxi's badges, the SAFE! sign) and the crash pop, over the picture during a run only */
 .cn-hud{position:absolute;left:0;pointer-events:none}
 .cn-popc,.cn-marks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .cn-root:not(.cn-in-game) .cn-hud,.cn-root:not(.cn-in-game) .cn-popc,.cn-root:not(.cn-in-game) .cn-marks{display:none}

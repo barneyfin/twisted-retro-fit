@@ -1,4 +1,4 @@
-/* City Nights 0.9.0 — runtime
+/* City Nights 0.9.1 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.9.0';
+  const VERSION = '0.9.1';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -2339,7 +2339,7 @@
       return { q, w, hgt };
     }
     function bakeCab(){
-      if (T.cab) for (const v of T.cab){ for (const k of ['body', 'bodyHired', 'low', 'mask', 'lit', 'hm', 'mirror']) if (v[k]) gl.deleteTexture(v[k]); if (v.glow) gl.deleteTexture(v.glow.tex); }
+      if (T.cab) for (const v of T.cab) for (const k of ['body', 'bodyHired', 'low', 'mask', 'lit', 'hm', 'mirror']) if (v[k]) gl.deleteTexture(v[k]);
       for (const k in rings){ gl.deleteTexture(rings[k].tex); delete rings[k]; }   // the bay's ring follows the taxi's size
       const cg = cabGeometry();
       T.cab = CAB_OFFS.map(off => {
@@ -2347,8 +2347,7 @@
         const low = cropCanvas(s.low), lit = cropCanvas(s.lit), hm = cropCanvas(s.litHM), mk2 = packMasks(s), mir = makeMirrorSmall(s);
         return { pxW: s.pxW, ax: s.ax, ay: s.ay, w: s.c.width, h: s.c.height, lamps: s.lamps,
           body: texFrom(s.c, true), bodyHired: s.hired ? texFrom(s.hired, true) : null, low: texFrom(low.c, true), lowR: low.r, lit: texFrom(lit.c, true), litR: lit.r, hm: texFrom(hm.c, true), hmR: hm.r,
-          mask: texFrom(mk2.data, false), maskR: mk2.r, mirror: texFrom(mir.q, true), mirW: mir.w, mirH: mir.hgt,
-          src: s.c, glow: null };   // src: the picture itself, kept for the shield trial's glow (made when first needed)
+          mask: texFrom(mk2.data, false), maskR: mk2.r, mirror: texFrom(mir.q, true), mirW: mir.w, mirH: mir.hgt };
       });
     }
     function makeSkylineTex(){
@@ -2442,53 +2441,28 @@
       gl.uniform3f(pc.u.uCab, W / 2 + sway(st), yAtZ(18), yAtZ(13));
       fullscreen(pc, out || null, PW, PH);
       drawBayRing(st);
-      drawShieldGL(st);
+      drawShieldRing(st);
       drawCabGL(st);
     }
-    /* TRIAL, for the test page only (Barney, 30 October 2026): other looks for 保 held, to compare before the design
-       system decides. 'design' is the design system's (TaxiMarks): hud.shieldRing drawn over the street with the badges.
-       'under': the same ring, laid on the road before the taxi, as the bay's ring is. 'glow': no ring, but a soft blue
-       glow round the whole taxi, its own outline blurred, behind it. Both step aside in a bay, as the ring does. */
-    let shieldLook = 'design';
-    function drawShieldGL(st){
+    /* 保's ring (TaxiMarks, design system v11): while 保 is held, the design system's hud.shieldRing, drawn once into a
+       picture (again after a resize) and laid on the road before the taxi each frame, as the bay's ring is, so the taxi
+       hides its middle and its rear bumper and number plate stay clear. It steps aside while the bay's ring shows. */
+    function drawShieldRing(st){
       const c = st.carry;
-      if (shieldLook === 'design' || !c || !c.shield || !(st.ringA < 1)) return;
-      const a = 1 - st.ringA, cg = cabGeometry(), x = W / 2 + sway(st), y = cg.gy;
-      let q;
-      if (shieldLook === 'under'){
-        // hud.shieldRing once into a picture (canvas pixels: s per metre at the taxi's rear), then laid under the taxi
-        if (!rings.shield){
-          const s = cg.rw / VEH.taxi.W * RS, half = 0.9 * s, rx = half * 1.75, ry = half * 0.75, cy = -half * 1.05 + ry, pad = 4;
-          const cv = mk(2 * rx + 2 * pad, 2 * ry + 2 * pad), g = cv.getContext('2d'), ax = rx + pad, ay = ry + pad - cy;
-          hud.shieldRing(g, ax, ay, s);
-          rings.shield = { tex: texFrom(cv, true), x0: -ax / RS, y0: -ay / RS, w: cv.width / RS, h: cv.height / RS };
-        }
-        const r = rings.shield, x0 = x + r.x0, y0 = y + r.y0;
-        q = { tex: r.tex, v: [x0, y0, x0 + r.w, y0, x0 + r.w, y0 + r.h, x0, y0 + r.h] };
-      } else {
-        // the taxi's outline (this view of it), blurred and coloured tube-blue, behind it with its sway, bob and roll
-        const view = cabView(st), N = T.cab[view.near], m = cabMotion(st), k = cg.rw / 200;
-        if (!N.glow){
-          // a wide soft halo and a closer, stronger one, from the taxi's outline grown a little, all in tube-blue
-          const sw = N.src.width, sh = N.src.height, b1 = Math.max(3, sw * 0.1), b2 = Math.max(2, sw * 0.035), pad = Math.ceil(b1 * 3);
-          const cv = mk(sw + pad * 2, sh + pad * 2), g = cv.getContext('2d');
-          g.translate(pad + sw / 2, pad + sh / 2); g.scale(1.06, 1.06); g.translate(-sw / 2, -sh / 2);
-          g.filter = 'blur(' + b1 + 'px)'; g.globalAlpha = 0.75; g.drawImage(N.src, 0, 0);
-          g.filter = 'blur(' + b2 + 'px)'; g.globalAlpha = 1; g.drawImage(N.src, 0, 0);
-          g.setTransform(1, 0, 0, 1, 0, 0); g.filter = 'none';
-          g.globalCompositeOperation = 'source-in'; g.fillStyle = col('tube-blue'); g.fillRect(0, 0, cv.width, cv.height);
-          N.glow = { tex: texFrom(cv, true), pad };
-        }
-        const ds = cg.rw / N.pxW, gp = N.glow.pad * ds, ox = x - N.ax * ds - gp, oy = y - N.ay * ds - gp, w = N.w * ds + 2 * gp, h = N.h * ds + 2 * gp;
-        const py = y - cg.rw * 0.22, ty = py + (m.bob + m.pitch) * k, cs = Math.cos(m.roll), sn = Math.sin(m.roll);
-        const tf = (px, pyy) => { const dx = px - x, dy = pyy - py; return [x + dx * cs - dy * sn, ty + dx * sn + dy * cs]; };
-        q = { tex: N.glow.tex, v: [].concat(tf(ox, oy), tf(ox + w, oy), tf(ox + w, oy + h), tf(ox, oy + h)) };
+      if (!c || !c.shield || !(st.ringA < 1)) return;
+      const cg = cabGeometry();
+      if (!rings.shield){
+        // canvas pixels: s per metre at the taxi's rear; the ring's middle, as shieldRing places it, in the picture's middle
+        const s = cg.rw / VEH.taxi.W * RS, half = 0.9 * s, rx = half * 1.75, ry = half * 0.75, cy = -half * 1.05 + ry, pad = 4;
+        const cv = mk(2 * rx + 2 * pad, 2 * ry + 2 * pad), g = cv.getContext('2d'), ax = rx + pad, ay = ry + pad - cy;
+        hud.shieldRing(g, ax, ay, s);
+        rings.shield = { tex: texFrom(cv, true), x0: -ax / RS, y0: -ay / RS, w: cv.width / RS, h: cv.height / RS };
       }
-      const v = q.v;
-      gl.bindBuffer(gl.ARRAY_BUFFER, cabVBO); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([v[0], v[1], 0, 0, v[2], v[3], 1, 0, v[4], v[5], 1, 1, v[6], v[7], 0, 1]), gl.DYNAMIC_DRAW);
+      const r = rings.shield, x0 = W / 2 + sway(st) + r.x0, y0 = cg.gy + r.y0;
+      gl.bindBuffer(gl.ARRAY_BUFFER, cabVBO); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x0, y0, 0, 0, x0 + r.w, y0, 1, 0, x0 + r.w, y0 + r.h, 1, 1, x0, y0 + r.h, 0, 1]), gl.DYNAMIC_DRAW);
       const p = P.ring; gl.useProgram(p.p); gl.bindVertexArray(cabVAO);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      bindT(0, gl.TEXTURE_2D, q.tex); gl.uniform1i(p.u.uTex, 0); gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uA, a);
+      bindT(0, gl.TEXTURE_2D, r.tex); gl.uniform1i(p.u.uTex, 0); gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uA, 1 - st.ringA);
       gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
       gl.disable(gl.BLEND);
     }
@@ -3894,19 +3868,18 @@
     // the meter's numbers this frame, and the caption's district and fade
     /* ---- the marks that belong to a place in the street, on their own canvas over the picture (PlayScreen: cn-marks): the
        pin over the bay the taxi is heading for (TargetPin), and the power-ups the taxi carries as badges under its rear
-       bumper with 保's ring of light round it (TaxiMarks). The design system's hud draws them, each frame. */
+       bumper (TaxiMarks), and the SAFE! sign (ShieldSign). The design system's hud draws them, each frame. */
     let marksDrawn = false;
     function clearMarks(){ if (marksDrawn){ const g = env.marks.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, env.marks.width, env.marks.height); marksDrawn = false; } }
     const PIN_UP = 3.2, PIN_FAR = 80 * UPM, BAY_MID = (BAY_X[0] + BAY_X[1]) / 2;
     function drawMarks(st){
       clearMarks();
-      // pk: canvas pixels per picture pixel; k: per 720-line pixel; m: per CSS pixel. The badges and the ring follow the taxi's sway
+      // pk: canvas pixels per picture pixel; k: per 720-line pixel; m: per CSS pixel. The badges follow the taxi's sway
       const cv = env.marks, g = cv.getContext('2d'), pk = cv.width / W, k = 0.75 * pk, m = pk / env.cssScale();
-      const cg = cabGeometry(), tx = (W / 2 + sway(st)) * pk, ty = cg.gy * pk, ppm = cg.rw / VEH.taxi.W * pk;
+      const cg = cabGeometry(), tx = (W / 2 + sway(st)) * pk, ty = cg.gy * pk;
       g.setTransform(1, 0, 0, 1, 0, 0);
       const c = st.carry;
-      // 保's ring on the road round the taxi, stepping aside while the bay's ring shows
-      if (c && c.shield && st.ringA < 1 && shieldLook === 'design'){ g.globalAlpha = 1 - st.ringA; hud.shieldRing(g, tx, ty, ppm); g.globalAlpha = 1; marksDrawn = true; }
+      // (保's ring is on the road under the taxi, drawn with the street: drawShieldRing)
       if (c){
         const list = [];
         if (c.speed != null && c.speed !== false) list.push({ kind: 'speed', left: clamp(+c.speed || 0, 0, 1) });
@@ -4074,9 +4047,6 @@
       // the page began opening)
       memory(){ return gpu.mb(streetBufs); },
       get cost(){ return Object.assign({}, streetCost); },
-      // the test page's shield trial: 'design', 'under' or 'glow'
-      get shieldLook(){ return shieldLook; },
-      set shieldLook(v){ shieldLook = v === 'under' || v === 'glow' ? v : 'design'; },
       // the test page: how long the crash pop's three words last took to draw, and the word the next pop shows
       get pop(){ return { ms: popMade.ms, width: popMade.width, height: popMade.height }; },
       get nextPop(){ return popNext; },
@@ -4181,7 +4151,7 @@
     canvas.setAttribute('aria-label', name);
     const hudCanvas = el('canvas', 'cn-hud');      // the meter and the district caption, redrawn when a number changes
     const popCanvas = el('canvas', 'cn-popc');     // the crash pop, over the picture
-    const marksCanvas = el('canvas', 'cn-marks');  // marks that belong to a place in the street: the pin, the taxi's badges and rings
+    const marksCanvas = el('canvas', 'cn-marks');  // marks that belong to a place in the street: the pin, the taxi's badges, the SAFE! sign
     hudCanvas.setAttribute('aria-hidden', 'true');
     popCanvas.setAttribute('aria-hidden', 'true');
     marksCanvas.setAttribute('aria-hidden', 'true');
@@ -5329,7 +5299,7 @@
                          5); round left null, no third line
          street.taxi.hired        true while a passenger is aboard: the TAXI roof sign goes out
          street.taxi.carry        { speed, shield, fare }: the badges under the taxi's rear bumper. speed: 快's time left, 0
-                         to 1 (null: none); shield: true while 保 is held (also its ring of light on the road round the
+                         to 1 (null: none); shield: true while 保 is held (also its ring of light on the road under the
                          taxi); fare: 'fare' (錢) or 'double' (雙) for the fare boost, or null
          street.stop.ring         true once three-quarters of the taxi is in the bay: the bay's ring fades in (ring-fade),
                          and out once it is false (the stop has counted); 保's ring steps aside meanwhile
@@ -5367,10 +5337,6 @@
         get nextPop() { return street.nextPop; },
         set nextPop(w) { street.nextPop = w; },
         get memory() { return street.memory(); },
-        // TRIAL, the test page only: how 保 held looks, 'design' (the design system's ring over the taxi), 'under' (that ring
-        // under the taxi) or 'glow' (a soft blue glow round the whole taxi); a game leaves it alone
-        get shieldLook() { return street.shieldLook; },
-        set shieldLook(v) { street.shieldLook = v; },
         // the test page: touch zones on or off whatever the game said, and outlined (nothing marks them in a game)
         get touchZones() { return zonesOn; },
         set touchZones(v) { zonesOn = !!v; },
