@@ -33,12 +33,14 @@
    line, the pin, the badges and 保's ring, the bay's ring, the passenger getting in, the roof sign, the receipt slip),
    9 Moments (the SAFE! sign over a car and over a barrier, the crash pop at roadworks with the move into the open lane,
    and the zone change), 10 Touch (the touch zones outlined: drag, hold or tap in either; tap in one for the next scene),
+   12 Tunnel (a loop on demand at each district's end, under the tunnel's own haze: nothing in view should change),
    11 Sound (a jump under a zone title to 10 s before a district line where the music switches, the 30 s the new track takes to build, then
    the city sound bed a step louder every 9 s, to choose its loudness by ear; the plaque times the jump and the switch). The page plays Grunge City Rider's two soundtracks, switched by district.
-   Keys 1-9, 0 and - change scene; on a phone, tap for the next one. */
+   Keys 1-9, 0, - and = change scene; on a phone, tap for the next one. */
 
-const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street', 'Play screen', 'Moments', 'Touch', 'Sound'];
-const SCENE_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'Minus'];
+const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street', 'Play screen', 'Moments', 'Touch', 'Sound', 'Tunnel'];
+const SCENE_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'Minus', 'Equal'];
+const SCENE_PAD = { Minus: 'NumpadSubtract', Equal: 'NumpadAdd' };
 const NOTES = [
   'All four districts, traffic, the meter and the caption. ← → steer, ↓ brakes, N jumps to the next district, hold F to drive fast. TIME runs out at 00 and the run ends.',
   '',
@@ -50,8 +52,12 @@ const NOTES = [
   '',
   '',
   '',
+  '',
   ''
 ];
+// Tunnel: a zone title puts the taxi TUNNEL_LEAD metres before a district's end; it drives through the tunnel there, loops at the
+// district line, and comes out at the start of the same district; TUNNEL_ON metres on, the next district's end
+const TUNNEL_LEAD = 150, TUNNEL_ON = 150, TUNNEL_SPEED = 70 / 3.6;
 // Sound: from SOUND_LEAD metres before a line where the music switches, SOUND_BUILD seconds for the new track to build (both
 // tracks start very quietly), then the sound bed's loudness steps through SOUND_BED, one step each SOUND_LEG seconds; then the next line
 // before a line where the music switches (into Yau Ma Tei, then from Mong Kok round into Tsim Sha Tsui)
@@ -134,7 +140,7 @@ CityNights.game({
   id: 'cn-sampler',
   title: ['City Nights', 'Sampler'],
   zh: '的士',
-  keys: [['1', '-', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
+  keys: [['1', '=', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
   touch: 'Drag to steer · Tap for the next scene',
   // Grunge City Rider's two soundtracks, each for its districts (the design system's Sound section)
   music: [{ data: window.MIDNIGHT_FARE_DASH, districts: [0, 1] }, { data: window.METER_RUNNING_HIGH, districts: [2, 3] }],
@@ -152,7 +158,7 @@ CityNights.game({
 
   update(g, cn) {
     const taxi = cn.street.taxi, dt = 1 / 60, n = SCENES.length;
-    for (let i = 0; i < n; i++) { const k = SCENE_KEYS[i]; if (cn.input.keyPressed(k.length === 1 ? 'Digit' + k : k) || cn.input.keyPressed(k.length === 1 ? 'Numpad' + k : 'NumpadSubtract')) setScene(g, cn, i); }
+    for (let i = 0; i < n; i++) { const k = SCENE_KEYS[i]; if (cn.input.keyPressed(k.length === 1 ? 'Digit' + k : k) || cn.input.keyPressed(k.length === 1 ? 'Numpad' + k : SCENE_PAD[k])) setScene(g, cn, i); }
     if (cn.input.tap) setScene(g, cn, (g.scene + 1) % n);
     // steering, in every scene
     if (cn.input.left) taxi.x -= 1.4 * dt;
@@ -165,14 +171,15 @@ CityNights.game({
     const scene = SCENES[g.scene], c = g.crash;
     taxi.speed = scene === 'Drive' ? (cn.input.down ? 4 : cn.input.key('KeyF') ? FAST : 16) : scene === 'Mong Kok' ? (cn.input.down ? 4 : 19)
       : scene === 'Power-ups' ? 5 : scene === 'Vehicles' ? 6 : scene === 'Street' ? (cn.input.down ? 3 : 8)
-      : scene === 'Long street' ? TOUR_SPEED : scene === 'Play screen' ? playSpeed(g) : scene === 'Moments' ? momentSpeed(g) : scene === 'Sound' ? SOUND_SPEED
+      : scene === 'Long street' ? TOUR_SPEED : scene === 'Play screen' ? playSpeed(g) : scene === 'Moments' ? momentSpeed(g) : scene === 'Sound' ? SOUND_SPEED : scene === 'Tunnel' ? TUNNEL_SPEED
       : scene === 'Touch' ? (cn.input.down || (cn.input.pointer.down && cn.input.pointer2.down) ? 3 : 10)   // two thumbs down: one steers, one holds
       : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
     taxi.z += taxi.speed * dt;
     if (scene === 'Play screen') playStep(g, cn, dt);
     if (scene === 'Moments') momentStep(g, cn, dt);
     if (scene === 'Sound') soundStep(g, cn, dt);
-    if (scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' || scene === 'Play screen' || scene === 'Touch' || scene === 'Sound') {
+    if (scene === 'Tunnel') tunnelStep(g, cn);
+    if (scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' || scene === 'Play screen' || scene === 'Touch' || scene === 'Sound' || scene === 'Tunnel') {
       for (const car of cn.street.cars) car.z += car.speed * dt;
       cn.street.recycle(cn.street.cars);
       if (scene === 'Drive') {
@@ -248,6 +255,7 @@ CityNights.game({
     g.last = now;
     if (g.check) runCheck(g, cn, real);
     if (g.sound) soundFrames(g.sound, cn, real);
+    if (g.tunnel && g.tunnel.left > 0) { g.tunnel.left -= real; g.tunnel.slow = Math.max(g.tunnel.slow, real * 1000); }
     if (g.tour && SCENES[g.scene] === 'Long street') { if (g.tour.skip > 0) g.tour.skip--; else if (real > 0) g.tour.gaps.push(real * 1000); }
     showReadout(g, cn);
   }
@@ -262,6 +270,7 @@ function setScene(g, cn, i) {
   g.play = null;
   if (g.sound) cn.picture.bed = g.sound.was;   // the sound bed back as it was
   g.sound = null;
+  g.tunnel = null;
   st.tokens = [];
   // today's meter and caption, and nothing carried, unless the scene says otherwise
   Object.assign(cn.meter, { lives: null, tip: null, round: null, fares: 0 });
@@ -280,6 +289,9 @@ function setScene(g, cn, i) {
   } else if (scene === 'Moments') {
     g.mo = { k: -1, t: MOMENT_GAP, phase: 'gap' };
     st.cars = [];
+  } else if (scene === 'Tunnel') {
+    st.cars = g.traffic;
+    g.tunnel = { d: st.district(st.taxi.z).index, phase: 'set', loops: 0, at: '', left: 0, slow: 0 };
   } else if (scene === 'Sound') {
     st.cars = g.traffic;
     g.sound = { line: -1, step: -1, t: 0, was: cn.picture.bed, track: null, jumpLeft: 0, jumpSlow: 0, switchLeft: 0, switchSlow: 0, log: [], heap: 0 };
@@ -331,6 +343,23 @@ function jumpTo(cn, z) {
   st.place({ z });
   for (const car of st.cars) car.z += d;
 }
+/* ----- Tunnel: a loop on demand. street.loop() is called in the update that crosses the line, as a game calls it ----- */
+function tunnelStep(g, cn) {
+  const t = g.tunnel, st = cn.street, d = st.districts[t.d], line = d.z + d.length;
+  if (t.phase === 'set') {
+    const to = line - TUNNEL_LEAD, by = to - st.taxi.z;
+    cn.zoneChange({ take: 51.3, round: 1, to }, () => { for (const car of st.cars) car.z += by; });
+    t.phase = 'in';
+  } else if (t.phase === 'in' && st.taxi.z >= line) {
+    st.loop();
+    t.loops++; t.at = d.en + ', at the meter\'s ' + cn.fare.toFixed(1); t.left = 0.5; t.slow = 0;
+    t.phase = 'out';
+  } else if (t.phase === 'out' && st.taxi.z >= d.z + TUNNEL_ON) {
+    t.d = (t.d + 1) % st.districts.length;
+    t.phase = 'set';
+  }
+}
+
 /* ----- Sound: the slowest frame in the half second after the jump, and in the second after the music switches; and a log
    by the meter's reading of the jumps, the switches and every slow frame, with how much memory the browser freed at it ----- */
 const SLOW_FRAME = 30;   // ms: three or four refreshes of a 120 Hz screen, two of a 60 Hz one
@@ -389,7 +418,7 @@ function momentStep(g, cn, dt) {
     else {
       // the zone change: the take and the round as a game would give them; the taxi jumps to the next district's start
       const d = st.districts[(st.district(taxi.z).index + 1) % 4], round = 1 + (d.index === 0 ? 1 : 0);
-      cn.zoneChange({ take: 51.3, round, to: d.z }, () => { st.cars = []; });
+      cn.zoneChange({ take: 51.3, round, to: d.start }, () => { st.cars = []; });
       mo.phase = 'gap'; mo.t = MOMENT_GAP;
       return;
     }
@@ -536,7 +565,7 @@ function runCheck(g, cn, real) {
       if (c.slipT <= 0) { cn.receipt({ head: 'RECEIPT', lines: [['車資', 'FARE', '9.20'], ['小費', 'TIP', '0.40'], ['雙', '+100%', '9.20'], ['', '', 'HK$ 18.80', 'total']] }); c.slipT = CHECK_SLIP; }
     }
     // the zone change, from the play screen, to the start of the next district; the frames it takes are timed
-    if (now.name === 'zone' && !c.zone) { c.zone = { all: [], fade: [] }; cn.zoneChange({ take: 51.3, round: 2, to: st.districts[0].z + 0.5 }); }
+    if (now.name === 'zone' && !c.zone) { c.zone = { all: [], fade: [] }; cn.zoneChange({ take: 51.3, round: 2, to: st.districts[0].start }); }
     c.fading = cn.picture.zoneFading;
   }
 }
@@ -580,6 +609,10 @@ function showReadout(g, cn) {
   let mem = scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' ? memLine(cn) : '';
   if (scene === 'Moments' && g.mo) {
     note = g.mo.k < 0 ? 'The moments, each in turn.' : (g.mo.k + 1) + ' of ' + MOMENTS.length + ': ' + MOMENTS[g.mo.k][1];
+  } else if (scene === 'Tunnel' && g.tunnel) {
+    const t = g.tunnel, d = cn.street.districts[t.d];
+    note = (t.phase === 'in' ? 'Driving into the tunnel at the end of ' + d.en + ', to loop at the district line. Nothing in view should change, the caption should stay, and the traffic should carry on.'
+      : 'Out at the start of the same district, ' + d.en + ': the zone carries on.') + (t.loops ? ' Loops so far: <b>' + t.loops + '</b>, the last in ' + t.at + ', its slowest frame <b>' + fmt(t.slow) + ' ms</b>.' : '');
   } else if (scene === 'Sound' && g.sound) {
     const mu = cn.picture.music, L = cn.street.length, z = ((cn.street.taxi.z % L) + L) % L;
     const toLine = g.sound.t - (SOUND_BUILD - SOUND_LEAD / SOUND_SPEED);

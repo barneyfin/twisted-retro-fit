@@ -1,4 +1,4 @@
-/* City Nights 0.11.1 — runtime
+/* City Nights 0.11.2 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.11.1';
+  const VERSION = '0.11.2';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -857,6 +857,8 @@
     // the inside, in street units (Tunnel): walls and ceiling; the tiles' height; the strips' height, and how far their glow reaches
     const TUN_X = 6 * UPM, TUN_H = 4.8 * UPM, TUN_TILE = 2.2 * UPM, TUN_STRIP = 0.45 * UPM, TUN_HALO_B = 3.5 * UPM, TUN_HALO_T = TUN_H;
     const TUN_SPILL = 16 * UPM / SEG;   // the exit's light spills over the last 16 m
+    // where a zone starts: just inside the exit of the tunnel at the district's start, 20 m before the exit (Barney, 30 October 2026)
+    const ZONE_START_M = (TUN_MID * SEG) / UPM - 20;
     const CAM_H = 950, DEPTH = 1 / Math.tan(50 * Math.PI / 180), PLAYER_Z = CAM_H * DEPTH;
     const HZ = 0.40, CAB_Y = 0.9, SHOP_H = 1000;
     const LANES = [-0.667, 0, 0.667];
@@ -3106,12 +3108,15 @@
     /* ---- the run: what the game sets (cn.street, in metres) and what the kit works out from it */
     const wrapU = u => (u % TRACK + TRACK) % TRACK;
     const api = {
-      taxi: { z: 0, x: 0, speed: 0 }, cars: [], tokens: [], obstacles: [], animals: [], stop: null, pin: null,
+      taxi: { z: ZONE_START_M, x: 0, speed: 0 }, cars: [], tokens: [], obstacles: [], animals: [], stop: null, pin: null,
       lanes: LANES.slice(), length: TRACK / UPM, width: ROAD * 2 / UPM,
-      districts: DISTRICTS.map((d, i) => ({ index: i, zh: d.zh, en: d.en, z: i * DIST_M, length: DIST_M })),
+      districts: DISTRICTS.map((d, i) => ({ index: i, zh: d.zh, en: d.en, z: i * DIST_M, length: DIST_M, start: i * DIST_M + ZONE_START_M })),
       traffic: (n, seed) => makeTraffic(n == null ? 16 : n, seed, wrapU((+api.taxi.z || 0) * UPM)).map(c => ({ z: c.z / UPM, x: c.x, speed: c.speed / UPM, kind: c.kind, tone: c.tone })),
       recycle: list => recycle(Array.isArray(list) ? list : [], +api.taxi.z || 0, UPM),
       place: o => { o = o || {}; if (o.z != null) api.taxi.z = +o.z || 0; if (o.x != null){ api.taxi.x = +o.x || 0; placed = true; } },
+      // the loop (Tunnel): from the district line at the end of a district, back to the same place in the tunnel at its start.
+      // Called in the update that crosses the line, before the street sees it, so the caption and the music stay as they are
+      loop: () => { api.taxi.z = (+api.taxi.z || 0) - DIST_M; if (Array.isArray(api.cars)) for (const c of api.cars) c.z -= DIST_M; },
       gap: (from, to) => { const L = TRACK / UPM; return (((to - from) % L) + L) % L; },
       size: kind => { const p = PIECE_SIZE[kind]; if (p) return { width: p[0], length: p[1] }; const v = VEH[kind] || VEH.taxi; return { width: v.W, length: v.L }; },
       district: z => { const d = DISTRICTS[Math.floor(wrapU(z * UPM) / SEG / DIST_LEN) % DISTRICTS.length], i = DISTRICTS.indexOf(d); return { index: i, zh: d.zh, en: d.en }; },
@@ -3155,7 +3160,7 @@
       return reduceMotion ? { id: slip.id, o: slip.o, show: 1, a: f } : { id: slip.id, o: slip.o, show: f, a: 1 };
     }
     function reset(){
-      api.taxi = { z: 0, x: 0, speed: 0 }; api.cars = []; api.tokens = []; api.obstacles = []; api.animals = []; api.stop = null; api.pin = null;
+      api.taxi = { z: ZONE_START_M, x: 0, speed: 0 }; api.cars = []; api.tokens = []; api.obstacles = []; api.animals = []; api.stop = null; api.pin = null;
       meter.time = null; meter.speed = null; meter.lives = null; meter.tip = null; meter.round = null; meter.fares = 0; placed = false;
       Object.assign(run, { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, trip: 0, moving: false, cap: { d: -1, t: 0 }, ringA: 0, ringKind: 'pickup', hired: false, carry: null });
       pop = null; popAsk = null; popLast = ''; slip = null; safe = null; safeAsk = null; zone = null;
@@ -5783,11 +5788,16 @@
                          the game to use
          street.recycle(cars)     keeps a list in the 560 m round the taxi: one more than 70 m behind goes round to the far
                          end (and one past the far end comes back), so moving traffic keeps its density; returns the list
+         street.loop()   in the update where the taxi crosses the district line at the end of its zone (taxi.z at or past
+                         d.z + d.length): the taxi and street.cars go back one district, so it comes out of the tunnel at the
+                         start of the same district. All four tunnels are the same, so nothing in view changes, and the caption
+                         and the music stay. A game moves anything else it has laid ahead. Practice never calls it
          street.place({ z, x })   moves the taxi at once (to another lane, or to a district's start) with no sway, roll
                          or bounce from the move; either may be left out
          street.length   one lap of the street in metres (14,800: Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok, each
                          3,700 m); z wraps round. The kit makes the street's shapes a piece at a time as the taxi drives
-         street.districts         [{ index, zh, en, z, length }]: each district, where it starts (z) and its length, in metres
+         street.districts         [{ index, zh, en, z, length, start }]: each district, where it starts (z, its line, in the middle of
+                         a tunnel), its length, and where a zone starts (start: just inside that tunnel's exit), in metres
          street.width    the road's width in metres, kerb to kerb (10: x = -1 to 1)
          street.gap(from, to)     metres forward from z = from to z = to, round the lap
          street.size(kind)        { width, length } in metres of a vehicle (z is its rear), an obstacle, an animal or 'bay'

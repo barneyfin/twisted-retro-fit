@@ -24,7 +24,7 @@ CityNights.game({
   keys: [['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],   // keyboard hints: keys as printed, then the action
   touch: 'Drag to steer',         // the phone's touch hint: one line, two actions at most, joined by ' · '
 
-  // New game: build and return this game's state. The kit has put the taxi at the start of Tsim Sha Tsui with
+  // New game: build and return this game's state. The kit has put the taxi just inside the tunnel's exit at the start of Tsim Sha Tsui, with
   // the street empty and the fare at HK$0.00.
   start(cn) {
     cn.street.cars = cn.street.traffic(12);   // other traffic, spread over the 560 m ahead in its lanes

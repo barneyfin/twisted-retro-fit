@@ -33,7 +33,7 @@ The template, as it is, drives up the street through traffic: a working game to 
 
 ## The test page
 
-`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **9**, **0** and **-** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate, the kit's version and the picture it is drawing; in scenes 1, 2 and 7 a fourth line shows the graphics memory and the opening times (the speed check, below).
+`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **9**, **0**, **-** and **=** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate, the kit's version and the picture it is drawing; in scenes 1, 2 and 7 a fourth line shows the graphics memory and the opening times (the speed check, below).
 
 | Scene | What it shows |
 |---|---|
@@ -48,6 +48,7 @@ The template, as it is, drives up the street through traffic: a working game to 
 | 9 Moments | Each in turn, laid out ahead of the taxi: the shielded hit on a car (the SAFE! sign over the taxi's roof, the car cleared away, 保's badge and ring gone, no freeze), the shielded hit on roadworks (the SAFE! sign over the barrier), a crash into roadworks (the crash pop, the barriers cleared away, the taxi moved into the open lane in the pop's first second), and the zone change (the street dims, the caption grows into the title of the district finished with its lamps and takings, the taxi jumps to the next district, the title of the new one and its round, then back into the caption). |
 | 0 Touch | The touch zones outlined (only here; nothing marks them in a game): from the top of the meter's case down, either side of the taxi. A touch that starts outside them does nothing, so here a tap over the street does not change scene. Drag in either to steer (either thumb), two thumbs down to slow; a tap inside an outline goes to the next scene, Sound. |
 | - Sound | A jump along the street, under a zone title as in a game, to 10 seconds before a district line where the music switches: into Yau Ma Tei (Meter Running High), then next time from Mong Kok round into Tsim Sha Tsui (Midnight Fare Dash). The plaque names what is happening and shows the slowest frame after the jump and after the music switches, and a log by the meter's reading of the jumps, the switches and any slow frame. Then 32 seconds for the new track to build, since both start very quietly, then the city sound bed a step louder every 9 seconds (0, 0.15, 0.25, 0.35, 0.5, 0.7; the plaque names the step). For choosing the sound bed's loudness by ear; leaving the scene puts it back. |
+| = Tunnel | A loop on demand: a zone title puts the taxi 150 m before a district's end; it drives through the portal, loops at the district line, and comes out at the start of the same district; then the next district. Nothing in view should change at the loop, the caption should stay and the traffic should carry on. The plaque counts the loops and shows the slowest frame after the last. |
 
 On a phone held sideways, the meter, the district caption and the receipt slip keep clear of the camera and the screen's rounded corners (the safe-area insets, as the design system's README asks), as the tiles always have.
 
