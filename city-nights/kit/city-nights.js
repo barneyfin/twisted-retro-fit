@@ -1,4 +1,4 @@
-/* City Nights 0.11.0 — runtime
+/* City Nights 0.11.1 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.11.0';
+  const VERSION = '0.11.1';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -406,7 +406,7 @@
       gust.frequency.value = 0.09; gg.gain.value = level * 0.2;
       gust.connect(gg).connect(rg.gain);
       for (const loop of [rb.patter, rb.pats]) { const rain = ctx.createBufferSource(); rain.buffer = loop.buf; rain.loop = true; rain.connect(rg); rain.start(); }
-      rg.connect(n.bed);
+      n.rain = ctx.createGain(); rg.connect(n.rain).connect(n.bed);   // quieter inside a tunnel (Barney, 30 October 2026)
       gust.start();
       // traffic: a low rumble that swells and falls slowly
       const rumble = noise(ctx, true), tg = ctx.createGain(); tg.gain.value = 0.7;
@@ -437,11 +437,12 @@
       for (const k of [1, 1.26]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * k; o.connect(bp); o.start(t); o.stop(t + len + 0.1); }
     }
     // Called every frame: the bed's level for the screen, the engine for the taxi's speed (km/h)
-    s.sync = function (inGame, screen, ending, kmh) {
+    s.sync = function (inGame, screen, ending, kmh, inside) {
       if (!audio.ctx || audio.ctx.state !== 'running' || settings.muted || settings.volume <= 0) { s.stop(); return; }
       if (!s.nodes) build();
       const n = s.nodes, t = audio.ctx.currentTime, panel = !(screen === 'play' || screen === 'title');
       n.bed.gain.setTargetAtTime(s.bed * (panel ? 0.5 : 1), t, 0.3);
+      n.rain.gain.setTargetAtTime(1 - 0.8 * clamp(+inside || 0, 0, 1), t, 0.3);
       const v = clamp(+kmh || 0, 0, 120), run = inGame && screen === 'play' && !ending;
       n.engine.gain.setTargetAtTime(run ? 0.05 + 0.03 * clamp(v / 84, 0, 1) : 0, t, 0.15);
       n.e1.frequency.setTargetAtTime(40 + 0.9 * v, t, 0.12);
@@ -853,6 +854,9 @@
     const TUN_SEGS = 180 * UPM / SEG, TUN_MID = TUN_SEGS / 2, CLEAR_SEGS = 40 * UPM / SEG;
     const tunnelK = i => { const k = (i + TUN_MID) % DIST_LEN; return k < TUN_SEGS ? k : -1; };
     const clearAt = i => (i + TUN_MID) % DIST_LEN >= DIST_LEN - CLEAR_SEGS;
+    // the inside, in street units (Tunnel): walls and ceiling; the tiles' height; the strips' height, and how far their glow reaches
+    const TUN_X = 6 * UPM, TUN_H = 4.8 * UPM, TUN_TILE = 2.2 * UPM, TUN_STRIP = 0.45 * UPM, TUN_HALO_B = 3.5 * UPM, TUN_HALO_T = TUN_H;
+    const TUN_SPILL = 16 * UPM / SEG;   // the exit's light spills over the last 16 m
     const CAM_H = 950, DEPTH = 1 / Math.tan(50 * Math.PI / 180), PLAYER_Z = CAM_H * DEPTH;
     const HZ = 0.40, CAB_Y = 0.9, SHOP_H = 1000;
     const LANES = [-0.667, 0, 0.667];
@@ -1889,8 +1893,40 @@
 
     /* ================================================================ building the street, a piece at a time */
     function band(Rq, wx, y0, y1, s, t0 = 0, t1 = 1){ Rq.quad([[t0, wx, y0], [t1, wx, y0], [t1, wx, y1], [t0, wx, y1]], s); }
+    // the inside's road and walkways, its markings carried through and the strips' smear: made from the place in the tunnel, not
+    // along the street, so all four tunnels are the same
+    function emitTunnelRoad(Rd, Dc, seg){
+      const white = { lv: Z.white, fl: FL.LEV | FL.GND };
+      const strip = (a, b, c) => Rd.quad([[0, a, 0], [1, a, 0], [1, b, 0], [0, b, 0]], S(col(c), white));
+      strip(-TUN_X, -ROAD, 'tunnel-walk'); strip(ROAD, TUN_X, 'tunnel-walk');
+      strip(-ROAD, ROAD, 'tunnel-road');
+      strip(-ROAD + 110, -ROAD + 150, 'tunnel-line'); strip(ROAD - 150, ROAD - 110, 'tunnel-line');
+      if (!(Math.floor(seg.tun / 3) % 2)) for (const lx of [-ROAD / 3, ROAD / 3]) strip(lx - 30, lx + 30, 'tunnel-line');
+      const sm = atlas.items.get('tn:smear'), sty = S('#ffffff', { ly: sm.layer, a: 0.5, fl: FL.ADD }), [u0, v0, u1, v1] = sm.uv, reach = TUN_X * 0.55;
+      Dc.quad([[0, TUN_X, 0], [1, TUN_X, 0], [1, TUN_X - reach, 0], [0, TUN_X - reach, 0]], sty, [[u0, v0], [u0, v1], [u1, v1], [u1, v0]]);
+      Dc.quad([[0, -TUN_X, 0], [1, -TUN_X, 0], [1, -TUN_X + reach, 0], [0, -TUN_X + reach, 0]], sty, [[u0, v0], [u0, v1], [u1, v1], [u1, v0]]);
+      const sp = spillAt(seg.tun);
+      if (sp > 0) Dc.quad([[0, -TUN_X, 0], [1, -TUN_X, 0], [1, TUN_X, 0], [0, TUN_X, 0]], S(col('tunnel-glow'), { a: sp, fl: FL.ADD }));
+    }
+    const spillAt = k => { const u = (k - (TUN_SEGS - TUN_SPILL)) / TUN_SPILL; return u > 0 ? 0.6 * u * u : 0; };
+    // the inside's walls, ceiling and light: the strips are continuous, with no grain, and bright enough to glow
+    function emitTunnel(Bq, seg){
+      const wl = atlas.items.get('tn:wall'), halo = atlas.items.get('tn:halo'), [u0, v0, u1, v1] = wl.uv, n = seg.tun % 12, du = (u1 - u0) / 12;
+      const wall = S('#ffffff', { ly: wl.layer, lv: Z.white, fl: FL.LEV }), ceil = S(col('tunnel-ceiling'), { lv: Z.white, fl: FL.LEV }), light = S(col('tunnel-strip'));
+      const hs = S('#ffffff', { ly: halo.layer, uv: halo.uv, fl: FL.ADD }), sp = spillAt(seg.tun), warm = sp > 0 ? S(col('tunnel-glow'), { a: sp, fl: FL.ADD }) : null;
+      for (const s of [-1, 1]){
+        const x = s * TUN_X;
+        Bq.quad([[0, x, TUN_H], [1, x, TUN_H], [1, x, 0], [0, x, 0]], wall, [[u0 + n * du, v0], [u0 + (n + 1) * du, v0], [u0 + (n + 1) * du, v1], [u0 + n * du, v1]]);
+        band(Bq, x, TUN_HALO_B, TUN_HALO_T, hs);
+        band(Bq, x, TUN_H - TUN_STRIP - 28, TUN_H - TUN_STRIP + 28, light);
+        if (warm) band(Bq, x, 0, TUN_H, warm);
+      }
+      Bq.quad([[0, -TUN_X, TUN_H], [0, TUN_X, TUN_H], [1, TUN_X, TUN_H], [1, -TUN_X, TUN_H]], ceil);
+      if (warm) Bq.quad([[0, -TUN_X, TUN_H], [0, TUN_X, TUN_H], [1, TUN_X, TUN_H], [1, -TUN_X, TUN_H]], warm);
+    }
     function emitRoad(Rd, Dc, i){
       const seg = segs[i], white = { lv: Z.white, fl: FL.LEV | FL.GND };
+      if (seg.tun >= 0){ emitTunnelRoad(Rd, Dc, seg); return; }
       const strip = (a, b, col, ly) => Rd.quad([[0, a, 0], [1, a, 0], [1, b, 0], [0, b, 0]], S(col, Object.assign({ ly }, white)));
       strip(-BLD, -ROAD, '#ffffff', GRAD_PAVE); strip(ROAD, BLD, '#ffffff', GRAD_PAVE);
       strip(-ROAD, ROAD, '#ffffff', GRAD_ROAD);
@@ -2178,6 +2214,7 @@
       for (const k in R) R[k].begin(i);
       const seg = segs[i];
       emitRoad(R.road, R.decal, i);
+      if (seg.tun >= 0) emitTunnel(R.bld, seg);
       if (seg.tun === 0) emitPortal(R.tr);
       if (seg.junc) emitJunction(R.bld, i);
       for (let side = 0; side < 2; side++){ const wd = seg.wall[side]; if (wd && wd.k === 0 && segs[(i + N_SEG - 1) % N_SEG].junc) emitEndFace(R.bld, side ? 1 : -1, wd.b); }
@@ -2262,13 +2299,14 @@
     layout(location=0) in vec4 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aCol;
     layout(location=3) in uvec4 aInfo; layout(location=4) in vec2 aOff;
     uniform sampler2D uB; uniform int uBase; uniform vec2 uView; uniform float uK;
-    out vec2 vUV; out vec4 vCol; flat out uvec4 vInfo;
+    out vec2 vUV; out vec4 vCol; flat out uvec4 vInfo; out float vHz;
     const int NSEG = ${N_SEG}, DRAWN = ${DRAW};
     void main(){
       int n = int(aPos.x + 0.5) - uBase; if (n < 0) n += NSEG;
       vec4 b = texelFetch(uB, ivec2(min(n, DRAWN), 0), 0);
-      if (n >= DRAWN || n >= int(aInfo.w) || b.w < 0.5){ gl_Position = vec4(0.0, 0.0, -2.0, 1.0); vUV = vec2(0.0); vCol = vec4(0.0); vInfo = uvec4(0u); return; }
+      if (n >= DRAWN || n >= int(aInfo.w) || b.w < 0.5){ gl_Position = vec4(0.0, 0.0, -2.0, 1.0); vUV = vec2(0.0); vCol = vec4(0.0); vInfo = uvec4(0u); vHz = 0.0; return; }
       vec4 nb = texelFetch(uB, ivec2(n + 1, 0), 0);
+      vHz = max(0.0, mix(b.w, max(nb.w, 1.0), aPos.y) - 1.0);
       float t = aPos.y, sc = mix(b.x, nb.x, t);
       float x = mix(b.y + b.x * aPos.z * uK, nb.y + nb.x * aPos.z * uK, t);
       float y = mix(b.z - b.x * aPos.w * uK, nb.z - nb.x * aPos.w * uK, t);
@@ -2300,6 +2338,7 @@
     uniform vec3 uRoad0, uRoad1, uPave0, uPave1;
     uniform vec2 uView; uniform float uRS, uPH, uHz;
     in vec2 vUV; in vec4 vCol; flat in uvec4 vInfo;
+    ${world ? 'in float vHz; uniform vec3 uHaze;' : ''}
     layout(location=0) out vec4 oCol;
     ${mrt ? 'layout(location=1) out vec4 oLev;' : ''}
     void main(){
@@ -2314,6 +2353,7 @@
       float a = vCol.a; if ((fl & 8u) != 0u) a *= uFlick;
       float cov = tx.a * a;
       oCol = (fl & 64u) != 0u ? vec4(0.0) : vec4(rgb * tx.rgb * a, (fl & 1u) != 0u ? 0.0 : cov);
+      ${world ? `if (vHz > 0.0 && (fl & 64u) == 0u){ if ((fl & 1u) != 0u) oCol.rgb *= 1.0 - vHz; else oCol.rgb = mix(oCol.rgb, uHaze * cov, vHz); }` : ''}
       ${mrt ? `if (uMode == 1) oLev = vec4(uCarLev * tx.a, 0.0, cov, tx.a);
       else if ((fl & 66u) != 0u && (fl & 128u) == 0u) oLev = vec4(float(vInfo.y) * 0.01, (fl & 4u) != 0u ? 1.0 : 0.0, 0.0, 1.0) * cov;
       else oLev = vec4(0.0);` : ''}
@@ -2411,9 +2451,9 @@
     void main(){ o = texture(uTex, vUV) * uA; }`;
     const FS_CAB = `#version 300 es
     precision highp float;
-    uniform sampler2D uBody, uMask, uLit, uHM, uS1t, uS2, uMottle, uSparkle;
+    uniform sampler2D uBody, uMask, uLitT, uHM, uS1t, uS2, uMottle, uSparkle;
     uniform vec4 uRM, uRL, uRH, uEnv, uRimX, uAmt; uniform vec2 uSpr, uRimY, uRimOn;
-    uniform float uGrain; uniform int uLow;
+    uniform float uGrain, uLit; uniform int uLow;
     uniform vec2 uView; uniform float uRS, uPH;
     in vec2 vUV; out vec4 o;
     ${GLSL_GRAIN}
@@ -2436,10 +2476,11 @@
           float al = 0.6 * m.b * uRimOn.x, ar = 0.6 * m.a * uRimOn.y;
           c.rgb += al * rl + ar * rr; c.a = min(1.0, c.a + al + ar);
         }
-        vec4 lt = sub(uLit, uRL, px), hm = sub(uHM, uRH, px);
+        vec4 lt = sub(uLitT, uRL, px), hm = sub(uHM, uRH, px);
         c.rgb += uAmt.x * lt.rgb + uAmt.y * hm.rgb; c.a = min(1.0, c.a + uAmt.x * lt.a + uAmt.y * hm.a);
         c.rgb = min(c.rgb, vec3(c.a));
       }
+      c.rgb *= uLit;
       if (uGrain > 0.0 && c.a > 0.004){
         vec2 lp = vec2(gl_FragCoord.x / uRS, (uPH - gl_FragCoord.y) / uRS);
         c.rgb = grain(c.rgb / c.a, lp, uGrain) * c.a;
@@ -2534,6 +2575,17 @@
     const pedList = [], carList = [], tokList = [], runs = [];
     const NEAR_CAR = 1000;   // vehicles and power-ups are drawn from 2.5 m ahead of the camera, so one beside the taxi stays in view
     const sway = st => reduceMotion ? 0 : st.lean * 5;
+    /* ---- the tunnel, as seen this frame: how far into the haze a segment n ahead is (it is lost by about 80 m), the end of the
+       tunnel in view, and how far the camera is inside one. The change as a mouth fills the view takes about a second */
+    const tunHaze = n => smooth(clamp((n - 80) / 80, 0, 1));
+    const tun = { end: -1, inside: 0 }, TUN_DIM = 0.45;   // inside is about half the street's brightness
+    const TUN_RAMP = 16 * UPM / SEG;
+    function tunnelView(st){
+      tun.end = -1;
+      for (let n = 0; n < DRAW; n++) if (B[n].seg.tun >= 0 && (B[n + 1].seg.tun < 0 || n === DRAW - 1)){ tun.end = n + 1; break; }
+      const u = ((Math.floor(st.pos / SEG) % N_SEG) + TUN_MID + TUN_RAMP / 2) % DIST_LEN;
+      tun.inside = u < TUN_RAMP ? smooth(u / TUN_RAMP) : u < TUN_SEGS ? 1 : u < TUN_SEGS + TUN_RAMP ? smooth(1 - (u - TUN_SEGS) / TUN_RAMP) : 0;
+    }
     function buildDynamic(st){
       dyn.nv = 0;
       const hzY = H * HZ;
@@ -2606,8 +2658,14 @@
       dynEnd('cabAdd');
       // haze over the far end of the street
       dynBegin('fog');
-      const f = LOOK.fog, fc = rgba(f.c), f0 = [fc[0], fc[1], fc[2], 0], f1 = [fc[0], fc[1], fc[2], Math.round(f.a * 255)];
+      const f = LOOK.fog, fc = rgba(f.c), f0 = [fc[0], fc[1], fc[2], 0], f1 = [fc[0], fc[1], fc[2], Math.round(f.a * 255 * (1 - tun.inside))];
       dq(0, hzY - f.spread * H, W, f.spread * H, 0, none, null, f0, f1); dq(0, hzY, W, f.spread * H, 0, none, null, f1, f0);
+      // the tunnel's far end: the mouth's opening, or the last of the drawn road, in tunnel-haze as far as it is lost
+      if (tun.end >= 0){
+        const b = B[tun.end], x0 = edgeX(b, -TUN_X), x1 = edgeX(b, TUN_X), y0 = yAt(b, TUN_H), y1 = yAt(b, 0), a = tun.end >= DRAW ? 1 : tunHaze(tun.end);
+        const hc = rgba(col('tunnel-haze')), c = [hc[0], hc[1], hc[2], Math.round(a * 255)];
+        if (b.ok && a > 0) dq(x0, y0, x1 - x0, y1 - y0, 0, none, null, c, c);
+      }
       dynEnd('fog');
       // the other vehicles, the power-ups and the standing pieces, far to near: the vehicles (and the pieces like them) in runs
       // kept out of the glow, the power-ups lit like signs
@@ -2624,8 +2682,11 @@
           const it = o.car, c = it.c, offM = (it.sx - W / 2) / (it.scale * K * UPM);
           let vi = 0, best = 1e9; OFFS.forEach((ov, i) => { const d = Math.abs(ov - offM); if (d < best){ best = d; vi = i; } });
           const spr = atlas.items.get('car:' + c.kind + ':' + c.tone + ':' + vi), dsc = VEH[c.kind].W * UPM * it.scale * K / spr.pxW;
-          const a = clamp(1 - (1 / it.scale - 26000) / 30000, 0.35, 1);
-          dItem(spr, it.sx - spr.ax * dsc, it.sy - spr.ay * dsc, spr.sw * dsc, spr.sh * dsc, (it.n + it.t - 0.5) / (DRAW + 2), S('#ffffff', { ly: spr.layer, a }));
+          // in a tunnel the traffic is lit as the tunnel is, and lost in its haze with the far end
+          const tk = B[it.n].seg.tun, gone = tun.end >= 0 ? tunHaze(tk >= 0 ? it.n : it.n > tun.end ? tun.end : 0) : 0, lit = tk >= 0 ? 1 - TUN_DIM * clamp(Math.min(tk, TUN_SEGS - tk) / TUN_RAMP, 0, 1) : 1, v = Math.round(255 * lit);
+          const a = clamp(1 - (1 / it.scale - 26000) / 30000, 0.35, 1) * (1 - gone), sty = S('#ffffff', { ly: spr.layer, a });
+          sty.c = [v, v, v, sty.c[3]];
+          dItem(spr, it.sx - spr.ax * dsc, it.sy - spr.ay * dsc, spr.sw * dsc, spr.sh * dsc, (it.n + it.t - 0.5) / (DRAW + 2), sty);
         } else {
           // a glow of its own face colour round it, then the sign, hung a third of its height above the road
           const q = o.tok, tk = TOKEN[q.tk.kind], it = atlas.items.get('token:' + q.tk.kind), d = (q.n + q.t - 0.5) / (DRAW + 2), top = q.y - q.s / 3 - q.s - q.bob, gs = q.s * 1.7;
@@ -2694,6 +2755,7 @@
     function useWorld(st, base){
       const p = P.world; gl.useProgram(p.p);
       gl.uniform1i(p.u.uB, 1); gl.uniform1i(p.u.uBase, base); gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uK, K);
+      const hz = rgba(col('tunnel-haze')); gl.uniform3f(p.u.uHaze, hz[0] / 255, hz[1] / 255, hz[2] / 255);
       setMainUniforms(p, st);
     }
     const GRAD = [LOOK.road.near, LOOK.road.far, LOOK.road.pave, LOOK.road.paveFar].map(h => new Float32Array(rgba(h).slice(0, 3).map(v => v / 255)));
@@ -2725,7 +2787,8 @@
       streetPieces(base, !out);
       if (!out) viewPos = st.pos;
       project(st);
-      for (let n = 0; n < DRAW + 8; n++){ const b = B[n], o = n * 4; Bf[o] = b.ok ? b.scale : 0; Bf[o + 1] = b.sx; Bf[o + 2] = b.sy; Bf[o + 3] = b.ok ? 1 : 0; }
+      tunnelView(st);
+      for (let n = 0; n < DRAW + 8; n++){ const b = B[n], o = n * 4; Bf[o] = b.ok ? b.scale : 0; Bf[o + 1] = b.sx; Bf[o + 2] = b.sy; Bf[o + 3] = b.ok ? 1 + (b.seg.tun >= 0 || (n > 0 && B[n - 1].seg.tun >= 0) ? tunHaze(n) : 0) : 0; }
       bindT(1, gl.TEXTURE_2D, texB); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, DRAW + 8, 1, gl.RGBA, gl.FLOAT, Bf);
       buildDynamic(st);
       // the street, into the multisampled buffers: colour, and the grain level each surface asks for
@@ -2841,7 +2904,8 @@
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       bindT(0, gl.TEXTURE_2D, N.low); bindT(1, gl.TEXTURE_2D, N.mask); bindT(2, gl.TEXTURE_2D, N.lit); bindT(3, gl.TEXTURE_2D, N.hm);
       bindT(4, gl.TEXTURE_2D, postFBO.q.t); bindT(5, gl.TEXTURE_2D, postFBO.s2.t); bindT(6, gl.TEXTURE_2D, T.mottle); bindT(7, gl.TEXTURE_2D, T.sparkle);
-      ['uBody', 'uMask', 'uLit', 'uHM', 'uS1t', 'uS2', 'uMottle', 'uSparkle'].forEach((n, i) => gl.uniform1i(p.u[n], i));
+      ['uBody', 'uMask', 'uLitT', 'uHM', 'uS1t', 'uS2', 'uMottle', 'uSparkle'].forEach((n, i) => gl.uniform1i(p.u[n], i));
+      gl.uniform1f(p.u.uLit, 1 - TUN_DIM * tun.inside);
       gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uRS, RS); gl.uniform1f(p.u.uPH, PH);
       gl.uniform1f(p.u.uGrain, cabGrain ? grainAmt * Z.cab / MAXL : 0);
       gl.uniform1i(p.u.uLow, 1); gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
@@ -4076,6 +4140,30 @@
       street.shadow(c.getContext('2d'), (d, x) => ({ x: (x + w / 2 + SH_M) * ppm, y: (l + SH_M - d) * ppm, s: ppm }), 0, 0, w, l, a);
       return c;
     }
+    // the tunnel's wall, 6 m of it (Tunnel): tiled to 2.2 m, joints every 0.6 m up and 1.2 m along, a little grime panel to
+    // panel, the upper wall lighter toward the light. Made from the tunnel's own place along it, so all four are the same
+    function tunnelWall(){
+      const ppm = 40, c = mk(6 * ppm, TUN_H / UPM * ppm), g = c.getContext('2d'), tile = TUN_TILE / UPM * ppm, H0 = c.height, r = rng(4801);
+      const up = g.createLinearGradient(0, 0, 0, H0 - tile); up.addColorStop(0, col('tunnel-wall-top')); up.addColorStop(1, col('tunnel-wall'));
+      g.fillStyle = up; g.fillRect(0, 0, c.width, H0 - tile);
+      const ti = g.createLinearGradient(0, H0 - tile, 0, H0); ti.addColorStop(0, col('tunnel-tile-top')); ti.addColorStop(1, col('tunnel-tile'));
+      g.fillStyle = ti; g.fillRect(0, H0 - tile, c.width, tile);
+      g.fillStyle = col('tunnel-wall');
+      for (let p = 0; p < 5; p++){ g.globalAlpha = 0.05 + 0.2 * r(); g.fillRect(p * 1.2 * ppm, H0 - tile, 1.2 * ppm, tile); }
+      g.globalAlpha = 0.75;
+      for (let y = 0.6; y < 2.2; y += 0.6) g.fillRect(0, H0 - y * ppm, c.width, 1);
+      for (let x = 0; x < 6; x += 1.2) g.fillRect(x * ppm, H0 - tile, 1, tile);
+      g.globalAlpha = 1;
+      return c;
+    }
+    // the strips' glow up the wall (halo: strongest at the strip's height), and their smear on the wet road (strongest at the wall)
+    function tunnelFade(w, h, kind){
+      const c = mk(w, h), g = c.getContext('2d'), glow = col('tunnel-glow'), gr = kind === 'halo' ? g.createLinearGradient(0, 0, 0, h) : g.createLinearGradient(0, 0, w, 0);
+      const clear = glow.replace(/[\d.]+\)$/, '0)');
+      gr.addColorStop(0, kind === 'halo' ? clear : glow); gr.addColorStop(kind === 'halo' ? (TUN_H - TUN_STRIP - TUN_HALO_B) / (TUN_HALO_T - TUN_HALO_B) : 0.5, kind === 'halo' ? glow : clear); gr.addColorStop(1, clear);
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      return c;
+    }
     function addPieces(){
       const up = (key, p) => atlasAdd(key, p.c, true, { ax: p.ax, ay: p.ay, ppm: p.ppm });
       for (const run of [0, 1]){
@@ -4088,6 +4176,7 @@
       atlasAdd('pc:oil:0', street.oil(7)); atlasAdd('pc:oil:1', street.oil(23));
       atlasAdd('pc:pothole', street.pothole()); atlasAdd('pc:pool', street.pool());
       atlasAdd('pc:tunnelFace', street.tunnelFace(48));   // kept whole: it is the portal's face, the mouth left clear
+      atlasAdd('tn:wall', tunnelWall()); atlasAdd('tn:halo', tunnelFade(4, 64, 'halo')); atlasAdd('tn:smear', tunnelFade(64, 4, 'smear'));
       for (const kind of ['pickup', 'dropoff']){ const b = street.bay(kind); atlasAdd('pc:bay:' + kind, b.paint); atlasAdd('pc:glow:' + kind, b.glow); atlasAdd('pc:spill:' + kind, b.spill); }
       for (const k in SHADOWS) atlasAdd('pc:shadow:' + k, shadowPicture(SHADOWS[k][0], SHADOWS[k][1], SHADOWS[k][2]));
       OFFS.forEach((off, v) => {
@@ -4466,6 +4555,7 @@
       },
       api, meter, receipt, zoneChange, touchZones,
       get holding(){ return !!zone; },
+      get insideNow(){ return tun.inside; },
       get fading(){ if (!zone || !zone.ready) return false; const Z = zoneTimes(); return zone.t >= Z.a2 && zone.t < Z.a3; },
       // for the sound: the district the taxi is in (null before a run has one) and its speed in km/h
       get districtNow(){ return run.cap.d < 0 ? null : run.cap.d; },
@@ -5638,7 +5728,7 @@
         while (acc >= STEP) { tick(); acc -= STEP; }
       } else acc = 0;
       if (music) music.sync(state.inGame, state.screen, state.ending, street.ready ? street.districtNow : null, street.holding);
-      ambience.sync(state.inGame, state.screen, state.ending, street.ready && state.inGame ? street.kmhNow : 0);
+      ambience.sync(state.inGame, state.screen, state.ending, street.ready && state.inGame ? street.kmhNow : 0, street.ready ? street.insideNow : 0);
       streetSounds.prepare();
       render(dt);
     }
