@@ -33,20 +33,23 @@ The template, as it is, drives up the street through traffic: a working game to 
 
 ## The test page
 
-`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **9** and **0** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate and the picture it is drawing; in scenes 1, 2 and 7 a fourth line shows the graphics memory and the opening times (the speed check, below).
+`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **9**, **0** and **-** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate, the kit's version and the picture it is drawing; in scenes 1, 2 and 7 a fourth line shows the graphics memory and the opening times (the speed check, below).
 
 | Scene | What it shows |
 |---|---|
 | 1 Drive | All four districts (Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok), the signs, people and traffic, the meter and the district caption. Steer with ← →, brake with ↓; N jumps to just before the next district's edge, and holding F drives at 100 m/s (360 km/h), to see the long street end to end. TIME counts down, and at 00 the run ends: game over, initials and high scores follow. |
 | 2 Mong Kok | The speed check (below). |
 | 3 Power-ups | The five power-up signs (時 錢 快 保 雙), near and far. |
-| 4 Crash | The taxi runs into each kind of vehicle in turn: the crash pop and the brake lights. The words come in turn, CRASH!, SMASH!, BANG!, then one the kit picks at random (as a game gets it); press C, S or B to choose the next word, R for a random one. The plaque shows how long the crash pop's three words took to draw. |
+| 4 Crash | The taxi runs into each kind of vehicle in turn, then roadworks: the crash pop, the brake lights and the two crash sounds. The words come in turn, CRASH!, SMASH!, BANG!, then one the kit picks at random (as a game gets it); press C, S or B to choose the next word, R for a random one. The plaque shows how long the crash pop's three words took to draw. |
 | 5 Vehicles | Every vehicle in every colour, keeping pace with the taxi. |
 | 6 Street | The street's pieces, laid out ahead of the taxi each lap: roadworks closing the left lane, an oil slick, spilt cargo and a flooded pothole; the wild boar, the stray dog, the street cat and the market chickens, each bolting for the kerb as the taxi comes; a passenger waving at the pick-up bay (plain, with a suitcase, then with shopping, one each lap), then the drop-off bay. ↓ slows down. |
 | 7 Long street | Each district in turn, from 40 m before its edge, for 15 seconds at 84 km/h (快's speed) with traffic, while the street is made a piece at a time; then again. After all four, about a minute, the plaque shows the frame rate, the slowest frames, and how many pieces of street were made and how long each took. On a phone this is the way to see every district. |
 | 8 Play screen | Grunge City Rider's play screen (design system v10), a state at a time, 3.5 seconds each, named on the plaque: mid-fare with everything at once (lives, the tip counting, the caption's round line and lamps, the drop-off pin far off, the 快 保 雙 badges with 快 emptying and 保's ring, the roof sign out); a fare paid (the receipt slip); a pick-up ahead (the teal pin, counting down); in the bay (the bay's ring, 保's ring stepping aside, the pin with no tag); getting in (the passenger fading, the roof sign going out); the tip halved and the tip lost (their receipts, the tip's dashes); lives from 3 to 0 and the lamps from 0 to 5. |
 | 9 Moments | Each in turn, laid out ahead of the taxi: the shielded hit on a car (the SAFE! sign over the taxi's roof, the car cleared away, 保's badge and ring gone, no freeze), the shielded hit on roadworks (the SAFE! sign over the barrier), a crash into roadworks (the crash pop, the barriers cleared away, the taxi moved into the open lane in the pop's first second), and the zone change (the street dims, the caption grows into the title of the district finished with its lamps and takings, the taxi jumps to the next district, the title of the new one and its round, then back into the caption). |
-| 0 Touch | The touch zones outlined (only here; nothing marks them in a game): from the top of the meter's case down, either side of the taxi. A touch that starts outside them does nothing. Drag in either to steer (either thumb), two thumbs down to slow; a tap in a zone goes to the next scene. |
+| 0 Touch | The touch zones outlined (only here; nothing marks them in a game): from the top of the meter's case down, either side of the taxi. A touch that starts outside them does nothing, so here a tap over the street does not change scene. Drag in either to steer (either thumb), two thumbs down to slow; a tap inside an outline goes to the next scene, Sound. |
+| - Sound | Over a district line where the music switches: into Yau Ma Tei (Meter Running High), then next time from Mong Kok round into Tsim Sha Tsui (Midnight Fare Dash). 32 seconds for the new track to build, since both start very quietly, then the city sound bed a step louder every 9 seconds (0, 0.15, 0.25, 0.35, 0.5, 0.7; the plaque names the step). For choosing the sound bed's loudness by ear; leaving the scene puts it back. |
+
+On a phone held sideways, the meter, the district caption and the receipt slip keep clear of the camera and the screen's rounded corners (the safe-area insets, as the design system's README asks), as the tiles always have.
 
 Pause (Esc, or the pause tile) and Settings work as in any game, so every screen can be seen. After changing anything in `kit\`, rebuild every City Nights game and look through this page before anything else.
 
@@ -89,7 +92,7 @@ Neither the crash pop nor the street pieces changed the time to draw a frame on 
 
 ### Results, 30 October 2026 (kit 0.7, the long street, Chrome 156)
 
-Measured on the Pixel only so far, from a copy of the test page opened in Chrome from the phone's Files app, with no other tab open. The computer's results are still to come.
+Measured on the Pixel, from a copy of the test page opened in Chrome from the phone's Files app, with no other tab open. The computer's results for the long street are under kit 0.10, below.
 
 | Device | Street alone | With a crash pop | With street pieces | Crash pop words drawn | Picture | Targets |
 |---|---|---|---|---|---|---|
@@ -107,6 +110,22 @@ The long street made no difference to the time to draw a frame; the slowest 1 fr
 
 Opening times vary from run to run by more than the difference between the kits: a first run of kit 0.7, with eight other tabs open, took 3.62 s to build the street. Kit 0.6.1's time comes from a copy of its test page with a timer added, made for this comparison. Making the street a piece at a time never held up a frame: the slowest frame in the whole tour came 20 ms after the one before, against 16.7 ms for one refresh of the screen.
 
+### Results, 30 October 2026 (kit 0.10, the computer, Chrome 156)
+
+| Device | Street alone | With a crash pop | With street pieces | Crash pop words drawn | Picture | Targets |
+|---|---|---|---|---|---|---|
+| Computer, RTX 5080 | 60 fps, under 2.1 ms | 60 fps, under 2.1 ms | 60 fps, under 2.1 ms | 47 ms, 2859 × 1853 each | 1632 × 810, 4× smoothing | pass |
+
+| Computer, RTX 5080 | Kit 0.10 (14.8 km) |
+|---|---|
+| Building the street when the page opens | 772 ms (planning it 34 ms, its first pieces 8 ms) |
+| Start game worked | 0.94 s after opening |
+| The street's shapes on the graphics chip | 3.9 to 4.8 MB |
+| Graphics memory in all (the kit's count) | 243 to 248 MB: textures 178 to 183, picture buffers 61 |
+| Long street (scene 7): all four districts at 84 km/h | 60 fps; slowest 1 in 20 came 17 ms apart, the slowest of all 17 ms; 88 pieces made, 0.6 ms each |
+
+The time to draw a frame is the same as kits 0.4 and 0.6, and making the street a piece at a time never held up a frame. These three runs do not yet have the whole play screen on at once; that is a fourth run still to come. The kit's memory count covers the graphics chip only, so it leaves out the decoded music, and Chrome's Task Manager has not been read yet.
+
 ## The long street (kit 0.7)
 
 Each district is 3.7 km long (`district-length`), so the street is 14.8 km, long enough for a whole zone of Grunge City Rider. It used to be 560 m. Each district keeps its look: its buildings, shop fronts, signs and people are picked the same way as before, and the first 560 m bend as the old street did.
@@ -114,6 +133,15 @@ Each district is 3.7 km long (`district-length`), so the street is 14.8 km, long
 Made whole, as the old street was, a 14.8 km street would need about 275 MB of the graphics chip just for its shapes, against 10.6 MB for the old one. So the kit plans the whole street when it opens, which is quick, and makes its shapes a piece at a time (25 m to a piece) as the taxi drives. Eight pieces are kept on the graphics chip, the stretch from the camera on: at most about 5 MB. The next piece ahead is made a millisecond a frame. A piece the picture needs at once, at the start or after a jump (a district's start, or the test page's N), is made there and then: a brief pause, which the zone-change title will cover in the game. People walk only near the camera, each within 30 m of where it started.
 
 In the app's own browser on Barney's computer (not Chrome; a rough guide only): building the street when the page opens took 784 ms against 775 ms for kit 0.6.1. Planning the 14.8 km street takes about 60 ms; making the first pieces about 20 ms, where the old street's shapes took about 100 ms. Each piece takes under 1 ms to make on that computer. The real measures are Barney's: the Pixel's are in the speed check's results above, and the computer's are still to come.
+
+## Sound (kit 0.10)
+
+- **The shell's sounds** are Retro Kit's set, made in code. A game's own sounds (Grunge City Rider's horn, the crash, a fare paid and so on) are made with `cn.sfx.tone` and `cn.sfx.noise`.
+- **The engine**: a steady note made in code that rises with the taxi's speed, during a run only.
+- **Crashes and animals**, made in code, for a game to play: `cn.sfx.crash('vehicle')` (a heavy thump, metal crunching and ringing, glass falling, bits landing), `cn.sfx.crash('obstacle')` (a hollow plastic thock and a crack, then barriers and cones bouncing away) and `cn.sfx.animal('boar')`, `'dog'`, `'cat'` or `'chickens'` as an animal bolts. Scene 4 plays the crashes, scene 9 the roadworks one, scene 6 the animals.
+- **The city sound bed**, made in code: rain (noise only: a soft wash with thousands of tiny ticks of noise in it, and heavier pats on a loop of another length), a low traffic rumble that swells and falls, and now and then a horn far off to one side. It plays under the title and in play, at half loudness behind a panel. Its loudness against the music is 0.5, Barney's choice by ear on the test page (scene -, Sound).
+- **Soundtracks**: a game gives one (`music: { data }`) or two, each for its districts (`music: [{ data, districts: [0, 1] }, { data, districts: [2, 3] }]`). When the street moves to the other track's districts, the old one fades (over 2 s as the taxi crosses the line, 1.5 s under a zone change's title) and the new one starts from its beginning; pause keeps the place, a new game starts the first track from the top, game over fades out. Both are decoded behind the title screen (about 120 MB of memory for Grunge City Rider's two). Both tracks open very quietly and reach full level after 20 to 30 seconds. They play at 0.525 of the file's full level against the sound effects (Barney, 30 October: Retro Kit's 0.35, 50% louder); a game can give its own with `level`.
+- **The soundtrack files**: a game's own `music.js` beside its `index.html`, or a file in `music\` that more than one page shares. `music\grunge-city-rider.js` holds Grunge City Rider's two tracks, *Midnight Fare Dash* and *Meter Running High*, as text; the game and the test page both copy it in, so each built file is about 10.8 MB larger.
 
 ## Picture: Automatic, Best, Faster, Fastest
 
@@ -133,6 +161,7 @@ Under Settings. **Best** is 4× edge smoothing at full sharpness (up to 1.5 canv
 | `kit\build.py` | Turns a game's source into one playable file, and checks it against the rules |
 | `kit\template.html` | Starting point for a new game |
 | `kit\fonts\`, `kit\licences\` | The six font files and their licences (SIL Open Font License: free to embed in games); Bangers is for the crash pop's letters and the SAFE! sign's word only. `fonts\characters.txt` lists the Chinese characters the fonts hold, for the build's check |
+| `music\grunge-city-rider.js` | Grunge City Rider's two soundtracks, as text, shared by the game and the test page |
 | `games\cn-sampler\` | The test page |
 | `games\cn-empty\` | The template as a game, to prove the template builds |
 | `..\dist\<name>.html` | The built games, shared with Retro Kit's (not kept in git) |

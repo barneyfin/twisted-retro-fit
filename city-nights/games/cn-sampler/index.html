@@ -7,6 +7,8 @@
 <!-- The kit. build.py copies both files, the fonts and their licences into dist/<game>.html. Keep data-cn-inline. -->
 <link rel="stylesheet" href="../../kit/city-nights.css" data-cn-inline>
 <script src="../../kit/city-nights.js" data-cn-inline></script>
+<!-- Grunge City Rider's two soundtracks, shared with the game (build.py copies them in) -->
+<script src="../../music/grunge-city-rider.js" data-cn-inline></script>
 <style>
 /* the test page's readout, top left over the picture, on the kit's dark plaque */
 .cs-readout{position:absolute;top:var(--space-6);left:var(--space-6);display:block;max-width:min(430px,calc(100% - 160px));padding:8px 12px;font:500 13px/18px var(--font-ui);pointer-events:none}
@@ -30,22 +32,31 @@
    (Grunge City Rider's information and moments, a state at a time: the meter with lives and the tip, the caption's round
    line, the pin, the badges and 保's ring, the bay's ring, the passenger getting in, the roof sign, the receipt slip),
    9 Moments (the SAFE! sign over a car and over a barrier, the crash pop at roadworks with the move into the open lane,
-   and the zone change), 10 Touch (the touch zones outlined: drag, hold or tap in either; tap in one for the next scene).
-   Keys 1-9 and 0 change scene; on a phone, tap for the next one. */
+   and the zone change), 10 Touch (the touch zones outlined: drag, hold or tap in either; tap in one for the next scene),
+   11 Sound (over a district line where the music switches, the 30 s the new track takes to build, then the city sound
+   bed a step louder every 9 s, to choose its loudness by ear). The page plays Grunge City Rider's two soundtracks, switched by district.
+   Keys 1-9, 0 and - change scene; on a phone, tap for the next one. */
 
-const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street', 'Play screen', 'Moments', 'Touch'];
+const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street', 'Play screen', 'Moments', 'Touch', 'Sound'];
+const SCENE_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'Minus'];
 const NOTES = [
   'All four districts, traffic, the meter and the caption. ← → steer, ↓ brakes, N jumps to the next district, hold F to drive fast. TIME runs out at 00 and the run ends.',
   '',
   'The five power-ups hovering over the road, near and far.',
-  'The taxi runs into each vehicle in turn: the crash pop and the brake lights.',
+  'The taxi runs into each vehicle in turn, then roadworks: the crash pop, the brake lights and the two crash sounds.',
   'Every vehicle in every colour, keeping pace with the taxi.',
   'Roadworks, oil, spilt cargo and a pothole; the four animals, each bolting as the taxi comes; a passenger at the pick-up bay, then the drop-off bay. ↓ slows down.',
   '',
   '',
   '',
+  '',
   ''
 ];
+// Sound: from SOUND_LEAD metres before a line where the music switches, SOUND_BUILD seconds for the new track to build (both
+// tracks start very quietly), then the sound bed's loudness steps through SOUND_BED, one step each SOUND_LEG seconds; then the next line
+// before a line where the music switches (into Yau Ma Tei, then from Mong Kok round into Tsim Sha Tsui)
+const SOUND_BED = [0, 0.15, 0.25, 0.35, 0.5, 0.7], SOUND_LEG = 9, SOUND_BUILD = 32, SOUND_LEAD = 50, SOUND_SPEED = 19;
+const TRACK_NAMES = ['Midnight Fare Dash (Tsim Sha Tsui and Jordan)', 'Meter Running High (Yau Ma Tei and Mong Kok)'];
 // Play screen: Grunge City Rider's states in turn, PLAY_STEP seconds each, then round again (the plaque names each)
 const PLAY_STEP = 3.5;
 const PLAY = [
@@ -58,7 +69,7 @@ const PLAY = [
   'The tip lost (driving past the drop-off): the tip struck through, and dashes on the meter.',
   'Lives from 3 down to 0, and the round\'s lamps from 0 to 5.'
 ];
-const TOUCH_NOTE = 'The touch zones, outlined: from the top of the meter\'s case down, either side of the taxi. Drag in either to steer, hold to brake; a touch outside them does nothing. Tap in one for the next scene.';
+const TOUCH_NOTE = 'The touch zones, outlined: from the top of the meter\'s case down, either side of the taxi. Drag in either to steer, hold to brake; a touch outside them does nothing. Tap inside an outline for the next scene (11, Sound).';
 // Moments: each in turn, the taxi meeting what is laid ahead of it, then a pause; the zone change last
 const MOMENTS = [
   ['safe-car', 'The shielded hit, a car: 保 takes the crash, the SAFE! sign lights over the taxi\'s roof, the car is cleared away, and 保\'s badge and ring go. No freeze.'],
@@ -87,7 +98,7 @@ const LINEUP = [   // Vehicles: metres ahead of the taxi, lane (0 left, 1 middle
   [19, 0, 'van', 0], [19, 2, 'van', 1], [25, 1, 'sedan', 2],
   [30, 0, 'minibus', 0], [30, 2, 'minibus', 1], [37, 1, 'van', 2]
 ];
-const CRASHERS = [['taxi', 0], ['sedan', 1], ['van', 2], ['minibus', 0]];
+const CRASHERS = [['taxi', 0], ['sedan', 1], ['van', 2], ['minibus', 0], ['roadworks']];
 const mongKok = (cn) => cn.street.districts[3].z + 0.5;   // metres: just inside Mong Kok, where the speed test began
 
 /* The speed check, as the speed test ran it: the street drives through Mong Kok at 68 km/h and every gap between
@@ -119,8 +130,10 @@ CityNights.game({
   id: 'cn-sampler',
   title: ['City Nights', 'Sampler'],
   zh: '的士',
-  keys: [['1', '0', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
+  keys: [['1', '-', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
   touch: 'Drag to steer · Tap for the next scene',
+  // Grunge City Rider's two soundtracks, each for its districts (the design system's Sound section)
+  music: [{ data: window.MIDNIGHT_FARE_DASH, districts: [0, 1] }, { data: window.METER_RUNNING_HIGH, districts: [2, 3] }],
 
   start(cn) {
     // the readout goes on the play layer, which the kit makes afresh for each run
@@ -135,7 +148,7 @@ CityNights.game({
 
   update(g, cn) {
     const taxi = cn.street.taxi, dt = 1 / 60, n = SCENES.length;
-    for (let i = 0; i < n; i++) if (cn.input.keyPressed('Digit' + ((i + 1) % 10)) || cn.input.keyPressed('Numpad' + ((i + 1) % 10))) setScene(g, cn, i);
+    for (let i = 0; i < n; i++) { const k = SCENE_KEYS[i]; if (cn.input.keyPressed(k.length === 1 ? 'Digit' + k : k) || cn.input.keyPressed(k.length === 1 ? 'Numpad' + k : 'NumpadSubtract')) setScene(g, cn, i); }
     if (cn.input.tap) setScene(g, cn, (g.scene + 1) % n);
     // steering, in every scene
     if (cn.input.left) taxi.x -= 1.4 * dt;
@@ -148,13 +161,14 @@ CityNights.game({
     const scene = SCENES[g.scene], c = g.crash;
     taxi.speed = scene === 'Drive' ? (cn.input.down ? 4 : cn.input.key('KeyF') ? FAST : 16) : scene === 'Mong Kok' ? (cn.input.down ? 4 : 19)
       : scene === 'Power-ups' ? 5 : scene === 'Vehicles' ? 6 : scene === 'Street' ? (cn.input.down ? 3 : 8)
-      : scene === 'Long street' ? TOUR_SPEED : scene === 'Play screen' ? playSpeed(g) : scene === 'Moments' ? momentSpeed(g)
+      : scene === 'Long street' ? TOUR_SPEED : scene === 'Play screen' ? playSpeed(g) : scene === 'Moments' ? momentSpeed(g) : scene === 'Sound' ? SOUND_SPEED
       : scene === 'Touch' ? (cn.input.down || (cn.input.pointer.down && cn.input.pointer2.down) ? 3 : 10)   // two thumbs down: one steers, one holds
       : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
     taxi.z += taxi.speed * dt;
     if (scene === 'Play screen') playStep(g, cn, dt);
     if (scene === 'Moments') momentStep(g, cn, dt);
-    if (scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' || scene === 'Play screen' || scene === 'Touch') {
+    if (scene === 'Sound') soundStep(g, cn, dt);
+    if (scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' || scene === 'Play screen' || scene === 'Touch' || scene === 'Sound') {
       for (const car of cn.street.cars) car.z += car.speed * dt;
       cn.street.recycle(cn.street.cars);
       if (scene === 'Drive') {
@@ -182,7 +196,7 @@ CityNights.game({
       cn.street.cars.forEach((car, i) => { car.z = taxi.z + LINEUP[i][0]; });
     } else if (scene === 'Street') {
       // each animal bolts the way it faces as the taxi comes; past a bay, the next one, and after the drop-off a new lap
-      for (const an of cn.street.animals) if (!an.bolt && cn.street.gap(taxi.z, an.z) < BOLT_AT) an.bolt = an.face;
+      for (const an of cn.street.animals) if (!an.bolt && cn.street.gap(taxi.z, an.z) < BOLT_AT) { an.bolt = an.face; cn.sfx.animal(an.kind); }
       const bay = cn.street.stop;
       if (bay && cn.street.gap(taxi.z, bay.z + 10) > cn.street.length / 2) {
         if (g.lay.stop === 0) setStop(g, cn, 1); else layStreet(g, cn, g.lay.lap + 1);
@@ -194,6 +208,20 @@ CityNights.game({
         if (c.wait <= 0) { c.i = (c.i + 1) % CRASHERS.length; placeCrasher(g, cn); }
         return;
       }
+      // the roadworks: the barriers stand 7 m in, across the kerbside lane
+      const works = cn.street.obstacles[0];
+      if (works) {
+        if (taxi.z + cn.street.size('taxi').length >= works.z + 7) {
+          if (taxi.x < (cn.street.lanes[0] + cn.street.lanes[1]) / 2) {
+            cn.picture.nextPop = POPS[c.pop][0];
+            c.pop = (c.pop + 1) % POPS.length;
+            cn.street.crash(works.z + 7, taxi.x);
+            cn.sfx.crash('obstacle');
+            c.wait = 1.2;
+          } else placeCrasher(g, cn);   // steered past it
+        }
+        return;
+      }
       // the taxi's front against the vehicle's rear (z is a vehicle's rear), and whether they overlap side to side
       const car = cn.street.cars[0], L = cn.street.size('taxi'), S = cn.street.size(car.kind);
       const ahead = cn.street.gap(taxi.z + L.length, car.z);
@@ -203,7 +231,7 @@ CityNights.game({
         cn.picture.nextPop = POPS[c.pop][0];   // 'random' is no word, so the kit picks
         c.pop = (c.pop + 1) % POPS.length;
         cn.street.crash(car.z, (taxi.x + car.x) / 2);
-        cn.sfx('hit');
+        cn.sfx.crash('vehicle');
         c.wait = 1.2;
       } else if (reached) placeCrasher(g, cn);   // steered past it
     }
@@ -227,6 +255,8 @@ function setScene(g, cn, i) {
   g.result = null;
   g.tour = null;
   g.play = null;
+  if (g.sound) cn.picture.bed = g.sound.was;   // the sound bed back as it was
+  g.sound = null;
   st.tokens = [];
   // today's meter and caption, and nothing carried, unless the scene says otherwise
   Object.assign(cn.meter, { lives: null, tip: null, round: null, fares: 0 });
@@ -245,6 +275,9 @@ function setScene(g, cn, i) {
   } else if (scene === 'Moments') {
     g.mo = { k: -1, t: MOMENT_GAP, phase: 'gap' };
     st.cars = [];
+  } else if (scene === 'Sound') {
+    st.cars = g.traffic;
+    g.sound = { line: -1, step: -1, t: 0, was: cn.picture.bed };
   } else if (scene === 'Touch') {
     st.cars = g.traffic;
     cn.picture.touchZones = true; cn.picture.showZones = true;
@@ -293,6 +326,23 @@ function jumpTo(cn, z) {
   st.place({ z });
   for (const car of st.cars) car.z += d;
 }
+/* ----- Sound: over a line where the music switches, time for the new track to build, then the sound bed's steps ----- */
+function soundStep(g, cn, dt) {
+  const s = g.sound, st = cn.street;
+  s.t -= dt;
+  if (s.t > 0) return;
+  s.step++;
+  if (s.line < 0 || s.step === SOUND_BED.length) {
+    s.line++; s.step = -1; s.t = SOUND_BUILD;
+    cn.picture.bed = s.was;
+    // into Yau Ma Tei (to Meter Running High), then from Mong Kok round into Tsim Sha Tsui (to Midnight Fare Dash)
+    jumpTo(cn, (s.line % 2 === 0 ? st.districts[2].z : st.length) - SOUND_LEAD);
+    return;
+  }
+  cn.picture.bed = SOUND_BED[s.step];
+  s.t = SOUND_LEG;
+}
+
 /* ----- Moments: lay out the next one ahead of the taxi, wait for the taxi to meet it, show it, pause, go on ----- */
 function momentSpeed(g) { const mo = g.mo; return mo && mo.phase === 'stopped' ? 0 : 10; }
 function momentStep(g, cn, dt) {
@@ -327,7 +377,7 @@ function momentStep(g, cn, dt) {
     } else {
       const works = st.obstacles[0], hit = works && taxi.z + L >= works.z + 7;   // the barriers stand 7 m into the roadworks
       if (hit && kind === 'safe-works') { st.safe(works.z + 7, taxi.x); st.obstacles = []; taxi.carry = null; mo.phase = 'gap'; mo.t = MOMENT_GAP; }
-      else if (hit) { st.crash(works.z + 7, taxi.x); mo.phase = 'stopped'; mo.t = 1.4; mo.moved = false; }
+      else if (hit) { st.crash(works.z + 7, taxi.x); cn.sfx.crash('obstacle'); mo.phase = 'stopped'; mo.t = 1.4; mo.moved = false; }
     }
   } else if (mo.phase === 'stopped') {
     // in the pop's first second: the barriers cleared away, the taxi moved into the open lane
@@ -397,8 +447,16 @@ function memLine(cn) {
     fmt(o.ready / 1000, 2) + ' s, first picture at ' + fmt(o.shown / 1000, 2) + ' s';
 }
 function placeCrasher(g, cn) {
-  const v = CRASHERS[g.crash.i];
-  cn.street.cars = [{ z: cn.street.taxi.z + 30, x: cn.street.lanes[1], kind: v[0], tone: v[1] }];
+  const v = CRASHERS[g.crash.i], st = cn.street;
+  st.obstacles = [];
+  if (v[0] === 'roadworks') {
+    st.cars = [];
+    st.place({ x: st.lanes[0] });
+    st.obstacles = [{ kind: 'roadworks', z: st.taxi.z + 30, x: st.lanes[0] }];
+  } else {
+    if (g.crash.i === 0) st.place({ x: 0 });
+    st.cars = [{ z: st.taxi.z + 30, x: st.lanes[1], kind: v[0], tone: v[1] }];
+  }
 }
 
 /* ----- the speed check ----- */
@@ -479,6 +537,12 @@ function showReadout(g, cn) {
   const mem = scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' ? memLine(cn) : '';
   if (scene === 'Moments' && g.mo) {
     note = g.mo.k < 0 ? 'The moments, each in turn.' : (g.mo.k + 1) + ' of ' + MOMENTS.length + ': ' + MOMENTS[g.mo.k][1];
+  } else if (scene === 'Sound' && g.sound) {
+    const mu = cn.picture.music, L = cn.street.length, z = ((cn.street.taxi.z % L) + L) % L;
+    const now = g.sound.step < 0 ? 'Crossing a line where the music switches, then letting the track build: it starts very quietly. Sound bed <b>' + cn.picture.bed.toFixed(2) + '</b>; its steps start in ' + Math.ceil(g.sound.t) + ' s.'
+      : 'Sound bed loudness <b>' + cn.picture.bed.toFixed(2) + '</b> (' + (g.sound.step + 1) + ' of ' + SOUND_BED.length + ': a step louder each ' + SOUND_LEG + ' s).';
+    note = now + ' Now in ' + cn.street.district(z).en + '; music: ' +
+      (mu ? TRACK_NAMES[mu.track] + (mu.states.every((s) => s === 'ready') ? '' : ' (decoding: ' + mu.states.join(', ') + ')') : 'none, this copy has no soundtracks') + '.';
   } else if (scene === 'Touch') {
     note = TOUCH_NOTE;
   } else if (scene === 'Play screen' && g.play) {
@@ -504,7 +568,7 @@ function showReadout(g, cn) {
     note += ' Next: ' + next + (cn.touch ? (next.endsWith('!') ? '' : '.') : ' (C, S or B for a word, R for a random one).');
     extra = 'C' + popMade(p).slice(1) + '.';
   }
-  const lines = ['<b>' + (g.scene + 1) + ' ' + scene + '</b> · ' + (p.fps ? Math.round(p.fps) : '…') + ' fps', note, extra, mem];
+  const lines = ['<b>' + (g.scene + 1) + ' ' + scene + '</b> · ' + (p.fps ? Math.round(p.fps) : '…') + ' fps · kit ' + cn.version, note, extra, mem];
   const key = lines.join('|');
   if (key === g.shown) return;
   g.shown = key;

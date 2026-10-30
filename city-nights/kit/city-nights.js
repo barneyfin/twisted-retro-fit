@@ -1,4 +1,4 @@
-/* City Nights 0.9.1 — runtime
+/* City Nights 0.10.0 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.9.1';
+  const VERSION = '0.10.0';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -219,18 +219,25 @@
     return a;
   }
 
-  /* ---------- Music (optional: one looping track, given as MP3 text in the game's config) ----------
-     Retro Kit's, unchanged: it plays on a loop during play, stops for the pause menu and picks up where it left
-     off, starts again from the top with each new game, fades out when the game ends, and follows the Volume
-     setting and the sound tile. */
+  /* ---------- Music (optional: a looping track, or two, given as MP3 text in the game's config) ----------
+     Retro Kit's, grown to two tracks for City Nights (ARCADE.md; the design system's Sound section): music: { data } for
+     one, or music: [{ data, districts: [0, 1] }, { data, districts: [2, 3] }] for two, each for its districts. It plays
+     on a loop during play, stops for the pause menu and picks up where it left off, starts again from the top with each
+     new game, fades out when the game ends, and follows the Volume setting and the sound tile. When the street changes
+     to a district of the other track, the old one fades (over 2 s as the taxi crosses the line; 1.5 s under a zone
+     change's title) and the new one starts from its beginning; a change that keeps the same track changes nothing. */
   function makeMusic(audio, settings, opts) {
-    const share = opts.level == null ? 0.35 : clamp(+opts.level || 0, 0, 1);   // against the sound effects; 1 = the file's full level
-    const m = { state: 'idle', buf: null, out: null, src: null, voice: null, t0: 0, offset: 0, loopStart: 0, loopEnd: 0, level: -1 };
-    const fail = () => {
-      m.state = 'none';
-      console.warn('City Nights: the music could not be loaded, so the game plays without it.');
+    const list = (Array.isArray(opts) ? opts : [opts]).filter((o) => o && typeof o === 'object').slice(0, 2);
+    const lead = list[0] || {};
+    const share = lead.level == null ? 0.525 : clamp(+lead.level || 0, 0, 1);   // against the sound effects; 1 = the file's full level (Barney, 30 October: Retro Kit's 0.35, 50% louder)
+    const tracks = list.map((o) => ({ data: o.data, districts: Array.isArray(o.districts) ? o.districts : null, state: 'idle', buf: null,
+      loopStart: 0, loopEnd: 0, offset: 0, src: null, voice: null, t0: 0 }));
+    const m = { out: null, level: -1, cur: 0, tracks: tracks };
+    const fail = (tr) => {
+      tr.state = 'none';
+      console.warn('City Nights: a soundtrack could not be loaded, so the game plays without it.');
     };
-    function ready(buf) {
+    function ready(tr, buf) {
       // MP3 files carry a moment of silence at each end. Loop between the first and last real sound.
       const ch = buf.getChannelData(0);
       let a = 0;
@@ -238,64 +245,71 @@
       while (a < b && Math.abs(ch[a]) < 0.004) a++;
       while (b > a && Math.abs(ch[b]) < 0.004) b--;
       const whole = b - a < buf.sampleRate;
-      m.loopStart = whole ? 0 : a / buf.sampleRate;
-      m.loopEnd = whole ? buf.duration : (b + 1) / buf.sampleRate;
-      m.buf = buf;
-      m.state = 'ready';
+      tr.loopStart = whole ? 0 : a / buf.sampleRate;
+      tr.loopEnd = whole ? buf.duration : (b + 1) / buf.sampleRate;
+      tr.buf = buf;
+      tr.state = 'ready';
     }
-    // Decodes the track, once. Unlike playing, this needs no key press or tap, so it can run behind the title screen.
+    // Decodes the tracks, once each. Unlike playing, this needs no key press or tap, so it can run behind the title screen.
     m.load = function () {
-      if (m.state !== 'idle') return;
       const Decoder = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-      if (!Decoder || typeof opts.data !== 'string' || !opts.data) { fail(); return; }
-      m.state = 'loading';
-      try {
-        const bin = atob(opts.data);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        const job = new Decoder(2, 1, 44100).decodeAudioData(bytes.buffer, ready, fail);
-        if (job && job.catch) job.catch(() => {});
-      } catch (e) { fail(); }
+      tracks.forEach((tr) => {
+        if (tr.state !== 'idle') return;
+        if (!Decoder || typeof tr.data !== 'string' || !tr.data) { fail(tr); return; }
+        tr.state = 'loading';
+        try {
+          const bin = atob(tr.data);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const job = new Decoder(2, 1, 44100).decodeAudioData(bytes.buffer, (buf) => ready(tr, buf), () => fail(tr));
+          if (job && job.catch) job.catch(() => {});
+        } catch (e) { fail(tr); }
+      });
     };
-    function start() {
+    // which track a district has (the first, if none names it)
+    const trackFor = (d) => { const i = tracks.findIndex((tr) => tr.districts && tr.districts.indexOf(d) >= 0); return i < 0 ? 0 : i; };
+    function start(tr) {
       const ctx = audio.ctx;
       const now = ctx.currentTime;
       const src = ctx.createBufferSource();
-      src.buffer = m.buf;
+      src.buffer = tr.buf;
       src.loop = true;
-      src.loopStart = m.loopStart;
-      src.loopEnd = m.loopEnd;
+      src.loopStart = tr.loopStart;
+      src.loopEnd = tr.loopEnd;
       const voice = ctx.createGain();
       voice.gain.setValueAtTime(0, now);
       voice.gain.linearRampToValueAtTime(1, now + 0.3);
       src.connect(voice);
       voice.connect(m.out);
-      src.start(now, m.offset);
-      m.src = src;
-      m.voice = voice;
-      m.t0 = now - m.offset;
+      src.start(now, tr.offset);
+      tr.src = src;
+      tr.voice = voice;
+      tr.t0 = now - tr.offset;
     }
-    // Fades out over `fade` seconds and remembers the place in the track.
-    m.stop = function (fade) {
-      if (!m.src) return;
+    // Fades a track out over `fade` seconds and remembers its place.
+    function stop(tr, fade) {
+      if (!tr || !tr.src) return;
       const now = audio.ctx.currentTime;
-      const at = now - m.t0;
-      m.offset = at < m.loopEnd ? at : m.loopStart + (at - m.loopStart) % (m.loopEnd - m.loopStart);
-      const gain = m.voice.gain;
+      const at = now - tr.t0;
+      tr.offset = at < tr.loopEnd ? at : tr.loopStart + (at - tr.loopStart) % (tr.loopEnd - tr.loopStart);
+      const gain = tr.voice.gain;
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(gain.value, now);
       gain.linearRampToValueAtTime(0, now + fade);
-      m.src.stop(now + fade + 0.02);
-      m.src = null;
-      m.voice = null;
-    };
-    // A new game: back to the top of the track.
+      tr.src.stop(now + fade + 0.02);
+      tr.src = null;
+      tr.voice = null;
+    }
+    m.stop = function (fade) { stop(tracks[m.cur], fade); };
+    // A new game: back to the top of the first track.
     m.rewind = function () {
-      m.stop(0.08);
-      m.offset = 0;
+      tracks.forEach((tr) => { stop(tr, 0.08); tr.offset = 0; });
+      m.cur = 0;
     };
-    // Called every frame: makes the music match the screen the player is on and the sound settings.
-    m.sync = function (inGame, screen, ending) {
+    // Called every frame: makes the music match the screen the player is on, the sound settings, and the district the
+    // taxi is in (quick: under a zone change's title, so the old track fades sooner)
+    m.sync = function (inGame, screen, ending, district, quick) {
+      if (!tracks.length) return;
       const level = settings.muted ? 0 : (settings.volume / 100) * share;
       const playing = inGame && screen === 'play' && !ending;
       const keepPlace = playing || (inGame && (screen === 'paused' || screen === 'settings'));
@@ -310,13 +324,305 @@
         m.level = level;
         m.out.gain.setTargetAtTime(level, audio.ctx.currentTime, 0.04);
       }
+      // the street has moved to the other track's districts: the old one fades, the new one will start from its beginning
+      const want = inGame && district != null ? trackFor(district) : m.cur;
+      if (want !== m.cur) {
+        stop(tracks[m.cur], quick ? 1.5 : 2);
+        tracks[m.cur].offset = 0;
+        m.cur = want;
+        tracks[want].offset = 0;
+      }
+      const tr = tracks[m.cur];
       if (playing && level > 0) {
-        if (m.state === 'idle') m.load();
-        if (!m.src && m.buf && m.out && audio.ctx.state === 'running') start();
-      } else if (m.src) m.stop(ending ? 0.7 : 0.08);
-      if (!keepPlace) m.offset = 0;
+        if (tr.state === 'idle') m.load();
+        if (!tr.src && tr.buf && m.out && audio.ctx.state === 'running') start(tr);
+      } else if (tr.src) stop(tr, ending ? 0.7 : 0.08);
+      if (!keepPlace) tracks.forEach((t) => { t.offset = 0; });
     };
     return m;
+  }
+
+  /* ---------- The street's own sound: the city sound bed and the taxi's engine (synthesised; no audio files) ----------
+     The sound bed (the design system's Sound section: rain, traffic, horns) plays under the title and play, quieter
+     behind a panel; its loudness against the music, 0.5, is Barney's choice by ear (the test page can change it: bed, 0 to 1). The engine is a
+     steady note that rises with the taxi's speed, in play only. Both follow the Volume setting and the sound tile. */
+  function makeAmbience(audio, settings) {
+    const s = { nodes: null, bed: 0.5, nextHorn: 0 };   // bed: Barney's choice by ear, 30 October
+    function noise(ctx, brown) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < d.length; i++) {
+        const w = Math.random() * 2 - 1;
+        if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w;
+      }
+      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; return src;
+    }
+    function filter(ctx, type, f, q) { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; if (q) n.Q.value = q; return n; }
+    // Rain, written out once and looped. Noise only: anything with a pitch turns musical (Barney, 30 October). The first
+    // loop is a soft wash, more low than high, with thousands of tiny ticks of noise in it, the patter; the second, of another
+    // length so that no pattern ever comes round again, is heavier pats on the roof and the awnings.
+    function rainLoop(ctx, secs, wash, drops) {
+      const sr = ctx.sampleRate, len = Math.floor(sr * secs), fade = Math.floor(sr * 0.02), buf = ctx.createBuffer(2, len, sr), L = buf.getChannelData(0), R = buf.getChannelData(1);
+      const pole = (f) => 1 - Math.exp(-2 * Math.PI * f / sr);
+      if (wash) {
+        const k1 = pole(wash.top), k2 = pole(wash.top * 3), kH = pole(wash.bottom), long = new Float32Array(len + fade);
+        for (const d of [L, R]) {
+          let a = 0, b = 0, hi = 0;
+          for (let i = 0; i < long.length; i++) { a += k1 * (Math.random() * 2 - 1 - a); b += k2 * (a - b); hi += kH * (b - hi); long[i] = (b - hi) * wash.amp; }
+          for (let i = 0; i < len; i++) d[i] = long[i];
+          for (let i = 0; i < fade; i++) { const u = i / fade; d[i] = long[i] * u + long[len + i] * (1 - u); }   // the end fades into the start, so the loop has no click
+        }
+      }
+      for (const [count, grain] of drops) {
+        for (let c = 0; c < count * secs; c++) {
+          // a tick of noise between two cut-offs, with a quick start and a quick end, somewhere across the stereo picture
+          const g = grain(), n = Math.floor(g.dur * sr), at = Math.floor(Math.random() * len), pan = Math.random() * Math.PI / 2, gl = Math.cos(pan), gr = Math.sin(pan);
+          const kA = pole(g.high), kB = pole(g.low), die = Math.exp(-4 / n);
+          let a = 0, b = 0, env = g.amp;
+          for (let i = 0; i < n; i++) {
+            a += kA * (Math.random() * 2 - 1 - a); b += kB * (a - b);
+            const v = (a - b) * env * Math.min(1, i / (sr * 0.0005)) * (1 - i / n), j = (at + i) % len;
+            L[j] += v * gl; R[j] += v * gr;
+            env *= die;
+          }
+        }
+      }
+      let sum = 0;
+      for (let i = 0; i < len; i++) sum += L[i] * L[i];
+      return { buf, rms: Math.sqrt(sum / len) };
+    }
+    function rainLoops(ctx) {
+      const rnd = (a, b) => a + Math.random() * (b - a), log = (a, b) => a * Math.pow(b / a, Math.random());
+      const patter = rainLoop(ctx, 6, { top: 1800, bottom: 220, amp: 0.15 }, [[300, () => { const low = log(600, 2400); return { low, high: low * 2.2, dur: rnd(0.0015, 0.005), amp: 0.25 + 0.9 * Math.pow(Math.random(), 3) }; }]]);
+      const pats = rainLoop(ctx, 9.7, null, [[35, () => { const low = log(220, 520); return { low, high: low * 3, dur: rnd(0.008, 0.024), amp: 0.35 + 0.8 * Math.pow(Math.random(), 2) }; }]]);
+      return { patter, pats };
+    }
+    function build() {
+      const ctx = audio.ctx, n = {};
+      n.bed = ctx.createGain(); n.bed.gain.value = 0; n.bed.connect(audio.master);
+      // rain, its loudness drifting slowly as gusts come and go
+      const rb = rainLoops(ctx), rg = ctx.createGain(), gust = ctx.createOscillator(), gg = ctx.createGain(), level = 0.07 / rb.patter.rms;
+      rg.gain.value = level;
+      gust.frequency.value = 0.09; gg.gain.value = level * 0.2;
+      gust.connect(gg).connect(rg.gain);
+      for (const loop of [rb.patter, rb.pats]) { const rain = ctx.createBufferSource(); rain.buffer = loop.buf; rain.loop = true; rain.connect(rg); rain.start(); }
+      rg.connect(n.bed);
+      gust.start();
+      // traffic: a low rumble that swells and falls slowly
+      const rumble = noise(ctx, true), tg = ctx.createGain(); tg.gain.value = 0.7;
+      const swell = ctx.createOscillator(), sg = ctx.createGain(); swell.frequency.value = 0.06; sg.gain.value = 0.25;
+      swell.connect(sg).connect(tg.gain);
+      rumble.connect(filter(ctx, 'lowpass', 240)).connect(tg).connect(n.bed);
+      rumble.start(); swell.start();
+      // the engine: two notes an octave apart through a filter that opens with speed
+      n.engine = ctx.createGain(); n.engine.gain.value = 0; n.engine.connect(audio.master);
+      n.lp = filter(ctx, 'lowpass', 300, 0.8); n.lp.connect(n.engine);
+      n.e1 = ctx.createOscillator(); n.e1.type = 'sawtooth'; n.e1.frequency.value = 40;
+      n.e2 = ctx.createOscillator(); n.e2.type = 'square'; n.e2.frequency.value = 20;
+      const e2g = ctx.createGain(); e2g.gain.value = 0.5;
+      n.e1.connect(n.lp); n.e2.connect(e2g).connect(n.lp);
+      n.e1.start(); n.e2.start();
+      s.nodes = n;
+    }
+    // a horn far off: two notes together, muffled by distance, somewhere to the left or right
+    function horn() {
+      const ctx = audio.ctx, t = ctx.currentTime, g = ctx.createGain(), bp = filter(ctx, 'bandpass', 900, 1.5);
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null, len = 0.18 + Math.random() * 0.25;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+      g.gain.setValueAtTime(0.12, t + len); g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.08);
+      bp.connect(g);
+      if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; g.connect(pan).connect(s.nodes.bed); } else g.connect(s.nodes.bed);
+      const f = 330 + Math.random() * 120;
+      for (const k of [1, 1.26]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * k; o.connect(bp); o.start(t); o.stop(t + len + 0.1); }
+    }
+    // Called every frame: the bed's level for the screen, the engine for the taxi's speed (km/h)
+    s.sync = function (inGame, screen, ending, kmh) {
+      if (!audio.ctx || audio.ctx.state !== 'running' || settings.muted || settings.volume <= 0) { s.stop(); return; }
+      if (!s.nodes) build();
+      const n = s.nodes, t = audio.ctx.currentTime, panel = !(screen === 'play' || screen === 'title');
+      n.bed.gain.setTargetAtTime(s.bed * (panel ? 0.5 : 1), t, 0.3);
+      const v = clamp(+kmh || 0, 0, 120), run = inGame && screen === 'play' && !ending;
+      n.engine.gain.setTargetAtTime(run ? 0.05 + 0.03 * clamp(v / 84, 0, 1) : 0, t, 0.15);
+      n.e1.frequency.setTargetAtTime(40 + 0.9 * v, t, 0.12);
+      n.e2.frequency.setTargetAtTime((40 + 0.9 * v) / 2, t, 0.12);
+      n.lp.frequency.setTargetAtTime(260 + 7 * v, t, 0.12);
+      if (t > s.nextHorn) { s.nextHorn = t + 3 + Math.random() * 7; if (!panel && s.bed > 0) horn(); }
+    };
+    s.stop = function () {
+      if (!s.nodes) return;
+      const t = audio.ctx.currentTime;
+      s.nodes.bed.gain.setTargetAtTime(0, t, 0.05);
+      s.nodes.engine.gain.setTargetAtTime(0, t, 0.05);
+    };
+    return s;
+  }
+
+  /* ---------- The street's one-off sounds: crashes and animals (synthesised; no audio files) ----------
+     Each is the game's to play: sfx.crash('vehicle' or 'obstacle'), sfx.animal('boar', 'dog', 'cat' or 'chickens').
+     A crash is written out ahead of time, three takes of each (a frame's work each, once sound is allowed), because it
+     has hundreds of small parts: a vehicle is a heavy thump, a body crunching, metal ringing, glass falling and bits
+     landing; an obstacle is a hollow plastic thock and a crack, then barriers and cones bouncing away, with no glass and
+     no long ring. An animal is played live, a voice or two through the filters that make it sound like a throat. */
+  function makeStreetSounds(audio) {
+    const s = {}, TAKES = 3, stock = { vehicle: [], obstacle: [] }, rnd = (a, b) => a + Math.random() * (b - a), log = (a, b) => a * Math.pow(b / a, Math.random());
+    let white = null;
+    // a sheet of sound to write on; pan 0 is left, 1 right
+    function sheet(ctx, secs) {
+      const sr = ctx.sampleRate, n = Math.floor(sr * secs), L = new Float32Array(n), R = new Float32Array(n);
+      const put = (i, v, pan) => { L[i] += v * Math.cos(pan * Math.PI / 2); R[i] += v * Math.sin(pan * Math.PI / 2); };
+      return {
+        // something struck, ringing as it dies away; its pitch falls from f to `to`
+        ring(at, f, dec, amp, pan = 0.5, to = f) {
+          const i0 = Math.floor(at * sr), len = Math.min(Math.floor(dec * 6 * sr), n - i0), fall = Math.exp(-1 / (dec * 0.7 * sr)), die = Math.exp(-1 / (dec * sr));
+          let ph = 0, env = amp, df = f - to;
+          for (let i = 0; i < len; i++) {
+            put(i0 + i, Math.sin(ph) * env * Math.min(1, i / (sr * 0.0003)), pan);
+            ph += 2 * Math.PI * (to + df) / sr; df *= fall; env *= die;
+          }
+        },
+        // a rush of noise, its top falling from `from` to `to` (Hz)
+        burst(at, dur, from, to, amp, pan = 0.5) {
+          const i0 = Math.floor(at * sr), len = Math.min(Math.floor(dur * sr), n - i0), die = Math.exp(-5 / (dur * sr));
+          let lo = 0, env = amp, c = 0;
+          for (let i = 0; i < len; i++) {
+            if (i % 32 === 0) c = 1 - Math.exp(-2 * Math.PI * from * Math.pow(to / from, i / len) / sr);
+            lo += c * (Math.random() * 2 - 1 - lo);
+            put(i0 + i, lo * env * 2, pan);
+            env *= die;
+          }
+        },
+        // squeezed a little for grit, then as loud as it can go without clipping
+        finish() {
+          let peak = 0.001;
+          for (let i = 0; i < n; i++) { L[i] = Math.tanh(L[i] * 1.4); R[i] = Math.tanh(R[i] * 1.4); peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i])); }
+          const buf = ctx.createBuffer(2, n, sr), a = buf.getChannelData(0), b = buf.getChannelData(1), g = 0.95 / peak;
+          for (let i = 0; i < n; i++) { a[i] = L[i] * g; b[i] = R[i] * g; }
+          return buf;
+        }
+      };
+    }
+    function vehicle(ctx) {
+      const p = sheet(ctx, 1.7), base = rnd(210, 300);
+      // the hit, then the body folding a moment later
+      p.ring(0, 125, 0.09, 1.1, 0.5, 38); p.burst(0, 0.45, 6000, 500, 0.8);
+      const again = rnd(0.09, 0.14); p.ring(again, 95, 0.07, 0.6, 0.5, 40); p.burst(again, 0.2, 3500, 400, 0.35);
+      // the crunch: sheet metal giving way
+      for (let i = 0; i < 60; i++) { const r = Math.random(), at = 0.38 * r * r; p.ring(at, log(300, 2800), rnd(0.006, 0.03), 0.05 + 0.25 * (1 - at / 0.4), Math.random()); }
+      // the panels ringing: pitches that do not fit together, as metal's do not
+      [1, 1.47, 2.09, 2.56, 3.39, 4.13, 5.4, 6.8].forEach((m, i) => p.ring(0.005, base * m, rnd(0.18, 0.55), 0.16 - i * 0.014, i % 2 ? 0.3 : 0.7));
+      // the glass: bright, tiny and falling for a second
+      for (let i = 0; i < 140; i++) { const r = Math.random(); p.ring(Math.min(1.3, 0.02 - Math.log(1 - r * 0.998) * 0.22), log(2800, 9500), rnd(0.005, 0.035), 0.03 + 0.14 * Math.pow(Math.random(), 3), Math.random()); }
+      // the bits landing
+      for (let i = 0; i < 22; i++) { const at = rnd(0.25, 1.35), f = log(500, 2000), a = 0.03 + 0.18 * (1 - (at - 0.25) / 1.1), pan = Math.random(); p.ring(at, f, rnd(0.015, 0.045), a, pan); p.ring(at, f * 1.47, 0.02, a * 0.5, pan); }
+      return p.finish();
+    }
+    function obstacle(ctx) {
+      const p = sheet(ctx, 1.5);
+      // the hit: lighter and hollow, a plastic shell over nothing
+      p.ring(0, 180, 0.05, 0.85, 0.5, 70);
+      [[290, 0.11, 0.35], [470, 0.09, 0.3], [730, 0.07, 0.2], [1120, 0.05, 0.15]].forEach(([f, d, a]) => p.ring(0, f * rnd(0.92, 1.08), d, a));
+      // the crack and the splinters; the barrier's post gives one short clang
+      p.burst(0, 0.05, 7000, 1500, 0.7);
+      for (let i = 0; i < 30; i++) p.ring(rnd(0, 0.14), log(900, 4500), rnd(0.003, 0.01), 0.2, Math.random());
+      p.ring(0.05, 1150, 0.09, 0.14, 0.4); p.ring(0.05, 1730, 0.06, 0.08, 0.4);
+      // barriers and cones bouncing away, each bounce quicker and quieter, drifting off to one side
+      for (let b = 0; b < 4; b++) {
+        let at = rnd(0.1, 0.24), gap = rnd(0.2, 0.3), a = 0.32;
+        const f = log(350, 950), from = Math.random(), to = from < 0.5 ? 0.05 : 0.95;
+        for (let i = 0; i < 7 && at < 1.4; i++) {
+          const pan = from + (to - from) * i / 7;
+          p.ring(at, f, rnd(0.018, 0.04), a, pan); p.ring(at, f * 1.62, 0.018, a * 0.5, pan); p.burst(at, 0.004, 3000, 1000, a * 0.3, pan);
+          at += gap; gap *= 0.7; a *= 0.72;
+        }
+      }
+      return p.finish();
+    }
+    // once sound is allowed: one take a frame until all are written
+    s.prepare = function () {
+      if (!audio.ctx || audio.ctx.state !== 'running') return;
+      if (stock.vehicle.length < TAKES) stock.vehicle.push(vehicle(audio.ctx));
+      else if (stock.obstacle.length < TAKES) stock.obstacle.push(obstacle(audio.ctx));
+    };
+    s.crash = function (kind) {
+      if (!audio.ctx || audio.ctx.state !== 'running') return;
+      const list = stock[kind === 'obstacle' ? 'obstacle' : 'vehicle'];
+      if (!list.length) list.push(kind === 'obstacle' ? obstacle(audio.ctx) : vehicle(audio.ctx));
+      const src = audio.ctx.createBufferSource();
+      src.buffer = list[Math.floor(Math.random() * list.length)];
+      src.playbackRate.value = rnd(0.94, 1.06);   // no two quite alike
+      src.connect(audio.master);
+      src.start();
+    };
+    const curve = (param, pts, t0, dur, k) => pts.forEach(([u, v], i) => { if (i) param.exponentialRampToValueAtTime(v * k, t0 + u * dur); else param.setValueAtTime(v * k, t0); });
+    // one call: o.f is the pitch's [when (0 to 1), Hz] points; o.form the throat, each [points, sharpness, loudness]; o.vib a wobble in
+    // pitch [times a second, Hz]; o.rough a rattle in loudness (times a second); o.k scales the pitches, for a bigger or smaller animal
+    function voice(o) {
+      const ctx = audio.ctx, t0 = ctx.currentTime + (o.at || 0), dur = o.dur, stop = t0 + dur + 0.02, k = o.k || 1, atk = o.atk || 0.008, rel = o.rel || 0.03;
+      const env = ctx.createGain(), osc = ctx.createOscillator(), throat = ctx.createGain();
+      env.gain.setValueAtTime(0.0001, t0); env.gain.exponentialRampToValueAtTime(o.vol, t0 + atk);
+      env.gain.setValueAtTime(o.vol, t0 + dur - rel); env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.type = o.type || 'sawtooth';
+      curve(osc.frequency, o.f, t0, dur, k);
+      if (o.vib) { const v = ctx.createOscillator(), g = ctx.createGain(); v.frequency.value = o.vib[0]; g.gain.value = o.vib[1]; v.connect(g).connect(osc.frequency); v.start(t0); v.stop(stop); }
+      if (o.rough) { const v = ctx.createOscillator(), g = ctx.createGain(); throat.gain.value = 0.55; v.type = 'square'; v.frequency.value = o.rough; g.gain.value = 0.45; v.connect(g).connect(throat.gain); v.start(t0); v.stop(stop); }
+      osc.connect(throat);
+      for (const [pts, q, loud] of o.form) {
+        const bp = ctx.createBiquadFilter(), g = ctx.createGain();
+        bp.type = 'bandpass'; bp.Q.value = q; g.gain.value = loud;
+        curve(bp.frequency, pts, t0, dur, 1);
+        throat.connect(bp).connect(g).connect(env);
+      }
+      out(env, o.pan);
+      osc.start(t0); osc.stop(stop);
+    }
+    // the throat's filters take most of a voice's loudness away: this puts an animal well over the sound bed and the music
+    function out(node, pan) {
+      const lift = audio.ctx.createGain(); lift.gain.value = 3.5;
+      if (audio.ctx.createStereoPanner) { const p = audio.ctx.createStereoPanner(); p.pan.value = pan || 0; node.connect(lift).connect(p).connect(audio.master); }
+      else node.connect(lift).connect(audio.master);
+    }
+    // a puff of noise: a hiss or a wing
+    function puff(at, dur, type, f, q, vol, pan) {
+      const ctx = audio.ctx, t0 = ctx.currentTime + at, src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+      if (!white) { white = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = white.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+      src.buffer = white; bp.type = type; bp.frequency.value = f; bp.Q.value = q;
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(bp).connect(g); out(g, pan);
+      src.start(t0, Math.random() * 0.5); src.stop(t0 + dur + 0.02);
+    }
+    const CALLS = {
+      // grunts, then a squeal as it runs
+      boar(k, pan) {
+        const form = [[[[0, 520]], 3, 1.4], [[[0, 1250]], 4, 0.7]];
+        for (const at of [0, 0.16, 0.32]) voice({ at, dur: 0.13, f: [[0, 150], [1, 105]], form, rough: 42, vol: 0.5, k, pan });
+        voice({ at: 0.44, dur: 0.6, f: [[0, 640], [0.3, 1150], [1, 820]], form: [[[[0, 1500]], 2.5, 1.2], [[[0, 2900]], 3, 0.6]], vib: [11, 35], vol: 0.34, atk: 0.03, k, pan });
+      },
+      // two or three barks, then a yelp
+      dog(k, pan) {
+        const form = [[[[0, 850]], 2.5, 1.3], [[[0, 1900]], 3, 0.7]], barks = Math.random() < 0.5 ? [0, 0.2] : [0, 0.19, 0.37];
+        for (const at of barks) voice({ at, dur: 0.12, f: [[0, 420], [0.3, 640], [1, 290]], form, vol: 0.5, k, pan });
+        voice({ at: barks[barks.length - 1] + 0.22, dur: 0.24, f: [[0, 950], [0.35, 1350], [1, 620]], form, vol: 0.3, k, pan });
+      },
+      // a yowl that opens and closes like a mouth, then a hiss
+      cat(k, pan) {
+        voice({ dur: 0.75, f: [[0, 470], [0.35, 860], [0.7, 620], [1, 400]], form: [[[[0, 520], [0.4, 1150], [1, 640]], 4, 1.3], [[[0, 1500], [0.4, 2600], [1, 1300]], 5, 0.8]], vib: [6.5, 14], vol: 0.36, atk: 0.05, rel: 0.1, k, pan });
+        puff(0.62, 0.45, 'highpass', 3200, 0.7, 0.1, pan);
+      },
+      // three birds' worth of clucks, squawks and wings
+      chickens(k, pan) {
+        const form = [[[[0, 1150]], 4, 1.2], [[[0, 2500]], 5, 0.6]];
+        [[0, 1, 0], [0.11, 1.15, 0.3], [0.05, 0.88, -0.3]].forEach(([d, m, side]) => {
+          for (const at of [0, 0.09, 0.17, 0.26]) voice({ at: d + at, dur: 0.07, type: 'square', f: [[0, 620], [1, 900]], form, vol: 0.2, k: k * m, pan: pan + side });
+          voice({ at: d + 0.36, dur: 0.4, type: 'square', f: [[0, 780], [0.25, 1280], [1, 960]], form, rough: 32, vol: 0.18, atk: 0.02, rel: 0.06, k: k * m, pan: pan + side });
+        });
+        for (let i = 0; i < 8; i++) puff(0.05 + i * 0.09, 0.05, 'bandpass', 1400, 1, 0.12, pan);
+      }
+    };
+    s.animal = function (kind) {
+      if (!audio.ctx || audio.ctx.state !== 'running' || !CALLS[kind]) return;
+      CALLS[kind](rnd(0.92, 1.08), rnd(-0.4, 0.4));
+    };
+    return s;
   }
 
   /* ---------- Menu navigation (keyboard + pointer) ----------
@@ -4064,6 +4370,9 @@
       },
       api, meter, receipt, zoneChange, touchZones,
       get holding(){ return !!zone; },
+      // for the sound: the district the taxi is in (null before a run has one) and its speed in km/h
+      get districtNow(){ return run.cap.d < 0 ? null : run.cap.d; },
+      get kmhNow(){ return run.speed / UPM * 3.6; },
       get showZones(){ return showZones; }, set showZones(v){ showZones = !!v; }
     };
   }
@@ -4112,6 +4421,10 @@
     sfx.tone = (o) => audio.tone(o || {});
     sfx.noise = (o) => audio.noise(o || {});
     const music = cfg.music ? makeMusic(audio, settings, cfg.music) : null;
+    const ambience = makeAmbience(audio, settings);   // the city sound bed and the taxi's engine
+    const streetSounds = makeStreetSounds(audio);     // crashes and animals: the game's to play
+    sfx.crash = (kind) => streetSounds.crash(kind);
+    sfx.animal = (kind) => streetSounds.animal(kind);
 
     /* Game modes (optional). The player picks one after Start game; the kit remembers it, hands it to
        the game as cn.mode, and keeps a separate high-score table for each. */
@@ -5162,6 +5475,7 @@
       if (!document.hidden) return;
       if (state.screen === 'play') pause();
       if (music) music.stop(0.08);   // a hidden tab stops drawing, so stop the music here rather than on the next frame
+      ambience.stop();
     });
     const onOrientation = () => { if (touch && mqPortrait.matches && state.screen === 'play') pause(); };
     if (mqPortrait.addEventListener) mqPortrait.addEventListener('change', onOrientation);
@@ -5224,7 +5538,9 @@
         acc += dt;
         while (acc >= STEP) { tick(); acc -= STEP; }
       } else acc = 0;
-      if (music) music.sync(state.inGame, state.screen, state.ending);
+      if (music) music.sync(state.inGame, state.screen, state.ending, street.ready ? street.districtNow : null, street.holding);
+      ambience.sync(state.inGame, state.screen, state.ending, street.ready && state.inGame ? street.kmhNow : 0);
+      streetSounds.prepare();
       render(dt);
     }
 
@@ -5266,6 +5582,7 @@
          street.animals  [{ z, x, kind, face, bolt }]: 'boar', 'dog', 'cat' or 'chickens' (three, by their crate), crossing,
                          facing right (face: -1 for left). Set bolt to -1 or 1 and the kit runs it for that kerb, moving x,
                          and sets gone once it is off the road. Animals always escape: never call crash() for one.
+                         As it bolts, a game plays its noise: cn.sfx.animal(kind).
          street.stop     { z, kind, passenger, waiting } or null: the one stop bay, 10 m from z in the kerbside lane on the
                          left; kind 'pickup' or 'dropoff'; passenger 'plain', 'case', 'bags' or null, at the kerb level with
                          its middle, waving while waiting is true (held still under Reduce motion)
@@ -5337,6 +5654,11 @@
         get nextPop() { return street.nextPop; },
         set nextPop(w) { street.nextPop = w; },
         get memory() { return street.memory(); },
+        // the test page: the city sound bed's loudness, 0 to 1 (against the music; Barney sets it by ear)
+        get bed() { return ambience.bed; },
+        set bed(v) { ambience.bed = clamp(+v || 0, 0, 1); },
+        // the test page: which soundtrack is playing (0 or 1) and whether each is decoded ('ready'), or null with no music
+        get music() { return music ? { track: music.cur, states: music.tracks.map((tr) => tr.state) } : null; },
         // the test page: touch zones on or off whatever the game said, and outlined (nothing marks them in a game)
         get touchZones() { return zonesOn; },
         set touchZones(v) { zonesOn = !!v; },

@@ -4,16 +4,18 @@
 Turns each City Nights game's source (city-nights/games/<name>/index.html) into one self-contained file
 (dist/<name>.html, beside Retro Kit's games): the kit's stylesheet, script and fonts are copied into the page,
 with the fonts' licences beside them, so the result plays offline, from any folder, with no other files.
-A game's soundtrack (music.js beside its index.html) is copied in too.
+A game's soundtrack is copied in too: a music.js beside its index.html, or a file in city-nights/music/ that more
+than one page can share (Grunge City Rider's two tracks, which the test page plays too).
 
 Run it from the Retro Games folder:
     python city-nights/kit/build.py               build every City Nights game
     python city-nights/kit/build.py my-game       build one game (its folder name)
     python city-nights/kit/build.py --characters  remake fonts/characters.txt after new fonts are copied in
 
-Only tags marked with data-cn-inline are copied in, and only three files may be: the kit's stylesheet,
-the kit's script, and a music.js beside the game's index.html. music.js is the soundtrack as text and
-nothing else, one line:  window.MY_GAME_MUSIC = "<the MP3 in base64>";
+Only tags marked with data-cn-inline are copied in, and only these files may be: the kit's stylesheet, the kit's
+script, and a soundtrack file (a music.js beside the game's index.html, or a .js file in city-nights/music/). A
+soundtrack file is the soundtrack as text and nothing else: a comment, then one line per track, two at most (a
+City Nights game may have two, ARCADE.md):  window.MY_GAME_MUSIC = "<the MP3 in base64>";
 
 It warns about anything the arcade's rules (ARCADE.md) or City Nights' rules forbid:
 - colour codes in a game (hex, rgb(), hsl(), colour names such as 'red'): games use the kit's named colours
@@ -47,6 +49,7 @@ CHARACTERS = FONTS / "characters.txt"
 DESIGN_FONTS = CN / "design-system" / "fonts"
 RETRO_KIT_GAMES = ROOT / "games"   # Retro Kit's games build into the same dist/ folder
 KIT_FILES = [KIT / "city-nights.css", KIT / "city-nights.js"]
+MUSIC_DIR = CN / "music"   # soundtrack files more than one page shares
 
 LINK_RE = re.compile(r"<link\b[^>]*\bdata-cn-inline\b[^>]*>", re.IGNORECASE)
 SCRIPT_RE = re.compile(r"<script\b[^>]*\bdata-cn-inline\b[^>]*>\s*</script>", re.IGNORECASE)
@@ -54,8 +57,8 @@ INLINE_RE = re.compile(r"<(?:link|script)\b[^>]*\bdata-cn-inline\b[^>]*>", re.IG
 HREF_RE = re.compile(r'\bhref\s*=\s*"([^"]+)"', re.IGNORECASE)
 SRC_RE = re.compile(r'\bsrc\s*=\s*"([^"]+)"', re.IGNORECASE)
 FONT_RE = re.compile(r'url\(\s*"?([^")]+\.woff2)"?\s*\)')
-# music.js: comments, then one line that stores the MP3 (as base64 text) on window. Nothing else.
-MUSIC_RE = re.compile(r'\s*(?:/\*.*?\*/\s*)*window\.[A-Za-z_$][\w$]*\s*=\s*"[A-Za-z0-9+/]+={0,2}"\s*;?\s*', re.DOTALL)
+# a soundtrack file: comments, then one line per track (two at most) that stores the MP3 (as base64 text) on window
+MUSIC_RE = re.compile(r'\s*(?:/\*.*?\*/\s*)*(?:window\.[A-Za-z_$][\w$]*\s*=\s*"[A-Za-z0-9+/]+={0,2}"\s*;?\s*){1,2}', re.DOTALL)
 MUSIC_OPTION_RE = re.compile(r"\bmusic\s*:")
 
 # Chinese: CJK ideographs, CJK punctuation and full-width forms. The two Chinese fonts hold only the word list's characters.
@@ -293,23 +296,27 @@ def check_inlined(game_dir, html):
     """Warn about copied-in files other than the kit and the soundtrack, and about a soundtrack that is
     not set up the allowed way. Returns the number of warnings."""
     music = (game_dir / "music.js").resolve()
-    allowed = [f.resolve() for f in KIT_FILES] + [music]
+    shared = MUSIC_DIR.resolve()
+    kit = [f.resolve() for f in KIT_FILES]
     notes = []
-    has_music = False
+    tracks = []   # the soundtrack files it copies in
     for tag in INLINE_RE.findall(html):
         ref = SRC_RE.search(tag) or HREF_RE.search(tag)
         if not ref:
             continue
         target = (game_dir / ref.group(1)).resolve()
-        if target not in allowed:
-            notes.append("index.html copies in " + ref.group(1) + ": only the kit's two files and a music.js beside index.html may be data-cn-inline")
-        has_music = has_music or target == music
-    if has_music:
-        if not MUSIC_RE.fullmatch(read_text(music)):
-            notes.append('music.js must hold only the soundtrack as text: one line of the form window.MY_GAME_MUSIC = "<the MP3 in base64>"')
-        if not MUSIC_OPTION_RE.search(html):
-            notes.append("index.html copies in music.js but never plays it: add music: { data: window.MY_GAME_MUSIC } to CityNights.game")
-    elif music.exists():
+        if target == music or (target.parent == shared and target.suffix == ".js"):
+            tracks.append((ref.group(1), target))
+        elif target not in kit:
+            notes.append("index.html copies in " + ref.group(1) + ": only the kit's two files and a soundtrack file (music.js beside index.html, or one in city-nights/music/) may be data-cn-inline")
+    for name, target in tracks:
+        if not target.exists():
+            notes.append("index.html copies in " + name + ", which is not there")
+        elif not MUSIC_RE.fullmatch(read_text(target)):
+            notes.append(name + ' must hold only the soundtrack as text: a line (two at most) of the form window.MY_GAME_MUSIC = "<the MP3 in base64>"')
+    if tracks and not MUSIC_OPTION_RE.search(html):
+        notes.append("index.html copies in a soundtrack but never plays it: add music: { data: window.MY_GAME_MUSIC } to CityNights.game")
+    if not any(target == music for name, target in tracks) and music.exists():
         notes.append('music.js is not copied in: add <script src="music.js" data-cn-inline></script> to the head of index.html')
     for p in sorted(game_dir.iterdir()):
         if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".bmp", ".ico", ".svg"):

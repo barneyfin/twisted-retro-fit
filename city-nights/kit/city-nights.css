@@ -217,6 +217,8 @@ html,body{margin:0;height:100%;background:var(--night-black);overflow:hidden}
 /* the meter, caption and receipt slip (bottom left; the script sets their place as parts of the picture), the marks that
    belong to a place in the street (the pin, the taxi's badges, the SAFE! sign) and the crash pop, over the picture during a run only */
 .cn-hud{position:absolute;left:0;pointer-events:none}
+/* on phones the meter and caption also keep clear of the camera and the screen's rounded corners: the safe-area insets */
+.cn-touch .cn-hud{transform:translate(env(safe-area-inset-left,0px),calc(0px - env(safe-area-inset-bottom,0px)))}
 .cn-popc,.cn-marks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .cn-root:not(.cn-in-game) .cn-hud,.cn-root:not(.cn-in-game) .cn-popc,.cn-root:not(.cn-in-game) .cn-marks{display:none}
 .cn-play,.cn-title-screen{position:absolute;inset:0}
