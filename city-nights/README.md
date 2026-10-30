@@ -33,7 +33,7 @@ The template, as it is, drives up the street through traffic: a working game to 
 
 ## The test page
 
-`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **7** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate and the picture it is drawing; in scenes 1, 2 and 7 a fourth line shows the graphics memory and the opening times (the speed check, below).
+`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **9** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate and the picture it is drawing; in scenes 1, 2 and 7 a fourth line shows the graphics memory and the opening times (the speed check, below).
 
 | Scene | What it shows |
 |---|---|
@@ -44,6 +44,8 @@ The template, as it is, drives up the street through traffic: a working game to 
 | 5 Vehicles | Every vehicle in every colour, keeping pace with the taxi. |
 | 6 Street | The street's pieces, laid out ahead of the taxi each lap: roadworks closing the left lane, an oil slick, spilt cargo and a flooded pothole; the wild boar, the stray dog, the street cat and the market chickens, each bolting for the kerb as the taxi comes; a passenger waving at the pick-up bay (plain, with a suitcase, then with shopping, one each lap), then the drop-off bay. ↓ slows down. |
 | 7 Long street | Each district in turn, from 40 m before its edge, for 15 seconds at 84 km/h (快's speed) with traffic, while the street is made a piece at a time; then again. After all four, about a minute, the plaque shows the frame rate, the slowest frames, and how many pieces of street were made and how long each took. On a phone this is the way to see every district. |
+| 8 Play screen | Grunge City Rider's play screen (design system v10), a state at a time, 3.5 seconds each, named on the plaque: mid-fare with everything at once (lives, the tip counting, the caption's round line and lamps, the drop-off pin far off, the 快 保 雙 badges with 快 emptying and 保's ring, the roof sign out); a fare paid (the receipt slip); a pick-up ahead (the teal pin, counting down); in the bay (the bay's ring, 保's ring stepping aside, the pin with no tag); getting in (the passenger fading, the roof sign going out); the tip halved and the tip lost (their receipts, the tip's dashes); lives from 3 to 0 and the lamps from 0 to 5. |
+| 9 Shield | A trial (Barney, 30 October 2026), to compare before the design system decides: 保 held, three looks in turn, 4 seconds each: the design system's ring drawn over the taxi (what the kit does), the same ring under the taxi, and a soft blue glow round the whole taxi. Once Barney has chosen in the design system, the kit follows it and this scene goes. |
 
 Pause (Esc, or the pause tile) and Settings work as in any game, so every screen can be seen. After changing anything in `kit\`, rebuild every City Nights game and look through this page before anything else.
 
@@ -126,10 +128,10 @@ Under Settings. **Best** is 4× edge smoothing at full sharpness (up to 1.5 canv
 | `design-system\` | A copy of the approved design system (the spec): tokens, components, the word list, the fonts |
 | `speed-test\` | Phase 1's WebGL2 speed test, kept as it is |
 | `kit\city-nights.css` | The look: colours, fonts, lightbox and neon signs |
-| `kit\city-nights.js` | The kit: the street and everything on it, the game shell, sound, saving, the Picture setting. The crash pop's drawings, the street's pieces and the code that draws them are copied unchanged from the design system (`design-system\components\bundle.js`) |
+| `kit\city-nights.js` | The kit: the street and everything on it, the game shell, sound, saving, the Picture setting. The crash pop's drawings, the street's pieces, the play screen's parts (`CityNights.hud`: lives, lamps, the caption, the pin, badges and rings, the receipt slip, the SAFE! sign, the zone title, the touch zones) and the code that draws them are copied unchanged from the design system (`design-system\components\bundle.js`) |
 | `kit\build.py` | Turns a game's source into one playable file, and checks it against the rules |
 | `kit\template.html` | Starting point for a new game |
-| `kit\fonts\`, `kit\licences\` | The six font files and their licences (SIL Open Font License: free to embed in games); Bangers is for the crash pop's letters only. `fonts\characters.txt` lists the Chinese characters the fonts hold, for the build's check |
+| `kit\fonts\`, `kit\licences\` | The six font files and their licences (SIL Open Font License: free to embed in games); Bangers is for the crash pop's letters and the SAFE! sign's word only. `fonts\characters.txt` lists the Chinese characters the fonts hold, for the build's check |
 | `games\cn-sampler\` | The test page |
 | `games\cn-empty\` | The template as a game, to prove the template builds |
 | `..\dist\<name>.html` | The built games, shared with Retro Kit's (not kept in git) |

@@ -57,6 +57,7 @@
   --tube-core-pink: #ffdaee;
   --tube-core-yellow: #fff7d5;
   --tube-core-red: #ffd6d3;
+  --tube-core-blue: #dbe7ff;
   --pop-crash-light: #fffbe6;
   --pop-crash-deep: #e09a12;
   --pop-smash-light: #ffd0c8;
@@ -126,6 +127,13 @@
   --rank-new: #ffb09f;
   --caption: #fff1c4;
   --caption-outline: rgba(0, 0, 0, 0.85);
+  --lamp-unlit: rgba(20, 14, 8, 0.85);
+  --lamp-unlit-ring: rgba(255, 241, 196, 0.7);
+  --life-lost: rgba(110, 80, 45, 0.28);
+  --receipt-paper: #f3ead2;
+  --receipt-ink: #2a2118;
+  --receipt-red: #b3261a;
+  --zone-shade: rgba(6, 5, 4, 0.7);
   --scrim: rgba(6, 5, 4, 0.64);
   --title-shade: rgba(6, 5, 4, 0.74);
   --neon-board: rgba(5, 3, 5, 0.93);
@@ -206,11 +214,11 @@ html,body{margin:0;height:100%;background:var(--night-black);overflow:hidden}
 .cn-ui [hidden]{display:none!important}
 .cn-stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:hidden}
 .cn-world{position:absolute;inset:0;width:100%;height:100%;display:block}
-/* the meter and caption (bottom left; the script sets their place as parts of the picture) and the crash pop, over the
-   picture during a run only */
+/* the meter, caption and receipt slip (bottom left; the script sets their place as parts of the picture), the marks that
+   belong to a place in the street (the pin, the taxi's badges and rings) and the crash pop, over the picture during a run only */
 .cn-hud{position:absolute;left:0;pointer-events:none}
-.cn-popc{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.cn-root:not(.cn-in-game) .cn-hud,.cn-root:not(.cn-in-game) .cn-popc{display:none}
+.cn-popc,.cn-marks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cn-root:not(.cn-in-game) .cn-hud,.cn-root:not(.cn-in-game) .cn-popc,.cn-root:not(.cn-in-game) .cn-marks{display:none}
 .cn-play,.cn-title-screen{position:absolute;inset:0}
 .cn-error{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:5;max-width:90%;color:var(--night-text);font:500 14px/20px var(--font-ui)}
 .cn-hidden-input{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;font-size:16px;pointer-events:none}

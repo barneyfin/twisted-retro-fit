@@ -26,10 +26,13 @@
    a crash pop lit and with street pieces), 3 Power-ups (all five), 4 Crash (each vehicle, and each crash pop word in
    turn, then a random one), 5 Vehicles (every vehicle and colour), 6 Street (the obstacles, the animals bolting, the
    passengers and the stop bays), 7 Long street (each district in turn from its edge, at 84 km/h, timing the frames
-   while the street is made a piece at a time, with the graphics memory and the opening times).
-   Keys 1-7 change scene; on a phone, tap for the next one. */
+   while the street is made a piece at a time, with the graphics memory and the opening times), 8 Play screen
+   (Grunge City Rider's information and moments, a state at a time: the meter with lives and the tip, the caption's round
+   line, the pin, the badges and 保's ring, the bay's ring, the passenger getting in, the roof sign, the receipt slip),
+   9 Shield (a trial: three looks for 保 held, in turn, to compare before the design system decides).
+   Keys 1-9 change scene; on a phone, tap for the next one. */
 
-const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street'];
+const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street', 'Play screen', 'Shield'];
 const NOTES = [
   'All four districts, traffic, the meter and the caption. ← → steer, ↓ brakes, N jumps to the next district, hold F to drive fast. TIME runs out at 00 and the run ends.',
   '',
@@ -37,8 +40,24 @@ const NOTES = [
   'The taxi runs into each vehicle in turn: the crash pop and the brake lights.',
   'Every vehicle in every colour, keeping pace with the taxi.',
   'Roadworks, oil, spilt cargo and a pothole; the four animals, each bolting as the taxi comes; a passenger at the pick-up bay, then the drop-off bay. ↓ slows down.',
+  '',
   ''
 ];
+// Play screen: Grunge City Rider's states in turn, PLAY_STEP seconds each, then round again (the plaque names each)
+const PLAY_STEP = 3.5;
+const PLAY = [
+  'Mid-fare, the busiest ride: two lives, the tip counting, round 2 with three fares done, the drop-off pin far off, 快 emptying, 保 with its ring, 雙, the roof sign out.',
+  'A fare paid: the receipt slip prints out of the meter while the caption steps aside; the tip row goes unlit and the roof sign lights again.',
+  'A pick-up ahead: the teal pin over the bay, the metres counting down, the passenger hailing; 保 still held.',
+  'In the bay: the bay\'s ring fades in round the taxi, 保\'s ring steps aside, and the pin keeps no tag.',
+  'Getting in: the passenger fades out where they stand, the roof sign goes out, and the bay\'s ring fades once the stop counts.',
+  'The tip halved (a crash or an animal): the receipt slip shows the tip before and after.',
+  'The tip lost (driving past the drop-off): the tip struck through, and dashes on the meter.',
+  'Lives from 3 down to 0, and the round\'s lamps from 0 to 5.'
+];
+// Shield (a trial, Barney, 30 October 2026): 保 held, each look in turn for SHIELD_STEP seconds
+const SHIELD_STEP = 4;
+const SHIELD_LOOKS = [['design', 'the design system\'s ring, drawn over the taxi'], ['under', 'the same ring, under the taxi'], ['glow', 'a soft blue glow round the whole taxi']];
 // Long street: each district in turn, from TOUR_LEAD metres before its edge, for TOUR_TIME seconds at TOUR_SPEED (84 km/h, 快's speed)
 const TOUR_LEAD = 40, TOUR_TIME = 15, TOUR_SPEED = 84 / 3.6;
 const FAST = 100;   // Drive, F held: metres a second
@@ -91,7 +110,7 @@ CityNights.game({
   id: 'cn-sampler',
   title: ['City Nights', 'Sampler'],
   zh: '的士',
-  keys: [['1', '7', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
+  keys: [['1', '9', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
   touch: 'Drag to steer · Tap for the next scene',
 
   start(cn) {
@@ -119,9 +138,15 @@ CityNights.game({
     const scene = SCENES[g.scene], c = g.crash;
     taxi.speed = scene === 'Drive' ? (cn.input.down ? 4 : cn.input.key('KeyF') ? FAST : 16) : scene === 'Mong Kok' ? (cn.input.down ? 4 : 19)
       : scene === 'Power-ups' ? 5 : scene === 'Vehicles' ? 6 : scene === 'Street' ? (cn.input.down ? 3 : 8)
-      : scene === 'Long street' ? TOUR_SPEED : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
+      : scene === 'Long street' ? TOUR_SPEED : scene === 'Play screen' ? playSpeed(g) : scene === 'Shield' ? 8
+      : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
     taxi.z += taxi.speed * dt;
-    if (scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street') {
+    if (scene === 'Play screen') playStep(g, cn, dt);
+    if (scene === 'Shield') {
+      g.shield = (g.shield + dt) % (SHIELD_STEP * SHIELD_LOOKS.length);
+      cn.picture.shieldLook = SHIELD_LOOKS[Math.floor(g.shield / SHIELD_STEP)][0];
+    }
+    if (scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' || scene === 'Play screen' || scene === 'Shield') {
       for (const car of cn.street.cars) car.z += car.speed * dt;
       cn.street.recycle(cn.street.cars);
       if (scene === 'Drive') {
@@ -193,7 +218,12 @@ function setScene(g, cn, i) {
   g.scene = i;
   g.result = null;
   g.tour = null;
+  g.play = null;
   st.tokens = [];
+  // today's meter and caption, and nothing carried, unless the scene says otherwise
+  Object.assign(cn.meter, { lives: null, tip: null, round: null, fares: 0 });
+  st.pin = null; taxi.hired = false; taxi.carry = null;
+  cn.picture.shieldLook = 'design';
   clearPieces(cn);
   cn.meter.time = null;
   const scene = SCENES[i];
@@ -204,6 +234,13 @@ function setScene(g, cn, i) {
       g.check = { i: -1, t: 0, prev: null, popT: 0, runs: [0, 1, 2].map(() => ({ fps: [], load: [] })) };
       jumpTo(cn, mongKok(cn));
     }
+  } else if (scene === 'Shield') {
+    st.cars = g.traffic;
+    g.shield = 0;
+    taxi.carry = { shield: true };
+  } else if (scene === 'Play screen') {
+    st.cars = g.traffic;
+    g.play = { t: 0, k: -1, dest: '' };
   } else if (scene === 'Long street') {
     // k: the district under way; gaps: the time between frames (ms); made: the pieces count when the tour began
     st.cars = g.traffic;
@@ -246,6 +283,53 @@ function jumpTo(cn, z) {
   st.place({ z });
   for (const car of st.cars) car.z += d;
 }
+/* ----- Play screen: Grunge City Rider's states, each set up as it begins (k changes) and moved on as it runs (u: 0 to 1) ----- */
+function playSpeed(g) { const k = g.play ? g.play.k : 0; return k === 3 || k === 4 ? 0 : 8; }
+function playStep(g, cn, dt) {
+  const P = g.play, st = cn.street, taxi = st.taxi, m = cn.meter;
+  P.t = (P.t + dt) % (PLAY_STEP * PLAY.length);
+  const k = Math.floor(P.t / PLAY_STEP), u = (P.t % PLAY_STEP) / PLAY_STEP, fresh = k !== P.k;
+  P.k = k;
+  m.time = 45 - u * 3;
+  if (fresh) {
+    // each state starts from the one before it; these are what it changes
+    if (k === 0) {
+      Object.assign(m, { lives: 2, round: 2, fares: 3 });
+      taxi.hired = true; taxi.carry = { speed: 1, shield: true, fare: 'double' };
+      st.stop = { kind: 'dropoff', z: taxi.z + 150, passenger: null, waiting: false };
+      // the destination: a sign on the left near the drop-off bay, as a game would name it
+      const near = st.signs(st.stop.z - 20, st.stop.z + 30), left = near.filter((s) => s.side < 0);
+      P.dest = ((left[0] || near[0]) || { zh: '明月酒店' }).zh;
+      st.pin = { name: P.dest, metres: 155 };
+    } else if (k === 1) {
+      cn.receipt({ head: 'RECEIPT', lines: [['車資', 'FARE', '9.20'], ['小費', 'TIP', '0.40'], ['雙', '+100%', '9.20'], ['', '', 'HK$ 18.80', 'total']] });
+      m.tip = null; m.fares = 4; taxi.hired = false; taxi.carry = { speed: null, shield: true }; st.pin = null; st.stop = null;
+    } else if (k === 2) {
+      st.stop = { kind: 'pickup', z: taxi.z + 34, passenger: 'case', waiting: true };
+      st.pin = { metres: 39 };
+    } else if (k === 3) {
+      // the taxi stopped with three-quarters of it in the bay (the bay is 10 m from z; the taxi's rear is its z)
+      st.place({ x: st.lanes[0] });
+      st.stop.z = taxi.z - 3.5; st.stop.ring = true; st.pin.bare = true;
+    } else if (k === 4) {
+      st.stop.boarding = true; taxi.hired = true; m.tip = 0;
+    } else if (k === 5) {
+      cn.receipt({ head: 'TIP', lines: [['小費', 'TIP', '0.40'], ['小費', 'HALVED', '0.20', 'receipt-red']] });
+      m.tip = 0.2; st.stop = null; st.pin = null; taxi.carry = null;
+    } else if (k === 6) {
+      cn.receipt({ head: 'TIP', lines: [['小費', 'TIP', '0.20', 'struck']] });
+      m.tip = 'lost';
+    } else {
+      m.tip = null; taxi.hired = false;
+    }
+  }
+  // what runs during a state
+  if (k === 0) { m.tip = 0.2 + 0.2 * u; taxi.carry.speed = 1 - u; st.pin.metres = 155 - 28 * u * PLAY_STEP / 3.5; }
+  if (k === 2 && st.pin) st.pin.metres = Math.max(0, st.stop.z + 5 - taxi.z);
+  if (k === 4 && u > 0.45 && st.stop) st.stop.ring = false;   // the stop has counted
+  if (k === 7) { m.lives = 3 - Math.min(3, Math.floor(u * 4)); m.fares = Math.min(5, Math.floor(u * 6)); }
+}
+
 // Long street: the frames over all four districts, and the pieces of street made meanwhile
 function tourResult(t, cn) {
   const tot = t.gaps.reduce((a, b) => a + b, 0), o = cn.picture.opening, n = o.pieces - t.made.pieces;
@@ -340,7 +424,12 @@ function showReadout(g, cn) {
   let note = cn.touch ? NOTES[g.scene].replace('← → steer, ↓ brakes', 'Drag to steer').replace(', N jumps to the next district, hold F to drive fast', '').replace(' ↓ slows down.', '') : NOTES[g.scene], extra = pic;
   // the graphics memory and the opening times, in the scenes that drive the long street
   const mem = scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' ? memLine(cn) : '';
-  if (scene === 'Long street') {
+  if (scene === 'Shield') {
+    const k = Math.floor(g.shield / SHIELD_STEP);
+    note = 'A trial: 保 held, three looks in turn, ' + SHIELD_STEP + ' s each. Now ' + (k + 1) + ' of ' + SHIELD_LOOKS.length + ': ' + SHIELD_LOOKS[k][1] + '.';
+  } else if (scene === 'Play screen' && g.play) {
+    note = (g.play.k + 1) + ' of ' + PLAY.length + ': ' + PLAY[Math.max(0, g.play.k)];
+  } else if (scene === 'Long street') {
     const t = g.tour, L = cn.street.length, z = ((cn.street.taxi.z % L) + L) % L, d = cn.street.district(z);
     note = 'Each district in turn from ' + TOUR_LEAD + ' m before its edge, ' + TOUR_TIME + ' s at 84 km/h with traffic. Now: ' + d.en + ', ' +
       fmt(z / 1000, 2) + ' km along the ' + fmt(L / 1000, 1) + ' km street.';

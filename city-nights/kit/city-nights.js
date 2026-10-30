@@ -1,4 +1,4 @@
-/* City Nights 0.7.0 — runtime
+/* City Nights 0.8.0 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.7.0';
+  const VERSION = '0.8.0';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -108,9 +108,9 @@
     for (const ch of str) {
       const d = el('span', 'cn-digit');
       d.style.height = r1(h) + 'px';
-      if (ch === '.') {
+      if (ch === '.' || ch === ',') {   // a comma is an unlit decimal point: ' ,  ' is a tip row with no passenger aboard
         d.style.width = r1(t + gap * 0.25) + 'px';
-        seg(d, [-gap * 0.35, h - t, t, t], true);
+        seg(d, [-gap * 0.35, h - t, t, t], ch === '.');
       } else {
         d.style.width = r1(h * 0.52 + gap) + 'px';
         const lit = LIT[ch] || '';
@@ -1128,12 +1128,17 @@
         if (t.hero) h.face(h.qZ(sz0 - 0.01, -sx - 0.04, sx + 0.04, roof, roof + 0.035), null, '#1e1b18');
         for (const s of [-1, 1]) h.face(h.qX(s * sx, sy0, sy1, sz0, sz1), [s, 0, 0], '#cfc4a6');
         h.face(h.qY(sy1, -sx, sx, sz0, sz1), [0, 1, 0], '#f3ead2');
-        const rs = h.qZ(sz0, -sx, sx, sy0, sy1);
+        const rs = h.qZ(sz0, -sx, sx, sy0, sy1), rb = h.bounds(rs);
+        // the player's taxi also gets a copy of its picture with the sign out, for while it is hired (TaxiMarks: the face
+        // about 86% of the way to case, TAXI only just showing, no glow): the picture so far, then the sign without its glow
+        const hiredG = t.hero ? (t.hiredC = mk(g.canvas.width, g.canvas.height)).getContext('2d') : null;
+        if (hiredG) hiredG.drawImage(g.canvas, 0, 0);
         g.save(); g.shadowColor = 'rgba(255,232,190,0.9)'; g.shadowBlur = Math.max(2, pxW * 0.05); h.face(rs, [0, 0, -1], '#f8efd6'); g.restore();
-        const rb = h.bounds(rs);
-        if (rb.y1 - rb.y0 > 3){ g.fillStyle = '#c4241c'; g.font = '700 ' + ((rb.y1 - rb.y0) * 0.8) + 'px ' + F.cond; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('TAXI', (rb.x0 + rb.x1) / 2, (rb.y0 + rb.y1) / 2 + 0.5); }
+        const lettering = gg => { if (rb.y1 - rb.y0 > 3){ gg.fillStyle = '#c4241c'; gg.font = '700 ' + ((rb.y1 - rb.y0) * 0.8) + 'px ' + F.cond; gg.textAlign = 'center'; gg.textBaseline = 'middle'; gg.fillText('TAXI', (rb.x0 + rb.x1) / 2, (rb.y0 + rb.y1) / 2 + 0.5); } };
+        lettering(g);
+        if (hiredG) onLayer(t, hiredG, hh => { hh.face(rs, [0, 0, -1], '#f8efd6'); lettering(hiredG); hh.path(rs); hiredG.fillStyle = hexA(col('case'), 0.86); hiredG.fill(); });
         const a0 = P(0.55, roof, zr1 + 0.12), a1 = P(0.62, roof + 0.45, zr1 - 0.02);
-        g.strokeStyle = '#141414'; g.lineWidth = Math.max(0.6, pxW * 0.004); g.beginPath(); g.moveTo(a0[0], a0[1]); g.lineTo(a1[0], a1[1]); g.stroke();
+        for (const gg of hiredG ? [g, hiredG] : [g]){ gg.strokeStyle = '#141414'; gg.lineWidth = Math.max(0.6, pxW * 0.004); gg.beginPath(); gg.moveTo(a0[0], a0[1]); gg.lineTo(a1[0], a1[1]); gg.stroke(); }
       }
     };
     VDRAW.van = t => {
@@ -1196,6 +1201,7 @@
       if (hero){ low = layer(); lit = layer(); litHM = layer(); t.lowG = low.getContext('2d'); t.litG = lit.getContext('2d'); t.litHMG = litHM.getContext('2d'); t.lamps = []; }
       VDRAW[kind === 'taxi' || kind === 'sedan' ? 'saloon' : kind](t);
       const a = P(0, 0, 0), out = { c, ax: a[0], ay: a[1], pxW, Wm: V.W };
+      if (t.hiredC) out.hired = t.hiredC;
       if (hero){
         const refl = layer(), reflG = layer(), rimL = layer(), rimR = layer(); t.reflGG = reflG.getContext('2d');
         heroMasks(t, refl.getContext('2d'), rimL.getContext('2d'), rimR.getContext('2d'));
@@ -1373,14 +1379,14 @@
           case 'd': g.rect(t * 0.8, hgt - t, w - t * 1.6, t); break; case 'e': g.rect(0, h2 + t * 0.4, t, h2 - t * 1.2); break; case 'f': g.rect(0, t * 0.8, t, h2 - t * 1.2); break; case 'g': g.rect(t * 0.8, h2 - t / 2, w - t * 1.6, t); break; } };
       let cx = x;
       for (const ch of str){
-        if (ch === '.'){ g.fillStyle = on; g.fillRect(cx - gap * 0.35, y + hgt - t, t, t); cx += t + gap * 0.25; continue; }
+        if (ch === '.' || ch === ','){ g.fillStyle = ch === '.' ? on : off; g.fillRect(cx - gap * 0.35, y + hgt - t, t, t); cx += t + gap * 0.25; continue; }   // a comma: an unlit point
         g.save(); g.translate(cx, y); g.transform(1, 0, -0.08, 1, 0, 0);
         for (const s of 'abcdefg'){ segP(s); g.fillStyle = (M[ch] || '').includes(s) ? on : off; g.fill(); }
         g.restore(); cx += w + gap;
       }
       return cx;
     }
-    function seg7w(str, hgt){ let w = 0; for (const ch of str) w += ch === '.' ? hgt * 0.12 + hgt * 0.04 : hgt * 0.68; return w; }
+    function seg7w(str, hgt){ let w = 0; for (const ch of str) w += ch === '.' || ch === ',' ? hgt * 0.12 + hgt * 0.04 : hgt * 0.68; return w; }
     function hudText(g, txt, x, y, size, weight, family, col, align, spacing){
       g.font = weight + ' ' + size + 'px ' + family; g.textAlign = align || 'left'; g.textBaseline = 'alphabetic';
       if ('letterSpacing' in g) g.letterSpacing = (spacing || 0) + 'px';
@@ -2066,6 +2072,10 @@
     layout(location=0) in vec4 aP;
     uniform vec2 uView; out vec2 vUV;
     void main(){ vUV = aP.zw; gl_Position = vec4(aP.x / uView.x * 2.0 - 1.0, 1.0 - aP.y / uView.y * 2.0, 0.0, 1.0); }`;
+    // the bay's ring, a picture made once per colour, laid on the finished street before the taxi and faded by uA
+    const FS_RING = `#version 300 es
+    precision mediump float; uniform sampler2D uTex; uniform float uA; in vec2 vUV; out vec4 o;
+    void main(){ o = texture(uTex, vUV) * uA; }`;
     const FS_CAB = `#version 300 es
     precision highp float;
     uniform sampler2D uBody, uMask, uLit, uHM, uS1t, uS2, uMottle, uSparkle;
@@ -2131,7 +2141,7 @@
     function initGL(){
       P.world = program(VS_WORLD, FS_MAIN(true, true)); P.dyn = program(VS_DYN, FS_MAIN(true)); P.dyn1 = program(VS_DYN, FS_MAIN(false));
       P.quarter = program(VS_FULL, FS_QUARTER); P.cube = program(VS_FULL, FS_CUBE); P.down = program(VS_FULL, FS_DOWN);
-      P.comp = program(VS_FULL, FS_COMP); P.cab = program(VS_CAB, FS_CAB);
+      P.comp = program(VS_FULL, FS_COMP); P.cab = program(VS_CAB, FS_CAB); P.ring = program(VS_CAB, FS_RING);
       // one index buffer of quads shared by the batches
       const MAXQ = 16384, qi = new Uint32Array(MAXQ * 6);
       for (let q = 0; q < MAXQ; q++){ const k = q * 4, n = q * 6; qi[n] = k; qi[n + 1] = k + 1; qi[n + 2] = k + 2; qi[n + 3] = k; qi[n + 4] = k + 2; qi[n + 5] = k + 3; }
@@ -2328,14 +2338,16 @@
       return { q, w, hgt };
     }
     function bakeCab(){
-      if (T.cab) for (const v of T.cab) for (const k of ['body', 'low', 'mask', 'lit', 'hm', 'mirror']) gl.deleteTexture(v[k]);
+      if (T.cab) for (const v of T.cab){ for (const k of ['body', 'bodyHired', 'low', 'mask', 'lit', 'hm', 'mirror']) if (v[k]) gl.deleteTexture(v[k]); if (v.glow) gl.deleteTexture(v.glow.tex); }
+      for (const k in rings){ gl.deleteTexture(rings[k].tex); delete rings[k]; }   // the bay's ring follows the taxi's size
       const cg = cabGeometry();
       T.cab = CAB_OFFS.map(off => {
         const s = bakeVehicle('taxi', 0, off, cg.zc / UPM, CAM_H / UPM, Math.round(cg.rw * RS * 1.1), 'NW 4183', true);
         const low = cropCanvas(s.low), lit = cropCanvas(s.lit), hm = cropCanvas(s.litHM), mk2 = packMasks(s), mir = makeMirrorSmall(s);
         return { pxW: s.pxW, ax: s.ax, ay: s.ay, w: s.c.width, h: s.c.height, lamps: s.lamps,
-          body: texFrom(s.c, true), low: texFrom(low.c, true), lowR: low.r, lit: texFrom(lit.c, true), litR: lit.r, hm: texFrom(hm.c, true), hmR: hm.r,
-          mask: texFrom(mk2.data, false), maskR: mk2.r, mirror: texFrom(mir.q, true), mirW: mir.w, mirH: mir.hgt };
+          body: texFrom(s.c, true), bodyHired: s.hired ? texFrom(s.hired, true) : null, low: texFrom(low.c, true), lowR: low.r, lit: texFrom(lit.c, true), litR: lit.r, hm: texFrom(hm.c, true), hmR: hm.r,
+          mask: texFrom(mk2.data, false), maskR: mk2.r, mirror: texFrom(mir.q, true), mirW: mir.w, mirH: mir.hgt,
+          src: s.c, glow: null };   // src: the picture itself, kept for the shield trial's glow (made when first needed)
       });
     }
     function makeSkylineTex(){
@@ -2428,7 +2440,83 @@
       const yAtZ = zm => H * HZ + DEPTH / (zm * UPM) * CAM_H * K;
       gl.uniform3f(pc.u.uCab, W / 2 + sway(st), yAtZ(18), yAtZ(13));
       fullscreen(pc, out || null, PW, PH);
+      drawBayRing(st);
+      drawShieldGL(st);
       drawCabGL(st);
+    }
+    /* TRIAL, for the test page only (Barney, 30 October 2026): other looks for 保 held, to compare before the design
+       system decides. 'design' is the design system's (TaxiMarks): hud.shieldRing drawn over the street with the badges.
+       'under': the same ring, laid on the road before the taxi, as the bay's ring is. 'glow': no ring, but a soft blue
+       glow round the whole taxi, its own outline blurred, behind it. Both step aside in a bay, as the ring does. */
+    let shieldLook = 'design';
+    function drawShieldGL(st){
+      const c = st.carry;
+      if (shieldLook === 'design' || !c || !c.shield || !(st.ringA < 1)) return;
+      const a = 1 - st.ringA, cg = cabGeometry(), x = W / 2 + sway(st), y = cg.gy;
+      let q;
+      if (shieldLook === 'under'){
+        // hud.shieldRing once into a picture (canvas pixels: s per metre at the taxi's rear), then laid under the taxi
+        if (!rings.shield){
+          const s = cg.rw / VEH.taxi.W * RS, half = 0.9 * s, rx = half * 1.75, ry = half * 0.75, cy = -half * 1.05 + ry, pad = 4;
+          const cv = mk(2 * rx + 2 * pad, 2 * ry + 2 * pad), g = cv.getContext('2d'), ax = rx + pad, ay = ry + pad - cy;
+          hud.shieldRing(g, ax, ay, s);
+          rings.shield = { tex: texFrom(cv, true), x0: -ax / RS, y0: -ay / RS, w: cv.width / RS, h: cv.height / RS };
+        }
+        const r = rings.shield, x0 = x + r.x0, y0 = y + r.y0;
+        q = { tex: r.tex, v: [x0, y0, x0 + r.w, y0, x0 + r.w, y0 + r.h, x0, y0 + r.h] };
+      } else {
+        // the taxi's outline (this view of it), blurred and coloured tube-blue, behind it with its sway, bob and roll
+        const view = cabView(st), N = T.cab[view.near], m = cabMotion(st), k = cg.rw / 200;
+        if (!N.glow){
+          // a wide soft halo and a closer, stronger one, from the taxi's outline grown a little, all in tube-blue
+          const sw = N.src.width, sh = N.src.height, b1 = Math.max(3, sw * 0.1), b2 = Math.max(2, sw * 0.035), pad = Math.ceil(b1 * 3);
+          const cv = mk(sw + pad * 2, sh + pad * 2), g = cv.getContext('2d');
+          g.translate(pad + sw / 2, pad + sh / 2); g.scale(1.06, 1.06); g.translate(-sw / 2, -sh / 2);
+          g.filter = 'blur(' + b1 + 'px)'; g.globalAlpha = 0.75; g.drawImage(N.src, 0, 0);
+          g.filter = 'blur(' + b2 + 'px)'; g.globalAlpha = 1; g.drawImage(N.src, 0, 0);
+          g.setTransform(1, 0, 0, 1, 0, 0); g.filter = 'none';
+          g.globalCompositeOperation = 'source-in'; g.fillStyle = col('tube-blue'); g.fillRect(0, 0, cv.width, cv.height);
+          N.glow = { tex: texFrom(cv, true), pad };
+        }
+        const ds = cg.rw / N.pxW, gp = N.glow.pad * ds, ox = x - N.ax * ds - gp, oy = y - N.ay * ds - gp, w = N.w * ds + 2 * gp, h = N.h * ds + 2 * gp;
+        const py = y - cg.rw * 0.22, ty = py + (m.bob + m.pitch) * k, cs = Math.cos(m.roll), sn = Math.sin(m.roll);
+        const tf = (px, pyy) => { const dx = px - x, dy = pyy - py; return [x + dx * cs - dy * sn, ty + dx * sn + dy * cs]; };
+        q = { tex: N.glow.tex, v: [].concat(tf(ox, oy), tf(ox + w, oy), tf(ox + w, oy + h), tf(ox, oy + h)) };
+      }
+      const v = q.v;
+      gl.bindBuffer(gl.ARRAY_BUFFER, cabVBO); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([v[0], v[1], 0, 0, v[2], v[3], 1, 0, v[4], v[5], 1, 1, v[6], v[7], 0, 1]), gl.DYNAMIC_DRAW);
+      const p = P.ring; gl.useProgram(p.p); gl.bindVertexArray(cabVAO);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      bindT(0, gl.TEXTURE_2D, q.tex); gl.uniform1i(p.u.uTex, 0); gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uA, a);
+      gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
+      gl.disable(gl.BLEND);
+    }
+    /* The bay's ring (StopZone): once three-quarters of the taxi is in the bay, a ring of the bay's light on the road round
+       the taxi. The design system's hud.bayRing draws it, with three soft blurs, so it is drawn once per colour (and again
+       after a resize) into a picture of the road round the taxi, then laid on the finished street each frame before the
+       taxi, so the taxi hides what is under it. It is light, so it takes no grain; it moves with the taxi's sway. */
+    const rings = {};   // per tube colour: { tex, x0, y0, w, h } in picture pixels, x0 from the taxi's middle
+    function bakeRing(tube){
+      // the street's pt(d, x, y) round the taxi: d metres ahead of its rear bumper, x metres across from its middle, y up
+      const cg = cabGeometry(), pt = (d, x, y) => { const s = DEPTH / (cg.zc + d * UPM); return { x: s * x * UPM * K, y: H * HZ + s * (CAM_H - y * UPM) * K }; };
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (let i = 0; i < 48; i++){ const a = i / 48 * Math.PI * 2, q = pt(2.3 + Math.sin(a) * 3.4, Math.cos(a) * 1.45, 0); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+      x0 -= 40; y0 -= 40; x1 += 40; y1 += 40;   // room for the widest blur
+      const c = mk((x1 - x0) * RS, (y1 - y0) * RS), g = c.getContext('2d');
+      g.setTransform(RS, 0, 0, RS, -x0 * RS, -y0 * RS);
+      hud.bayRing(g, pt, 0, tube, 1);   // laneX 0: round the taxi's middle, wherever it is across the road
+      return { tex: texFrom(c, true), x0, y0, w: x1 - x0, h: y1 - y0 };
+    }
+    function drawBayRing(st){
+      if (!(st.ringA > 0.001)) return;
+      const tube = st.ringKind === 'dropoff' ? 'tube-pink' : 'tube-teal', r = rings[tube] || (rings[tube] = bakeRing(tube));
+      const x = W / 2 + sway(st) + r.x0, y = r.y0;
+      gl.bindBuffer(gl.ARRAY_BUFFER, cabVBO); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x, y, 0, 0, x + r.w, y, 1, 0, x + r.w, y + r.h, 1, 1, x, y + r.h, 0, 1]), gl.DYNAMIC_DRAW);
+      const p = P.ring; gl.useProgram(p.p); gl.bindVertexArray(cabVAO);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      bindT(0, gl.TEXTURE_2D, r.tex); gl.uniform1i(p.u.uTex, 0); gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uA, st.ringA);
+      gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
+      gl.disable(gl.BLEND);
     }
     function drawCabGL(st){
       const cg = cabGeometry(), view = cabView(st), m = cabMotion(st), k = cg.rw / 200, x = W / 2 + sway(st), y = cg.gy, N = T.cab[view.near];
@@ -2449,7 +2537,7 @@
       gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uRS, RS); gl.uniform1f(p.u.uPH, PH);
       gl.uniform1f(p.u.uGrain, cabGrain ? grainAmt * Z.cab / MAXL : 0);
       gl.uniform1i(p.u.uLow, 1); gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
-      bindT(0, gl.TEXTURE_2D, N.body); gl.uniform1i(p.u.uLow, 0);
+      bindT(0, gl.TEXTURE_2D, st.hired && N.bodyHired ? N.bodyHired : N.body); gl.uniform1i(p.u.uLow, 0);   // hired: the roof sign out
       gl.uniform2f(p.u.uSpr, N.w, N.h);
       gl.uniform4fv(p.u.uRM, N.maskR); gl.uniform4fv(p.u.uRL, N.litR); gl.uniform4fv(p.u.uRH, N.hmR);
       gl.uniform4f(p.u.uEnv, Math.max(0, x - cg.rw * 1.7), Math.min(W, x + cg.rw * 1.7), H * 0.02, H * (HZ + 0.12));
@@ -2476,10 +2564,12 @@
     }
 
     /* ================================================================ the meter: its own small canvas over the corner, redrawn only when a number changes */
-    const HUDY = 200, HUDW = 300, HUDC = { red: '#ff3b26', off: '#2b0e08', lab: '#d9c7a3' };
+    // The canvas reaches 390 picture pixels up from the picture's foot (HUDY = 150): room over the meter for the caption's
+    // round line and the receipt slip at their phone sizes, where their smallest lettering makes them taller
+    const HUDY = 150, HUDW = 300, HUDC = { red: '#ff3b26', off: '#2b0e08', lab: '#d9c7a3' };
     // the meter is drawn at 82.5% of its round 9 size (Barney, 28 October: 75%, then 10% larger than that), shrunk towards its bottom-left corner; the district name keeps its size
     const MS = 0.825, meterT = g => g.setTransform(RS * MS, 0, 0, RS * MS, RS * 14 * (1 - MS), RS * ((H - 14) * (1 - MS) - HUDY));
-    let hudBase = null, hudKey = '', labK = 1;
+    let hudBase = null, hudBaseLives = false, hudKey = '', labK = 1;
     const glyphs = new Map();
     function hudLayout(){
       hudC.width = Math.round(HUDW * RS); hudC.height = Math.round((H - HUDY) * RS);
@@ -2488,9 +2578,11 @@
       labK = env.touch ? Math.max(1, 10 / (11 * MS * env.cssScale())) : 1;
       hudBase = null; hudKey = ''; glyphs.clear();
     }
-    function hudGeom(){ const w = 210, rowH = [80, 50, 50], faceH = rowH[0] + rowH[1] + rowH[2] + 10, head = 34, border = 9, outerW = w + border * 2, outerH = faceH + head + border * 2, ox = 14, oy = H - 14 - outerH; return { w, rowH, faceH, outerW, outerH, ox, oy, x: ox + border, y: oy + border + head }; }
-    function drawHudBase(){
-      const c = mk(hudC.width, hudC.height), g = c.getContext('2d'), G = hudGeom();
+    // lives: Grunge City Rider's meter (Meter: has-lives), 16 wider, with lives in the heading and the tip sharing the time's row
+    function hudGeom(lives){ const w = lives ? 226 : 210, rowH = [80, 50, 50], faceH = rowH[0] + rowH[1] + rowH[2] + 10, head = 34, border = 9, outerW = w + border * 2, outerH = faceH + head + border * 2, ox = 14, oy = H - 14 - outerH; return { w, rowH, faceH, outerW, outerH, ox, oy, x: ox + border, y: oy + border + head }; }
+    const PAIR = { label: 16, digits: 24.65, h: 21.8 };   // the shared row: each label's baseline, then its digits' top and height, from the row's top
+    function drawHudBase(lives){
+      const c = mk(hudC.width, hudC.height), g = c.getContext('2d'), G = hudGeom(lives);
       meterT(g);
       // the meter set into a lightbox sign, like the shop signs
       g.save(); g.shadowColor = 'rgba(255,226,170,0.8)'; g.shadowBlur = 20 * MS; g.fillStyle = '#070504'; rr(g, G.ox - 4, G.oy - 4, G.outerW + 8, G.outerH + 8, 10); g.fill(); g.restore();
@@ -2498,16 +2590,21 @@
       g.fillStyle = gr; rr(g, G.ox, G.oy, G.outerW, G.outerH, 7); g.fill();
       g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 1; rr(g, G.ox + 2.5, G.oy + 2.5, G.outerW - 5, G.outerH - 5, 6); g.stroke();
       hudText(g, '的士', G.ox + 14, G.oy + 27, 23, 900, F.zhSerif, '#a8140c');
-      hudText(g, 'TAXI METER', G.ox + G.outerW - 14, G.oy + 25, 16, 700, F.cond, '#a8140c', 'right', 2.5);
+      // with lives, 的士 and TAXI METER sit together on the left, 8 apart, and the lives take the right (drawn with the numbers)
+      if (lives) hudText(g, 'TAXI METER', G.ox + 14 + g.measureText('的士').width + 8, G.oy + 25, 16, 700, F.cond, '#a8140c', 'left', 2.5);
+      else hudText(g, 'TAXI METER', G.ox + G.outerW - 14, G.oy + 25, 16, 700, F.cond, '#a8140c', 'right', 2.5);
       g.fillStyle = 'rgba(8,5,3,0.96)'; rr(g, G.x, G.y, G.w, G.faceH, 4); g.fill();
-      const L0 = G.x + 18, lab = HUDC.lab;
+      const L0 = G.x + 18, R0 = G.x + G.w - 18, lab = HUDC.lab;
       const label = (yy, zh, en) => { hudText(g, zh, L0, yy, 13 * labK, 700, F.zhSans, lab); hudText(g, en, L0 + zh.length * 14 * labK + 6, yy - 1, 11 * labK, 600, F.plex, lab, 'left', labK); };
+      const labelEnd = (yy, zh, en) => { hudText(g, en, R0, yy - 1, 11 * labK, 600, F.plex, lab, 'right', labK); const ew = g.measureText(en).width; hudText(g, zh, R0 - ew - 6 * labK, yy, 13 * labK, 700, F.zhSans, lab, 'right'); };   // the gap grows with the labels, as the Meter's CSS has it
       const rule = yy => { g.fillStyle = '#2a1d12'; g.fillRect(G.x + 14, yy, G.w - 28, 1); };
       let yy = G.y + 8;
       label(yy + 18, '車資', 'FARE  HK$'); yy += G.rowH[0]; rule(yy);
-      label(yy + 30, '時間', 'TIME'); yy += G.rowH[1]; rule(yy);
+      if (lives){ label(yy + PAIR.label, '小費', 'TIP'); labelEnd(yy + PAIR.label, '時間', 'TIME'); }
+      else label(yy + 30, '時間', 'TIME');
+      yy += G.rowH[1]; rule(yy);
       label(yy + 30, '速度', 'KM/H');
-      hudBase = c;
+      hudBase = c; hudBaseLives = lives;
     }
     function glyph(ch, dh){
       const key = ch + '|' + dh; let e = glyphs.get(key); if (e) return e;
@@ -2518,32 +2615,43 @@
     }
     function hudDigits(g, val, R0, y, dh){
       let cx = R0 - seg7w(val, dh);
-      for (const ch of val){ const e = glyph(ch, dh); g.drawImage(e.c, cx - e.m, y - e.m, e.c.width / (RS * MS), e.c.height / (RS * MS)); cx += ch === '.' ? dh * 0.12 + dh * 0.04 : dh * 0.68; }
+      for (const ch of val){ const e = glyph(ch, dh); g.drawImage(e.c, cx - e.m, y - e.m, e.c.width / (RS * MS), e.c.height / (RS * MS)); cx += ch === '.' || ch === ',' ? dh * 0.12 + dh * 0.04 : dh * 0.68; }
     }
-    // m: the fare (HK$), the time and the km/h (numbers, or null for unlit places), the district, and the caption's fade (0 to 1)
+    /* m: the fare (HK$), the time and the km/h (numbers, or null for unlit places), the district and the caption's fade
+       (0 to 1); and for Grunge City Rider's meter, lives (0 to 3; null for today's meter), the tip (HK$; null unlit, 'lost'
+       dashes), the round and the fares done in this zone, and the receipt slip { id, o, show, a } or null */
     function drawHUD(m){
-      const dist = DISTRICTS[m.d], a = clamp(m.a, 0, 1);
+      const dist = DISTRICTS[m.d], a = clamp(m.a, 0, 1), lives = m.lives != null, rc = m.receipt;
       // six places, so the meter holds at 999.99 (a seventh place is for a game's rules to decide: the Meter README)
       const fare = Math.min(999.99, Math.round((+m.fare || 0) * 100) / 100).toFixed(2);
       const time = m.time == null ? '  ' : String(clamp(Math.ceil(m.time), 0, 99)).padStart(2, '0'), kmh = m.kmh == null ? '   ' : String(clamp(Math.round(m.kmh), 0, 999));
-      const key = fare + '|' + time + '|' + kmh + '|' + m.d + '|' + a.toFixed(2);
+      // the tip, four places: unlit with no passenger aboard (a comma is an unlit point), dashes once it is lost
+      const tip = m.tip === 'lost' ? '-.--' : m.tip == null ? ' ,  ' : clamp(+m.tip || 0, 0, 9.99).toFixed(2);
+      const show = rc ? clamp(rc.show, 0, 1) : 0, ra = rc ? clamp(rc.a, 0, 1) : 0;
+      const key = [fare, time, kmh, m.d, a.toFixed(2), lives ? clamp(m.lives | 0, 0, 3) : '', tip, m.round, m.fares, rc ? rc.id : '', show.toFixed(3), ra.toFixed(2)].join('|');
       if (key === hudKey) return;
       hudKey = key;
-      if (!hudBase) drawHudBase();
-      const g = hctx, G = hudGeom();
+      if (!hudBase || hudBaseLives !== lives) drawHudBase(lives);
+      const g = hctx, G = hudGeom(lives);
       g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.clearRect(0, 0, hudC.width, hudC.height); g.drawImage(hudBase, 0, 0);
       meterT(g);
-      const R0 = G.x + G.w - 18; let yy = G.y + 8;
+      const L0 = G.x + 18, R0 = G.x + G.w - 18; let yy = G.y + 8;
       hudDigits(g, fare.padStart(6, ' '), R0, yy + 28, 40); yy += G.rowH[0];
-      hudDigits(g, time, R0, yy + 11, 28); yy += G.rowH[1];
+      if (lives){
+        // lives at the heading's right, 14 in, as the Meter preview has them; then TIP on the left and TIME on the right
+        const lw = 3 * 15.5 * 1.3 + 2 * 15.5 * 0.22;
+        hud.lives(g, G.ox + G.outerW - 14 - lw, G.oy + 21 - 15.5 / 2, 15.5, clamp(m.lives | 0, 0, 3));
+        hudDigits(g, tip, L0 + seg7w(tip, PAIR.h), yy + PAIR.digits, PAIR.h);
+        hudDigits(g, time, R0, yy + PAIR.digits, PAIR.h);
+      } else hudDigits(g, time, R0, yy + 11, 28);
+      yy += G.rowH[1];
       hudDigits(g, kmh.padStart(3, ' '), R0, yy + 11, 28);
-      // the district, Chinese over English, as a film subtitle
-      g.setTransform(RS, 0, 0, RS, 0, -HUDY * RS);
-      g.save(); g.globalAlpha = a; g.lineJoin = 'round'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-      const cy = H - 14 - G.outerH * MS - 14;
-      g.font = '700 28px ' + F.zhSans; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.lineWidth = 5; g.strokeText(dist.zh, G.ox + 2, cy - 24); g.fillStyle = '#fff1c4'; g.fillText(dist.zh, G.ox + 2, cy - 24);
-      g.font = '500 18px ' + F.plex; g.strokeText(dist.en, G.ox + 2, cy); g.fillText(dist.en, G.ox + 2, cy);
-      g.restore();
+      // the caption (the design system's, with the round line when there is a round), stepping aside while a receipt shows;
+      // then the receipt slip printed up out of the meter. k: canvas pixels per 720-line pixel; mm: canvas pixels per CSS pixel
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      const k = RS * 0.75, mm = RS / env.cssScale(), top = (H - 14 - G.outerH * MS - HUDY) * RS;
+      hud.caption(g, (G.ox + 2) * RS, top, k, mm, { zh: dist.zh, en: dist.en, round: m.round == null ? null : m.round, fares: clamp(m.fares | 0, 0, 5), a: a * (1 - show * ra) });
+      if (rc && show > 0 && ra > 0){ g.globalAlpha = ra; hud.receipt(g, G.ox * RS + 24 * k, top - 4 * k, k, mm, rc.o, show); g.globalAlpha = 1; }
     }
 
     /* ================================================================ City Nights: the street as tools a game calls
@@ -2626,7 +2734,7 @@
     /* ---- the run: what the game sets (cn.street, in metres) and what the kit works out from it */
     const wrapU = u => (u % TRACK + TRACK) % TRACK;
     const api = {
-      taxi: { z: 0, x: 0, speed: 0 }, cars: [], tokens: [], obstacles: [], animals: [], stop: null,
+      taxi: { z: 0, x: 0, speed: 0 }, cars: [], tokens: [], obstacles: [], animals: [], stop: null, pin: null,
       lanes: LANES.slice(), length: TRACK / UPM, width: ROAD * 2 / UPM,
       districts: DISTRICTS.map((d, i) => ({ index: i, zh: d.zh, en: d.en, z: i * DIST_M, length: DIST_M })),
       traffic: (n, seed) => makeTraffic(n == null ? 16 : n, seed, wrapU((+api.taxi.z || 0) * UPM)).map(c => ({ z: c.z / UPM, x: c.x, speed: c.speed / UPM, kind: c.kind, tone: c.tone })),
@@ -2635,17 +2743,50 @@
       gap: (from, to) => { const L = TRACK / UPM; return (((to - from) % L) + L) % L; },
       size: kind => { const p = PIECE_SIZE[kind]; if (p) return { width: p[0], length: p[1] }; const v = VEH[kind] || VEH.taxi; return { width: v.W, length: v.L }; },
       district: z => { const d = DISTRICTS[Math.floor(wrapU(z * UPM) / SEG / DIST_LEN) % DISTRICTS.length], i = DISTRICTS.indexOf(d); return { index: i, zh: d.zh, en: d.en }; },
-      crash: (z, x) => { popAsk = { z: z * UPM, x: clamp(+x || 0, -1.2, 1.2) }; }
+      crash: (z, x) => { popAsk = { z: z * UPM, x: clamp(+x || 0, -1.2, 1.2) }; },
+      // the signs beside the street from z0 to z1 (metres, round the lap), to name a destination after: [{ zh, en, z, side }]
+      signs: (z0, z1) => {
+        const out = [], a = Math.floor(wrapU((+z0 || 0) * UPM) / SEG), n = clamp(Math.ceil(((+z1 || 0) - (+z0 || 0)) * UPM / SEG), 0, N_SEG - 1);
+        for (let k = 0; k <= n; k++){
+          const i = (a + k) % N_SEG, sg = segs[i], z = i * SEG / UPM;
+          for (const s of sg.signs) out.push({ zh: s.t.zh, en: s.t.en || '', z, side: s.side });
+          for (let side = 0; side < 2; side++){
+            const wd = sg.wall[side]; if (!wd) continue;
+            for (const f of wd.b.fsigns) if (f.k0 === wd.k) out.push({ zh: f.t.zh, en: f.t.en || '', z, side: side ? 1 : -1 });
+          }
+        }
+        return out;
+      }
     };
-    const meter = { time: null, speed: null };
-    const run = { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, trip: 0, moving: false, cars: [], tokens: [], pos: 0, cap: { d: -1, t: 0 } };
+    // lives, tip, round and fares: Grunge City Rider's meter and caption (left as they are, today's meter and caption)
+    const meter = { time: null, speed: null, lives: null, tip: null, round: null, fares: 0 };
+    const run = { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, trip: 0, moving: false, cars: [], tokens: [], pos: 0, cap: { d: -1, t: 0 }, ringA: 0, ringKind: 'pickup', hired: false, carry: null };
     let placed = false;   // street.place moved the taxi across: no lean from it
+    // the receipt slip: what it says (o), how long it has been out (t), and a number for each new one (id)
+    let slip = null, slipN = 0;
+    // receipt-time: up, held, back in (seconds; hud is defined further down, so read when needed)
+    const SLIP = { get in(){ return hud.times.receiptIn; }, get hold(){ return hud.times.receiptHold; }, get out(){ return hud.times.receiptOut; } };
+    function receipt(o){
+      if (!o || !Array.isArray(o.lines)) return;
+      // a new slip replaces the one showing: one already out stays out and holds again
+      const out = slip && slip.t >= SLIP.in && slip.t < SLIP.in + SLIP.hold;
+      // a game names the red line by its colour, 'receipt-red' (the build forbids bare colour names in games); the design
+      // system's receipt() calls the style 'red'
+      slip = { o: { head: o.head, lines: o.lines.map(l => { const c = l.slice(); if (c[3] === 'receipt-red') c[3] = 'red'; return c; }) }, t: out ? SLIP.in : 0, id: ++slipN };
+    }
+    // how far the slip is out (0 to 1) and its opacity; under Reduce motion it fades in and out where it stands
+    function slipNow(){
+      if (!slip) return null;
+      const t = slip.t, e = u => u * u * (3 - 2 * u);
+      const f = t < SLIP.in ? e(t / SLIP.in) : t < SLIP.in + SLIP.hold ? 1 : 1 - e(clamp((t - SLIP.in - SLIP.hold) / SLIP.out, 0, 1));
+      return reduceMotion ? { id: slip.id, o: slip.o, show: 1, a: f } : { id: slip.id, o: slip.o, show: f, a: 1 };
+    }
     function reset(){
-      api.taxi = { z: 0, x: 0, speed: 0 }; api.cars = []; api.tokens = []; api.obstacles = []; api.animals = []; api.stop = null;
-      meter.time = null; meter.speed = null; placed = false;
-      Object.assign(run, { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, trip: 0, moving: false, cap: { d: -1, t: 0 } });
-      pop = null; popAsk = null; popLast = '';
-      hudKey = ''; clearPop();
+      api.taxi = { z: 0, x: 0, speed: 0 }; api.cars = []; api.tokens = []; api.obstacles = []; api.animals = []; api.stop = null; api.pin = null;
+      meter.time = null; meter.speed = null; meter.lives = null; meter.tip = null; meter.round = null; meter.fares = 0; placed = false;
+      Object.assign(run, { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, trip: 0, moving: false, cap: { d: -1, t: 0 }, ringA: 0, ringKind: 'pickup', hired: false, carry: null });
+      pop = null; popAsk = null; popLast = ''; slip = null;
+      hudKey = ''; clearPop(); clearMarks();
     }
     // one step of play, after the game's own: the street's life, then the taxi's motion from how the game moved it
     function step(dt){
@@ -2664,6 +2805,11 @@
       if (d !== run.cap.d){ run.cap.d = d; run.cap.t = 0; }
       run.cap.t += dt;
       if (pop) pop.t += dt;
+      if (slip){ slip.t += dt; if (slip.t >= SLIP.in + SLIP.hold + SLIP.out) slip = null; }
+      // the bay's ring fades in while the game says the taxi is in the bay (stop.ring), and out once it says not (ring-fade)
+      const sp = api.stop && typeof api.stop === 'object' ? api.stop : null;
+      run.ringA = clamp(run.ringA + (sp && sp.ring ? 1 : -1) * dt / hud.times.ringFade, 0, 1);
+      if (sp && (sp.kind === 'pickup' || sp.kind === 'dropoff')) run.ringKind = sp.kind;
       boltStep(dt);
     }
     const toUnits = (list, out) => {
@@ -2678,6 +2824,7 @@
       run.obstacles = Array.isArray(api.obstacles) ? api.obstacles : [];
       run.animals = Array.isArray(api.animals) ? api.animals : [];
       run.stop = api.stop && typeof api.stop === 'object' ? api.stop : null;
+      run.hired = !!api.taxi.hired; run.carry = api.taxi.carry && typeof api.taxi.carry === 'object' ? api.taxi.carry : null;
       for (const c of run.cars){ if (!VEH[c.kind]) c.kind = 'sedan'; c.tone = ((c.tone % TONES[c.kind]) + TONES[c.kind]) % TONES[c.kind]; }
       return run;
     }
@@ -3273,6 +3420,243 @@
       };
     })();
 
+    /* ---- the play screen's new parts: lives, the fare lamps, the caption's round line, the pin, the power-up badges and
+       rings, the bay's ring, the receipt slip, the SAFE! sign, the zone title and the touch zones (design system v10)
+       The design system's code (components/bundle.js, CityNights.hud), copied unchanged. It takes colours by token name
+       through popCol, so from the kit's colour table. How the kit uses each part is with the play screen, further down. */
+    /* ---------------- The play screen's new parts: Grunge City Rider's information and moments ----------------
+       Barney, 29 and 30 October 2026 (HUD round 1: C, "where it happens"; round 2: the bay's ring, the passenger
+       fading with the roof sign going out, the receipt slip, the SAFE! sign, the film title; the full play screen).
+       Screen pieces are drawn for a 720-line window: k is canvas pixels per 720-line pixel, m is canvas pixels per
+       CSS pixel (it sets the smallest sizes on phones). Road pieces take the street's pt(d, x, y) like CityNights.street
+       and draw in the caller's picture units (540-line picture pixels, the street's own). Colours come by token name. */
+    var hud = (function () {
+      var col = popCol, rgba = popAlpha;
+      var FZH = '"Noto Sans TC", sans-serif', FZS = '"Noto Serif TC", serif', FUI = '"IBM Plex Sans Condensed", sans-serif', FAN = 'Antonio, sans-serif', FCO = 'Bangers, Impact, sans-serif';
+      function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+      function mix(c, d, t) {   // two #rrggbb colours mixed, t of the way from c to d, as #rrggbb
+        var a = parseInt(col(c).slice(1), 16), b = parseInt(col(d).slice(1), 16), f = function (s) { return Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t); };
+        return '#' + ((1 << 24) + (f(16) << 16) + (f(8) << 8) + f(0)).toString(16).slice(1);
+      }
+      function spaced(g, px) { if ('letterSpacing' in g) g.letterSpacing = px + 'px'; }
+
+      // ---- lives: three small taxis seen from behind, as the player's own; a lost one is left as a faint shape.
+      // (x, y) is the top left; h the height in the caller's units (15.5 meter units in the meter's heading).
+      var BODY = new Path2D('M7.5 1.5 H18.5 L21 8 H24 Q25 8 25 9 V17 Q25 18 24 18 H21 V19.5 H17.5 V18 H8.5 V19.5 H5 V18 H2 Q1 18 1 17 V9 Q1 8 2 8 H5 Z');
+      var GLASS = new Path2D('M8.6 3 H17.4 L19.2 7.6 H6.8 Z');
+      function lives(g, x, y, h, n) {
+        var s = h / 20, step = h * 1.3 + h * 0.22;
+        for (var i = 0; i < 3; i++) {
+          g.save(); g.translate(x + i * step, y); g.scale(s, s);
+          if (i < n) {
+            g.fillStyle = col('taxi-red'); g.fill(BODY); g.lineWidth = 1.2; g.strokeStyle = col('case'); g.stroke(BODY);
+            g.fillStyle = col('shutter'); g.fill(GLASS);
+            g.fillStyle = col('face-cream'); rr(g, 10.5, 0, 5, 2.2, 0.6); g.fill(); g.lineWidth = 0.8; g.stroke();
+            g.fillStyle = col('cone-orange'); rr(g, 2.6, 10, 3.6, 2.6, 0.5); g.fill(); rr(g, 19.8, 10, 3.6, 2.6, 0.5); g.fill();
+            g.fillStyle = col('face-yellow'); g.fillRect(10, 13.6, 6, 2.4);
+          } else { g.fillStyle = col('life-lost'); g.fill(BODY); rr(g, 10.5, 0, 5, 2.2, 0.6); g.fill(); }
+          g.restore();
+        }
+        return 3 * h * 1.3 + 2 * h * 0.22;   // width drawn
+      }
+      // ---- five fare lamps, lit for each fare done in this zone. (x, cy): the first lamp's left edge and the row's middle; d the lamp's size
+      function fareLamps(g, x, cy, d, n) {
+        for (var i = 0; i < 5; i++) {
+          var cx = x + d / 2 + i * d * 1.4;
+          g.save(); g.beginPath(); g.arc(cx, cy, d / 2, 0, Math.PI * 2);
+          if (i < n) { g.shadowColor = rgba(col('face-yellow'), 0.95); g.shadowBlur = d * 0.6; g.fillStyle = col('face-yellow'); g.fill(); g.shadowBlur = 0; g.lineWidth = 1; g.strokeStyle = 'rgba(120,70,0,0.5)'; g.stroke(); }
+          else { g.fillStyle = col('lamp-unlit'); g.fill(); g.lineWidth = Math.max(1, d * 0.11); g.strokeStyle = col('lamp-unlit-ring'); g.beginPath(); g.arc(cx, cy, d / 2 - g.lineWidth / 2, 0, Math.PI * 2); g.stroke(); }
+          g.restore();
+        }
+        return d * 1.4 * 4 + d;
+      }
+      // ---- the district caption, now three lines: Chinese, English, then 輪 ROUND n with the zone's five fare lamps.
+      // x: its left edge (2 picture pixels right of the meter's); meterTop: the top of the meter's case; a: its fade (0 to 1).
+      function caption(g, x, meterTop, k, m, o) {
+        var a = o.a == null ? 1 : o.a; if (a <= 0) return;
+        var rs = Math.max(18 * k, 11 * m), re = Math.max(17 * k, 11 * m), ld = Math.max(13 * k, 8 * m), pad = 3 * k, rowH = Math.max(rs, ld + 2 * pad);
+        var withRound = o.round != null, rowMid = meterTop - 13.7 * k - rowH / 2;
+        var enBase = withRound ? rowMid - rowH / 2 - 10 * k : meterTop - 18.67 * k, zhBase = enBase - 32 * k;   // without a round: 14 picture px above the meter
+        g.save(); g.globalAlpha = a; g.lineJoin = 'round'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+        var out = function (text, xx, yy, f, w) { g.font = f; g.lineWidth = w; g.strokeStyle = col('caption-outline'); g.strokeText(text, xx, yy); g.fillStyle = col('caption'); g.fillText(text, xx, yy); };
+        out(o.zh, x, zhBase, '700 ' + 37.3 * k + 'px ' + FZH, 6.67 * k);
+        out(o.en, x, enBase, '500 ' + 24 * k + 'px ' + FUI, 6.67 * k);
+        if (!withRound) { g.restore(); return; }
+        // the round: 輪 ROUND n, its own outline thinner, then the lamps on a small dark pill
+        g.textBaseline = 'middle'; var xx = x, ow = Math.max(4 * k, 2.5 * m);
+        out('輪', xx, rowMid, '700 ' + rs + 'px ' + FZH, ow); g.font = '700 ' + rs + 'px ' + FZH; xx += g.measureText('輪').width + 6 * k;
+        spaced(g, k); out('ROUND ' + o.round, xx, rowMid + re * 0.04, '600 ' + re + 'px ' + FUI, ow); g.font = '600 ' + re + 'px ' + FUI; xx += g.measureText('ROUND ' + o.round).width + 10 * k; spaced(g, 0);
+        var pw = ld * 1.4 * 4 + ld + 2 * pad; g.fillStyle = 'rgba(0,0,0,0.55)'; rr(g, xx, rowMid - ld / 2 - pad, pw, ld + 2 * pad, (ld + 2 * pad) / 2); g.fill();
+        fareLamps(g, xx + pad, rowMid, ld, o.fares);
+        g.restore();
+      }
+      // ---- the pin over where the taxi is heading: pink 落 over the drop-off with the place's name and the distance,
+      // teal 上 over a pick-up with the distance. (x, y): the point 3.2 m above the bay's middle (or above the far end
+      // of the drawn road in the bay's lane, until the bay is in view). o: { kind: 'drop' | 'pick', name, metres, bare }
+      function pin(g, x, y, k, m, o) {
+        var kk = Math.max(k, 0.6 * m), pick = o.kind === 'pick', tube = col(pick ? 'tube-teal' : 'tube-pink'), core = col(pick ? 'tube-core-teal' : 'tube-core-pink');
+        var shape = new Path2D('M20 55 C13 41 3 32 3 20 A17 17 0 0 1 37 20 C37 32 27 41 20 55 Z');
+        g.save(); g.translate(x - 20 * kk, y - 58 * kk); g.scale(kk, kk);
+        g.shadowColor = tube; g.shadowBlur = 10 * kk; g.fillStyle = col('neon-board'); g.fill(shape);
+        g.lineWidth = 3.6; g.strokeStyle = tube; g.stroke(shape); g.shadowBlur = 4 * kk; g.stroke(shape); g.shadowBlur = 0;
+        g.lineWidth = 1.3; g.strokeStyle = core; g.stroke(shape);
+        g.fillStyle = core; g.font = '700 17px ' + FZH; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText(pick ? '上' : '落', 20, 27);
+        g.restore();
+        if (o.bare) return;
+        // the tag on the kerb side: the name (drop-offs), then the metres to go
+        var fz = Math.max(15 * kk, 11 * m), fa = Math.max(15 * kk, 11 * m), padX = 8 * kk, w = 0, lines = [];
+        if (o.name) lines.push({ t: o.name, f: '700 ' + fz + 'px ' + FZH, lh: fz * 1.2, sp: 0 });
+        lines.push({ t: o.metres + ' M', f: '700 ' + fa + 'px ' + FAN, lh: fa * 1.15, sp: kk });
+        g.save(); lines.forEach(function (l) { g.font = l.f; spaced(g, l.sp); w = Math.max(w, g.measureText(l.t).width); }); spaced(g, 0);
+        var bw = w + padX * 2, bh = lines.reduce(function (s, l) { return s + l.lh; }, 0) + 9 * kk, bx = x - 28 * kk - bw, by = y - 56 * kk;
+        g.shadowColor = tube; g.shadowBlur = 10 * kk; g.fillStyle = col('neon-board'); rr(g, bx, by, bw, bh, 6 * kk); g.fill();
+        g.shadowBlur = 0; g.lineWidth = 2 * kk; g.strokeStyle = tube; rr(g, bx - kk, by - kk, bw + 2 * kk, bh + 2 * kk, 7 * kk); g.stroke();
+        g.textAlign = 'right'; g.textBaseline = 'alphabetic'; g.fillStyle = core; g.shadowColor = tube; g.shadowBlur = 5 * kk;
+        var ty = by + 4 * kk; lines.forEach(function (l) { g.font = l.f; spaced(g, l.sp); ty += l.lh; g.fillText(l.t, bx + bw - padX, ty - l.lh * 0.22); });
+        spaced(g, 0); g.restore();
+      }
+      // ---- the power-ups the taxi carries, as small sign tokens just under its rear bumper: 快 with a ring that empties
+      // over its 10 s, 保 while held, the fare boost on (錢 or 雙). (x, y): the taxi's rear on the road. list: [{ kind, left }]
+      var FACES = { speed: ['快', 'face-red', 'ink-yellow'], shield: ['保', 'face-blue', 'ink-white'], fare: ['錢', 'face-yellow', 'ink-black'], double: ['雙', 'face-cream', 'ink-red'] };
+      function badges(g, x, y, k, m, list) {
+        var kk = Math.max(k, 0.68 * m) * 1.15, box = 34 * kk, face = 24 * kk, gap = 5 * kk, n = list.length; if (!n) return;
+        var x0 = x - (n * box + (n - 1) * gap) / 2, top = y + 4 * kk;
+        list.forEach(function (b, i) {
+          var F = FACES[b.kind], cx = x0 + i * (box + gap) + box / 2, cy = top + box / 2;
+          g.save();
+          if (b.left != null) {   // the ring of time left, from the top, clockwise
+            g.lineWidth = 3.4 * kk; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.beginPath(); g.arc(cx, cy, 15 * kk, 0, Math.PI * 2); g.stroke();
+            g.strokeStyle = col(F[1]); g.beginPath(); g.arc(cx, cy, 15 * kk, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, Math.min(1, b.left))); g.stroke();
+          }
+          g.shadowColor = col(F[1]); g.shadowBlur = 9 * kk; g.fillStyle = col('case'); rr(g, cx - face / 2 - 2 * kk, cy - face / 2 - 2 * kk, face + 4 * kk, face + 4 * kk, 6 * kk); g.fill();
+          g.shadowBlur = 0; g.fillStyle = col(F[1]); rr(g, cx - face / 2, cy - face / 2, face, face, 4 * kk); g.fill();
+          g.fillStyle = col(F[2]); g.font = '900 ' + 16 * kk + 'px ' + FZS; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(F[0], cx, cy + kk);
+          g.restore();
+        });
+      }
+      // ---- 保 held: a ring of blue light on the road round the taxi. (x, y): the taxi's rear on the road; s: pixels per metre there.
+      // It steps aside while the taxi is in a bay (the bay's own ring shows instead) and comes back as the taxi leaves.
+      function shieldRing(g, x, y, s) {
+        var half = 0.9 * s, rx = half * 1.75, ry = half * 0.75, cy = y - half * 1.05 + ry, b = col('tube-blue');
+        g.save(); g.globalCompositeOperation = 'screen'; g.translate(x, cy); g.scale(1, ry / rx);
+        var gr = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+        gr.addColorStop(0, rgba(b, 0)); gr.addColorStop(0.55, rgba(b, 0.35)); gr.addColorStop(0.82, rgba(mix('tube-blue', '#ffffff', 0.3), 0.75)); gr.addColorStop(1, rgba(b, 0));
+        g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.fill();
+        g.restore();
+      }
+      // ---- the bay's ring: once three-quarters of the taxi is inside a bay, the bay's colour gathers in a ring of light on the
+      // road round it (drawn on the road, so the taxi drawn over it hides what is under it). laneX: the taxi's lane centre (m);
+      // tube: 'tube-teal' (pick-up) or 'tube-pink' (drop-off); a: 0 to 1 (it fades in, and out once the stop counts).
+      function bayRing(g, pt, laneX, tube, a) {
+        if (!(a > 0)) return;
+        var ell = function (ad, ax) { var p = []; for (var i = 0; i < 48; i++) { var t = i / 48 * Math.PI * 2, q = pt(2.3 + Math.sin(t) * ad, laneX + Math.cos(t) * ax, 0); if (!q) return null; p.push(q); } return p; };
+        var path = function (p) { g.beginPath(); p.forEach(function (q, i) { if (i) g.lineTo(q.x, q.y); else g.moveTo(q.x, q.y); }); g.closePath(); };
+        var e1 = ell(3.4, 1.45), e0 = ell(3.0, 1.2); if (!e1 || !e0) return;
+        var c = col(tube), px = g.getTransform().a || 1;   // canvas pixels per picture pixel, for the blurs
+        g.save(); g.globalCompositeOperation = 'lighter';
+        g.filter = 'blur(' + (6.6 * px) + 'px)'; path(e1); g.lineWidth = 16; g.strokeStyle = c; g.globalAlpha = 0.55 * a; g.stroke();
+        g.filter = 'blur(' + (2 * px) + 'px)'; g.lineWidth = 5; g.globalAlpha = 0.9 * a; g.stroke();
+        g.filter = 'none'; g.lineWidth = 1.6; g.strokeStyle = '#ffffff'; g.globalAlpha = 0.7 * a; g.stroke();
+        g.filter = 'blur(' + (9.2 * px) + 'px)'; path(e0); g.fillStyle = c; g.globalAlpha = 0.28 * a; g.fill();
+        g.restore();
+      }
+      // ---- the receipt slip: printed out of the top of the meter when a fare is paid, the tip halves or the tip is lost.
+      // (x, bottom): its left edge and where it meets the meter's case. o: { head, lines: [[zh, en, value, 'total' | 'red' | 'struck']] }
+      // show: 0 to 1, how much of it is out (it prints up out of the meter, holds, and goes back in).
+      function receipt(g, x, bottom, k, m, o, show) {
+        var s = show == null ? 1 : Math.max(0, Math.min(1, show)); if (!s) return;
+        var w = 210 * k, padX = 12 * k, zig = 7 * k;
+        var fz = Math.max(14 * k, 10 * m), fe = Math.max(11.5 * k, 9 * m), fv = Math.max(16 * k, 11 * m), ft = Math.max(20 * k, 12 * m), fh = Math.max(14 * k, 10 * m), fhe = Math.max(11 * k, 9 * m);
+        var rows = o.lines.map(function (l) { return l[3] === 'total' ? { l: l, h: ft * 1.25 + 9 * k } : { l: l, h: Math.max(fv, fz) * 1.3 }; });
+        var h = 6 * k + fh * 1.3 + 5 * k + rows.reduce(function (a, r) { return a + r.h; }, 0) + 10 * k, top = bottom - h;
+        g.save(); g.beginPath(); g.rect(x - 20 * k, bottom - (h + zig) * s - 20 * k, w + 40 * k, (h + zig) * s + 20 * k); g.clip();
+        g.translate(0, (h + zig) * (1 - s));
+        g.shadowColor = 'rgba(0,0,0,0.45)'; g.shadowBlur = 14 * k; g.shadowOffsetY = 6 * k; g.fillStyle = col('receipt-paper');
+        g.beginPath(); g.moveTo(x, bottom); g.lineTo(x, top - zig + 3 * k);
+        for (var i = 0; i < 21; i++) { g.lineTo(x + (i * 10 + 5) / 210 * w, top - zig); g.lineTo(x + (i * 10 + 10) / 210 * w, top - zig + 3 * k); }
+        g.lineTo(x + w, bottom); g.closePath(); g.fill();
+        g.shadowColor = 'transparent';
+        var yy = top + 6 * k + fh;
+        g.textBaseline = 'alphabetic'; g.fillStyle = col('ink-red'); g.textAlign = 'left'; g.font = '900 ' + fh + 'px ' + FZS; g.fillText('的士', x + padX, yy);
+        g.textAlign = 'right'; g.font = '600 ' + fhe + 'px ' + FUI; spaced(g, 1.2 * k); g.fillText(o.head || 'TAXI', x + w - padX, yy); spaced(g, 0);
+        yy += fh * 0.3 + 5 * k;
+        rows.forEach(function (r) {
+          var l = r.l, total = l[3] === 'total', red = l[3] === 'red' || l[3] === 'struck';
+          if (total) { g.save(); g.strokeStyle = rgba(col('receipt-ink'), 0.5); g.lineWidth = Math.max(1, k); g.setLineDash([3 * k, 2.5 * k]); g.beginPath(); g.moveTo(x + padX, yy + 4 * k); g.lineTo(x + w - padX, yy + 4 * k); g.stroke(); g.restore(); yy += 9 * k; }
+          var base = yy + (total ? ft : Math.max(fv, fz)) * 1.0;
+          g.textAlign = 'left'; g.fillStyle = col('receipt-ink');
+          if (l[0]) { g.font = '700 ' + fz + 'px ' + FZH; g.fillText(l[0], x + padX, base); }
+          if (l[1]) { var zw = 0; if (l[0]) { g.font = '700 ' + fz + 'px ' + FZH; zw = g.measureText(l[0]).width + 5 * k; } g.font = '600 ' + fe + 'px ' + FUI; spaced(g, 0.8 * k); g.fillText(l[1], x + padX + zw, base); spaced(g, 0); }
+          g.textAlign = 'right'; g.font = '600 ' + (total ? ft : fv) + 'px ' + FUI; g.fillStyle = red ? col('receipt-red') : col('receipt-ink');
+          var vx = x + w - padX; g.fillText(l[2], vx, base);
+          if (l[3] === 'struck') { var vw = g.measureText(l[2]).width; g.strokeStyle = col('receipt-red'); g.lineWidth = 2 * Math.max(k, 0.5 * m); g.beginPath(); g.moveTo(vx - vw - k, base - fv * 0.32); g.lineTo(vx + k, base - fv * 0.32); g.stroke(); }
+          yy += r.h - (total ? 9 * k : 0);
+        });
+        g.restore();
+        return h + zig;
+      }
+      // ---- the shielded hit: a small neon sign of the crash pop's family, without the smoke: a blue shield with 保 and
+      // SAFE! in the pop's comic letters on a curve. (x, y): its middle, over the point of contact. The hit car or barrier
+      // is cleared away underneath it. It lives as the crash pop does (pop-time); a: its opacity, sc: the spring scale.
+      var SHIELD = new Path2D('M150 62 L208 82 C208 132 186 166 150 186 C114 166 92 132 92 82 Z');
+      function shieldSign(g, x, y, k, a, sc) {
+        var kk = k * (sc || 1); if (!(a > 0)) return;
+        g.save(); g.globalAlpha = a; g.translate(x - 150 * kk, y - 105 * kk); g.scale(kk, kk);
+        var blue = col('tube-blue'), core = col('tube-core-blue');
+        g.shadowColor = blue; g.shadowBlur = 16 * kk; g.fillStyle = 'rgba(5,3,5,0.92)'; g.fill(SHIELD);
+        g.lineWidth = 7; g.strokeStyle = blue; g.stroke(SHIELD); g.shadowBlur = 6 * kk; g.stroke(SHIELD); g.shadowBlur = 0;
+        g.lineWidth = 2.2; g.strokeStyle = core; g.stroke(SHIELD);
+        g.fillStyle = core; g.font = '900 58px ' + FZS; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText('保', 150, 150);
+        // SAFE! along the curve from (40, 92) through (150, 18) to (260, 92): each letter at its place on the curve, turned to follow it
+        var word = 'SAFE!', P = function (t) { var u = 1 - t; return { x: u * u * 40 + 2 * u * t * 150 + t * t * 260, y: u * u * 92 + 2 * u * t * 18 + t * t * 92 }; };
+        var len = [0], prev = P(0), N = 200; for (var i = 1; i <= N; i++) { var q = P(i / N); len.push(len[i - 1] + Math.hypot(q.x - prev.x, q.y - prev.y)); prev = q; }
+        var at = function (dist) { for (var j = 1; j <= N; j++) if (len[j] >= dist) { var t = (j - 1 + (dist - len[j - 1]) / (len[j] - len[j - 1])) / N; return t; } return 1; };
+        g.font = '62px ' + FCO; var widths = word.split('').map(function (ch) { return g.measureText(ch).width; }), total = widths.reduce(function (s, v) { return s + v; }, 0) + 3 * (word.length - 1);
+        var d = len[N] / 2 - total / 2;
+        word.split('').forEach(function (ch, idx) {
+          var mid = d + widths[idx] / 2, t = at(mid), p = P(t), p2 = P(Math.min(1, t + 0.01)), ang = Math.atan2(p2.y - p.y, p2.x - p.x);
+          g.save(); g.translate(p.x, p.y); g.rotate(ang); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+          g.lineJoin = 'round'; g.lineWidth = 7; g.strokeStyle = col('face-blue'); g.strokeText(ch, 0, 0); g.fillStyle = '#ffffff'; g.fillText(ch, 0, 0);
+          g.restore(); d += widths[idx] + 3;
+        });
+        g.restore();
+      }
+      // ---- the zone change: the caption grows into a big title in the middle, over the street dimmed (zone-shade).
+      // o: { zh, en, done: true, take: '51.30' } for the zone just finished; { zh, en, round: '3' } for the next. a: its opacity.
+      function zoneTitle(g, cx, cy, k, m, o, a) {
+        if (!(a > 0)) return;
+        var ow = Math.max(6 * k, 3 * m);
+        g.save(); g.globalAlpha = a; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.lineJoin = 'round';
+        var out = function (text, xx, yy, f) { g.font = f; g.lineWidth = ow; g.strokeStyle = col('caption-outline'); g.shadowColor = 'rgba(0,0,0,0.9)'; g.shadowBlur = 12 * k; g.strokeText(text, xx, yy); g.shadowBlur = 0; g.fillStyle = col('caption'); g.fillText(text, xx, yy); };
+        if (o.done) {
+          out(o.zh, cx, cy - 22 * k, '700 ' + 76 * k + 'px ' + FZH);
+          out(o.en, cx, cy + 24 * k, '500 ' + 42 * k + 'px ' + FUI);
+          // the five lamps on their pill, then the zone's takings
+          var d = 20 * k, pad = 5 * k, pw = d * 1.4 * 4 + d + 2 * pad; g.font = '600 ' + 34 * k + 'px ' + FUI; var tw = g.measureText('HK$' + o.take).width, rowW = pw + 20 * k + tw, rx = cx - rowW / 2, ry = cy + 70 * k;
+          g.fillStyle = 'rgba(0,0,0,0.55)'; rr(g, rx, ry - d / 2 - pad, pw, d + 2 * pad, (d + 2 * pad) / 2); g.fill();
+          fareLamps(g, rx + pad, ry, d, 5);
+          g.textAlign = 'left'; g.textBaseline = 'middle'; out('HK$' + o.take, rx + pw + 20 * k, ry + 2 * k, '600 ' + 34 * k + 'px ' + FUI);
+        } else {
+          out(o.zh, cx, cy - 26 * k, '700 ' + 92 * k + 'px ' + FZH);
+          out(o.en, cx, cy + 28 * k, '500 ' + 48 * k + 'px ' + FUI);
+          g.font = '700 ' + 30 * k + 'px ' + FZH; var zw = g.measureText('輪').width; g.font = '600 ' + 30 * k + 'px ' + FUI; spaced(g, k); var ew = g.measureText('ROUND ' + o.round).width;
+          var lx = cx - (zw + 10 * k + ew) / 2; g.textAlign = 'left';
+          out('輪', lx, cy + 76 * k, '700 ' + 30 * k + 'px ' + FZH); out('ROUND ' + o.round, lx + zw + 10 * k, cy + 76 * k, '600 ' + 30 * k + 'px ' + FUI); spaced(g, 0);
+        }
+        g.restore();
+      }
+      // ---- the touch zones on a phone: either thumb, in either zone (drag to steer, hold to brake, a quick tap for the horn).
+      // Each runs from the top of the meter's case to the bottom of the screen: one from the left edge to the taxi, one from the
+      // taxi to the right edge. A touch that starts in a zone keeps counting wherever it moves. Returns the two rectangles.
+      function touchZones(viewW, viewH, meterTop, taxiLeft, taxiRight) {
+        return [{ x0: 0, y0: meterTop, x1: taxiLeft, y1: viewH }, { x0: taxiRight, y0: meterTop, x1: viewW, y1: viewH }];
+      }
+      return { lives: lives, fareLamps: fareLamps, caption: caption, pin: pin, badges: badges, shieldRing: shieldRing, bayRing: bayRing,
+        receipt: receipt, shieldSign: shieldSign, zoneTitle: zoneTitle, touchZones: touchZones,
+        // how long each moment lasts (seconds); the receipt prints up, holds and goes back in
+        times: { receiptIn: 0.25, receiptHold: 2, receiptOut: 0.25, zoneIn: 0.4, zoneHold: 1, zoneSwap: 0.6, zoneOut: 0.4, ringFade: 0.3 } };
+    })();
+
     const LAMP_TIME = 0.5, WAVE_TIME = 0.4;   // lamp-time, wave-time
     const KERB_M = ROAD / UPM;                 // metres from the road's middle to the kerb (x = 1)
     // sizes in metres, across the road and along it (street.size): a piece's z is its near end, its x its middle across
@@ -3430,16 +3814,26 @@
           decalGL(st, 'pc:bay:' + sp.kind, z0, z0 + L, x0, x1, 0.88);
           decalGL(st, 'pc:glow:' + sp.kind, z0, z0 + L, x0, x1, 0.6, true);
         });
-        if (PASSENGERS.includes(sp.passenger)){
+        // getting in (Passenger): once the game sets stop.boarding, the passenger, their shadow and their pool of light fade
+        // out where they stand over BOARD_TIME
+        const pf = boardFade(sp);
+        if (PASSENGERS.includes(sp.passenger) && pf > 0){
           // level with the middle of the bay: the pool of light first, then the shadow, then the passenger, hailing or waving
           const zp = z0 + 5 * UPM, pose = sp.waiting && !reduceMotion ? Math.floor(amb.t / WAVE_TIME) % 2 : 0, sh = SHADOWS.passenger, zs = zp - 0.1 * UPM;
           ground(zp - 1.4 * UPM, 2.8 * UPM, () => {
-            decalGL(st, 'pc:pool', zp - 1.4 * UPM, zp + 1.4 * UPM, PASS_X - 1.4, PASS_X + 1.4, 1, true);
-            decalGL(st, 'pc:shadow:passenger', zs - SH_M * UPM, zs + (sh[1] + SH_M) * UPM, PASS_X - sh[0] / 2 - SH_M, PASS_X + sh[0] / 2 + SH_M, 1);
+            decalGL(st, 'pc:pool', zp - 1.4 * UPM, zp + 1.4 * UPM, PASS_X - 1.4, PASS_X + 1.4, pf, true);
+            decalGL(st, 'pc:shadow:passenger', zs - SH_M * UPM, zs + (sh[1] + SH_M) * UPM, PASS_X - sh[0] / 2 - SH_M, PASS_X + sh[0] / 2 + SH_M, pf);
           });
-          stand(zp, PASS_X, 1, p => standGL('pc:pass:' + sp.passenger + ':' + pose, p, false, asTraffic(p.a)));
+          stand(zp, PASS_X, 1, p => standGL('pc:pass:' + sp.passenger + ':' + pose, p, false, asTraffic(p.a * pf)));
         }
       }
+    }
+    // the passenger's fade as they get in: 1 until the game sets stop.boarding, then down to 0 over BOARD_TIME (the kit's clock)
+    const boards = new WeakMap(), BOARD_TIME = 0.4;
+    function boardFade(sp){
+      if (!sp.boarding){ boards.delete(sp); return 1; }
+      if (!boards.has(sp)) boards.set(sp, amb.t);
+      return clamp(1 - (amb.t - boards.get(sp)) / BOARD_TIME, 0, 1);
     }
     // a step of play: animals the game has set bolting run for the kerb, and are gone once past it
     function boltStep(dt){
@@ -3472,6 +3866,7 @@
       if (pw === env.pop.width && ph === env.pop.height) return false;
       const taller = ph !== env.pop.height;
       env.pop.width = pw; env.pop.height = ph; popDrawn = false;   // a new size also clears it
+      env.marks.width = pw; env.marks.height = ph; marksDrawn = false;
       if (built && taller) drawPopWords();
       return true;
     }
@@ -3493,8 +3888,46 @@
       streetCost.buildMs = performance.now() - t0; streetCost.readyAt = performance.now();
     }
     // the meter's numbers this frame, and the caption's district and fade
+    /* ---- the marks that belong to a place in the street, on their own canvas over the picture (PlayScreen: cn-marks): the
+       pin over the bay the taxi is heading for (TargetPin), and the power-ups the taxi carries as badges under its rear
+       bumper with 保's ring of light round it (TaxiMarks). The design system's hud draws them, each frame. */
+    let marksDrawn = false;
+    function clearMarks(){ if (marksDrawn){ const g = env.marks.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, env.marks.width, env.marks.height); marksDrawn = false; } }
+    const PIN_UP = 3.2, PIN_FAR = 80 * UPM, BAY_MID = (BAY_X[0] + BAY_X[1]) / 2;
+    function drawMarks(st){
+      clearMarks();
+      // pk: canvas pixels per picture pixel; k: per 720-line pixel; m: per CSS pixel. The badges and the ring follow the taxi's sway
+      const cv = env.marks, g = cv.getContext('2d'), pk = cv.width / W, k = 0.75 * pk, m = pk / env.cssScale();
+      const cg = cabGeometry(), tx = (W / 2 + sway(st)) * pk, ty = cg.gy * pk, ppm = cg.rw / VEH.taxi.W * pk;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      const c = st.carry;
+      // 保's ring on the road round the taxi, stepping aside while the bay's ring shows
+      if (c && c.shield && st.ringA < 1 && shieldLook === 'design'){ g.globalAlpha = 1 - st.ringA; hud.shieldRing(g, tx, ty, ppm); g.globalAlpha = 1; marksDrawn = true; }
+      if (c){
+        const list = [];
+        if (c.speed != null && c.speed !== false) list.push({ kind: 'speed', left: clamp(+c.speed || 0, 0, 1) });
+        if (c.shield) list.push({ kind: 'shield' });
+        if (c.fare === 'fare' || c.fare === 'double') list.push({ kind: c.fare });
+        if (list.length){ hud.badges(g, tx, ty, k, m, list); marksDrawn = true; }
+      }
+      // the pin: 3.2 m over the middle of the bay, or over the far end of the drawn road in the bay's lane until it is in view
+      const pin = api.pin, sp = st.stop;
+      if (pin && sp && (sp.kind === 'pickup' || sp.kind === 'dropoff')){
+        let z = wrapU((+sp.z || 0) * UPM + 5 * UPM);
+        const rel = relOf(st, z);
+        if (rel < TRACK / 2){
+          if (rel > PIN_FAR) z = wrapU(st.pos + PIN_FAR);
+          const q = spot(st, z, BAY_MID, PIN_UP), pick = sp.kind === 'pickup';
+          if (q){
+            hud.pin(g, q.x * pk, q.y * pk, k, m, { kind: pick ? 'pick' : 'drop', name: pick ? '' : String(pin.name || ''), metres: String(Math.max(0, Math.round(+pin.metres || 0))), bare: !!pin.bare });
+            marksDrawn = true;
+          }
+        }
+      }
+    }
     function meterNow(fare){
-      return { fare, time: meter.time, kmh: meter.speed != null ? meter.speed : run.speed / UPM * 3.6, d: Math.max(0, run.cap.d), a: run.cap.t / 0.6 };
+      return { fare, time: meter.time, kmh: meter.speed != null ? meter.speed : run.speed / UPM * 3.6, d: Math.max(0, run.cap.d), a: run.cap.t / 0.6,
+        lives: meter.lives, tip: meter.tip, round: meter.round, fares: meter.fares, receipt: slipNow() };
     }
     // the graphics chip's name, as the browser reports it (for the test page's speed check)
     let chip = null;
@@ -3518,21 +3951,24 @@
       // the page began opening)
       memory(){ return gpu.mb(streetBufs); },
       get cost(){ return Object.assign({}, streetCost); },
+      // the test page's shield trial: 'design', 'under' or 'glow'
+      get shieldLook(){ return shieldLook; },
+      set shieldLook(v){ shieldLook = v === 'under' || v === 'glow' ? v : 'design'; },
       // the test page: how long the crash pop's three words last took to draw, and the word the next pop shows
       get pop(){ return { ms: popMade.ms, width: popMade.width, height: popMade.height }; },
       get nextPop(){ return popNext; },
       set nextPop(w){ popNext = POP.words[w] ? w : null; },
       // the title's street: its own life and the slow drive, then the picture
-      title(dt){ ambientStep(dt); demoStep(dt); renderGL(demo); clearPop(); if (!streetCost.shownAt) streetCost.shownAt = performance.now(); },
+      title(dt){ ambientStep(dt); demoStep(dt); renderGL(demo); clearPop(); clearMarks(); if (!streetCost.shownAt) streetCost.shownAt = performance.now(); },
       reset, step,
       // the run as it stands: the street, then the meter, the caption and the crash pop over it
       draw(fare){
         const st = runScene(); if (popAsk) startPop(st);
         for (let k = 1; k < repeat; k++){ renderGL(st, extraTarget()); drawPop(); }
-        renderGL(st); drawHUD(meterNow(fare)); drawPop();
+        renderGL(st); drawMarks(st); drawHUD(meterNow(fare)); drawPop();
         if (!streetCost.shownAt) streetCost.shownAt = performance.now();
       },
-      api, meter
+      api, meter, receipt
     };
   }
 
@@ -3619,8 +4055,10 @@
     canvas.setAttribute('aria-label', name);
     const hudCanvas = el('canvas', 'cn-hud');      // the meter and the district caption, redrawn when a number changes
     const popCanvas = el('canvas', 'cn-popc');     // the crash pop, over the picture
+    const marksCanvas = el('canvas', 'cn-marks');  // marks that belong to a place in the street: the pin, the taxi's badges and rings
     hudCanvas.setAttribute('aria-hidden', 'true');
     popCanvas.setAttribute('aria-hidden', 'true');
+    marksCanvas.setAttribute('aria-hidden', 'true');
     const playUi = el('div', 'cn-play');
     const hintEl = el('div', 'cn-touch-hint', ICON.drag);
     hintEl.append(txt('span', '', touchHint));
@@ -3628,7 +4066,7 @@
     const meterSr = el('div', 'cn-sr');            // the meter's numbers and the district, for screen readers
     meterSr.setAttribute('aria-live', 'polite');
     const titleScreen = el('div', 'cn-title-screen');
-    stage.append(canvas, hudCanvas, popCanvas, playUi, titleScreen);
+    stage.append(canvas, marksCanvas, hudCanvas, popCanvas, playUi, titleScreen);
     const dialogLayer = el('div', 'cn-dialog-layer');
     dialogLayer.hidden = true;
     const rotateEl = el('div', 'cn-rotate');
@@ -3709,9 +4147,11 @@
       'tube-green', 'tube-blue', 'tube-violet', 'face-white', 'night-black', 'road-far', 'figure-rim', 'animal-dark', 'animal-lit',
       'eyeshine-amber', 'eyeshine-gold', 'eyeshine-green', 'chicken-light', 'chicken-shade', 'chicken-wing', 'chicken-beak', 'crate-dark', 'crate-cane',
       'oil-dark', 'pothole-lip', 'pothole-edge', 'lamp-amber', 'cone-orange', 'cardboard', 'parcel-tape', 'fruit-orange',
-      'coat-red', 'coat-blue', 'coat-olive', 'skin', 'hair-dark', 'trouser-dark', 'suitcase-blue', 'bag-paper']
+      'coat-red', 'coat-blue', 'coat-olive', 'skin', 'hair-dark', 'trouser-dark', 'suitcase-blue', 'bag-paper',
+      'taxi-red', 'shutter', 'caption', 'caption-outline', 'tube-core-blue', 'lamp-unlit', 'lamp-unlit-ring', 'life-lost',
+      'receipt-paper', 'receipt-ink', 'receipt-red', 'zone-shade']
       .forEach((t) => { colours[t] = rootStyle.getPropertyValue('--' + t).trim(); });
-    const street = makeStreet({ canvas: canvas, gl: gl, hud: hudCanvas, pop: popCanvas, colours: colours, touch: touch, cssScale: () => V.k });
+    const street = makeStreet({ canvas: canvas, gl: gl, hud: hudCanvas, pop: popCanvas, marks: marksCanvas, colours: colours, touch: touch, cssScale: () => V.k });
     let dirty = true;          // the picture needs drawing again while play is stopped (a setting changed, or the window)
     let pendingStart = false;  // Start game pressed before the street was built
     let lost = false;          // the browser took the graphics chip back
@@ -4689,6 +5129,11 @@
       get mode() { return state.mode; },
       get ending() { return state.ending; },
       addFare: addFare, setFare: setFare, gameOver: gameOver, after: after,
+      /* receipt({ head, lines }): prints the receipt slip out of the top of the meter for receipt-time (0.25 s up, 2 s held,
+         0.25 s back in), the caption stepping aside; a new one replaces the one showing. head is 'RECEIPT' or 'TIP'; each line
+         is [Chinese, English, amount, style], style 'total' (a dashed rule above, larger), 'receipt-red' (in receipt-red;
+         the design system's code calls it 'red') or 'struck' (red, with a line through) (ReceiptSlip). */
+      receipt: (o) => street.receipt(o),
       money: money, rand: rand, randInt: randInt, pick: pick, clamp: clamp, lerp: lerp, hit: hit,
       /* The World. The kit draws the street every frame; the game moves what is on it (distances in metres):
          street.taxi     { z, x, speed, brake }: how far along the street (z), across it (x: -1 the left kerb, 1 the right;
@@ -4718,7 +5163,26 @@
          street.size(kind)        { width, length } in metres of a vehicle (z is its rear), an obstacle, an animal or 'bay'
          street.district(z)       { index, zh, en } of the district at z; the caption follows the taxi by itself
          street.crash(z, x)       lights the crash pop (CRASH!, SMASH! or BANG!) over the point where two vehicles meet
-         meter.time, meter.speed  the meter's TIME (two places) and KM/H (left as null: the taxi's own speed); FARE is the fare */
+         street.signs(z0, z1)     the signs beside the street from z0 to z1: [{ zh, en, z, side }] (side -1 left, 1 right, 0
+                         across the road); a destination is named after one of them (TargetPin)
+         meter.time, meter.speed  the meter's TIME (two places) and KM/H (left as null: the taxi's own speed); FARE is the fare
+         Grunge City Rider's play screen (design system v10):
+         meter.lives     0 to 3: the meter becomes Grunge City Rider's, 16 wider, with three small taxis in its heading (a
+                         lost one faint) and the tip sharing the time's row; left null, today's meter
+         meter.tip       with lives: the tip in HK$ (four places), null for the row unlit (no passenger aboard), or 'lost' for
+                         dashes
+         meter.round, meter.fares the caption's third line, 輪 ROUND n, and its five lamps, one lit for each fare done (0 to
+                         5); round left null, no third line
+         street.taxi.hired        true while a passenger is aboard: the TAXI roof sign goes out
+         street.taxi.carry        { speed, shield, fare }: the badges under the taxi's rear bumper. speed: 快's time left, 0
+                         to 1 (null: none); shield: true while 保 is held (also its ring of light on the road round the
+                         taxi); fare: 'fare' (錢) or 'double' (雙) for the fare boost, or null
+         street.stop.ring         true once three-quarters of the taxi is in the bay: the bay's ring fades in (ring-fade),
+                         and out once it is false (the stop has counted); 保's ring steps aside meanwhile
+         street.stop.boarding     true when the passenger gets in: they fade out where they stand over 0.4 s
+         street.pin      { name, metres, bare } or null: the neon pin over street.stop's bay, teal 上 for a pick-up, pink 落
+                         with the name for a drop-off, and the metres to go; until the bay is in view it stands over the
+                         far end of the drawn road in the bay's lane. bare: no tag (once the taxi is in the bay) */
       street: street.api,
       meter: street.meter,
       /* The picture, for the test page: the Picture setting ('auto', 'best', 'faster' or 'fastest') and the level in
@@ -4749,6 +5213,10 @@
         get nextPop() { return street.nextPop; },
         set nextPop(w) { street.nextPop = w; },
         get memory() { return street.memory(); },
+        // TRIAL, the test page only: how 保 held looks, 'design' (the design system's ring over the taxi), 'under' (that ring
+        // under the taxi) or 'glow' (a soft blue glow round the whole taxi); a game leaves it alone
+        get shieldLook() { return street.shieldLook; },
+        set shieldLook(v) { street.shieldLook = v; },
         get opening() { const c = street.cost; return { build: c.buildMs, plan: c.planMs, first: c.firstMs, ready: c.readyAt, shown: c.shownAt, pieces: c.pieces, pieceMs: c.pieceMs }; }
       }
     };
