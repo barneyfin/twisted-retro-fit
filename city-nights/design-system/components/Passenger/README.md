@@ -21,6 +21,7 @@ S.stand(g, pt, p, d, x);
 - Where the passenger waits (the bay's place), which kind, and when they get in.
 
 ## Rules
+- **Never in the clear stretch** (`clear-stretch`, 40 m) before a tunnel, nor inside one (Tunnel; Barney, 30 October 2026).
 - **Option A** (Barney, 29 October 2026): every passenger stands in the warm pool of light (`sodium`), the suitcase passenger included.
 - **Three kinds** (all approved): plain, in a `coat-red` coat; with a `suitcase-blue` suitcase, in `coat-blue`; with shopping (`bag-paper` and `face-red` bags), in `coat-olive`. Faces and hands `skin`, hair and shoes `hair-dark`, trousers `trouser-dark`.
 - **The one person in colour.** Everyone else in the street is a ghosted silhouette; the passenger is drawn sharp, not ghosted, with the shops' warm light along their edges (`figure-rim`) and the street's light on the side facing the road.

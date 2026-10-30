@@ -18,6 +18,7 @@ Add `is-phone` at a phone's scale. Announce the district to screen readers in th
 - Grunge City Rider gives the round and the fares done in this zone (0 to 5).
 
 ## Rules
+- At a district line it changes mid-tunnel, where the line is (Tunnel). On a Competitive loop it does not change: the zone carries on in the same district.
 - `caption-zh` over `caption-en` in `caption`, each with a 5px `caption-outline` (picture pixels), so it reads over any part of the street.
 - Left edge 2 picture pixels right of the meter's. It keeps its size when the meter is scaled. With no round line, the English baseline is 14 picture pixels above the meter's top.
 - **The round line** (Grunge City Rider): 輪 (`caption-round-zh`, 18px on a 720-line window) then ROUND n (`caption-round-en`, 17px, 1px spacing), both no smaller than 11 CSS px on phones and outlined like the caption (4px on a 720-line window); then, 10px on, five fare lamps 13px across (8 CSS px at least), 0.4 of a lamp apart, on a pill of black at 55%: a lamp lit `face-yellow` with its glow for each fare done in this zone, the rest `lamp-unlit` ringed `lamp-unlit-ring`. The line's middle sits 13.7px plus half its height above the meter's case; the English baseline 10px above the line, the Chinese 32px above that (as without the line).

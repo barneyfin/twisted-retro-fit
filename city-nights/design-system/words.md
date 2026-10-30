@@ -75,3 +75,10 @@ Every Chinese word City Nights shows. A Cantonese reader checks this list before
 | 易碎 | Spilt cargo boxes | Fragile (ji6 seoi3), as printed on boxes. |
 | 上客 | Pick-up bay, PICK-UP | Pick up passengers (soeng5 haak3). 上 alone is on the pin over a pick-up. |
 | 落客 | Drop-off bay, DROP-OFF | Drop off passengers (lok6 haak3), as on Hong Kong drop-off signs. 落 alone is on the pin over a drop-off. |
+
+## The tunnel
+
+| Word | Where | Meaning |
+| --- | --- | --- |
+| 夜光隧道 | The lightbox over each tunnel's mouth, NIGHTGLOW TUNNEL | Nightglow Tunnel (je6 gwong1 seoi6 dou6): 夜光, glowing at night; 隧道, tunnel, as Hong Kong's road tunnels are named. Invented name. Added 30 October 2026. |
+| (the street's own signs) | The signs on the block over each tunnel | 好味麵家, 好運茶餐廳, 健康藥房, 時裝 and 金滿金行, from the street's signs above. |

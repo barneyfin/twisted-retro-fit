@@ -20,6 +20,7 @@ S.drawBay(g, pt, pickup, d0, d0 + 10, -4.85, -1.85);        // 10 m along, 3 m a
 - Where the bay is, which kind, how much of the taxi is inside it, and when the stop has counted.
 
 ## Rules
+- **Never in the clear stretch** (`clear-stretch`, 40 m) before a tunnel, nor inside one (Tunnel; Barney, 30 October 2026).
 - **Option A, the painted bay** (Barney, 29 October 2026): a faint wash of the colour over the bay, dashed sides, solid ends, and the words painted on the road, stretched along it as road lettering is, read from the approach.
 - **Two colours** (Barney, 29 October 2026): pick-up `tube-teal` with `tube-core-teal` lettering 上客 PICK-UP; drop-off `tube-pink` with `tube-core-pink` lettering 落客 DROP-OFF. Teal and pink differ in lightness as well as hue, and the words differ, so colour is never the only clue.
 - **Size**: `bay-size`, 3 m across and 10 m along, about twice the taxi's length: that is the stopping area.

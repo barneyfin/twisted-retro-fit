@@ -23,6 +23,6 @@ CityNights.hud.zoneTitle(g, w / 2, h * 0.45, k, m, { zh: '尖沙咀', en: 'Tsim 
 - **Next**: the Chinese at 92px over the English at 48px, then 輪 ROUND n (30px).
 - All in `caption` with a 6px `caption-outline` and a soft dark shadow, as the caption is, centred 45% down the picture. Sizes are for a 720-line window.
 - **Safety**: the street dims gently and never goes black; nothing flashes.
-- **Underneath**: the taxi's jump to the start of the next district, and, at every second zone change, the music's switch (the Sound section).
+- **Underneath**: the taxi's jump to just inside the next tunnel's exit, at the start of the next district (Tunnel; Barney, 30 October 2026), so the zone opens with the drive out into it; and, at every second zone change, the music's switch (the Sound section).
 - **The game holds still** while it shows: the clock and the fare do not run. The next zone's clock starts at 50 s.
 - Chinese: the districts and 輪 are on the word list.

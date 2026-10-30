@@ -1,6 +1,6 @@
 /* City Nights: the meter's seven-segment digits, built as HTML for previews and the interface,
    the crash pop's drawings with the Canvas 2D code that draws them, the street's pieces (obstacles, animals,
-   passengers, the stop bay) and the play screen's new parts (lives, fare lamps, the caption's round line, the pin,
+   passengers, the stop bay, the tunnel's portal face) and the play screen's new parts (lives, fare lamps, the caption's round line, the pin,
    the power-up badges and rings, the receipt slip, the SAFE! sign, the zone title, the touch zones) as Canvas 2D
    drawing code (further down).
    The same shapes the game's meter draws on its canvas: each place is 0.52 x height wide, segments 0.12 x height thick,
@@ -534,14 +534,82 @@ window.CityNights = (function () {
       decal(g, pt, b.glow, d0, d1, x0, x1, 0.6, 'lighter');
     }
 
+    // ---- the tunnel at every district line: the portal's face (Barney, 30 October 2026: B, under a tower, 夜光隧道 Nightglow
+    // Tunnel). One picture of the block's face as the road meets it, 13.5 m across (building line to building line) and 36 m
+    // high, drawn at ppm pixels per metre, with the mouth (12 m by 4.8 m) left clear so the tunnel's inside shows through.
+    // The kit stands it at the portal, square to the road, like a sign; ax, ay is the middle of the mouth's foot.
+    function tunnelFace(ppm) {
+      var W = 13.5, H = 36, M = { w: 12, h: 4.8 }, c = mk(W * ppm, H * ppm), g = c.getContext('2d');
+      var X = function (x) { return (x + W / 2) * ppm; }, Y = function (y) { return (H - y) * ppm; };   // metres (x across from the middle, y up) to pixels
+      var rect = function (x, y, w, h) { g.fillRect(X(x), Y(y + h), w * ppm, h * ppm); };
+      // the block: dark, warm-lit from the signs low down
+      var gr = g.createLinearGradient(0, Y(0), 0, Y(16)); gr.addColorStop(0, col('tunnel-face')); gr.addColorStop(1, col('tunnel-face-top'));
+      g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
+      // its windows from 10.5 m up, a quarter or so lit, some with an air-conditioner box below
+      var r = rnd(7);
+      for (var y = 10.5; y < H; y += 3.1) for (var x = -W / 2 + 1.2; x < W / 2 - 1.2; x += 2.6) {
+        var lit = r() < 0.28, t = r();
+        g.fillStyle = lit ? rgba(col(t < 0.5 ? 'window-warm' : 'window-white'), t < 0.5 ? 0.85 : 0.7) : col('window-dim'); rect(x, y, 1.5, 1.7);
+        if (r() < 0.35) { g.fillStyle = col('aircon'); rect(x + 0.2, y - 0.55, 1.1, 0.5); }
+      }
+      // the podium's fascia above the mouth
+      g.fillStyle = col('tunnel-fascia'); rect(-W / 2, 5.9, W, 3.7);
+      // signs: lightboxes and neon, flat on the face, in the street's own looks (Signs)
+      var fit = function (text, h, w, k) { return Math.min(h * k, w * 0.86 / Math.max(1, text.length)); };
+      var lightbox = function (x, y, w, h, zh, en) {
+        g.save(); g.shadowColor = col('lightbox-glow'); g.shadowBlur = 0.6 * ppm; g.fillStyle = col('case'); rect(x - 0.12, y - 0.12, w + 0.24, h + 0.24); g.restore();
+        var lg = g.createLinearGradient(0, Y(y + h), 0, Y(y)); lg.addColorStop(0, col('lightbox-top')); lg.addColorStop(0.35, col('lightbox-mid')); lg.addColorStop(1, col('lightbox-low'));
+        g.fillStyle = lg; rect(x, y, w, h);
+        g.fillStyle = col('ink-red'); g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.font = '900 ' + fit(zh, h, w, 0.5) * ppm + 'px "Noto Serif TC", serif'; g.fillText(zh, X(x + w / 2), Y(y + h * 0.62));
+        if (en) { g.font = '700 ' + h * 0.17 * ppm + 'px Antonio, sans-serif'; if ('letterSpacing' in g) g.letterSpacing = 0.05 * ppm + 'px'; g.fillText(en, X(x + w / 2), Y(y + h * 0.2)); if ('letterSpacing' in g) g.letterSpacing = '0px'; }
+      };
+      var neon = function (x, y, w, h, zh, en, tube) {
+        var tc = col('tube-' + tube), core = col('tube-core-' + tube);
+        g.fillStyle = col('neon-board'); rect(x, y, w, h);
+        g.save(); g.shadowColor = rgba(tc, 0.9); g.shadowBlur = 0.6 * ppm; g.strokeStyle = tc; g.lineWidth = 0.1 * ppm; g.strokeRect(X(x + 0.15), Y(y + h - 0.15), (w - 0.3) * ppm, (h - 0.3) * ppm); g.restore();
+        var line = function (text, font, yy) {
+          g.font = font; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.lineJoin = 'round';
+          g.save(); g.shadowColor = rgba(tc, 0.9); g.shadowBlur = 0.45 * ppm; g.lineWidth = 0.12 * ppm; g.strokeStyle = tc; g.strokeText(text, X(x + w / 2), Y(yy)); g.restore();
+          g.lineWidth = 0.045 * ppm; g.strokeStyle = core; g.strokeText(text, X(x + w / 2), Y(yy));
+        };
+        if (h > w * 1.5) {   // a tall sign: the characters stacked, as the street's vertical signs are
+          var n = zh.length, fs = Math.min(w * 0.62, (h - 0.6) / n * 0.86), step = (h - 0.6) / n;
+          for (var i = 0; i < n; i++) line(zh.charAt(i), '700 ' + fs * ppm + 'px "Noto Sans TC", sans-serif', y + h - 0.3 - step * (i + 0.5) - fs * 0.36);
+        } else {
+          line(zh, '700 ' + fit(zh, h, w, 0.42) * ppm + 'px "Noto Sans TC", sans-serif', y + h * 0.45);
+          if (en) line(en, '700 ' + h * 0.15 * ppm + 'px Antonio, sans-serif', y + h * 0.15);
+        }
+      };
+      lightbox(-5.2, 6.2, 10.4, 3.1, '夜光隧道', 'NIGHTGLOW  TUNNEL');      // the tunnel's name, over the mouth
+      neon(-6.2, 10.2, 7.4, 3.0, '好味麵家', 'HO MEI NOODLE', 'yellow');
+      lightbox(1.6, 10.5, 4.6, 3.0, '好運茶餐廳', 'LUCKY CAFE');
+      neon(-6.3, 13.9, 2.6, 5.6, '健康藥房', '', 'green');
+      neon(-3.3, 14.1, 5.0, 2.8, '時裝', 'FASHION', 'pink');
+      lightbox(2.3, 14.3, 4.0, 2.6, '金滿金行', 'GOLDSMITH');
+      // lane signals over the mouth: a steady green arrow over each lane, never flashing
+      [-3.33, 0, 3.33].forEach(function (lx) {
+        g.fillStyle = col('case'); rect(lx - 0.42, 4.83, 0.84, 0.84);
+        var cx = X(lx), cy = Y(5.25), s = ppm;
+        g.save(); g.shadowColor = col('signal-glow'); g.shadowBlur = 0.35 * s; g.fillStyle = col('signal-green'); g.beginPath();
+        g.moveTo(cx - 0.07 * s, cy - 0.28 * s); g.lineTo(cx + 0.07 * s, cy - 0.28 * s); g.lineTo(cx + 0.07 * s, cy + 0.02 * s); g.lineTo(cx + 0.2 * s, cy + 0.02 * s);
+        g.lineTo(cx, cy + 0.28 * s); g.lineTo(cx - 0.2 * s, cy + 0.02 * s); g.lineTo(cx - 0.07 * s, cy + 0.02 * s); g.closePath(); g.fill(); g.restore();
+      });
+      // the mouth, left clear
+      g.clearRect(X(-M.w / 2), Y(M.h), M.w * ppm, M.h * ppm);
+      c.ppm = ppm; c.ax = c.width / 2; c.ay = c.height; c.metres = [W, H];
+      return c;
+    }
+
     return {
       PPM: PPM, stand: stand, decal: decal, shadow: shadow, box: box,
       boar: boar, dog: dog, cat: cat, chicken: chicken, crate: crate,
       oil: oil, pothole: pothole, cone: cone, roadworks: roadworks, cargo: cargo,
-      passenger: passenger, pool: pool, bay: bay, drawBay: drawBay,
+      passenger: passenger, pool: pool, bay: bay, drawBay: drawBay, tunnelFace: tunnelFace,
       // true sizes in metres (Barney, 29 October 2026: true size)
       sizes: { boar: [1.4, 0.9], dog: [1.0, 0.62], cat: [0.5, 0.3], chicken: [0.45, 0.4], crate: [0.7, 0.45], oil: [2.8, 6.5], pothole: [1.9, 3.2],
-        barriers: [3.15, 0.95], cone: [0.4, 0.72], cargo: [2.6, 3.2], passenger: [0.6, 1.7], pool: [2.8, 2.8], bay: [3, 10] }
+        barriers: [3.15, 0.95], cone: [0.4, 0.72], cargo: [2.6, 3.2], passenger: [0.6, 1.7], pool: [2.8, 2.8], bay: [3, 10],
+        tunnel: [12, 4.8], tunnelFace: [13.5, 36] }
     };
   })();
 
@@ -778,5 +846,5 @@ window.CityNights = (function () {
       times: { receiptIn: 0.25, receiptHold: 2, receiptOut: 0.25, zoneIn: 0.4, zoneHold: 1, zoneSwap: 0.6, zoneOut: 0.4, ringFade: 0.3 } };
   })();
 
-  return { digits: digits, mountDigits: mountDigits, fare: fare, crashPop: POP, drawCrashPop: drawCrashPop, street: street, hud: hud, version: '0.4.0' };
+  return { digits: digits, mountDigits: mountDigits, fare: fare, crashPop: POP, drawCrashPop: drawCrashPop, street: street, hud: hud, version: '0.5.0' };
 })();

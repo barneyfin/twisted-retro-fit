@@ -1,0 +1,45 @@
+<!-- @dsCard group="Play" height=1300 width=960 subtitle="夜光隧道 Nightglow Tunnel, at every district line: the approach, the mouth, inside at the jump (the pin showing), coming out; and the portal's face drawn by its own code" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tunnel</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;overflow:hidden;background:var(--night-black)}
+.stage img,.stage canvas{position:absolute;display:block}
+.tag{position:absolute;padding:5px 10px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);color:var(--night-text);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.zh{font-family:var(--font-zh-sans);font-weight:700}
+</style>
+</head>
+<body>
+<div class="stage" style="width:960px;height:1300px">
+  <img src="/_blob/3650d273db830ff4cfd899fc8654b9a0" alt="The tunnel's portal 24 m ahead, under a tower block with its signs" style="left:0;top:0;width:480px;height:270px">
+  <img src="/_blob/2c9e0b4adfcc2c0635452de47866ff9e" alt="The tunnel's mouth 12 m ahead, the name on a lightbox over it" style="left:480px;top:0;width:480px;height:270px">
+  <img src="/_blob/3a22ba34b87babfb3afe4af773517f04" alt="Inside the tunnel at the jump, its far end lost in haze" style="left:0;top:270px;width:480px;height:270px">
+  <img src="/_blob/65ee29d9d65bbd39fe49b61ddffbf4a9" alt="Coming out of the tunnel at the start of Yau Ma Tei" style="left:480px;top:270px;width:480px;height:270px">
+  <canvas id="pin" style="left:0;top:270px;width:480px;height:270px"></canvas>
+  <canvas id="face" style="left:0;top:560px;width:960px;height:740px"></canvas>
+  <span class="tag" style="left:10px;top:10px">The approach, 24 m: the clear stretch</span>
+  <span class="tag" style="left:490px;top:10px">The mouth, 12 m</span>
+  <span class="tag" style="left:10px;top:280px">Inside, at the jump: the pin still shows</span>
+  <span class="tag" style="left:490px;top:280px">Coming out</span>
+  <span class="tag" style="left:10px;top:570px">The portal's face, <code>CityNights.street.tunnelFace</code>: the mouth left clear</span>
+</div>
+<script>
+(function () {
+  function cv(id, w, h) { var c = document.getElementById(id), r = window.devicePixelRatio || 1; c.width = Math.round(w * r); c.height = Math.round(h * r); return { g: c.getContext('2d'), r: r }; }
+  Promise.all(['700 20px "Noto Sans TC"', '900 20px "Noto Serif TC"', '700 20px Antonio', '600 20px "IBM Plex Sans Condensed"'].map(function (f) { return document.fonts.load(f); })).then(draw, draw);
+  function draw() {
+    // the pin inside the tunnel: over the far end of the drawn road in the bay's lane (street picture 960 x 540, shown at half size)
+    var P = cv('pin', 480, 270), q = P.r * 0.5;   // canvas pixels per street-picture pixel
+    CityNights.hud.pin(P.g, 484.5 * q, 212.1 * q, P.r * 270 / 720, P.r, { kind: 'drop', name: '明月酒店', metres: '420' });
+    // the face, as the kit draws it once, on a dark ground (the mouth shows the ground through it)
+    var F = cv('face', 960, 740), g = F.g, r = F.r, face = CityNights.street.tunnelFace(18 * r);
+    g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--tunnel-haze'); g.fillRect(0, 0, 960 * r, 740 * r);
+    g.drawImage(face, (480 - 13.5 * 9) * r, 40 * r, 13.5 * 18 * r, 36 * 18 * r);
+  }
+})();
+</script>
+</body>
+</html>

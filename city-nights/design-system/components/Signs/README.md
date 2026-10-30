@@ -4,6 +4,7 @@ The World's signs, the wall overhead that City Nights is remembered by: lightbox
 
 ## When to use
 - The kit hangs them over the street from its own sign list; a game uses the kit's street and does not make its own signs.
+- **None hang in the clear stretch** (`clear-stretch`, 40 m) before each tunnel, so the portal and its name read (Tunnel; Barney, 30 October 2026). Five of them stand flat on the tunnel's portal instead.
 - The preview draws them in HTML for reference. The game draws them once with the 2D canvas into its texture, sized to each sign, then on the graphics chip.
 
 ## Markup

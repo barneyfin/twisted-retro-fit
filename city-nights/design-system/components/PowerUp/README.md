@@ -20,6 +20,7 @@ The game draws the token once with the 2D canvas into its texture, like the stre
 - Which kind, where on the road (lane and distance), and what happens when the taxi collects it. In Grunge City Rider one comes every 20–40 s of driving; 雙 is 1 in 12 and the other four share the rest.
 
 ## Rules
+- **Never in the clear stretch** (`clear-stretch`, 40 m) before a tunnel, nor inside one (Tunnel; Barney, 30 October 2026).
 - **The five**, each a sign face with its ink:
 
 | Name | Character | Face | Ink | What it does (Grunge City Rider) |

@@ -25,6 +25,7 @@ S.cargo(g, pt, d, laneX, { camX: camX });
 - Which kind, which lane, how far ahead, and what happens if the taxi hits it.
 
 ## Rules
+- **Never in the clear stretch** (`clear-stretch`, 40 m) before a tunnel, nor inside one (Tunnel; Barney, 30 October 2026).
 - **Oil slick**: darker than the wet road (`oil-dark` at 80%), with the street's tube colours caught in a thin rainbow sheen, its edge feathered into the road. Takes the road's grain.
 - **Flooded pothole**: a pale broken lip (`pothole-lip`) round rainwater that mirrors the lamps (`sodium` on the far side) and a neon sign, with rings from the rain. Takes the road's grain.
 - **Roadworks** close one lane: four `cone-orange` cones with `face-white` bands lead out from the kerb side, then three water-filled barriers, 1.05 m each, `face-red` and `face-white` with reflective bands, an amber lamp (`lamp-amber`) on each, and a `face-yellow` sign, 1.45 m by 0.7 m, lettered 道路工程 ROAD WORKS in `ink-black` (Noto Serif TC Black and Antonio); the Chinese is never wider than the sign's face.

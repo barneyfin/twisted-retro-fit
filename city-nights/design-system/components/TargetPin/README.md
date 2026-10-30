@@ -12,7 +12,7 @@ Canvas 2D, by `CityNights.hud`, on a canvas over the street:
 ```js
 CityNights.hud.pin(g, x, y, k, m, { kind: 'drop', name: '明月酒店', metres: '300' });   // kind 'pick' has no name; bare: true for no tag
 ```
-- `x, y`: the screen point 3.2 m above the middle of the bay, from the game's projection (`pt(dMid, laneX, 3.2)`). Until the bay is within the drawn road, use the far end of the drawn road (about 80 m) in the bay's lane.
+- `x, y`: the screen point 3.2 m above the middle of the bay, from the game's projection (`pt(dMid, laneX, 3.2)`). Until the bay is within the drawn road, use the far end of the drawn road (about 80 m) in the bay's lane. **Inside a tunnel the pin still shows** there, under the tunnel's ceiling (Barney, 30 October 2026; Tunnel).
 - `k`: canvas pixels per pixel of a 720-line window; `m`: canvas pixels per CSS pixel. The pin is `pin-size` (40 × 58) at `k` = 1 and never smaller than 0.6 × `m`; its tag's lettering never smaller than 11 CSS pixels.
 
 ## The game provides

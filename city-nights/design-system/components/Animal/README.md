@@ -21,6 +21,7 @@ Each picture carries its own scale (`ppm`, pixels per metre) and the point it st
 - Which animal, where it steps into the road, when it bolts and which way.
 
 ## Rules
+- **Never in the clear stretch** (`clear-stretch`, 40 m) before a tunnel, nor inside one (Tunnel; Barney, 30 October 2026).
 - **Side-on, crossing, head turned to the taxi.** Two pictures each: standing, and the bolting stride.
 - **Wild boar**, 1.4 m long, 0.9 m high: a heavy dark body, a bristly ridge, a long snout and small tusks (`chicken-light`). Eyeshine `eyeshine-amber`.
 - **Stray dog**, about 1 m long: a Hong Kong village dog, pricked ears, long muzzle, tail curled over its back. Eyeshine `eyeshine-gold`.
