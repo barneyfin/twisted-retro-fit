@@ -87,7 +87,9 @@ One every 20–40 s of driving, the same in every zone. 雙 is 1 in 12; the othe
 
 - **Game sounds**, made in code: a power-up picked up, a crash, the passenger getting in, a fare paid, a tip lost, a steady engine note that rises with speed, the player's horn, other vehicles honking.
 - **A city sound bed** (rain, traffic, horns): yes.
-- **Soundtrack**: two MP3s from Barney, about 2:50 each, one for Tsim Sha Tsui and Jordan, one for Yau Ma Tei and Mong Kok. ARCADE.md now allows two in a City Nights game (each adds about 5.5 MB to the file). In Competitive the switch falls in the zone-change moment; in Practice it comes as the taxi crosses into Yau Ma Tei, and back into Tsim Sha Tsui.
+- **Soundtrack**: two MP3s from Barney, chosen 30 October 2026: *Midnight Fare Dash* (2 min 45 s) for Tsim Sha Tsui and Jordan, *Meter Running High* (2 min 53 s) for Yau Ma Tei and Mong Kok. ARCADE.md now allows two in a City Nights game. Both are 192 kbps stereo, at the same loudness as each other and as the Retro Kit games' tracks. Together they add about 10.8 MB to the game's file, and about 120 MB of memory if both are decoded at once. Barney keeps the two files until the kit change turns them into the game's music files.
+- Both tracks start quietly (building for 20–30 s) and end with a fade-out, so each loop brings 30–40 s of quieter music, as in the Retro Kit games. A zone lasts a little longer than a track, so each track loops once in most zones.
+- In Competitive the switch falls in the zone-change moment; in Practice it comes as the taxi crosses into Yau Ma Tei, and back into Tsim Sha Tsui. Whether the new track starts from its beginning or where it last stopped is for the design system.
 
 ## Screens
 
@@ -109,7 +111,7 @@ The design system is the spec, so each of these is designed there first, then co
 10. **Active power-ups**: 快's time left, 保 held, a fare boost on; and the five power-ups' final names and effects (the PowerUp part calls its names placeholders).
 11. **A shielded hit**: what it looks like. Otherwise the taxi drives straight through a car or a barrier, which looks like a fault.
 12. **Messages during play**, if any (a fare paid, a tip lost, a zone done). The design system says nothing else goes over the street besides the meter, caption, tiles and touch hint.
-13. **Sound**: the city sound bed, the game's sounds and the two soundtracks. The Sound section still says one MP3 and calls the sound bed open.
+13. **Sound**: the city sound bed, the game's sounds and the two soundtracks, including whether a track starts from its beginning when the music switches to it. The Sound section still says one MP3 and calls the sound bed open.
 14. **New Chinese words** any of these need: on the word list, with the fonts re-cut.
 15. **Left over from phase 3** (in `HANDOVER.md`, "Where phase 3 ended"): Automatic's 17.5 ms step, the animals' bolting speeds, the shadow sizes, where settings and scores are saved, and the meter holding at HK$999.99, now confirmed as enough for this game.
 
