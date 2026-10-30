@@ -29,10 +29,11 @@
    while the street is made a piece at a time, with the graphics memory and the opening times), 8 Play screen
    (Grunge City Rider's information and moments, a state at a time: the meter with lives and the tip, the caption's round
    line, the pin, the badges and 保's ring, the bay's ring, the passenger getting in, the roof sign, the receipt slip),
-   9 Shield (a trial: three looks for 保 held, in turn, to compare before the design system decides).
-   Keys 1-9 change scene; on a phone, tap for the next one. */
+   9 Moments (the SAFE! sign over a car and over a barrier, the crash pop at roadworks with the move into the open lane,
+   and the zone change), 10 Touch (the touch zones outlined: drag, hold or tap in either; tap in one for the next scene).
+   Keys 1-9 and 0 change scene; on a phone, tap for the next one. */
 
-const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street', 'Play screen', 'Shield'];
+const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street', 'Play screen', 'Moments', 'Touch'];
 const NOTES = [
   'All four districts, traffic, the meter and the caption. ← → steer, ↓ brakes, N jumps to the next district, hold F to drive fast. TIME runs out at 00 and the run ends.',
   '',
@@ -40,6 +41,8 @@ const NOTES = [
   'The taxi runs into each vehicle in turn: the crash pop and the brake lights.',
   'Every vehicle in every colour, keeping pace with the taxi.',
   'Roadworks, oil, spilt cargo and a pothole; the four animals, each bolting as the taxi comes; a passenger at the pick-up bay, then the drop-off bay. ↓ slows down.',
+  '',
+  '',
   '',
   ''
 ];
@@ -55,9 +58,15 @@ const PLAY = [
   'The tip lost (driving past the drop-off): the tip struck through, and dashes on the meter.',
   'Lives from 3 down to 0, and the round\'s lamps from 0 to 5.'
 ];
-// Shield (a trial, Barney, 30 October 2026): 保 held, each look in turn for SHIELD_STEP seconds
-const SHIELD_STEP = 4;
-const SHIELD_LOOKS = [['design', 'the design system\'s ring, drawn over the taxi'], ['under', 'the same ring, under the taxi'], ['glow', 'a soft blue glow round the whole taxi']];
+const TOUCH_NOTE = 'The touch zones, outlined: from the top of the meter\'s case down, either side of the taxi. Drag in either to steer, hold to brake; a touch outside them does nothing. Tap in one for the next scene.';
+// Moments: each in turn, the taxi meeting what is laid ahead of it, then a pause; the zone change last
+const MOMENTS = [
+  ['safe-car', 'The shielded hit, a car: 保 takes the crash, the SAFE! sign lights over the taxi\'s roof, the car is cleared away, and 保\'s badge and ring go. No freeze.'],
+  ['safe-works', 'The shielded hit, roadworks: the SAFE! sign over the barrier, which is cleared away under it.'],
+  ['crash-works', 'A crash into roadworks: the crash pop, the barriers cleared away and the taxi moved into the open lane in the pop\'s first second.'],
+  ['zone', 'The zone change: the street dims, the caption grows into the title (the district finished, its lamps and takings), the taxi jumps to the next district under it, then the title shrinks back.']
+];
+const MOMENT_GAP = 1.6;   // seconds between one moment and the next
 // Long street: each district in turn, from TOUR_LEAD metres before its edge, for TOUR_TIME seconds at TOUR_SPEED (84 km/h, 快's speed)
 const TOUR_LEAD = 40, TOUR_TIME = 15, TOUR_SPEED = 84 / 3.6;
 const FAST = 100;   // Drive, F held: metres a second
@@ -110,7 +119,7 @@ CityNights.game({
   id: 'cn-sampler',
   title: ['City Nights', 'Sampler'],
   zh: '的士',
-  keys: [['1', '9', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
+  keys: [['1', '0', 'Scene'], ['←', '→', 'Steer'], ['↓', 'Brake'], ['Esc', 'Pause']],
   touch: 'Drag to steer · Tap for the next scene',
 
   start(cn) {
@@ -126,27 +135,26 @@ CityNights.game({
 
   update(g, cn) {
     const taxi = cn.street.taxi, dt = 1 / 60, n = SCENES.length;
-    for (let i = 0; i < n; i++) if (cn.input.keyPressed('Digit' + (i + 1)) || cn.input.keyPressed('Numpad' + (i + 1))) setScene(g, cn, i);
+    for (let i = 0; i < n; i++) if (cn.input.keyPressed('Digit' + ((i + 1) % 10)) || cn.input.keyPressed('Numpad' + ((i + 1) % 10))) setScene(g, cn, i);
     if (cn.input.tap) setScene(g, cn, (g.scene + 1) % n);
     // steering, in every scene
     if (cn.input.left) taxi.x -= 1.4 * dt;
     if (cn.input.right) taxi.x += 1.4 * dt;
     if (cn.input.pointer.down) taxi.x += cn.input.pointer.dx / cn.W * 2;
+    if (cn.input.pointer2.down) taxi.x += cn.input.pointer2.dx / cn.W * 2;   // either thumb steers
     taxi.x = cn.clamp(taxi.x, -0.85, 0.85);
 
     // the taxi's speed, then it moves, then what the scene puts round it
     const scene = SCENES[g.scene], c = g.crash;
     taxi.speed = scene === 'Drive' ? (cn.input.down ? 4 : cn.input.key('KeyF') ? FAST : 16) : scene === 'Mong Kok' ? (cn.input.down ? 4 : 19)
       : scene === 'Power-ups' ? 5 : scene === 'Vehicles' ? 6 : scene === 'Street' ? (cn.input.down ? 3 : 8)
-      : scene === 'Long street' ? TOUR_SPEED : scene === 'Play screen' ? playSpeed(g) : scene === 'Shield' ? 8
+      : scene === 'Long street' ? TOUR_SPEED : scene === 'Play screen' ? playSpeed(g) : scene === 'Moments' ? momentSpeed(g)
+      : scene === 'Touch' ? (cn.input.down || (cn.input.pointer.down && cn.input.pointer2.down) ? 3 : 10)   // two thumbs down: one steers, one holds
       : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
     taxi.z += taxi.speed * dt;
     if (scene === 'Play screen') playStep(g, cn, dt);
-    if (scene === 'Shield') {
-      g.shield = (g.shield + dt) % (SHIELD_STEP * SHIELD_LOOKS.length);
-      cn.picture.shieldLook = SHIELD_LOOKS[Math.floor(g.shield / SHIELD_STEP)][0];
-    }
-    if (scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' || scene === 'Play screen' || scene === 'Shield') {
+    if (scene === 'Moments') momentStep(g, cn, dt);
+    if (scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' || scene === 'Play screen' || scene === 'Touch') {
       for (const car of cn.street.cars) car.z += car.speed * dt;
       cn.street.recycle(cn.street.cars);
       if (scene === 'Drive') {
@@ -179,7 +187,7 @@ CityNights.game({
       if (bay && cn.street.gap(taxi.z, bay.z + 10) > cn.street.length / 2) {
         if (g.lay.stop === 0) setStop(g, cn, 1); else layStreet(g, cn, g.lay.lap + 1);
       }
-    } else {
+    } else if (scene === 'Crash') {
       POPS.forEach((p, i) => { if (cn.input.keyPressed(p[2])) c.pop = i; });
       if (c.wait > 0) {
         c.wait -= dt;
@@ -223,7 +231,7 @@ function setScene(g, cn, i) {
   // today's meter and caption, and nothing carried, unless the scene says otherwise
   Object.assign(cn.meter, { lives: null, tip: null, round: null, fares: 0 });
   st.pin = null; taxi.hired = false; taxi.carry = null;
-  cn.picture.shieldLook = 'design';
+  cn.picture.touchZones = false; cn.picture.showZones = false;
   clearPieces(cn);
   cn.meter.time = null;
   const scene = SCENES[i];
@@ -234,10 +242,12 @@ function setScene(g, cn, i) {
       g.check = { i: -1, t: 0, prev: null, popT: 0, runs: [0, 1, 2].map(() => ({ fps: [], load: [] })) };
       jumpTo(cn, mongKok(cn));
     }
-  } else if (scene === 'Shield') {
+  } else if (scene === 'Moments') {
+    g.mo = { k: -1, t: MOMENT_GAP, phase: 'gap' };
+    st.cars = [];
+  } else if (scene === 'Touch') {
     st.cars = g.traffic;
-    g.shield = 0;
-    taxi.carry = { shield: true };
+    cn.picture.touchZones = true; cn.picture.showZones = true;
   } else if (scene === 'Play screen') {
     st.cars = g.traffic;
     g.play = { t: 0, k: -1, dest: '' };
@@ -283,6 +293,49 @@ function jumpTo(cn, z) {
   st.place({ z });
   for (const car of st.cars) car.z += d;
 }
+/* ----- Moments: lay out the next one ahead of the taxi, wait for the taxi to meet it, show it, pause, go on ----- */
+function momentSpeed(g) { const mo = g.mo; return mo && mo.phase === 'stopped' ? 0 : 10; }
+function momentStep(g, cn, dt) {
+  const mo = g.mo, st = cn.street, taxi = st.taxi, L = st.size('taxi').length, lane = st.lanes[0], open = st.lanes[1];
+  mo.t -= dt;
+  if (mo.phase === 'gap') {
+    if (mo.t > 0) return;
+    // the next moment, laid out ahead
+    mo.k = (mo.k + 1) % MOMENTS.length;
+    const kind = MOMENTS[mo.k][0];
+    st.place({ x: lane });
+    st.obstacles = []; st.cars = []; taxi.carry = null;
+    if (kind === 'safe-car') { taxi.carry = { shield: true }; st.cars = [{ z: taxi.z + 16, x: lane, kind: 'sedan', tone: 1, speed: 4 }]; }
+    else if (kind === 'safe-works') { taxi.carry = { shield: true }; st.obstacles = [{ kind: 'roadworks', z: taxi.z + 18, x: lane }]; }
+    else if (kind === 'crash-works') st.obstacles = [{ kind: 'roadworks', z: taxi.z + 18, x: lane }];
+    else {
+      // the zone change: the take and the round as a game would give them; the taxi jumps to the next district's start
+      const d = st.districts[(st.district(taxi.z).index + 1) % 4], round = 1 + (d.index === 0 ? 1 : 0);
+      cn.zoneChange({ take: 51.3, round, to: d.z }, () => { st.cars = []; });
+      mo.phase = 'gap'; mo.t = MOMENT_GAP;
+      return;
+    }
+    mo.phase = 'ahead';
+    return;
+  }
+  if (mo.phase === 'ahead') {
+    const kind = MOMENTS[mo.k][0];
+    for (const car of st.cars) car.z += car.speed * dt;
+    if (kind === 'safe-car') {
+      const car = st.cars[0];
+      if (car && taxi.z + L >= car.z) { st.safe(car.z, (taxi.x + car.x) / 2); st.cars = []; taxi.carry = null; mo.phase = 'gap'; mo.t = MOMENT_GAP; }
+    } else {
+      const works = st.obstacles[0], hit = works && taxi.z + L >= works.z + 7;   // the barriers stand 7 m into the roadworks
+      if (hit && kind === 'safe-works') { st.safe(works.z + 7, taxi.x); st.obstacles = []; taxi.carry = null; mo.phase = 'gap'; mo.t = MOMENT_GAP; }
+      else if (hit) { st.crash(works.z + 7, taxi.x); mo.phase = 'stopped'; mo.t = 1.4; mo.moved = false; }
+    }
+  } else if (mo.phase === 'stopped') {
+    // in the pop's first second: the barriers cleared away, the taxi moved into the open lane
+    if (!mo.moved && mo.t < 1.1) { st.obstacles = []; st.place({ x: open }); mo.moved = true; }
+    if (mo.t <= 0) { mo.phase = 'gap'; mo.t = MOMENT_GAP; }
+  }
+}
+
 /* ----- Play screen: Grunge City Rider's states, each set up as it begins (k changes) and moved on as it runs (u: 0 to 1) ----- */
 function playSpeed(g) { const k = g.play ? g.play.k : 0; return k === 3 || k === 4 ? 0 : 8; }
 function playStep(g, cn, dt) {
@@ -424,9 +477,10 @@ function showReadout(g, cn) {
   let note = cn.touch ? NOTES[g.scene].replace('← → steer, ↓ brakes', 'Drag to steer').replace(', N jumps to the next district, hold F to drive fast', '').replace(' ↓ slows down.', '') : NOTES[g.scene], extra = pic;
   // the graphics memory and the opening times, in the scenes that drive the long street
   const mem = scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' ? memLine(cn) : '';
-  if (scene === 'Shield') {
-    const k = Math.floor(g.shield / SHIELD_STEP);
-    note = 'A trial: 保 held, three looks in turn, ' + SHIELD_STEP + ' s each. Now ' + (k + 1) + ' of ' + SHIELD_LOOKS.length + ': ' + SHIELD_LOOKS[k][1] + '.';
+  if (scene === 'Moments' && g.mo) {
+    note = g.mo.k < 0 ? 'The moments, each in turn.' : (g.mo.k + 1) + ' of ' + MOMENTS.length + ': ' + MOMENTS[g.mo.k][1];
+  } else if (scene === 'Touch') {
+    note = TOUCH_NOTE;
   } else if (scene === 'Play screen' && g.play) {
     note = (g.play.k + 1) + ' of ' + PLAY.length + ': ' + PLAY[Math.max(0, g.play.k)];
   } else if (scene === 'Long street') {

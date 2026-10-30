@@ -1,4 +1,4 @@
-/* City Nights 0.8.0 — runtime
+/* City Nights 0.9.0 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.8.0';
+  const VERSION = '0.9.0';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -2171,6 +2171,7 @@
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       if (T.extra){ gl.deleteFramebuffer(T.extra.f); gl.deleteTexture(T.extra.t); T.extra = null; }
+      if (T.zone){ gl.deleteFramebuffer(T.zone.f); gl.deleteTexture(T.zone.t); T.zone = null; if (zone) zone.snap = false; }
     }
     // an off-screen copy of the picture, for the extra drawings while the test page times a frame
     function extraTarget(){
@@ -2744,6 +2745,7 @@
       size: kind => { const p = PIECE_SIZE[kind]; if (p) return { width: p[0], length: p[1] }; const v = VEH[kind] || VEH.taxi; return { width: v.W, length: v.L }; },
       district: z => { const d = DISTRICTS[Math.floor(wrapU(z * UPM) / SEG / DIST_LEN) % DISTRICTS.length], i = DISTRICTS.indexOf(d); return { index: i, zh: d.zh, en: d.en }; },
       crash: (z, x) => { popAsk = { z: z * UPM, x: clamp(+x || 0, -1.2, 1.2) }; },
+      safe: (z, x) => { safeAsk = { z: z * UPM, x: clamp(+x || 0, -1.2, 1.2) }; },
       // the signs beside the street from z0 to z1 (metres, round the lap), to name a destination after: [{ zh, en, z, side }]
       signs: (z0, z1) => {
         const out = [], a = Math.floor(wrapU((+z0 || 0) * UPM) / SEG), n = clamp(Math.ceil(((+z1 || 0) - (+z0 || 0)) * UPM / SEG), 0, N_SEG - 1);
@@ -2785,7 +2787,7 @@
       api.taxi = { z: 0, x: 0, speed: 0 }; api.cars = []; api.tokens = []; api.obstacles = []; api.animals = []; api.stop = null; api.pin = null;
       meter.time = null; meter.speed = null; meter.lives = null; meter.tip = null; meter.round = null; meter.fares = 0; placed = false;
       Object.assign(run, { x: 0, speed: 0, brake: 0, accel: 0, lean: 0, sky: 0, trip: 0, moving: false, cap: { d: -1, t: 0 }, ringA: 0, ringKind: 'pickup', hired: false, carry: null });
-      pop = null; popAsk = null; popLast = ''; slip = null;
+      pop = null; popAsk = null; popLast = ''; slip = null; safe = null; safeAsk = null; zone = null;
       hudKey = ''; clearPop(); clearMarks();
     }
     // one step of play, after the game's own: the street's life, then the taxi's motion from how the game moved it
@@ -2805,6 +2807,8 @@
       if (d !== run.cap.d){ run.cap.d = d; run.cap.t = 0; }
       run.cap.t += dt;
       if (pop) pop.t += dt;
+      if (safe) safe.t += dt;
+      if (zone) zoneStep(dt);
       if (slip){ slip.t += dt; if (slip.t >= SLIP.in + SLIP.hold + SLIP.out) slip = null; }
       // the bay's ring fades in while the game says the taxi is in the bay (stop.ring), and out once it says not (ring-fade)
       const sp = api.stop && typeof api.stop === 'object' ? api.stop : null;
@@ -3924,6 +3928,125 @@
           }
         }
       }
+      // the SAFE! sign: the design system's drawing, made once at this size, sprung in and faded as the crash pop is
+      if (safe){
+        const f = safe.t / POP_TIME;
+        if (f >= 1) safe = null;
+        else {
+          const pic = safePicture(k), a = keyed(f, reduceMotion ? POP_FADE : POP_ALPHA), sc = reduceMotion ? 1 : keyed(f, POP_SCALE), w = pic.c.width * sc, h = pic.c.height * sc;
+          g.globalAlpha = a; g.drawImage(pic.c, safe.x * pk - w / 2, safe.y * pk - h / 2, w, h); g.globalAlpha = 1; marksDrawn = true;
+        }
+      }
+      // the test page only: the touch zones outlined (nothing marks them in a game)
+      if (showZones){
+        g.save(); g.strokeStyle = col('tube-teal'); g.lineWidth = Math.max(1, 2 * m); g.setLineDash([8 * m, 6 * m]);
+        for (const r of touchZones()) g.strokeRect(r.x0 * pk + m, r.y0 * pk + m, (r.x1 - r.x0) * pk - 2 * m, (r.y1 - r.y0) * pk - 2 * m);
+        g.restore(); marksDrawn = true;
+      }
+    }
+
+    /* ---- the shielded hit (ShieldSign): street.safe(z, x) lights the SAFE! sign over the point of contact, or, when that
+       is in the taxi's own lane and so hidden behind it, over its roof: its rear on the road, 2.55 m up. Its life is the
+       crash pop's (pop-time), and it is drawn once at the marks canvas's size, then shown with the spring and the fade. */
+    let safe = null, safeAsk = null, safePic = null;
+    function startSafe(st){
+      const ask = safeAsk; safeAsk = null;
+      const cg = cabGeometry(), ppm = cg.rw / VEH.taxi.W;
+      let x = W / 2 + sway(st), y = cg.gy - ppm * 2.55;
+      if (Math.abs(ask.x - st.x) > 0.25){ const q = projectZ2(st, ask.z); if (q){ x = q.sx + q.scale * ask.x * ROAD * K; y = q.sy - q.scale * 0.8 * UPM * K; } }
+      safe = { t: 0, x, y };
+    }
+    function safePicture(k){
+      if (safePic && safePic.k === k) return safePic;
+      const pad = 30 * k, c = mk(300 * k + pad * 2, 210 * k + pad * 2);   // shield-box, with room for its glow
+      hud.shieldSign(c.getContext('2d'), c.width / 2, c.height / 2, k, 1, 1);
+      return (safePic = { c, k });
+    }
+
+    /* ---- the touch zones (TouchZones), in picture pixels: from the top of the meter's case to the foot of the picture,
+       left of the taxi and right of it, at its rear bumper, its widest */
+    let showZones = false;
+    function touchZones(){
+      const cg = cabGeometry(), x = W / 2 + sway(run), G = hudGeom(meter.lives != null);
+      return hud.touchZones(W, H, H - 14 - (G.outerH + 4) * MS, x - cg.rw / 2, x + cg.rw / 2);
+    }
+
+    /* ---- the zone change (ZoneTitle): cn.zoneChange({ take, round, to }, then). zone-time in all: the street dims and the
+       caption grows into a title in the middle, the district just finished with its five lamps and takings; the taxi
+       jumps under it (to: its new z, then the game's then()) and the street fades across from the old place, kept as a
+       still picture, to the new; the next district and its round; then the title shrinks back into the caption and the
+       shade lifts. The game holds still meanwhile: the shell calls no update() and the clock does not run. */
+    let zone = null;
+    function zoneChange(o, then){
+      if (!built || zone) return;
+      o = o || {};
+      const d = DISTRICTS[Math.floor(wrapU((+api.taxi.z || 0) * UPM) / SEG / DIST_LEN) % DISTRICTS.length];
+      const take = typeof o.take === 'number' ? o.take.toFixed(2) : String(o.take == null ? '0.00' : o.take);
+      zone = { t: 0, o, then: typeof then === 'function' ? then : null, snap: false, swapped: false, ready: false,
+        done: { zh: d.zh, en: d.en, done: true, take }, next: null };
+    }
+    const zoneTimes = () => { const T = hud.times; return { a1: T.zoneIn, a2: T.zoneIn + T.zoneHold, a3: T.zoneIn + T.zoneHold + T.zoneSwap, a4: T.zoneIn + T.zoneHold * 2 + T.zoneSwap, a5: T.zoneIn + T.zoneHold * 2 + T.zoneSwap + T.zoneOut }; };
+    function zoneStep(dt){
+      zone.t += dt;
+      const Z = zoneTimes();
+      // the jump, early in the hold on the finished district, so the new place is made while the old one shows
+      if (!zone.swapped && zone.snap && zone.t >= Z.a1 + 0.05){
+        zone.swapped = true;
+        if (zone.o.to != null) api.place({ z: +zone.o.to });
+        if (zone.then){ try { zone.then(); } catch (e) { console.error(e); } }
+        const d = DISTRICTS[Math.floor(wrapU((+api.taxi.z || 0) * UPM) / SEG / DIST_LEN) % DISTRICTS.length];
+        zone.next = { zh: d.zh, en: d.en, round: String(zone.o.round == null ? '' : zone.o.round) };
+      }
+      if (zone.t >= Z.a5){ zone = null; run.cap.t = 0.6; }   // the title has shrunk back into the caption: it shows at once
+    }
+    function zoneTarget(){
+      if (!T.zone){ const tx = tex2D(PW, PH, gl.LINEAR), f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tx, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null); T.zone = { t: tx, f }; }
+      return T.zone;
+    }
+    // the old place's still picture over the screen, at opacity a (on its own when the new place is not drawn yet)
+    function drawStill(a, alone){
+      if (alone){ gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, PW, PH); }
+      gl.bindBuffer(gl.ARRAY_BUFFER, cabVBO); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 1, W, 0, 1, 1, W, H, 1, 0, 0, H, 0, 0]), gl.DYNAMIC_DRAW);
+      const p = P.ring; gl.useProgram(p.p); gl.bindVertexArray(cabVAO);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      bindT(0, gl.TEXTURE_2D, zoneTarget().t); gl.uniform1i(p.u.uTex, 0); gl.uniform2f(p.u.uView, W, H); gl.uniform1f(p.u.uA, a);
+      gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
+      gl.disable(gl.BLEND);
+    }
+    function drawZone(st, fare){
+      const Z = zoneTimes(), t = zone.t, ease = u => u * u * (3 - 2 * u);
+      if (!zone.snap){ renderGL(st, zoneTarget().f); zone.snap = true; }
+      // after the jump, the new place is drawn once off screen (its pieces made there), then on screen as it fades across
+      if (zone.swapped && !zone.ready){ renderGL(st, extraTarget()); zone.ready = true; }
+      const across = zone.ready ? clamp((t - Z.a2) / (Z.a3 - Z.a2), 0, 1) : 0;
+      if (across > 0) renderGL(st);
+      if (across < 1) drawStill(1 - across, across === 0);
+      clearMarks();
+      drawHUD(Object.assign(meterNow(fare), { a: 0 }));   // the caption has grown into the title
+      // the shade and the title over everything, on the crash pop's canvas
+      clearPop();
+      const cv = env.pop, g = cv.getContext('2d'), pk = cv.width / W, k = 0.75 * pk, m = pk / env.cssScale();
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      const shade = t < Z.a1 ? t / (Z.a1) : t > Z.a4 ? 1 - (t - Z.a4) / (Z.a5 - Z.a4) : 1;
+      g.globalAlpha = clamp(shade, 0, 1); g.fillStyle = col('zone-shade'); g.fillRect(0, 0, cv.width, cv.height); g.globalAlpha = 1;
+      // grow: 0 at the caption's place and size, 1 in the middle at full size; under Reduce motion the title only fades
+      const grow = t < Z.a1 ? ease(t / Z.a1) : t > Z.a4 ? 1 - ease(clamp((t - Z.a4) / (Z.a5 - Z.a4), 0, 1)) : 1;
+      const cx = cv.width / 2, cy = cv.height * 0.45;
+      const titles = [[zone.done, 1 - across], [zone.next, across]];
+      // the caption's Chinese baseline and middle, where the title grows from and shrinks back into
+      const G = hudGeom(meter.lives != null), top = (H - 14 - G.outerH * MS) * pk, round = meter.round != null;
+      const zhBase = round ? top - 13.7 * k - Math.max(18 * k, 11 * m, Math.max(13 * k, 8 * m) + 6 * k) - 10 * k - 32 * k : top - 18.67 * k - 32 * k;
+      g.font = '700 ' + 37.3 * k + 'px "Noto Sans TC", sans-serif';
+      for (const [ti, ta] of titles){
+        if (!ti || ta <= 0) continue;
+        const big = ti.done ? 76 : 92, s0 = 37.3 / big, capX = (14 + 2) * pk + g.measureText(ti.zh).width / 2, capY = zhBase + (ti.done ? 22 : 26) * k * s0;
+        if (reduceMotion){ hud.zoneTitle(g, cx, cy, k, m, ti, ta * grow); continue; }
+        const s = lerp(s0, 1, grow);
+        g.save(); g.translate(lerp(capX, cx, grow), lerp(capY, cy, grow)); g.scale(s, s);
+        hud.zoneTitle(g, 0, 0, k, m, ti, ta);
+        g.restore();
+      }
+      popDrawn = true;
     }
     function meterNow(fare){
       return { fare, time: meter.time, kmh: meter.speed != null ? meter.speed : run.speed / UPM * 3.6, d: Math.max(0, run.cap.d), a: run.cap.t / 0.6,
@@ -3963,12 +4086,15 @@
       reset, step,
       // the run as it stands: the street, then the meter, the caption and the crash pop over it
       draw(fare){
-        const st = runScene(); if (popAsk) startPop(st);
+        const st = runScene(); if (popAsk) startPop(st); if (safeAsk) startSafe(st);
+        if (zone){ drawZone(st, fare); return; }
         for (let k = 1; k < repeat; k++){ renderGL(st, extraTarget()); drawPop(); }
         renderGL(st); drawMarks(st); drawHUD(meterNow(fare)); drawPop();
         if (!streetCost.shownAt) streetCost.shownAt = performance.now();
       },
-      api, meter, receipt
+      api, meter, receipt, zoneChange, touchZones,
+      get holding(){ return !!zone; },
+      get showZones(){ return showZones; }, set showZones(v){ showZones = !!v; }
     };
   }
 
@@ -4230,9 +4356,13 @@
     let stale = new Set();        // keys held over from a menu: ignored until released
     const V = { W: 960, H: PICTURE_H, k: 1, q: 1 };   // the picture's size, CSS px per picture px, canvas px per CSS px
     const pointer = { x: V.W / 2, y: V.H / 2, down: false, pressed: false, released: false, moved: false, dx: 0, dy: 0, id: null, sx: 0, sy: 0, st: 0 };
-    // A second finger, down while the first one is: it never moves `pointer`, so one thumb can steer
-    // while the other taps or holds. A quick tap with it counts as `tap`, like the first finger's.
-    const pointer2 = { x: V.W / 2, y: V.H / 2, down: false, pressed: false, released: false, id: null, sx: 0, sy: 0, st: 0 };
+    // A second finger, down while the first one is: it never moves `pointer`, so one thumb can steer while the other
+    // taps or holds; it has its own movement too (dx, dy, moved), so either thumb can drag. A quick tap with it counts
+    // as `tap`, like the first finger's.
+    const pointer2 = { x: V.W / 2, y: V.H / 2, down: false, pressed: false, released: false, moved: false, dx: 0, dy: 0, id: null, sx: 0, sy: 0, st: 0 };
+    // touchZones (a game's choice; Grunge City Rider's): a touch counts only if it starts in one of the two zones, from the
+    // top of the meter's case down, either side of the taxi (TouchZones); once started it counts wherever it moves
+    let zonesOn = !!cfg.touchZones;
     let tapPending = false;
     const input = {
       left: false, right: false, up: false, down: false, fire: false, alt: false,
@@ -4261,6 +4391,9 @@
       pointer.dy = 0;
       pointer2.pressed = false;
       pointer2.released = false;
+      pointer2.moved = false;
+      pointer2.dx = 0;
+      pointer2.dy = 0;
       tapPending = false;
     }
     function resetInput() {
@@ -4289,12 +4422,16 @@
     stage.addEventListener('pointerdown', (e) => {
       audio.unlock();
       if (state.screen !== 'play' || e.target.closest('button, a')) return;   // the tiles are buttons, not play
+      if (zonesOn && street.ready) {   // outside the zones a touch does nothing
+        const px = picX(e), py = picY(e);
+        if (!street.touchZones().some((r) => px >= r.x0 && px <= r.x1 && py >= r.y0 && py <= r.y1)) return;
+      }
       e.preventDefault();
       if (pointer.down && e.pointerId !== pointer.id) {   // a second finger: the first keeps steering
         if (pointer2.down) return;                        // a third is ignored
         try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
         pointer2.id = e.pointerId;
-        pointer2.x = picX(e); pointer2.y = picY(e);
+        pointer2.x = picX(e); pointer2.y = picY(e); pointer2.dx = 0; pointer2.dy = 0;
         pointer2.down = true;
         pointer2.pressed = true;
         pointer2.sx = e.clientX; pointer2.sy = e.clientY; pointer2.st = performance.now();
@@ -4312,7 +4449,11 @@
     });
     stage.addEventListener('pointermove', (e) => {
       if (state.screen !== 'play') return;
-      if (pointer2.down && e.pointerId === pointer2.id) { pointer2.x = picX(e); pointer2.y = picY(e); return; }
+      if (pointer2.down && e.pointerId === pointer2.id) {
+        const nx = picX(e), ny = picY(e);
+        pointer2.dx += nx - pointer2.x; pointer2.dy += ny - pointer2.y; pointer2.x = nx; pointer2.y = ny; pointer2.moved = true;
+        return;
+      }
       if (pointer.down && e.pointerId !== pointer.id) return;
       setPointer(e);
     });
@@ -5060,6 +5201,8 @@
     let lastFrame = performance.now();
     let acc = 0;
     function tick() {
+      // the zone change holds the game still: no update(), no clock, no timers; the street's own life goes on
+      if (state.screen === 'play' && street.holding) { prepareInput(); endTickInput(); street.step(STEP); return; }
       state.time += STEP;
       if (state.timers.length) {
         const due = state.timers.filter((t) => t.at <= state.time);
@@ -5134,6 +5277,13 @@
          is [Chinese, English, amount, style], style 'total' (a dashed rule above, larger), 'receipt-red' (in receipt-red;
          the design system's code calls it 'red') or 'struck' (red, with a line through) (ReceiptSlip). */
       receipt: (o) => street.receipt(o),
+      /* zoneChange({ take, round, to }, then): the zone change's film title (ZoneTitle), zone-time in all. The street dims
+         and the caption grows into a title: the district the taxi is in, its five lamps lit and take (HK$, the fares and
+         tips earned in it); under it the taxi jumps to z = to (metres) and then() is called, for the game to set up the
+         new zone; then the district it is in now and 輪 ROUND round. The game holds still meanwhile: update() is not
+         called and cn.time does not run. zoning is true while it shows. */
+      zoneChange: (o, then) => street.zoneChange(o, then),
+      get zoning() { return street.holding; },
       money: money, rand: rand, randInt: randInt, pick: pick, clamp: clamp, lerp: lerp, hit: hit,
       /* The World. The kit draws the street every frame; the game moves what is on it (distances in metres):
          street.taxi     { z, x, speed, brake }: how far along the street (z), across it (x: -1 the left kerb, 1 the right;
@@ -5162,7 +5312,11 @@
          street.gap(from, to)     metres forward from z = from to z = to, round the lap
          street.size(kind)        { width, length } in metres of a vehicle (z is its rear), an obstacle, an animal or 'bay'
          street.district(z)       { index, zh, en } of the district at z; the caption follows the taxi by itself
-         street.crash(z, x)       lights the crash pop (CRASH!, SMASH! or BANG!) over the point where two vehicles meet
+         street.crash(z, x)       lights the crash pop (CRASH!, SMASH! or BANG!) over the point where the taxi meets a
+                         vehicle, a roadworks barrier or a cone. Clearing what was hit away under it, and moving the taxi
+                         into the open lane (street.place), are the game's
+         street.safe(z, x)        lights the SAFE! sign, the shielded hit (ShieldSign), over the point of contact, or over
+                         the taxi's roof when that is in its own lane; it lives as the crash pop does
          street.signs(z0, z1)     the signs beside the street from z0 to z1: [{ zh, en, z, side }] (side -1 left, 1 right, 0
                          across the road); a destination is named after one of them (TargetPin)
          meter.time, meter.speed  the meter's TIME (two places) and KM/H (left as null: the taxi's own speed); FARE is the fare
@@ -5217,6 +5371,11 @@
         // under the taxi) or 'glow' (a soft blue glow round the whole taxi); a game leaves it alone
         get shieldLook() { return street.shieldLook; },
         set shieldLook(v) { street.shieldLook = v; },
+        // the test page: touch zones on or off whatever the game said, and outlined (nothing marks them in a game)
+        get touchZones() { return zonesOn; },
+        set touchZones(v) { zonesOn = !!v; },
+        get showZones() { return street.showZones; },
+        set showZones(v) { street.showZones = v; },
         get opening() { const c = street.cost; return { build: c.buildMs, plan: c.planMs, first: c.firstMs, ready: c.readyAt, shown: c.shownAt, pieces: c.pieces, pieceMs: c.pieceMs }; }
       }
     };
