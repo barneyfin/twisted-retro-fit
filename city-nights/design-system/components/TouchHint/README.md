@@ -18,5 +18,5 @@ A dark plaque at the bottom centre of a phone's picture that tells the player ho
 ## Rules
 - `plaque` ground, 6px corners, a 1px `meter-rule` edge, 13px `hint` type in `night-text`, a 16px icon.
 - Bottom centre, 12px above the bottom edge plus the safe-area inset.
-- The only interface element over the picture during play besides the meter, caption and tiles, and only until the player moves. Never over the taxi.
-- The line in the preview is Grunge City Rider's provisional wording; its controls are settled with its gameplay.
+- Over the picture only until the player moves. Never over the taxi.
+- Grunge City Rider's line stays "Drag to steer · Hold with your other thumb to brake" (its gameplay, 29 October 2026); the horn's quick tap is left for players to find. Where thumbs may go is TouchZones.

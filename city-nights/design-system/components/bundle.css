@@ -177,6 +177,16 @@
 .cn-meter-lab{display:flex;align-items:baseline;gap:calc(6px*var(--lab));color:var(--meter-label)}
 .cn-meter-lab .zh{font:700 calc(13px*var(--lab))/1.2 var(--font-zh-sans)}
 .cn-meter-lab .en{font:600 calc(11px*var(--lab))/1.2 var(--font-ui);letter-spacing:calc(1px*var(--lab));white-space:pre}
+/* Grunge City Rider's meter (Barney, 30 October 2026): lives in the heading, so the face is 244 wide (dial 226),
+   and the time row shared with the tip, each a label over its digits (22 high). */
+.cn-meter.has-lives .cn-meter-face{width:calc(244px*var(--k))}
+.cn-meter.has-lives .cn-meter-dial{width:calc(226px*var(--k))}
+.cn-meter-head .lead{display:flex;align-items:center;gap:calc(8px*var(--k))}
+.cn-meter-lives{display:flex;align-items:center;gap:calc(3.4px*var(--k))}
+.cn-meter-lives svg{display:block;width:calc(20.2px*var(--k));height:calc(15.5px*var(--k))}
+.cn-meter-row.is-pair{align-items:center}
+.cn-meter-cell{display:flex;flex-direction:column;align-items:flex-start;gap:calc(5.5px*var(--k))}
+.cn-meter-cell.is-end{align-items:flex-end}
 
 /* the district, Chinese over English, like a film subtitle */
 .cn-caption{display:flex;flex-direction:column;gap:2px;color:var(--caption);
@@ -185,6 +195,15 @@
 .cn-caption .en{font:500 24px/26px var(--font-ui)}
 .cn-caption.is-phone .zh{font-size:20px;line-height:22px}
 .cn-caption.is-phone .en{font-size:13px;line-height:15px}
+/* the caption's third line: 輪 ROUND n and the zone's five fare lamps on a small dark pill */
+.cn-caption .round{display:flex;align-items:center;gap:10px;margin-top:5px;font:600 17px/20px var(--font-ui);letter-spacing:1px}
+.cn-caption .round .zh{font:700 18px/20px var(--font-zh-sans);letter-spacing:0}
+.cn-caption .round .lbl{display:flex;align-items:baseline;gap:6px}
+.cn-caption.is-phone .round{gap:6px;margin-top:3px;font-size:11px;line-height:13px}
+.cn-caption.is-phone .round .zh{font-size:11px;line-height:13px}
+.cn-lamps{display:inline-flex;align-items:center;gap:calc(var(--d,13px)*0.4);padding:calc(var(--d,13px)*0.23);border-radius:99px;background:rgba(0,0,0,0.55)}
+.cn-lamps i{display:block;width:var(--d,13px);height:var(--d,13px);border-radius:50%;background:var(--lamp-unlit);box-shadow:inset 0 0 0 1.5px var(--lamp-unlit-ring)}
+.cn-lamps i.is-on{background:var(--face-yellow);box-shadow:0 0 calc(var(--d,13px)*0.6) rgba(255,210,58,0.95),inset 0 0 0 1px rgba(120,70,0,0.5)}
 
 /* ---------- World: sign styles, drawn in HTML for reference (the game draws them on canvas) ---------- */
 .cn-sign{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:14px 26px 12px;border-radius:8px;background:var(--case)}

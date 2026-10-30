@@ -1,4 +1,4 @@
-<!-- @dsCard group="World" height=570 width=960 subtitle="One bay, two colours: on the street, then drawn live in the kerbside lane" -->
+<!-- @dsCard group="World" height=840 width=960 subtitle="One bay, two colours: on the street, drawn live in the kerbside lane, then the bay's ring once three-quarters of the taxi is inside" -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -14,7 +14,7 @@ body{margin:0;background:var(--night-black)}
 </style>
 </head>
 <body>
-<div class="stage" style="height:570px">
+<div class="stage" style="height:840px">
   <img src="/_blob/ed15cb20b576926117f1f9c15f642c22" alt="On the street: the teal pick-up bay in the left-hand lane, lettered 上客 PICK-UP" style="left:0px;top:0px;width:480px;height:270px">
   <img src="/_blob/38bc1e349cd1006239cb078f39724d5f" alt="On the street: the pink drop-off bay in the left-hand lane, lettered 落客 DROP-OFF" style="left:480px;top:0px;width:480px;height:270px">
   <canvas id="c1" style="left:0;top:270px;width:480px;height:300px"></canvas>
@@ -22,6 +22,10 @@ body{margin:0;background:var(--night-black)}
   <span class="tag" style="left:10px;top:10px">On the street</span>
   <span class="tag" style="left:10px;top:280px">Pick-up · tube-teal · <span class="zh">上客</span> PICK-UP</span>
   <span class="tag" style="left:490px;top:280px">Drop-off · tube-pink · <span class="zh">落客</span> DROP-OFF</span>
+  <img src="/_blob/543158efeeea9bbfada604101d1569aa" alt="The taxi three-quarters inside the teal pick-up bay, the bay's teal ring of light on the road round it" style="left:0;top:570px;width:480px;height:270px">
+  <img src="/_blob/81eea484599ba0d10ede32d1197a363e" alt="The taxi braking inside the pink drop-off bay, the bay's pink ring round it" style="left:480px;top:570px;width:480px;height:270px">
+  <span class="tag" style="left:10px;top:580px">In the bay: its ring (<code>CityNights.hud.bayRing</code>)</span>
+  <span class="tag" style="left:490px;top:580px">Only paint by the rear wheels still shows</span>
 </div>
 <script>
 (function () {

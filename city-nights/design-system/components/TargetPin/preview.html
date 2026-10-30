@@ -1,0 +1,39 @@
+<!-- @dsCard group="Play" height=810 width=960 subtitle="The pink pin over the drop-off, far up the road; the teal pin over a pick-up; inside the bay, no tag" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TargetPin</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;overflow:hidden;background:var(--night-black)}
+.stage img,.stage canvas{position:absolute;display:block}
+.tag{position:absolute;padding:5px 10px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);color:var(--night-text);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.zh{font-family:var(--font-zh-sans);font-weight:700}
+</style>
+</head>
+<body>
+<div class="stage" style="width:960px;height:810px">
+  <img src="/_blob/5cd6fb916eaa11262343c8c122f8ccfb" alt="Mid-fare in Mong Kok: the road ahead, the drop-off not yet in view" style="left:0;top:0;width:960px;height:540px">
+  <img src="/_blob/343f123beb4ee0ae55e8652e450ddd54" alt="A pick-up bay and its passenger about 20 metres ahead in the kerbside lane" style="left:0;top:540px;width:480px;height:270px">
+  <img src="/_blob/543158efeeea9bbfada604101d1569aa" alt="The taxi three-quarters inside the teal pick-up bay" style="left:480px;top:540px;width:480px;height:270px">
+  <canvas id="c" style="left:0;top:0;width:960px;height:810px"></canvas>
+  <span class="tag" style="left:10px;top:10px">Drop-off: <span class="zh">落</span>, the place's name, metres to go · standing at the end of the drawn road until the bay is in view</span>
+  <span class="tag" style="left:10px;top:550px">Pick-up: <span class="zh">上</span> and metres</span>
+  <span class="tag" style="left:490px;top:550px">Inside the bay: no tag</span>
+</div>
+<script>
+(function () {
+  function cv(id, w, h) { var c = document.getElementById(id), r = window.devicePixelRatio || 1; c.width = Math.round(w * r); c.height = Math.round(h * r); return { g: c.getContext('2d'), r: r }; }
+  function ready(fn) { Promise.all(['700 20px "Noto Sans TC"', '900 20px "Noto Serif TC"', '62px Bangers', '700 20px Antonio', '600 20px "IBM Plex Sans Condensed"', '500 20px "IBM Plex Sans Condensed"'].map(function (f) { return document.fonts.load(f); })).then(fn, fn); }
+  ready(function () {
+    var C = cv('c', 960, 810), g = C.g, r = C.r, H = CityNights.hud;
+    // points 3.2 m over the bay's middle, in the street picture's pixels (960 x 540), placed on each still
+    H.pin(g, 432.8 * r, 212.0 * r, 0.75 * r, 0.75 * r, { kind: 'drop', name: '明月酒店', metres: '300' });
+    H.pin(g, 457.0 * 0.5 * r, (540 + 204.4 * 0.5) * r, 0.375 * r, 0.375 * r, { kind: 'pick', metres: '20' });
+    H.pin(g, (480 + 463.4 * 0.5) * r, (540 + 181.7 * 0.5) * r, 0.375 * r, 0.375 * r, { kind: 'pick', bare: true });
+  });
+})();
+</script>
+</body>
+</html>

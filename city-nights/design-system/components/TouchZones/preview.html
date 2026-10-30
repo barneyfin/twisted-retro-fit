@@ -1,0 +1,44 @@
+<!-- @dsCard group="Play" height=390 width=844 subtitle="A phone held sideways: thumbs anywhere in the two zones, from the meter's top down, either side of the taxi" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TouchZones</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;overflow:hidden;background:var(--night-black)}
+.stage img,.stage canvas{position:absolute;display:block}
+.tag{position:absolute;padding:5px 10px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);color:var(--night-text);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.zh{font-family:var(--font-zh-sans);font-weight:700}
+</style>
+</head>
+<body>
+<div class="stage" style="width:844px;height:390px">
+  <img src="/_blob/103dbc30cf5fea21e7ee71a93f5a629f" alt="A phone held sideways at the start of a run in Tsim Sha Tsui" style="left:0;top:0;width:844px;height:390px">
+  <div id="m" class="cn-meter has-lives" style="--k:0.596;--lab:0.909;position:absolute;left:7.7px;bottom:7.7px"></div>
+  <canvas id="c" style="left:0;top:0;width:844px;height:390px"></canvas>
+  <span class="tag" style="left:12px;top:12px">Either thumb, either zone: drag to steer · hold to brake · a quick tap for the horn</span>
+</div>
+<script>
+(function () {
+  function cv(id, w, h) { var c = document.getElementById(id), r = window.devicePixelRatio || 1; c.width = Math.round(w * r); c.height = Math.round(h * r); return { g: c.getContext('2d'), r: r }; }
+  function ready(fn) { Promise.all(['700 20px "Noto Sans TC"', '900 20px "Noto Serif TC"', '62px Bangers', '700 20px Antonio', '600 20px "IBM Plex Sans Condensed"', '500 20px "IBM Plex Sans Condensed"'].map(function (f) { return document.fonts.load(f); })).then(fn, fn); }
+  var life = '<svg viewBox="0 0 26 20"><path d="M7.5 1.5 H18.5 L21 8 H24 Q25 8 25 9 V17 Q25 18 24 18 H21 V19.5 H17.5 V18 H8.5 V19.5 H5 V18 H2 Q1 18 1 17 V9 Q1 8 2 8 H5 Z" style="fill:var(--taxi-red);stroke:var(--case);stroke-width:1.2"/><path d="M8.6 3 H17.4 L19.2 7.6 H6.8 Z" style="fill:var(--shutter)"/><rect x="10.5" y="0" width="5" height="2.2" rx="0.6" style="fill:var(--face-cream);stroke:var(--case);stroke-width:0.8"/><rect x="2.6" y="10" width="3.6" height="2.6" rx="0.5" style="fill:var(--cone-orange)"/><rect x="19.8" y="10" width="3.6" height="2.6" rx="0.5" style="fill:var(--cone-orange)"/><rect x="10" y="13.6" width="6" height="2.4" style="fill:var(--face-yellow)"/></svg>';
+  var m = document.getElementById('m');
+  m.innerHTML = '<div class="cn-meter-face"><div class="cn-meter-head"><span class="lead"><span class="zh">的士</span><span class="en">TAXI METER</span></span><span class="cn-meter-lives">' + life + life + life + '</span></div><div class="cn-meter-dial">'
+    + '<div class="cn-meter-row is-fare"><div class="cn-meter-lab"><span class="zh">車資</span><span class="en">FARE  HK$</span></div><div data-cn-digits="  0.00" data-h="23.8"></div></div>'
+    + '<div class="cn-meter-row is-pair"><div class="cn-meter-cell"><div class="cn-meter-lab"><span class="zh">小費</span><span class="en">TIP</span></div><div data-cn-digits=" ,  " data-h="13"></div></div><div class="cn-meter-cell is-end"><div class="cn-meter-lab"><span class="zh">時間</span><span class="en">TIME</span></div><div data-cn-digits="50" data-h="13"></div></div></div>'
+    + '<div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">速度</span><span class="en">KM/H</span></div><div data-cn-digits=" 12" data-h="16.7"></div></div></div></div>';
+  CityNights.mountDigits(m);
+  ready(function () {
+    var C = cv('c', 844, 390), g = C.g, r = C.r, top = m.getBoundingClientRect().top - document.querySelector('.stage').getBoundingClientRect().top;
+    var cx = 585 * 390 / 540, half = 1.1 * 0.845 * 114 * 390 / 540;   // the taxi's middle and half its width at the rear, in CSS pixels
+    var zones = CityNights.hud.touchZones(844, 390, top, cx - half, cx + half);
+    g.save(); g.setLineDash([8 * r, 6 * r]); g.lineWidth = 2 * r; g.strokeStyle = 'rgba(255, 241, 196, 0.8)'; g.fillStyle = 'rgba(255, 241, 196, 0.1)';
+    zones.forEach(function (z) { g.fillRect(z.x0 * r, z.y0 * r, (z.x1 - z.x0) * r, (z.y1 - z.y0) * r); g.strokeRect(z.x0 * r + r, z.y0 * r + r, (z.x1 - z.x0) * r - 2 * r, (z.y1 - z.y0) * r - 2 * r); });
+    g.restore();
+  });
+})();
+</script>
+</body>
+</html>

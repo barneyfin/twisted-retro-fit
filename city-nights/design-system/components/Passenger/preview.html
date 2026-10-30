@@ -1,4 +1,4 @@
-<!-- @dsCard group="World" height=840 width=960 subtitle="On the street beside the pick-up bay, then the three kinds and two poses drawn live, each in its pool of light" -->
+<!-- @dsCard group="World" height=1040 width=960 subtitle="On the street beside the pick-up bay, the three kinds and two poses drawn live, each in its pool of light; then getting in" -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -14,7 +14,7 @@ body{margin:0;background:var(--night-black)}
 </style>
 </head>
 <body>
-<div class="stage" style="height:840px">
+<div class="stage" style="height:1040px">
   <img src="/_blob/ed15cb20b576926117f1f9c15f642c22" alt="On the street: a passenger with a suitcase waving from the left-hand pavement, standing in a warm pool of light beside the teal pick-up bay" style="left:0px;top:0px;width:960px;height:540px">
   <canvas id="c" style="left:0;top:540px;width:960px;height:300px"></canvas>
   <span class="tag" style="left:10px;top:10px">On the street</span>
@@ -23,6 +23,13 @@ body{margin:0;background:var(--night-black)}
   <span class="tag" style="left:325px;top:806px">Waving</span>
   <span class="tag" style="left:540px;top:806px">With a suitcase</span>
   <span class="tag" style="left:770px;top:806px">With shopping</span>
+  <img src="/_blob/faa672b38f58a1d7e255d015e12540aa" alt="The stop counts, the taxi still rolling past the waving passenger" style="left:0;top:840px;width:320px;height:180px">
+  <img src="/_blob/571acfe8a49c021f49a1b52b807c8161" alt="The passenger fading out as the taxi takes them" style="left:320px;top:840px;width:320px;height:180px">
+  <img src="/_blob/340518c2148990d875abafc16d080a62" alt="The taxi pulling away, its roof sign out" style="left:640px;top:840px;width:320px;height:180px">
+  <canvas id="gi" style="left:0;top:840px;width:960px;height:180px"></canvas>
+  <span class="tag" style="left:10px;top:850px">Getting in: the stop counts</span>
+  <span class="tag" style="left:330px;top:850px">The passenger fades</span>
+  <span class="tag" style="left:650px;top:850px">The roof sign out while hired</span>
 </div>
 <script>
 (function () {
@@ -61,6 +68,10 @@ body{margin:0;background:var(--night-black)}
     });
   }
 })();
+  // getting in: the roof sign goes out (the kit bakes it into the taxi; here its face is darkened as the kit does it)
+  (function () { var c = document.getElementById('gi'), r = window.devicePixelRatio || 1; c.width = 960 * r; c.height = 180 * r; var g = c.getContext('2d'), k = 320 / 960 * r;
+    g.fillStyle = 'rgba(28, 22, 16, 0.5)'; g.beginPath(); g.roundRect(320 * r + 460.5 * k, 261.5 * k, 39 * k, 19.4 * k, 2 * k); g.fill();
+    g.fillStyle = 'rgba(28, 22, 16, 0.86)'; g.beginPath(); g.roundRect(640 * r + 460.5 * k, 261.5 * k, 39 * k, 19.4 * k, 2 * k); g.fill(); })();
 </script>
 </body>
 </html>

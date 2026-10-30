@@ -1,0 +1,36 @@
+<!-- @dsCard group="Play" height=330 width=960 subtitle="Five fares done in Mong Kok, round 2; on to Tsim Sha Tsui, round 3" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZoneTitle</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;overflow:hidden;background:var(--night-black)}
+.stage img,.stage canvas{position:absolute;display:block}
+.tag{position:absolute;padding:5px 10px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);color:var(--night-text);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.zh{font-family:var(--font-zh-sans);font-weight:700}
+</style>
+</head>
+<body>
+<div class="stage" style="width:960px;height:330px">
+  <img src="/_blob/799ceca026b872e8345f71ed54e6035f" alt="Braking in the pink drop-off bay in Mong Kok" style="left:0;top:0;width:480px;height:270px">
+  <img src="/_blob/c1a206ccfc56edd77e136c72f87e3c95" alt="The taxi at the start of Tsim Sha Tsui" style="left:480px;top:0;width:480px;height:270px">
+  <canvas id="c" style="left:0;top:0;width:960px;height:270px"></canvas>
+  <span class="tag" style="left:10px;top:280px">1 · the district finished, its lamps and takings (1 s)</span>
+  <span class="tag" style="left:490px;top:280px">2 · the next district and its round (1 s)</span>
+</div>
+<script>
+(function () {
+  function cv(id, w, h) { var c = document.getElementById(id), r = window.devicePixelRatio || 1; c.width = Math.round(w * r); c.height = Math.round(h * r); return { g: c.getContext('2d'), r: r }; }
+  function ready(fn) { Promise.all(['700 20px "Noto Sans TC"', '900 20px "Noto Serif TC"', '62px Bangers', '700 20px Antonio', '600 20px "IBM Plex Sans Condensed"', '500 20px "IBM Plex Sans Condensed"'].map(function (f) { return document.fonts.load(f); })).then(fn, fn); }
+  ready(function () {
+    var C = cv('c', 960, 270), g = C.g, r = C.r, H = CityNights.hud, k = 0.375 * r;
+    g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--zone-shade').trim(); g.fillRect(0, 0, 960 * r, 270 * r);
+    H.zoneTitle(g, 240 * r, 121.5 * r, k, k, { zh: '旺角', en: 'Mong Kok', done: true, take: '51.30' }, 1);
+    H.zoneTitle(g, 720 * r, 121.5 * r, k, k, { zh: '尖沙咀', en: 'Tsim Sha Tsui', round: '3' }, 1);
+  });
+})();
+</script>
+</body>
+</html>

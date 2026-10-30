@@ -1,4 +1,4 @@
-<!-- @dsCard group="Screens" height=720 width=1280 subtitle="A 1280 by 720 window in Yau Ma Tei" -->
+<!-- @dsCard group="Screens" height=720 width=1280 subtitle="Grunge City Rider in play, a 1280 by 720 window: everything at once (快 running, 保 held, 雙 on, heading for 明月酒店)" -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -7,32 +7,48 @@
 <style>
 body{margin:0;background:var(--night-black)}
 .stage{position:relative;width:1280px;height:720px;overflow:hidden}
-.stage>img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+.stage>img,.stage>canvas{position:absolute;left:0;top:0;width:1280px;height:720px}
 .stage .cn-meter{position:absolute;left:14px;bottom:14px}
-.stage .cn-caption{position:absolute;left:21px;top:350px}
 .tiles{position:absolute;right:24px;top:24px}
 </style>
 </head>
 <body>
 <div class="stage">
-  <img src="/_blob/8ea4e078544762a0d0cac5604bfc5cd1" alt="The taxi driving up a wet Yau Ma Tei street under lit signs">
-  <div class="cn-caption" aria-hidden="true"><span class="zh">油麻地</span><span class="en">Yau Ma Tei</span></div>
-  <div class="cn-meter" style="--k:1.1">
+  <img src="/_blob/5cd6fb916eaa11262343c8c122f8ccfb" alt="The taxi mid-fare on a wet Mong Kok street under lit signs">
+  <canvas id="marks"></canvas>
+  <div class="cn-meter has-lives" id="meter" style="--k:1.1">
     <div class="cn-meter-face">
-      <div class="cn-meter-head"><span class="zh">的士</span><span class="en">TAXI METER</span></div>
+      <div class="cn-meter-head"><span class="lead"><span class="zh">的士</span><span class="en">TAXI METER</span></span><span class="cn-meter-lives"><svg viewBox="0 0 26 20"><path d="M7.5 1.5 H18.5 L21 8 H24 Q25 8 25 9 V17 Q25 18 24 18 H21 V19.5 H17.5 V18 H8.5 V19.5 H5 V18 H2 Q1 18 1 17 V9 Q1 8 2 8 H5 Z" style="fill:var(--taxi-red);stroke:var(--case);stroke-width:1.2"/><path d="M8.6 3 H17.4 L19.2 7.6 H6.8 Z" style="fill:var(--shutter)"/><rect x="10.5" y="0" width="5" height="2.2" rx="0.6" style="fill:var(--face-cream);stroke:var(--case);stroke-width:0.8"/><rect x="2.6" y="10" width="3.6" height="2.6" rx="0.5" style="fill:var(--cone-orange)"/><rect x="19.8" y="10" width="3.6" height="2.6" rx="0.5" style="fill:var(--cone-orange)"/><rect x="10" y="13.6" width="6" height="2.4" style="fill:var(--face-yellow)"/></svg><svg viewBox="0 0 26 20"><path d="M7.5 1.5 H18.5 L21 8 H24 Q25 8 25 9 V17 Q25 18 24 18 H21 V19.5 H17.5 V18 H8.5 V19.5 H5 V18 H2 Q1 18 1 17 V9 Q1 8 2 8 H5 Z" style="fill:var(--taxi-red);stroke:var(--case);stroke-width:1.2"/><path d="M8.6 3 H17.4 L19.2 7.6 H6.8 Z" style="fill:var(--shutter)"/><rect x="10.5" y="0" width="5" height="2.2" rx="0.6" style="fill:var(--face-cream);stroke:var(--case);stroke-width:0.8"/><rect x="2.6" y="10" width="3.6" height="2.6" rx="0.5" style="fill:var(--cone-orange)"/><rect x="19.8" y="10" width="3.6" height="2.6" rx="0.5" style="fill:var(--cone-orange)"/><rect x="10" y="13.6" width="6" height="2.4" style="fill:var(--face-yellow)"/></svg><svg viewBox="0 0 26 20"><path d="M7.5 1.5 H18.5 L21 8 H24 Q25 8 25 9 V17 Q25 18 24 18 H21 V19.5 H17.5 V18 H8.5 V19.5 H5 V18 H2 Q1 18 1 17 V9 Q1 8 2 8 H5 Z" style="fill:var(--life-lost)"/><rect x="10.5" y="0" width="5" height="2.2" rx="0.6" style="fill:var(--life-lost)"/></svg></span></div>
       <div class="cn-meter-dial">
-        <div class="cn-meter-row is-fare"><div class="cn-meter-lab"><span class="zh">車資</span><span class="en">FARE  HK$</span></div><div data-cn-digits=" 23.40" data-h="44"></div></div>
-        <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">時間</span><span class="en">TIME</span></div><div data-cn-digits="45" data-h="30.8"></div></div>
-        <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">速度</span><span class="en">KM/H</span></div><div data-cn-digits=" 62" data-h="30.8"></div></div>
+        <div class="cn-meter-row is-fare"><div class="cn-meter-lab"><span class="zh">車資</span><span class="en">FARE  HK$</span></div><div data-cn-digits="366.40" data-h="44"></div></div>
+        <div class="cn-meter-row is-pair"><div class="cn-meter-cell"><div class="cn-meter-lab"><span class="zh">小費</span><span class="en">TIP</span></div><div data-cn-digits="0.32" data-h="24"></div></div><div class="cn-meter-cell is-end"><div class="cn-meter-lab"><span class="zh">時間</span><span class="en">TIME</span></div><div data-cn-digits="38" data-h="24"></div></div></div>
+        <div class="cn-meter-row"><div class="cn-meter-lab"><span class="zh">速度</span><span class="en">KM/H</span></div><div data-cn-digits=" 84" data-h="30.8"></div></div>
       </div>
     </div>
-    <span class="cn-sr">Yau Ma Tei. Fare HK$23.40, time 45, speed 62 km/h</span>
+    <span class="cn-sr">Mong Kok, round 2, three fares done. Fare HK$366.40, tip HK$0.32, time 38, speed 84 km/h. Two lives left. Heading for 明月酒店, 300 metres.</span>
   </div>
+  <canvas id="hud"></canvas>
   <div class="cn-ui cn-tiles tiles">
     <button class="cn-tile" type="button" aria-label="Full screen" aria-pressed="false"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></span></button>
     <button class="cn-tile" type="button" aria-label="Pause"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5.5v13M15 5.5v13"/></svg></span></button>
   </div>
 </div>
-<script>CityNights.mountDigits();</script>
+<script>
+(function () {
+  CityNights.mountDigits();
+  function cv(id) { var c = document.getElementById(id), r = window.devicePixelRatio || 1; c.width = 1280 * r; c.height = 720 * r; return { g: c.getContext('2d'), r: r }; }
+  Promise.all(['700 20px "Noto Sans TC"', '900 20px "Noto Serif TC"', '700 20px Antonio', '600 20px "IBM Plex Sans Condensed"', '500 20px "IBM Plex Sans Condensed"'].map(function (f) { return document.fonts.load(f); })).then(draw, draw);
+  function draw() {
+    var H = CityNights.hud, A = cv('marks'), g = A.g, r = A.r, P = 1280 / 960;   // street picture (960 x 540) to the window
+    var x = 480 * P * r, y = 486 * P * r, s = 114 * P * r;                        // the taxi's rear on the road; pixels per metre there
+    g.fillStyle = 'rgba(28, 22, 16, 0.86)'; g.beginPath(); g.roundRect(460.5 * P * r, 261.5 * P * r, 39 * P * r, 19.4 * P * r, 2 * P * r); g.fill();   // the roof sign out (hired), as the kit bakes it
+    H.shieldRing(g, x, y, s);
+    H.badges(g, x, y, r, r, [{ kind: 'speed', left: 0.6 }, { kind: 'shield' }, { kind: 'double' }]);
+    H.pin(g, 432.8 * P * r, 212.0 * P * r, r, r, { kind: 'drop', name: '明月酒店', metres: '300' });
+    var B = cv('hud'), top = document.getElementById('meter').getBoundingClientRect().top - document.querySelector('.stage').getBoundingClientRect().top;
+    H.caption(B.g, 21.33 * r, top * r, r, r, { zh: '旺角', en: 'Mong Kok', round: '2', fares: 3 });
+  }
+})();
+</script>
 </body>
 </html>

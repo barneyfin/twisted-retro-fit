@@ -3,8 +3,8 @@
 A comic-book word lit as a neon sign right over a crash: a cloud of smoke in a cream tube, CRASH!, SMASH! or BANG! in big comic letters on a rising curve, neon debris that tells what happened, and the word's Chinese sound-word on a small round tag.
 
 ## When to use
-- When the player's taxi hits another vehicle. One pop per crash; the next crash replaces it.
-- Not for anything else: not for near misses, pick-ups or points. Power-ups have their own pick-up.
+- When the player's taxi hits another vehicle, or a roadworks barrier or cone (Grunge City Rider's gameplay, 29 October 2026). One pop per crash; the next crash replaces it.
+- Not for anything else: not for animals (they always escape), near misses, pick-ups or points, and not for a crash the shield takes (that is the SAFE! sign, ShieldSign).
 
 ## How it is drawn
 The drawings are data, `CityNights.crashPop`, and `CityNights.drawCrashPop` draws them with Canvas 2D: paths, gradients, glows and text in the kit's fonts. There are no image files.
@@ -22,8 +22,9 @@ CityNights.drawCrashPop(ctx, 'crash', x, y, scale);   // 'crash', 'smash' or 'ba
 The preview above draws with this same code, so what it shows is what the game shows.
 
 ## The game provides
-- Where the two vehicles meet, in screen position, and the moment they hit.
+- Where the taxi meets the vehicle or barrier, in screen position, and the moment they hit.
 - Nothing else: the kit picks the word and draws, times and removes the pop.
+- **Under the pop** (Barney, 29 October 2026): the game clears the vehicle hit away while the pop covers it, so after the pop only the taxi stands; after a roadworks crash it moves the taxi into the open lane in the pop's first second. The freeze after a crash is the game's (3 s in Grunge City Rider).
 
 ## Rules
 - **The smoke cloud** (Barney, 29 October 2026, round 2 direction B: "fits the overall game theme better"). It replaces the first round's bursts.
@@ -33,7 +34,8 @@ The preview above draws with this same code, so what it shows is what the game s
   - **SMASH!**, glass breaks: `tube-teal` shards with cream trails, cream cracks bursting out of the cloud, a broken `tube-yellow` headlamp, white glints. Letters lit red (`pop-smash-light`, `tube-red`, `pop-smash-deep`), edged `tube-yellow`. Tag 啪 in a `tube-yellow` ring.
   - **BANG!**, something bursts: `tube-red` flame tongues with `tube-yellow` inner flames behind the cloud, dashed `tube-yellow` shock rings, a `tube-teal` hubcap, `tube-pink` sparks and nuts, white glints. Letters lit pink (`pop-bang-light`, `tube-pink`, `pop-bang-deep`), edged `tube-teal`. Tag 砰 in a `tube-teal` ring.
   - The kit picks one at random, never the same word twice in a row.
-- **The one exclamation mark.** The pop is World copy, so it alone ends with "!"; the interface still never uses one. **Bangers** is used here and nowhere else.
+- **Roadworks**: the same three words and the same debris. The debris is the taxi's own parts and glass, so it tells a crash into a barrier as well as into a car.
+- **Exclamation marks.** The pop is World copy, so it ends with "!", as does the SAFE! sign; the interface still never uses one. **Bangers** is used here and on the SAFE! sign only.
 - **Timing** (`pop-time`, 1 s): it springs in from 55% to 108% and settles at full size within the first fifth of a second, holds, dips once to half brightness like a neon tube catching, and fades out by the end. A game may freeze its street for longer after a crash; the pop does not wait for it, so for the rest of the freeze the player sees the frozen taxi and the vehicle it hit (Barney, 29 October 2026).
 - **No grain** on the pop (`grain-signs`).
 - **Safety:** it never flashes; its one dip is well under the 3-a-second limit. It is big, but most of it is dark smoke: what is lit is tubes, letters and debris. **Reduce motion**: no spring, no dip, a fade in and out only.

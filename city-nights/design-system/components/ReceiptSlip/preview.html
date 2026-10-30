@@ -1,0 +1,47 @@
+<!-- @dsCard group="Play" height=380 width=960 subtitle="Printed out of the top of the meter: a fare paid, the tip halved, the tip lost" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ReceiptSlip</title>
+<style>
+body{margin:0;background:var(--night-black)}
+.stage{position:relative;overflow:hidden;background:var(--night-black)}
+.stage img,.stage canvas{position:absolute;display:block}
+.tag{position:absolute;padding:5px 10px;border-radius:6px;background:var(--plaque);box-shadow:0 0 0 1px var(--meter-rule);color:var(--night-text);font:600 13px/18px var(--font-ui);white-space:nowrap}
+.zh{font-family:var(--font-zh-sans);font-weight:700}
+</style>
+</head>
+<body>
+<div class="stage" style="width:960px;height:380px">
+  <canvas id="c" style="left:0;top:0;width:960px;height:380px"></canvas>
+  <span class="tag" style="left:20px;top:12px">A fare paid</span>
+  <span class="tag" style="left:340px;top:12px">The tip halved (a near miss)</span>
+  <span class="tag" style="left:660px;top:12px">The tip lost (past the drop-off)</span>
+</div>
+<script>
+(function () {
+  function cv(id, w, h) { var c = document.getElementById(id), r = window.devicePixelRatio || 1; c.width = Math.round(w * r); c.height = Math.round(h * r); return { g: c.getContext('2d'), r: r }; }
+  function ready(fn) { Promise.all(['700 20px "Noto Sans TC"', '900 20px "Noto Serif TC"', '62px Bangers', '700 20px Antonio', '600 20px "IBM Plex Sans Condensed"', '500 20px "IBM Plex Sans Condensed"'].map(function (f) { return document.fonts.load(f); })).then(fn, fn); }
+  ready(function () {
+    var C = cv('c', 960, 380), g = C.g, r = C.r, H = CityNights.hud, k = 1.1 * r;
+    var css = getComputedStyle(document.documentElement), tok = function (n) { return css.getPropertyValue('--' + n).trim(); };
+    var slips = [
+      { head: 'RECEIPT', lines: [['車資', 'FARE', '9.20'], ['小費', 'TIP', '0.46'], ['錢', '+20%', '1.84'], ['', '', 'HK$ 11.50', 'total']] },
+      { head: 'TIP', lines: [['小費', 'TIP', '½'], ['', '', '0.32 → 0.16', 'red']] },
+      { head: 'TIP', lines: [['小費', 'TIP', '0.46', 'struck'], ['', '', '0.00', 'red']] }
+    ];
+    slips.forEach(function (s, i) {
+      var x0 = (20 + i * 320) * r, top = 300 * r;
+      // the top of the meter's case and face, for the slip to come out of
+      g.fillStyle = tok('case'); g.beginPath(); g.roundRect(x0, top, 280 * r, 120 * r, 12 * r); g.fill();
+      var gr = g.createLinearGradient(0, top + 5 * r, 0, top + 80 * r); gr.addColorStop(0, tok('lightbox-top')); gr.addColorStop(1, tok('lightbox-mid'));
+      g.fillStyle = gr; g.beginPath(); g.roundRect(x0 + 5 * r, top + 5 * r, 270 * r, 110 * r, 8 * r); g.fill();
+      g.fillStyle = tok('ink-red'); g.font = '900 ' + 25 * r + 'px "Noto Serif TC"'; g.textBaseline = 'middle'; g.fillText('的士', x0 + 20 * r, top + 30 * r);
+      H.receipt(g, x0 + 26 * r, top - 4 * r, k, r, s, 1);
+    });
+  });
+})();
+</script>
+</body>
+</html>

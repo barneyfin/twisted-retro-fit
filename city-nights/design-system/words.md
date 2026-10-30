@@ -36,7 +36,10 @@ Every Chinese word City Nights shows. A Cantonese reader checks this list before
 | --- | --- | --- |
 | 的士 | Meter heading, TAXI METER | Taxi (the Cantonese word). |
 | 車資 · 時間 · 速度 | Meter rows | Fare · time · speed. |
-| 尖沙咀 · 佐敦 · 油麻地 · 旺角 | District caption | Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok: real districts, in order up Nathan Road. |
+| 小費 | Meter row and the receipt slip, TIP | Tip (siu2 fai3), the usual word for a tip in Hong Kong. Added 30 October 2026. |
+| (a sign's name) | The pin over a drop-off | The destination is named after one of the street's own signs, above, so the player can spot it on arrival (Barney, 30 October 2026). |
+| 輪 | The caption's third line and the zone-change title, ROUND | Round (leon4), the word used for a round of a game or contest; here alone, as a short label. Added 30 October 2026: a Cantonese reader should check it reads well alone. |
+| 尖沙咀 · 佐敦 · 油麻地 · 旺角 | District caption and the zone-change title | Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok: real districts, in order up Nathan Road. |
 
 ## The interface
 
@@ -61,7 +64,7 @@ Every Chinese word City Nights shows. A Cantonese reader checks this list before
 | 時 | Power-up, More time | Time. |
 | 錢 | Power-up, Fare bonus | Money. |
 | 快 | Power-up, Speed boost | Fast. |
-| 保 | Power-up, Shield | Protect, keep safe. |
+| 保 | Power-up, Shield | Protect, keep safe. Also on the SAFE! sign, the shielded hit. |
 | 雙 | Power-up, Double fare | Double, a pair. |
 
 ## Obstacles and the stop bay
@@ -70,5 +73,5 @@ Every Chinese word City Nights shows. A Cantonese reader checks this list before
 | --- | --- | --- |
 | 道路工程 | Roadworks sign, ROAD WORKS | Road works (dou6 lou6 gung1 cing4). |
 | 易碎 | Spilt cargo boxes | Fragile (ji6 seoi3), as printed on boxes. |
-| 上客 | Pick-up bay, PICK-UP | Pick up passengers (soeng5 haak3). |
-| 落客 | Drop-off bay, DROP-OFF | Drop off passengers (lok6 haak3), as on Hong Kong drop-off signs. |
+| 上客 | Pick-up bay, PICK-UP | Pick up passengers (soeng5 haak3). 上 alone is on the pin over a pick-up. |
+| 落客 | Drop-off bay, DROP-OFF | Drop off passengers (lok6 haak3), as on Hong Kong drop-off signs. 落 alone is on the pin over a drop-off. |
