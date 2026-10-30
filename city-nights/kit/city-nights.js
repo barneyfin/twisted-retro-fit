@@ -1,4 +1,4 @@
-/* City Nights 0.10.2 — runtime
+/* City Nights 0.11.0 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.10.2';
+  const VERSION = '0.11.0';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -848,6 +848,11 @@
     // segments (25 m) to a piece, NCH pieces kept on the graphics chip, from the camera on (DRAW needs 5 of them at most)
     const CHUNK = 50, NCH = 8, N_CHUNK = Math.ceil(N_SEG / CHUNK);
     const TRAFFIC_SPAN = 560 * UPM;   // the stretch round the taxi that street.traffic and street.recycle keep the traffic in: the old street's lap
+    // a tunnel at every district line (Tunnel, design system v12): tunnel-length long, the line in its middle, with clear-stretch
+    // before it. tunnelK(i): how far segment i is into its tunnel, in segments, or -1 outside one; clearAt(i): in a clear stretch
+    const TUN_SEGS = 180 * UPM / SEG, TUN_MID = TUN_SEGS / 2, CLEAR_SEGS = 40 * UPM / SEG;
+    const tunnelK = i => { const k = (i + TUN_MID) % DIST_LEN; return k < TUN_SEGS ? k : -1; };
+    const clearAt = i => (i + TUN_MID) % DIST_LEN >= DIST_LEN - CLEAR_SEGS;
     const CAM_H = 950, DEPTH = 1 / Math.tan(50 * Math.PI / 180), PLAYER_Z = CAM_H * DEPTH;
     const HZ = 0.40, CAB_Y = 0.9, SHOP_H = 1000;
     const LANES = [-0.667, 0, 0.667];
@@ -885,30 +890,36 @@
       const rc = rng(1980);
       for (let lap = 0; curves.length < N_SEG; lap++) plan.forEach(([n, c]) => {
         const k1 = lap && c ? (0.7 + 0.5 * rc()) * (rc() < 0.5 ? -1 : 1) : 1;
-        // a bend the lap would cut short is left out: the street meets its start straight, with no sudden jump in the road
-        const whole = curves.length + n <= N_SEG;
+        // a bend the lap would cut short is left out: the street meets its start straight, with no sudden jump in the road.
+        // So is one that reaches a clear stretch or a tunnel: the road runs straight from there to the exit, so all four are the same
+        let whole = curves.length + n <= N_SEG;
+        for (let k = 0; k < n && whole; k++) if (tunnelK(curves.length + k) >= 0 || clearAt(curves.length + k)) whole = false;
         for (let k = 0; k < n; k++) curves.push(c && whole ? c * k1 * Math.sin(Math.PI * k / n) : 0);
       });
       curves.length = N_SEG;
-      segs = curves.map((c, i) => ({ i, curve: c, signs: [], lamp: 0, cable: 0, wall: [null, null], junc: false, cross: false, lights: 0 }));
-      // side streets
+      segs = curves.map((c, i) => ({ i, curve: c, tun: tunnelK(i), signs: [], lamp: 0, cable: 0, wall: [null, null], junc: false, cross: false, lights: 0 }));
+      // side streets, none in a clear stretch or a tunnel
       for (let i = 60; i < N_SEG - 12; i += 120 + Math.floor(r() * 50)){
+        const lights = r() < 0.5 ? 1 : 2;
+        let free = true;
+        for (let k = -7; k < 7; k++) if (tunnelK(i + k) >= 0 || clearAt(i + k)) free = false;
+        if (!free) continue;
         for (let k = 0; k < 7; k++) segs[i + k].junc = true;
-        segs[i - 7].cross = true; segs[i].lights = r() < 0.5 ? 1 : 2;
+        segs[i - 7].cross = true; segs[i].lights = lights;
       }
       // buildings along each side
       buildings = []; let policeDone = false;
       [0, 1].forEach(side => {
         let i = 0;
         while (i < N_SEG){
-          if (segs[i].junc){ i++; continue; }
+          if (segs[i].junc || segs[i].tun >= 0){ i++; continue; }
           const d = Math.floor(i / DIST_LEN);
           // one police station a lap, on the right in Jordan
           let type = pickType(r, d);
           if (side === 1 && d === 1 && !policeDone && i > DIST_LEN * 1.35){ type = 'police'; policeDone = true; }
           const T = BT[type];
           let len = T.len[0] + Math.floor(r() * (T.len[1] - T.len[0] + 1));
-          let k = 0; while (k < len && i + k < N_SEG && !segs[i + k].junc) k++;
+          let k = 0; while (k < len && i + k < N_SEG && !segs[i + k].junc && segs[i + k].tun < 0) k++;
           len = k; if (!len){ i++; continue; }
           const bl = { id: buildings.length, type, T, h: lerp(T.h[0], T.h[1], r()), col: T.cols[Math.floor(r() * T.cols.length)], shop: Math.floor(r() * 6), shut: r() < 0.2, gv: r(), start: i, len, side, fsigns: [] };
           // first floor: iron window grilles, a wide lit window with blinds, or plain
@@ -981,6 +992,11 @@
       }
       for (let i = 6; i < N_SEG; i += 14) if (!segs[i].junc) segs[i].lamp = (Math.floor(i / 14) % 2) ? 1 : -1;
       for (let i = 3; i < N_SEG; i += 9 + Math.floor(r() * 5)){ const L = segs[i].wall[0], R = segs[i].wall[1]; const lo = Math.min(L ? L.b.h : 9000, R ? R.b.h : 9000); if (lo > 4600) segs[i].cable = 4300 + r() * Math.min(1200, lo - 4500); }
+      // nothing hangs over a clear stretch, so the portal and its name read; a tunnel has nothing of the street's at all
+      for (const seg of segs){
+        if (clearAt(seg.i)){ seg.signs = seg.signs.filter(s => s.roof); seg.cable = 0; }
+        if (seg.tun >= 0){ seg.signs = []; seg.cable = 0; seg.lamp = 0; }
+      }
     }
 
     // people walking along the pavements, and small groups waiting at the crossings
@@ -988,7 +1004,8 @@
     function buildPeople(){
       const r = rng(515); peds = [];
       for (let i = 0; i < N_SEG; i++){
-        if (segs[i].junc) continue;
+        // nobody walks in a tunnel, or near enough to stray into one (each keeps to the 30 m either side of where it started)
+        if (segs[i].junc || (i + TUN_MID + PED_ROAM / SEG) % DIST_LEN < TUN_SEGS + PED_ROAM / SEG * 2) continue;
         const d = Math.floor(i / DIST_LEN), busy = [0.22, 0.2, 0.5, 0.55][d];
         if (r() < busy){
           const walking = r() < 0.78;
@@ -2128,6 +2145,12 @@
       Tq.sprite(0, headX, 2800, 750, 750, AS('glow:lamp', '#ffffff', { fl: FL.ADD }));
       Tq.sprite(0, headX, 2800, 450 * 32 / 30, 450 * 32 / 30, AS('disc', '#ffffff', { lv: Z.sign, fl: FL.LEVONLY }));
     }
+    // the portal: the block's face (Tunnel) standing square to the road where the tunnel starts, its width building line to
+    // building line, its foot on the road; at the buildings' grain (the signs on it share that, HANDOVER-tunnel.md)
+    function emitPortal(Tq){
+      const h = street.sizes.tunnelFace[1] * UPM;
+      Tq.quad([[0, -BLD, h], [0, BLD, h], [0, BLD, 0], [0, -BLD, 0]], AS('pc:tunnelFace', '#ffffff', { lv: Z.white, fl: FL.LEV }));
+    }
     function emitSign(Tq, s){
       const sg = signTex[s.t.id], it = sg.it, pole = S(LOOK.pole);
       if (s.span){
@@ -2155,6 +2178,7 @@
       for (const k in R) R[k].begin(i);
       const seg = segs[i];
       emitRoad(R.road, R.decal, i);
+      if (seg.tun === 0) emitPortal(R.tr);
       if (seg.junc) emitJunction(R.bld, i);
       for (let side = 0; side < 2; side++){ const wd = seg.wall[side]; if (wd && wd.k === 0 && segs[(i + N_SEG - 1) % N_SEG].junc) emitEndFace(R.bld, side ? 1 : -1, wd.b); }
       emitSlice(R.bld, i, 0); emitSlice(R.bld, i, 1);
@@ -2986,7 +3010,7 @@
 
     /* ---- the title's street: the speed test's drive, eased off to about 38 km/h, steering round the traffic itself */
     const DEMO_SPEED = 4200;
-    const demo = { pos: 30 * SEG, trip: 0, x: 0, tx: 0, speed: DEMO_SPEED, brake: 0, accel: 0, hold: 0, sky: 0, lean: 0, moving: true, cars: [], tokens: [] };
+    const demo = { pos: (TUN_MID + 30) * SEG, trip: 0, x: 0, tx: 0, speed: DEMO_SPEED, brake: 0, accel: 0, hold: 0, sky: 0, lean: 0, moving: true, cars: [], tokens: [] };
     function demoStep(dt){
       const st = demo, cars = st.cars;
       st.pos = (st.pos + st.speed * dt) % TRACK; st.trip += st.speed * dt;
@@ -3696,14 +3720,82 @@
         decal(g, pt, b.glow, d0, d1, x0, x1, 0.6, 'lighter');
       }
 
+      // ---- the tunnel at every district line: the portal's face (Barney, 30 October 2026: B, under a tower, 夜光隧道 Nightglow
+      // Tunnel). One picture of the block's face as the road meets it, 13.5 m across (building line to building line) and 36 m
+      // high, drawn at ppm pixels per metre, with the mouth (12 m by 4.8 m) left clear so the tunnel's inside shows through.
+      // The kit stands it at the portal, square to the road, like a sign; ax, ay is the middle of the mouth's foot.
+      function tunnelFace(ppm) {
+        var W = 13.5, H = 36, M = { w: 12, h: 4.8 }, c = mk(W * ppm, H * ppm), g = c.getContext('2d');
+        var X = function (x) { return (x + W / 2) * ppm; }, Y = function (y) { return (H - y) * ppm; };   // metres (x across from the middle, y up) to pixels
+        var rect = function (x, y, w, h) { g.fillRect(X(x), Y(y + h), w * ppm, h * ppm); };
+        // the block: dark, warm-lit from the signs low down
+        var gr = g.createLinearGradient(0, Y(0), 0, Y(16)); gr.addColorStop(0, col('tunnel-face')); gr.addColorStop(1, col('tunnel-face-top'));
+        g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
+        // its windows from 10.5 m up, a quarter or so lit, some with an air-conditioner box below
+        var r = rnd(7);
+        for (var y = 10.5; y < H; y += 3.1) for (var x = -W / 2 + 1.2; x < W / 2 - 1.2; x += 2.6) {
+          var lit = r() < 0.28, t = r();
+          g.fillStyle = lit ? rgba(col(t < 0.5 ? 'window-warm' : 'window-white'), t < 0.5 ? 0.85 : 0.7) : col('window-dim'); rect(x, y, 1.5, 1.7);
+          if (r() < 0.35) { g.fillStyle = col('aircon'); rect(x + 0.2, y - 0.55, 1.1, 0.5); }
+        }
+        // the podium's fascia above the mouth
+        g.fillStyle = col('tunnel-fascia'); rect(-W / 2, 5.9, W, 3.7);
+        // signs: lightboxes and neon, flat on the face, in the street's own looks (Signs)
+        var fit = function (text, h, w, k) { return Math.min(h * k, w * 0.86 / Math.max(1, text.length)); };
+        var lightbox = function (x, y, w, h, zh, en) {
+          g.save(); g.shadowColor = col('lightbox-glow'); g.shadowBlur = 0.6 * ppm; g.fillStyle = col('case'); rect(x - 0.12, y - 0.12, w + 0.24, h + 0.24); g.restore();
+          var lg = g.createLinearGradient(0, Y(y + h), 0, Y(y)); lg.addColorStop(0, col('lightbox-top')); lg.addColorStop(0.35, col('lightbox-mid')); lg.addColorStop(1, col('lightbox-low'));
+          g.fillStyle = lg; rect(x, y, w, h);
+          g.fillStyle = col('ink-red'); g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.font = '900 ' + fit(zh, h, w, 0.5) * ppm + 'px "Noto Serif TC", serif'; g.fillText(zh, X(x + w / 2), Y(y + h * 0.62));
+          if (en) { g.font = '700 ' + h * 0.17 * ppm + 'px Antonio, sans-serif'; if ('letterSpacing' in g) g.letterSpacing = 0.05 * ppm + 'px'; g.fillText(en, X(x + w / 2), Y(y + h * 0.2)); if ('letterSpacing' in g) g.letterSpacing = '0px'; }
+        };
+        var neon = function (x, y, w, h, zh, en, tube) {
+          var tc = col('tube-' + tube), core = col('tube-core-' + tube);
+          g.fillStyle = col('neon-board'); rect(x, y, w, h);
+          g.save(); g.shadowColor = rgba(tc, 0.9); g.shadowBlur = 0.6 * ppm; g.strokeStyle = tc; g.lineWidth = 0.1 * ppm; g.strokeRect(X(x + 0.15), Y(y + h - 0.15), (w - 0.3) * ppm, (h - 0.3) * ppm); g.restore();
+          var line = function (text, font, yy) {
+            g.font = font; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.lineJoin = 'round';
+            g.save(); g.shadowColor = rgba(tc, 0.9); g.shadowBlur = 0.45 * ppm; g.lineWidth = 0.12 * ppm; g.strokeStyle = tc; g.strokeText(text, X(x + w / 2), Y(yy)); g.restore();
+            g.lineWidth = 0.045 * ppm; g.strokeStyle = core; g.strokeText(text, X(x + w / 2), Y(yy));
+          };
+          if (h > w * 1.5) {   // a tall sign: the characters stacked, as the street's vertical signs are
+            var n = zh.length, fs = Math.min(w * 0.62, (h - 0.6) / n * 0.86), step = (h - 0.6) / n;
+            for (var i = 0; i < n; i++) line(zh.charAt(i), '700 ' + fs * ppm + 'px "Noto Sans TC", sans-serif', y + h - 0.3 - step * (i + 0.5) - fs * 0.36);
+          } else {
+            line(zh, '700 ' + fit(zh, h, w, 0.42) * ppm + 'px "Noto Sans TC", sans-serif', y + h * 0.45);
+            if (en) line(en, '700 ' + h * 0.15 * ppm + 'px Antonio, sans-serif', y + h * 0.15);
+          }
+        };
+        lightbox(-5.2, 6.2, 10.4, 3.1, '夜光隧道', 'NIGHTGLOW  TUNNEL');      // the tunnel's name, over the mouth
+        neon(-6.2, 10.2, 7.4, 3.0, '好味麵家', 'HO MEI NOODLE', 'yellow');
+        lightbox(1.6, 10.5, 4.6, 3.0, '好運茶餐廳', 'LUCKY CAFE');
+        neon(-6.3, 13.9, 2.6, 5.6, '健康藥房', '', 'green');
+        neon(-3.3, 14.1, 5.0, 2.8, '時裝', 'FASHION', 'pink');
+        lightbox(2.3, 14.3, 4.0, 2.6, '金滿金行', 'GOLDSMITH');
+        // lane signals over the mouth: a steady green arrow over each lane, never flashing
+        [-3.33, 0, 3.33].forEach(function (lx) {
+          g.fillStyle = col('case'); rect(lx - 0.42, 4.83, 0.84, 0.84);
+          var cx = X(lx), cy = Y(5.25), s = ppm;
+          g.save(); g.shadowColor = col('signal-glow'); g.shadowBlur = 0.35 * s; g.fillStyle = col('signal-green'); g.beginPath();
+          g.moveTo(cx - 0.07 * s, cy - 0.28 * s); g.lineTo(cx + 0.07 * s, cy - 0.28 * s); g.lineTo(cx + 0.07 * s, cy + 0.02 * s); g.lineTo(cx + 0.2 * s, cy + 0.02 * s);
+          g.lineTo(cx, cy + 0.28 * s); g.lineTo(cx - 0.2 * s, cy + 0.02 * s); g.lineTo(cx - 0.07 * s, cy + 0.02 * s); g.closePath(); g.fill(); g.restore();
+        });
+        // the mouth, left clear
+        g.clearRect(X(-M.w / 2), Y(M.h), M.w * ppm, M.h * ppm);
+        c.ppm = ppm; c.ax = c.width / 2; c.ay = c.height; c.metres = [W, H];
+        return c;
+      }
+
       return {
         PPM: PPM, stand: stand, decal: decal, shadow: shadow, box: box,
         boar: boar, dog: dog, cat: cat, chicken: chicken, crate: crate,
         oil: oil, pothole: pothole, cone: cone, roadworks: roadworks, cargo: cargo,
-        passenger: passenger, pool: pool, bay: bay, drawBay: drawBay,
+        passenger: passenger, pool: pool, bay: bay, drawBay: drawBay, tunnelFace: tunnelFace,
         // true sizes in metres (Barney, 29 October 2026: true size)
         sizes: { boar: [1.4, 0.9], dog: [1.0, 0.62], cat: [0.5, 0.3], chicken: [0.45, 0.4], crate: [0.7, 0.45], oil: [2.8, 6.5], pothole: [1.9, 3.2],
-          barriers: [3.15, 0.95], cone: [0.4, 0.72], cargo: [2.6, 3.2], passenger: [0.6, 1.7], pool: [2.8, 2.8], bay: [3, 10] }
+          barriers: [3.15, 0.95], cone: [0.4, 0.72], cargo: [2.6, 3.2], passenger: [0.6, 1.7], pool: [2.8, 2.8], bay: [3, 10],
+          tunnel: [12, 4.8], tunnelFace: [13.5, 36] }
       };
     })();
 
@@ -3995,6 +4087,7 @@
       // the road pictures are kept whole: their edges are the piece's
       atlasAdd('pc:oil:0', street.oil(7)); atlasAdd('pc:oil:1', street.oil(23));
       atlasAdd('pc:pothole', street.pothole()); atlasAdd('pc:pool', street.pool());
+      atlasAdd('pc:tunnelFace', street.tunnelFace(48));   // kept whole: it is the portal's face, the mouth left clear
       for (const kind of ['pickup', 'dropoff']){ const b = street.bay(kind); atlasAdd('pc:bay:' + kind, b.paint); atlasAdd('pc:glow:' + kind, b.glow); atlasAdd('pc:spill:' + kind, b.spill); }
       for (const k in SHADOWS) atlasAdd('pc:shadow:' + k, shadowPicture(SHADOWS[k][0], SHADOWS[k][1], SHADOWS[k][2]));
       OFFS.forEach((off, v) => {
@@ -4562,7 +4655,9 @@
       'oil-dark', 'pothole-lip', 'pothole-edge', 'lamp-amber', 'cone-orange', 'cardboard', 'parcel-tape', 'fruit-orange',
       'coat-red', 'coat-blue', 'coat-olive', 'skin', 'hair-dark', 'trouser-dark', 'suitcase-blue', 'bag-paper',
       'taxi-red', 'shutter', 'caption', 'caption-outline', 'tube-core-blue', 'lamp-unlit', 'lamp-unlit-ring', 'life-lost',
-      'receipt-paper', 'receipt-ink', 'receipt-red', 'zone-shade']
+      'receipt-paper', 'receipt-ink', 'receipt-red', 'zone-shade',
+      'window-warm', 'window-white', 'window-dim', 'lightbox-glow', 'lightbox-top', 'lightbox-mid', 'lightbox-low',
+      'tunnel-face', 'tunnel-face-top', 'tunnel-fascia', 'aircon', 'signal-green', 'signal-glow', 'tunnel-tile', 'tunnel-tile-top', 'tunnel-wall', 'tunnel-wall-top', 'tunnel-ceiling', 'tunnel-road', 'tunnel-walk', 'tunnel-line', 'tunnel-strip', 'tunnel-glow', 'tunnel-haze']
       .forEach((t) => { colours[t] = rootStyle.getPropertyValue('--' + t).trim(); });
     const street = makeStreet({ canvas: canvas, gl: gl, hud: hudCanvas, pop: popCanvas, marks: marksCanvas, colours: colours, touch: touch, cssScale: () => V.k });
     let dirty = true;          // the picture needs drawing again while play is stopped (a setting changed, or the window)

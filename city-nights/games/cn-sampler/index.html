@@ -79,7 +79,7 @@ const MOMENTS = [
 ];
 const MOMENT_GAP = 1.6;   // seconds between one moment and the next
 // Long street: each district in turn, from TOUR_LEAD metres before its edge, for TOUR_TIME seconds at TOUR_SPEED (84 km/h, 快's speed)
-const TOUR_LEAD = 40, TOUR_TIME = 15, TOUR_SPEED = 84 / 3.6;
+const TOUR_LEAD = 150, TOUR_TIME = 15, TOUR_SPEED = 84 / 3.6;
 const FAST = 100;   // Drive, F held: metres a second
 // Street, laid out ahead of the taxi each lap: obstacles [kind, metres ahead, lane (0 left, 1 middle, 2 right)], animals in
 // the middle lane [kind, metres ahead, the way they face and bolt], then the pick-up bay and, once it is passed, the drop-off bay
@@ -99,7 +99,7 @@ const LINEUP = [   // Vehicles: metres ahead of the taxi, lane (0 left, 1 middle
   [30, 0, 'minibus', 0], [30, 2, 'minibus', 1], [37, 1, 'van', 2]
 ];
 const CRASHERS = [['taxi', 0], ['sedan', 1], ['van', 2], ['minibus', 0], ['roadworks']];
-const mongKok = (cn) => cn.street.districts[3].z + 0.5;   // metres: just inside Mong Kok, where the speed test began
+const mongKok = (cn) => cn.street.districts[3].z + 95;   // metres: just past the tunnel's exit into Mong Kok, near where the speed test began
 
 /* The speed check, as the speed test ran it: the street drives through Mong Kok at 68 km/h and every gap between
    frames is recorded (the frame rate); then each frame is drawn eight times over, seven of them off screen, so the
