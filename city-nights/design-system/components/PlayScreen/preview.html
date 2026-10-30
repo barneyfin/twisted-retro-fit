@@ -41,8 +41,15 @@ body{margin:0;background:var(--night-black)}
   function draw() {
     var H = CityNights.hud, A = cv('marks'), g = A.g, r = A.r, P = 1280 / 960;   // street picture (960 x 540) to the window
     var x = 480 * P * r, y = 486 * P * r, s = 114 * P * r;                        // the taxi's rear on the road; pixels per metre there
-    g.fillStyle = 'rgba(28, 22, 16, 0.86)'; g.beginPath(); g.roundRect(460.5 * P * r, 261.5 * P * r, 39 * P * r, 19.4 * P * r, 2 * P * r); g.fill();   // the roof sign out (hired), as the kit bakes it
+    // 保's ring is on the road under the taxi (Barney, 30 October 2026): the kit draws it before the taxi; here it is laid
+    // over the still and the taxi's shape (traced from the same frame) cut out of it where the ring passes behind, with the
+    // dark shadow under its rear dimming the ring as the kit's taxi does
+    var TAXI = new Path2D('M397.9 354.8 L386.0 375.9 L378.8 386.4 L378.2 396.9 L383.4 407.5 L383.4 425.9 L379.5 433.8 L379.5 452.2 L377.5 457 L581.5 457 L581.2 454.8 L579.9 449.6 L579.9 431.1 L575.9 425.9 L576.6 410.1 L577.2 407.5 L581.2 402.2 L583.2 391.7 L580.5 383.8 L572.6 373.3 L562.1 354.8 Z'), UNDER = new Path2D('M377.5 457 L358.5 511 L601 511 L581.5 457 Z');
     H.shieldRing(g, x, y, s);
+    g.save(); g.globalCompositeOperation = 'destination-out'; g.scale(P * r, P * r); g.fill(TAXI);
+    var sh = g.createLinearGradient(0, 457, 0, 511); sh.addColorStop(0, 'rgba(0,0,0,0.58)'); sh.addColorStop(0.75, 'rgba(0,0,0,0.5)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = sh; g.fill(UNDER); g.restore();
+    g.fillStyle = 'rgba(28, 22, 16, 0.86)'; g.beginPath(); g.roundRect(460.5 * P * r, 261.5 * P * r, 39 * P * r, 19.4 * P * r, 2 * P * r); g.fill();   // the roof sign out (hired), as the kit bakes it
     H.badges(g, x, y, r, r, [{ kind: 'speed', left: 0.6 }, { kind: 'shield' }, { kind: 'double' }]);
     H.pin(g, 432.8 * P * r, 212.0 * P * r, r, r, { kind: 'drop', name: '明月酒店', metres: '300' });
     var B = cv('hud'), top = document.getElementById('meter').getBoundingClientRect().top - document.querySelector('.stage').getBoundingClientRect().top;

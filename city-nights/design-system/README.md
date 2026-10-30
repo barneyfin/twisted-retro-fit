@@ -79,7 +79,7 @@ Neon is kept to the title screen on purpose. Pause, settings, game over, initial
 
 - Small lightbox signs hovering over the road on their own pool of light, one Chinese character each (PowerUp), named and settled with Grunge City Rider's gameplay (29 October 2026): **時 More time** (+20 s on the clock, 99 at most), **錢 Fare bonus** (+20% of the trip's fare at the drop-off), **快 Speed boost** (20% faster, 84 km/h, for 10 s), **保 Shield** (one free crash: no pop, no freeze, no life or tip lost), **雙 Double fare** (+100% of the trip's fare at the drop-off; rare).
 - They are told apart by colour first and the character close up, scale with distance like the cars, bob slowly and never flash.
-- **Carried**: 快, 保 and one fare boost (錢 or 雙) ride as small badges just under the taxi's rear bumper, 快 with a ring that empties over its 10 s; 保 also lights the road round the taxi in a ring of `tube-blue` (TaxiMarks). 時 works at once, so it has no badge.
+- **Carried**: 快, 保 and one fare boost (錢 or 雙) ride as small badges just under the taxi's rear bumper, 快 with a ring that empties over its 10 s; 保 also lights the road round the taxi in a ring of `tube-blue`, drawn on the road under the taxi like the bay's ring, so the bumper and number plate stay clear (TaxiMarks; Barney, 30 October 2026). 時 works at once, so it has no badge.
 - **The shielded hit**: a small blue neon sign of the crash pop's family, without the smoke, a shield with 保 and SAFE! over the point of contact, while the car or barrier hit is cleared away underneath (ShieldSign).
 
 ### Obstacles, animals and passengers

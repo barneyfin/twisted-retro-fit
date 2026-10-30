@@ -8,7 +8,7 @@ Play on a computer: the street fills the window; the meter bottom left with the 
 ## Markup
 ```html
 <canvas class="cn-world"></canvas>                  <!-- the street, WebGL -->
-<canvas class="cn-marks"></canvas>                  <!-- the pin, the taxi's badges and rings, the SAFE! sign: CityNights.hud -->
+<canvas class="cn-marks"></canvas>                  <!-- the pin, the taxi's badges, the SAFE! sign: CityNights.hud (保's ring and the bay's ring are on the road, drawn before the taxi) -->
 <canvas class="cn-hud"></canvas>                    <!-- the meter, the caption and the receipt slip, redrawn when something changes -->
 <div class="cn-ui cn-tiles" style="position:absolute;right:24px;top:24px">{IconTile: full screen, pause}</div>
 ```

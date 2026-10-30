@@ -1,4 +1,4 @@
-<!-- @dsCard group="Play" height=810 width=960 subtitle="What the taxi carries: 快 with its time left, 保 with its ring, the fare boost; the roof sign out while hired; in a bay, the bay's ring instead of 保's" -->
+<!-- @dsCard group="Play" height=810 width=960 subtitle="What the taxi carries: 快 with its time left, 保 with its ring on the road under the taxi, the fare boost; the roof sign out while hired; in a bay, the bay's ring instead of 保's" -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -29,9 +29,17 @@ body{margin:0;background:var(--night-black)}
   ready(function () {
     var C = cv('c', 960, 540), g = C.g, r = C.r, H = CityNights.hud, k = 0.75 * r;
     var x = 480 * r, y = 486 * r, s = 114 * r;   // the taxi's rear on the road, and pixels per metre there (street picture 960 x 540)
+    // 保's ring is drawn on the road before the taxi, so the taxi hides what is under it (Barney, 30 October 2026). The kit
+    // draws it in the street's own pass; this preview lays it over the still, then cuts out the taxi's shape where the ring
+    // passes behind it: the body traced from the same frame (from 355 px down to the bumper), and the dark shadow under the
+    // rear, which dims the ring there as the kit's taxi does.
+    var TAXI = new Path2D('M397.9 354.8 L386.0 375.9 L378.8 386.4 L378.2 396.9 L383.4 407.5 L383.4 425.9 L379.5 433.8 L379.5 452.2 L377.5 457 L581.5 457 L581.2 454.8 L579.9 449.6 L579.9 431.1 L575.9 425.9 L576.6 410.1 L577.2 407.5 L581.2 402.2 L583.2 391.7 L580.5 383.8 L572.6 373.3 L562.1 354.8 Z'), UNDER = new Path2D('M377.5 457 L358.5 511 L601 511 L581.5 457 Z');
+    H.shieldRing(g, x, y, s);
+    g.save(); g.globalCompositeOperation = 'destination-out'; g.scale(r, r); g.fill(TAXI);
+    var sh = g.createLinearGradient(0, 457, 0, 511); sh.addColorStop(0, 'rgba(0,0,0,0.58)'); sh.addColorStop(0.75, 'rgba(0,0,0,0.5)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = sh; g.fill(UNDER); g.restore();
     // the roof sign out: the kit draws the taxi; here the sign's face is darkened as the kit does it
     g.fillStyle = 'rgba(28, 22, 16, 0.86)'; g.beginPath(); g.roundRect(461 * r, 261 * r, 38 * r, 18.4 * r, 2 * r); g.fill();
-    H.shieldRing(g, x, y, s);
     H.badges(g, x, y, k, k, [{ kind: 'speed', left: 0.6 }, { kind: 'shield' }, { kind: 'double' }]);
   });
 })();

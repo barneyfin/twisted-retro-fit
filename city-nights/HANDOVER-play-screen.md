@@ -94,6 +94,7 @@ From the full play screen, also decided:
 - `cn-marks` is new and covers the whole window. It holds the pin, the badges, 保's ring and the SAFE! sign.
 - `cn-hud` holds the meter, the caption and the receipt slip.
 - The zone title and its shade go on a canvas above the meter's (ZoneTitle).
+- **Changed 30 October 2026 (design system version 11):** 保's ring is drawn on the road before the taxi, as the bay's ring is, not on `cn-marks`. The taxi hides what is under it, so its rear bumper and number plate stay clear (Barney's choice from the test page). `cn-marks` keeps the pin, the badges and the SAFE! sign. `hud.shieldRing` is unchanged, and the ring still steps aside while the bay's ring shows and goes with its badge when the shield is used. This replaces what this note says about 保's ring in the `cn-marks` line above and under "The other pieces". The commit message for this change is CM31.txt (CM29 is kit 0.9; CM30 is the design system refresh that brought this line).
 
 **The meter**
 - This is the one piece the kit draws with its own code; the design system's meter is HTML and CSS.
