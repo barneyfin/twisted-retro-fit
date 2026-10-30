@@ -1,4 +1,4 @@
-/* City Nights 0.10.0 — runtime
+/* City Nights 0.10.2 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.10.0';
+  const VERSION = '0.10.2';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -424,12 +424,13 @@
       n.e1.start(); n.e2.start();
       s.nodes = n;
     }
-    // a horn far off: two notes together, muffled by distance, somewhere to the left or right
+    // a horn far off: two notes together, muffled by distance, somewhere to the left or right; loud enough to carry over the music
+    const HORN = 0.6;
     function horn() {
       const ctx = audio.ctx, t = ctx.currentTime, g = ctx.createGain(), bp = filter(ctx, 'bandpass', 900, 1.5);
       const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null, len = 0.18 + Math.random() * 0.25;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
-      g.gain.setValueAtTime(0.12, t + len); g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.08);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(HORN, t + 0.02);
+      g.gain.setValueAtTime(HORN, t + len); g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.08);
       bp.connect(g);
       if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; g.connect(pan).connect(s.nodes.bed); } else g.connect(s.nodes.bed);
       const f = 330 + Math.random() * 120;
@@ -884,7 +885,9 @@
       const rc = rng(1980);
       for (let lap = 0; curves.length < N_SEG; lap++) plan.forEach(([n, c]) => {
         const k1 = lap && c ? (0.7 + 0.5 * rc()) * (rc() < 0.5 ? -1 : 1) : 1;
-        for (let k = 0; k < n; k++) curves.push(c ? c * k1 * Math.sin(Math.PI * k / n) : 0);
+        // a bend the lap would cut short is left out: the street meets its start straight, with no sudden jump in the road
+        const whole = curves.length + n <= N_SEG;
+        for (let k = 0; k < n; k++) curves.push(c && whole ? c * k1 * Math.sin(Math.PI * k / n) : 0);
       });
       curves.length = N_SEG;
       segs = curves.map((c, i) => ({ i, curve: c, signs: [], lamp: 0, cable: 0, wall: [null, null], junc: false, cross: false, lights: 0 }));
@@ -4370,6 +4373,7 @@
       },
       api, meter, receipt, zoneChange, touchZones,
       get holding(){ return !!zone; },
+      get fading(){ if (!zone || !zone.ready) return false; const Z = zoneTimes(); return zone.t >= Z.a2 && zone.t < Z.a3; },
       // for the sound: the district the taxi is in (null before a run has one) and its speed in km/h
       get districtNow(){ return run.cap.d < 0 ? null : run.cap.d; },
       get kmhNow(){ return run.speed / UPM * 3.6; },
@@ -5546,6 +5550,10 @@
 
     /* ----- Public API handed to the game ----- */
     const api = {
+      /* sfx(name) plays one of the shell's sounds; sfx.tone(o) and sfx.noise(o) make a game's own; sfx.crash('vehicle' or
+         'obstacle') and sfx.animal('boar', 'dog', 'cat' or 'chickens') are the street's. input has the keys, the taps and
+         two fingers (pointer, pointer2). In the game's config: music, one soundtrack or two (see makeMusic), and
+         touchZones: true, so that a touch counts only if it starts in one of the two zones (TouchZones). */
       version: VERSION, touch: touch, input: input, sfx: sfx,
       get W() { return V.W; },
       get H() { return V.H; },
@@ -5657,6 +5665,8 @@
         // the test page: the city sound bed's loudness, 0 to 1 (against the music; Barney sets it by ear)
         get bed() { return ambience.bed; },
         set bed(v) { ambience.bed = clamp(+v || 0, 0, 1); },
+        // the test page's speed check: true during the zone change's cross-fade, while two pictures are drawn each frame
+        get zoneFading() { return street.fading; },
         // the test page: which soundtrack is playing (0 or 1) and whether each is decoded ('ready'), or null with no music
         get music() { return music ? { track: music.cur, states: music.tracks.map((tr) => tr.state) } : null; },
         // the test page: touch zones on or off whatever the game said, and outlined (nothing marks them in a game)

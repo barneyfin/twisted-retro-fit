@@ -33,8 +33,8 @@
    line, the pin, the badges and 保's ring, the bay's ring, the passenger getting in, the roof sign, the receipt slip),
    9 Moments (the SAFE! sign over a car and over a barrier, the crash pop at roadworks with the move into the open lane,
    and the zone change), 10 Touch (the touch zones outlined: drag, hold or tap in either; tap in one for the next scene),
-   11 Sound (over a district line where the music switches, the 30 s the new track takes to build, then the city sound
-   bed a step louder every 9 s, to choose its loudness by ear). The page plays Grunge City Rider's two soundtracks, switched by district.
+   11 Sound (a jump under a zone title to 10 s before a district line where the music switches, the 30 s the new track takes to build, then
+   the city sound bed a step louder every 9 s, to choose its loudness by ear; the plaque times the jump and the switch). The page plays Grunge City Rider's two soundtracks, switched by district.
    Keys 1-9, 0 and - change scene; on a phone, tap for the next one. */
 
 const SCENES = ['Drive', 'Mong Kok', 'Power-ups', 'Crash', 'Vehicles', 'Street', 'Long street', 'Play screen', 'Moments', 'Touch', 'Sound'];
@@ -55,7 +55,7 @@ const NOTES = [
 // Sound: from SOUND_LEAD metres before a line where the music switches, SOUND_BUILD seconds for the new track to build (both
 // tracks start very quietly), then the sound bed's loudness steps through SOUND_BED, one step each SOUND_LEG seconds; then the next line
 // before a line where the music switches (into Yau Ma Tei, then from Mong Kok round into Tsim Sha Tsui)
-const SOUND_BED = [0, 0.15, 0.25, 0.35, 0.5, 0.7], SOUND_LEG = 9, SOUND_BUILD = 32, SOUND_LEAD = 50, SOUND_SPEED = 19;
+const SOUND_BED = [0, 0.15, 0.25, 0.35, 0.5, 0.7], SOUND_LEG = 9, SOUND_BUILD = 42, SOUND_LEAD = 190, SOUND_SPEED = 19;
 const TRACK_NAMES = ['Midnight Fare Dash (Tsim Sha Tsui and Jordan)', 'Meter Running High (Yau Ma Tei and Mong Kok)'];
 // Play screen: Grunge City Rider's states in turn, PLAY_STEP seconds each, then round again (the plaque names each)
 const PLAY_STEP = 3.5;
@@ -104,15 +104,19 @@ const mongKok = (cn) => cn.street.districts[3].z + 0.5;   // metres: just inside
 /* The speed check, as the speed test ran it: the street drives through Mong Kok at 68 km/h and every gap between
    frames is recorded (the frame rate); then each frame is drawn eight times over, seven of them off screen, so the
    device can't keep up with the screen, and the gap divided by eight is the time to draw one frame. Then the same
-   again with a crash pop lit all the while (a new one each second), and again with street pieces on screen, to show
-   what each costs. */
+   again with a crash pop lit all the while (a new one each second), again with street pieces on screen, and again with
+   Grunge City Rider's whole play screen on top of them (pin, badges, 保's ring, the caption's round line, a receipt
+   always showing, traffic), to show what each costs. Last, a zone change, timing its frames. */
 const LOADN = 8;
-const CHECK = [   // the parts in order and how long each lasts in seconds; run 0 is the street alone, 1 with a crash pop, 2 with pieces
+const CHECK = [   // the parts in order and how long each lasts in seconds; run 0 is the street alone, 1 with a crash pop, 2 with pieces, 3 the whole play screen
   { name: 'settle', t: 0.7, run: 0 }, { name: 'fps', t: 3.5, run: 0 }, { name: 'rest', t: 0.4, run: 0 }, { name: 'load', t: 2.5, run: 0 },
   { name: 'rest', t: 0.6, run: 1 }, { name: 'fps', t: 3.5, run: 1 }, { name: 'rest', t: 0.4, run: 1 }, { name: 'load', t: 2.5, run: 1 },
-  { name: 'rest', t: 0.6, run: 2 }, { name: 'fps', t: 3.5, run: 2 }, { name: 'rest', t: 0.4, run: 2 }, { name: 'load', t: 2.5, run: 2 }
+  { name: 'rest', t: 0.6, run: 2 }, { name: 'fps', t: 3.5, run: 2 }, { name: 'rest', t: 0.4, run: 2 }, { name: 'load', t: 2.5, run: 2 },
+  { name: 'rest', t: 0.6, run: 3 }, { name: 'fps', t: 3.5, run: 3 }, { name: 'rest', t: 0.4, run: 3 }, { name: 'load', t: 2.5, run: 3 },
+  { name: 'rest', t: 0.4, run: 3 }, { name: 'zone', t: 0, run: 3 }
 ];
-const RUN_NAMES = ['', ', with a crash pop lit', ', with street pieces'];
+const CHECK_SLIP = 1.8;   // seconds between receipts: each holds for 2, so one is always showing
+const RUN_NAMES = ['', ', with a crash pop lit', ', with street pieces', ', with the whole play screen'];
 const fmt = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d) : '–');
 const median = (a) => { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
 const pct = (a, p) => { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
@@ -243,6 +247,7 @@ CityNights.game({
     const now = performance.now(), real = g.last ? (now - g.last) / 1000 : 0;
     g.last = now;
     if (g.check) runCheck(g, cn, real);
+    if (g.sound) soundFrames(g.sound, cn, real);
     if (g.tour && SCENES[g.scene] === 'Long street') { if (g.tour.skip > 0) g.tour.skip--; else if (real > 0) g.tour.gaps.push(real * 1000); }
     showReadout(g, cn);
   }
@@ -269,7 +274,7 @@ function setScene(g, cn, i) {
     st.cars = g.traffic;
     if (scene === 'Mong Kok') {
       // i: the part of CHECK under way (-1 while waiting for Automatic); runs: the frames of each run
-      g.check = { i: -1, t: 0, prev: null, popT: 0, runs: [0, 1, 2].map(() => ({ fps: [], load: [] })) };
+      g.check = { i: -1, t: 0, prev: null, popT: 0, slipT: 0, zone: null, fading: false, runs: [0, 1, 2, 3].map(() => ({ fps: [], load: [] })) };
       jumpTo(cn, mongKok(cn));
     }
   } else if (scene === 'Moments') {
@@ -277,7 +282,7 @@ function setScene(g, cn, i) {
     st.cars = [];
   } else if (scene === 'Sound') {
     st.cars = g.traffic;
-    g.sound = { line: -1, step: -1, t: 0, was: cn.picture.bed };
+    g.sound = { line: -1, step: -1, t: 0, was: cn.picture.bed, track: null, jumpLeft: 0, jumpSlow: 0, switchLeft: 0, switchSlow: 0, log: [], heap: 0 };
   } else if (scene === 'Touch') {
     st.cars = g.traffic;
     cn.picture.touchZones = true; cn.picture.showZones = true;
@@ -326,7 +331,26 @@ function jumpTo(cn, z) {
   st.place({ z });
   for (const car of st.cars) car.z += d;
 }
-/* ----- Sound: over a line where the music switches, time for the new track to build, then the sound bed's steps ----- */
+/* ----- Sound: the slowest frame in the half second after the jump, and in the second after the music switches; and a log
+   by the meter's reading of the jumps, the switches and every slow frame, with how much memory the browser freed at it ----- */
+const SLOW_FRAME = 30;   // ms: three or four refreshes of a 120 Hz screen, two of a 60 Hz one
+function soundNote(s, cn, what) {
+  s.log.push(cn.fare.toFixed(1) + ' ' + what);
+  if (s.log.length > 8) s.log.shift();
+}
+function soundFrames(s, cn, real) {
+  const mu = cn.picture.music, ms = real * 1000;
+  const heap = performance.memory ? performance.memory.usedJSHeapSize / 1e6 : 0, freed = s.heap - heap;
+  s.heap = heap;
+  if (ms > SLOW_FRAME) soundNote(s, cn, Math.round(ms) + ' ms' + (freed > 2 ? ' (freed ' + Math.round(freed) + ' MB)' : ''));
+  if (mu && s.track !== null && mu.track !== s.track) soundNote(s, cn, 'switch');
+  if (s.jumpLeft > 0) { s.jumpLeft -= real; s.jumpSlow = Math.max(s.jumpSlow, ms); }
+  if (mu && s.track !== null && mu.track !== s.track) { s.switchLeft = 1; s.switchSlow = 0; }
+  if (s.switchLeft > 0) { s.switchLeft -= real; s.switchSlow = Math.max(s.switchSlow, ms); }
+  if (mu) s.track = mu.track;
+}
+
+/* ----- Sound: from a jump to before a line where the music switches, time for the new track to build, then the sound bed's steps ----- */
 function soundStep(g, cn, dt) {
   const s = g.sound, st = cn.street;
   s.t -= dt;
@@ -335,8 +359,12 @@ function soundStep(g, cn, dt) {
   if (s.line < 0 || s.step === SOUND_BED.length) {
     s.line++; s.step = -1; s.t = SOUND_BUILD;
     cn.picture.bed = s.was;
-    // into Yau Ma Tei (to Meter Running High), then from Mong Kok round into Tsim Sha Tsui (to Midnight Fare Dash)
-    jumpTo(cn, (s.line % 2 === 0 ? st.districts[2].z : st.length) - SOUND_LEAD);
+    s.jumpLeft = 0.5; s.jumpSlow = 0;
+    soundNote(s, cn, 'jump');
+    // into Yau Ma Tei (to Meter Running High), then from Mong Kok round into Tsim Sha Tsui (to Midnight Fare Dash); the jump
+    // is under a zone title, as in a game: the picture would otherwise cut to another stretch of road, in plain view
+    const to = (s.line % 2 === 0 ? st.districts[2].z : st.length) - SOUND_LEAD, d = to - st.taxi.z;
+    cn.zoneChange({ take: 51.3, round: 1, to }, () => { for (const car of st.cars) car.z += d; });
     return;
   }
   cn.picture.bed = SOUND_BED[s.step];
@@ -473,10 +501,12 @@ function runCheck(g, cn, real) {
   }
   // the gap recorded belongs to the frame drawn before it, so each one is filed under the part that frame was drawn in
   if (c.prev.name === 'fps' || c.prev.name === 'load') c.runs[c.prev.run][c.prev.name].push(real * 1000);
+  if (c.prev.name === 'zone') { c.zone.all.push(real * 1000); if (c.fading) c.zone.fade.push(real * 1000); }
   // a part ends when its time is up; a load part also waits for at least 4 frames (for 6 seconds more at most)
   c.t += real;
   const part = CHECK[c.i];
-  if (c.t >= part.t && !(part.name === 'load' && c.runs[part.run].load.length < 4 && c.t < part.t + 6)) {
+  // the zone change's part ends when the zone change does
+  if (part.name === 'zone' ? c.zone && !cn.zoning : c.t >= part.t && !(part.name === 'load' && c.runs[part.run].load.length < 4 && c.t < part.t + 6)) {
     c.i++; c.t = 0;
     if (CHECK[c.i] && CHECK[c.i].run !== part.run) jumpTo(cn, mongKok(cn));   // each run drives through Mong Kok from its edge
   }
@@ -489,7 +519,7 @@ function runCheck(g, cn, real) {
     // a crash pop a few metres ahead, a new one each second (each lasts one), so one is always lit
     c.popT -= real;
     if (c.popT <= 0) { st.crash(z + 14, st.taxi.x); c.popT = 0.95; }
-  } else if (now.run === 2) {
+  } else if (now.run >= 2) {
     // the pieces kept ahead of the taxi, all on screen at once
     if (!st.stop) {
       st.obstacles = CHECK_PIECES.obstacles.map(([kind, d, lane]) => ({ kind, z: z + d, x: st.lanes[lane], d }));
@@ -498,12 +528,24 @@ function runCheck(g, cn, real) {
     }
     for (const p of st.obstacles.concat(st.animals)) p.z = z + p.d;
     st.stop.z = z + CHECK_PIECES.stop;
+    if (now.run === 3) {
+      Object.assign(cn.meter, { lives: 2, tip: 0.4, round: 2, fares: 3 });
+      st.taxi.hired = true; st.taxi.carry = { speed: 0.6, shield: true, fare: 'double' };
+      st.pin = { metres: Math.round(CHECK_PIECES.stop + 5) };
+      c.slipT -= real;
+      if (c.slipT <= 0) { cn.receipt({ head: 'RECEIPT', lines: [['車資', 'FARE', '9.20'], ['小費', 'TIP', '0.40'], ['雙', '+100%', '9.20'], ['', '', 'HK$ 18.80', 'total']] }); c.slipT = CHECK_SLIP; }
+    }
+    // the zone change, from the play screen, to the start of the next district; the frames it takes are timed
+    if (now.name === 'zone' && !c.zone) { c.zone = { all: [], fade: [] }; cn.zoneChange({ take: 51.3, round: 2, to: st.districts[0].z + 0.5 }); }
+    c.fading = cn.picture.zoneFading;
   }
 }
 function stopCheck(g, cn, why) {
   g.check = null;
   cn.picture.repeat = 1;
   clearPieces(cn);
+  Object.assign(cn.meter, { lives: null, tip: null, round: null, fares: 0 });
+  cn.street.pin = null; cn.street.taxi.hired = false; cn.street.taxi.carry = null;
   if (why) g.result = [why, ''];
 }
 // a run's frame rate, the slowest 1 frame in 20, and the time to draw a frame; if the device kept up with the screen
@@ -513,13 +555,14 @@ function score(run) {
   return { avg: run.fps.length / (tot / 1000), slow: pct(run.fps, 0.95), cost: median(run.load) / LOADN, sat: median(run.load) > median(run.fps) * 1.3 };
 }
 function finishCheck(g, cn) {
-  const c = g.check, p = cn.picture, all = c.runs.map(score), [a, b, d] = all;
+  const c = g.check, p = cn.picture, all = c.runs.map(score), [a, b, d, s] = all, z = c.zone;
   stopCheck(g, cn);
   const phone = all.every((r) => r.avg >= 29.5 && r.cost <= 25) ? 'pass' : 'below', computer = all.every((r) => r.avg >= 58) ? 'pass' : 'below';
   const ms = (r) => (r.sat ? 'about ' : 'under ') + '<b>' + fmt(r.cost, 1) + ' ms</b>';
   g.result = [
     '<b>' + fmt(a.avg) + ' fps</b> in Mong Kok, each frame drawn in ' + ms(a) + '; slowest 1 in 20 came ' + fmt(a.slow) + ' ms apart. With a crash pop lit: <b>' + fmt(b.avg) + ' fps</b>, ' + ms(b) +
-      '. With street pieces: <b>' + fmt(d.avg) + ' fps</b>, ' + ms(d) + '.',
+      '. With street pieces: <b>' + fmt(d.avg) + ' fps</b>, ' + ms(d) + '. With the whole play screen: <b>' + fmt(s.avg) + ' fps</b>, ' + ms(s) +
+      '. Zone change: its cross-fade <b>' + fmt(z.fade.length / (z.fade.reduce((u, v) => u + v, 0) / 1000 || 1)) + ' fps</b>, slowest ' + fmt(Math.max(0, ...z.fade)) + ' ms; slowest frame of the whole change ' + fmt(Math.max(0, ...z.all)) + ' ms.',
     'Phone target (30 fps, 25 ms): <b>' + phone + '</b> · Computer target (60 fps): <b>' + computer + '</b> · ' + popMade(p) + ' · ' + p.width + ' × ' + p.height + ', ' + (p.smoothing ? p.smoothing + '× smoothing' : 'no smoothing') + ' · ' + browserName() + ' · ' + (p.chip || 'unknown chip')
   ];
 }
@@ -534,15 +577,19 @@ function showReadout(g, cn) {
     ' · ' + p.width + ' × ' + p.height + ', ' + (p.smoothing ? p.smoothing + '× smoothing' : 'no smoothing');
   let note = cn.touch ? NOTES[g.scene].replace('← → steer, ↓ brakes', 'Drag to steer').replace(', N jumps to the next district, hold F to drive fast', '').replace(' ↓ slows down.', '') : NOTES[g.scene], extra = pic;
   // the graphics memory and the opening times, in the scenes that drive the long street
-  const mem = scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' ? memLine(cn) : '';
+  let mem = scene === 'Drive' || scene === 'Mong Kok' || scene === 'Long street' ? memLine(cn) : '';
   if (scene === 'Moments' && g.mo) {
     note = g.mo.k < 0 ? 'The moments, each in turn.' : (g.mo.k + 1) + ' of ' + MOMENTS.length + ': ' + MOMENTS[g.mo.k][1];
   } else if (scene === 'Sound' && g.sound) {
     const mu = cn.picture.music, L = cn.street.length, z = ((cn.street.taxi.z % L) + L) % L;
-    const now = g.sound.step < 0 ? 'Crossing a line where the music switches, then letting the track build: it starts very quietly. Sound bed <b>' + cn.picture.bed.toFixed(2) + '</b>; its steps start in ' + Math.ceil(g.sound.t) + ' s.'
+    const toLine = g.sound.t - (SOUND_BUILD - SOUND_LEAD / SOUND_SPEED);
+    const now = g.sound.step < 0 && toLine > 0 ? 'The taxi has jumped along the street under a zone title, as in a game. Now it drives to a line where the music switches, in ' + Math.ceil(toLine) + ' s.'
+      : g.sound.step < 0 ? 'The music has switched and is building: it starts very quietly. Sound bed <b>' + cn.picture.bed.toFixed(2) + '</b>; its steps start in ' + Math.ceil(g.sound.t) + ' s.'
       : 'Sound bed loudness <b>' + cn.picture.bed.toFixed(2) + '</b> (' + (g.sound.step + 1) + ' of ' + SOUND_BED.length + ': a step louder each ' + SOUND_LEG + ' s).';
     note = now + ' Now in ' + cn.street.district(z).en + '; music: ' +
       (mu ? TRACK_NAMES[mu.track] + (mu.states.every((s) => s === 'ready') ? '' : ' (decoding: ' + mu.states.join(', ') + ')') : 'none, this copy has no soundtracks') + '.';
+    extra = 'Slowest frame: after the jump <b>' + fmt(g.sound.jumpSlow) + ' ms</b>; after the music switched ' + (g.sound.switchSlow ? '<b>' + fmt(g.sound.switchSlow) + ' ms</b>' : '(not yet)') + '. ' + pic;
+    mem = 'By the meter: ' + (g.sound.log.join(' · ') || 'nothing yet');
   } else if (scene === 'Touch') {
     note = TOUCH_NOTE;
   } else if (scene === 'Play screen' && g.play) {
@@ -558,8 +605,8 @@ function showReadout(g, cn) {
     else if (!part) note = 'Speed check: waiting for Automatic to finish timing the picture…';
     else {
       const timing = part.name === 'load' || (part.name === 'rest' && CHECK[c.i - 1].name === 'fps');
-      note = 'Speed check' + RUN_NAMES[part.run] + ': ' + (timing ? 'timing a frame. The picture slows down on purpose.'
-        : 'measuring every frame. Leave the page alone for about ' + (21 - part.run * 7) + ' seconds.');
+      note = 'Speed check' + RUN_NAMES[part.run] + ': ' + (part.name === 'zone' ? 'timing a zone change.' : timing ? 'timing a frame. The picture slows down on purpose.'
+        : 'measuring every frame. Leave the page alone for about ' + (32 - part.run * 7) + ' seconds.');
     }
   } else if (scene === 'Street') {
     note += ' Passenger: ' + PASSENGERS[g.lay.lap % PASSENGERS.length][1] + '.';

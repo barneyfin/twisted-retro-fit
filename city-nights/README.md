@@ -47,7 +47,7 @@ The template, as it is, drives up the street through traffic: a working game to 
 | 8 Play screen | Grunge City Rider's play screen (design system v10), a state at a time, 3.5 seconds each, named on the plaque: mid-fare with everything at once (lives, the tip counting, the caption's round line and lamps, the drop-off pin far off, the 快 保 雙 badges with 快 emptying and 保's ring, the roof sign out); a fare paid (the receipt slip); a pick-up ahead (the teal pin, counting down); in the bay (the bay's ring, 保's ring stepping aside, the pin with no tag); getting in (the passenger fading, the roof sign going out); the tip halved and the tip lost (their receipts, the tip's dashes); lives from 3 to 0 and the lamps from 0 to 5. |
 | 9 Moments | Each in turn, laid out ahead of the taxi: the shielded hit on a car (the SAFE! sign over the taxi's roof, the car cleared away, 保's badge and ring gone, no freeze), the shielded hit on roadworks (the SAFE! sign over the barrier), a crash into roadworks (the crash pop, the barriers cleared away, the taxi moved into the open lane in the pop's first second), and the zone change (the street dims, the caption grows into the title of the district finished with its lamps and takings, the taxi jumps to the next district, the title of the new one and its round, then back into the caption). |
 | 0 Touch | The touch zones outlined (only here; nothing marks them in a game): from the top of the meter's case down, either side of the taxi. A touch that starts outside them does nothing, so here a tap over the street does not change scene. Drag in either to steer (either thumb), two thumbs down to slow; a tap inside an outline goes to the next scene, Sound. |
-| - Sound | Over a district line where the music switches: into Yau Ma Tei (Meter Running High), then next time from Mong Kok round into Tsim Sha Tsui (Midnight Fare Dash). 32 seconds for the new track to build, since both start very quietly, then the city sound bed a step louder every 9 seconds (0, 0.15, 0.25, 0.35, 0.5, 0.7; the plaque names the step). For choosing the sound bed's loudness by ear; leaving the scene puts it back. |
+| - Sound | A jump along the street, under a zone title as in a game, to 10 seconds before a district line where the music switches: into Yau Ma Tei (Meter Running High), then next time from Mong Kok round into Tsim Sha Tsui (Midnight Fare Dash). The plaque names what is happening and shows the slowest frame after the jump and after the music switches, and a log by the meter's reading of the jumps, the switches and any slow frame. Then 32 seconds for the new track to build, since both start very quietly, then the city sound bed a step louder every 9 seconds (0, 0.15, 0.25, 0.35, 0.5, 0.7; the plaque names the step). For choosing the sound bed's loudness by ear; leaving the scene puts it back. |
 
 On a phone held sideways, the meter, the district caption and the receipt slip keep clear of the camera and the screen's rounded corners (the safe-area insets, as the design system's README asks), as the tiles always have.
 
@@ -55,9 +55,9 @@ Pause (Esc, or the pause tile) and Settings work as in any game, so every screen
 
 ## The speed check
 
-Scene 2 repeats the speed test's Mong Kok measurement, now on the finished kit. It starts by itself: the taxi goes to the edge of Mong Kok and drives through it at 68 km/h, three times, about 21 seconds in all. For the first part every frame is timed (the frame rate); for the next 3 seconds each frame is drawn eight times over, so the picture slows down on purpose while it works out how long one frame takes to draw. The second run does the same with a crash pop lit all the while (a new one each second), and the third with street pieces on screen: roadworks, oil, spilt cargo, a pothole, the chickens and the boar, and a passenger at the pick-up bay. Each run starts again from the edge of Mong Kok, so all three are measured on the same street. Leave the page alone until the plaque shows the result.
+Scene 2 repeats the speed test's Mong Kok measurement, now on the finished kit. It starts by itself: the taxi goes to the edge of Mong Kok and drives through it at 68 km/h, four times, about 32 seconds in all with the zone change at the end. For the first part every frame is timed (the frame rate); for the next 3 seconds each frame is drawn eight times over, so the picture slows down on purpose while it works out how long one frame takes to draw. The second run does the same with a crash pop lit all the while (a new one each second), the third with street pieces on screen: roadworks, oil, spilt cargo, a pothole, the chickens and the boar, and a passenger at the pick-up bay; and the fourth with the whole play screen on top of those (the pin, the badges, 保's ring, the caption's round line and lamps, the meter with lives and the tip, and a receipt always showing). Each run starts again from the edge of Mong Kok, so all four are measured on the same street. Last comes a zone change, whose frames are timed: its cross-fade draws two pictures a frame, and its jump makes new pieces of street. Leave the page alone until the plaque shows the result.
 
-Close any other copy of the page first (two copies fight over the graphics chip), and use Chrome. The result names the frame rate and the time to draw a frame for each run (the street alone, with a crash pop, with street pieces); whether each target passes (on all three runs); how long the crash pop's three words took to draw; the picture size and smoothing, the browser and the graphics chip. The targets, as in the speed test:
+Close any other copy of the page first (two copies fight over the graphics chip), and use Chrome. The result names the frame rate and the time to draw a frame for each run (the street alone, with a crash pop, with street pieces, with the whole play screen); the zone change's cross-fade frame rate and its slowest frames; whether each target passes (on all four runs); how long the crash pop's three words took to draw; the picture size and smoothing, the browser and the graphics chip. The targets, as in the speed test:
 
 - **Phone**: at least 30 frames a second, and each frame drawn in 25 ms or less.
 - **Computer**: 60 frames a second.
@@ -68,7 +68,7 @@ The check waits until Automatic (below) has finished timing the picture. To run 
 
 **Graphics memory and opening times** (kit 0.7): the plaque's fourth line, in scenes 1, 2 and 7, shows what the kit has put on the graphics chip, in MB (the street's shapes, other buffers, textures, and the picture's buffers), and three times from opening the page: how long building the street took, when Start game began to work, and when the first street picture showed. It is the kit's own count of what it asked for; on the computer, Chrome's Task Manager (Shift+Esc, the GPU memory column) shows what the driver really uses.
 
-Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips while each frame is drawn eight times (three times in the check, 3 seconds each); the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
+Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips while each frame is drawn eight times (four times in the check, 3 seconds each); the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
 
 ### Results, 29 October 2026 (kit 0.4, Mong Kok, Chrome 156)
 
@@ -124,11 +124,49 @@ Opening times vary from run to run by more than the difference between the kits:
 | Graphics memory in all (the kit's count) | 243 to 248 MB: textures 178 to 183, picture buffers 61 |
 | Long street (scene 7): all four districts at 84 km/h | 60 fps; slowest 1 in 20 came 17 ms apart, the slowest of all 17 ms; 88 pieces made, 0.6 ms each |
 
-The time to draw a frame is the same as kits 0.4 and 0.6, and making the street a piece at a time never held up a frame. These three runs do not yet have the whole play screen on at once; that is a fourth run still to come. The kit's memory count covers the graphics chip only, so it leaves out the decoded music, and Chrome's Task Manager has not been read yet.
+The time to draw a frame is the same as kits 0.4 and 0.6, and making the street a piece at a time never held up a frame. These three runs do not have the whole play screen on at once; kit 0.10.1, below, adds that as a fourth run.
+
+### Results, 30 October 2026 (kit 0.10.1, the whole play screen and the zone change, Chrome 156)
+
+The computer ran the page with both soundtracks; the Pixel ran a copy without them, in full screen, with its screen at 120 Hz.
+
+| | Computer, RTX 5080 | Pixel 11 Pro XL |
+|---|---|---|
+| Street alone | 60 fps, under 2.1 ms | 120 fps, about 3.1 ms |
+| With a crash pop | 60 fps, under 2.1 ms | 120 fps, about 3.1 ms |
+| With street pieces | 60 fps, under 2.1 ms | 120 fps, about 3.1 ms |
+| With the whole play screen | 60 fps, under 2.1 ms | 120 fps, about 3.2 ms |
+| Slowest 1 frame in 20 came | 17 ms apart | 9 ms apart |
+| Zone change's cross-fade | 60 fps, slowest frame 18 ms | 120 fps, slowest frame 9 ms |
+| Slowest frame of the whole zone change | 18 ms | 11 ms |
+| Crash pop words drawn | 52 ms, 2859 × 1853 each | 114 ms, 1329 × 861 each |
+| Picture | 1632 × 810, 4× smoothing | 1803 × 810, 4× smoothing |
+| Targets | pass | pass |
+| Building the street when the page opens | 891 ms (planning it 35 ms, its first pieces 7 ms) | 2.76 s (planning it 69 ms, its first pieces 23 ms) |
+| Start game worked, and the first picture | 1.05 s after opening | 3.06 s after opening |
+| Graphics memory in all (the kit's count) | 254 MB: street shapes 4.8, other buffers 0.4, textures 188, picture buffers 61 | 261 MB: street shapes 4.1, other buffers 0.4, textures 190, picture buffers 67 |
+| GPU memory (Chrome's Task Manager) | 153 MB | not read |
+| Memory footprint (Chrome's Task Manager) | 228 MB, with both soundtracks | not read |
+| The built file | 11.6 MB, with both soundtracks | 749 KB, without them |
+
+With everything on screen, the time to draw a frame is the same as the street alone on both devices, and the zone change's cross-fade and its jump held up no frame. The computer's 228 MB includes the two decoded soundtracks, about 119 MB worked out from their length (337 s of stereo); the footprint was not read without them. Its 153 MB is what Chrome reports the page really using on the graphics chip, against the 254 MB the kit asked for, a reading taken on one run. Opening times vary from run to run. On the Pixel with both soundtracks (kit 0.10.2), Barney saw no glitch through scene 11's jumps and switches, the music did not stutter at a switch, and the page opened with the street built in 2.98 s (planning it 56 ms, its first pieces 22 ms) and Start game working at 3.23 s, against 3.06 s without the soundtracks: about the variation between any two runs. Its speed check, in full screen with both soundtracks: 120 fps on all four runs, about 3.2 ms a frame, slowest 1 frame in 20 came 9 ms apart; the zone change's cross-fade at 120 fps, its slowest frame 12 ms; crash pop words drawn in 121 ms, 1329 × 861 each; a 1803 × 810 picture with 4× smoothing; both targets pass; 262 MB of graphics memory by the kit's count (street shapes 4.4, other buffers 0.4, textures 190, picture buffers 67). The soundtracks made no difference to the frames.
+
+### Checks before handing back (kit 0.10.2)
+
+Checked in the app's own browser, with the page's sound silenced:
+
+- **The speed check** runs all four runs and the zone change, and puts the meter and the taxi back afterwards. The app's browser is too slow to give real numbers: the results to come are from the computer and the Pixel.
+- **The music**: pause keeps the place (it came back 25.8 s in), a new game starts the first track from the top, game over fades it out, and it changes track at a zone change. The two modes belong to the game.
+- **A shielded hit**: the SAFE! sign and no crash pop; the taxi drives on. Lives and the tip belong to the game.
+- **Touch**: a touch outside the zones does nothing, and the tiles still work with the zones on.
+- **Reduce motion**: all four Moments run with it on, without errors. Barney looked at it on the test page: fine.
+- **The fonts** in `kit\fonts\` are the design system's, and the build's font and character checks pass (122 characters).
+
+Barney compared each piece side by side with the design system's previews and the canvas row: good.
 
 ## The long street (kit 0.7)
 
-Each district is 3.7 km long (`district-length`), so the street is 14.8 km, long enough for a whole zone of Grunge City Rider. It used to be 560 m. Each district keeps its look: its buildings, shop fronts, signs and people are picked the same way as before, and the first 560 m bend as the old street did.
+Each district is 3.7 km long (`district-length`), so the street is 14.8 km, long enough for a whole zone of Grunge City Rider. It used to be 560 m. Each district keeps its look: its buildings, shop fronts, signs and people are picked the same way as before, and the first 560 m bend as the old street did. The last bend that would not fit before the lap's end is left out, so the street meets its start straight (kit 0.10.2; it used to stop at full strength on the line from Mong Kok into Tsim Sha Tsui, a sudden shift in the road).
 
 Made whole, as the old street was, a 14.8 km street would need about 275 MB of the graphics chip just for its shapes, against 10.6 MB for the old one. So the kit plans the whole street when it opens, which is quick, and makes its shapes a piece at a time (25 m to a piece) as the taxi drives. Eight pieces are kept on the graphics chip, the stretch from the camera on: at most about 5 MB. The next piece ahead is made a millisecond a frame. A piece the picture needs at once, at the start or after a jump (a district's start, or the test page's N), is made there and then: a brief pause, which the zone-change title will cover in the game. People walk only near the camera, each within 30 m of where it started.
 
