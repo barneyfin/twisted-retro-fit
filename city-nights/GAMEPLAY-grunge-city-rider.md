@@ -29,6 +29,7 @@ Two, in this order, each with its own high-score table. The website's card shows
 
 - **A zone is a district**: Tsim Sha Tsui, Jordan, Yau Ma Tei, Mong Kok. Five fares complete it. The taxi then jumps to the start of the next district, behind the zone-change moment. After Mong Kok, round 2 starts again in Tsim Sha Tsui, harder, and so on.
 - **Longer districts**: each is long enough for a whole zone, about 3.7 km (190 s of clock at 70 km/h), so the street is about 15 km. Today's is 560 m.
+- **A zone that reaches the end of its district** (rare: it takes a 時 power-up, since four fares buy only enough clock to drive the district flat out): the taxi jumps back to the start of the same district and the zone carries on, with its fares, tip, passenger and music unchanged (Barney, 30 October 2026). The jump is hidden by a sign or tunnel that the taxi drives through, to be designed (below).
 - **The clock** restarts at **50 s** in every zone. Each fare finished adds time: **35 s** in round 1's Tsim Sha Tsui, then 1 s less in each zone after (34, 33, 32; round 2: 31, 30, 29, 28; and on down) (*starting figures*). The meter's clock shows 99 at most.
 - **The run ends** when the clock reaches 00 or on the third crash. **Three lives** for the whole run.
 - **Harder each zone**: more traffic, obstacles and animals (the table below) and less time per fare. Top speed stays the same.
@@ -114,6 +115,7 @@ The design system is the spec, so each of these is designed there first, then co
 13. **Sound**: the city sound bed, the game's sounds and the two soundtracks, including whether a track starts from its beginning when the music switches to it. The Sound section still says one MP3 and calls the sound bed open.
 14. **New Chinese words** any of these need: on the word list, with the fonts re-cut.
 15. **Left over from phase 3** (in `HANDOVER.md`, "Where phase 3 ended"): Automatic's 17.5 ms step, the animals' bolting speeds, the shadow sizes, where settings and scores are saved, and the meter holding at HK$999.99, now confirmed as enough for this game.
+16. **A sign or tunnel that hides a district's loop** (Barney, 30 October 2026): when a zone reaches the end of its district, the taxi drives through it and comes out at the start of the same district. It must fill the whole picture for a moment, since the kit makes new street while it does, about a quarter of a second to be safe (about 5 m at 70 km/h). To decide: which it is; whether it stands at every district line or only appears for a loop (at every line, Practice drives through it each time without jumping); what it looks like from both sides; how dark it may go, with nothing flashing; its name and any new Chinese words. No bay, power-up or obstacle stands near it.
 
 ## Then, back in Claude Code
 
