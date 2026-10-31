@@ -44,6 +44,16 @@ const PAY_S = 0.8;                                   // the meter counts up what
 const ZONE_FARES = 5, RECEIPT_S = 2.5;               // fares to clear a zone; the fifth's receipt goes back in before the zone change
 const TUNNEL_HALF = 90, CLEAR = 40;                  // metres: a tunnel each side of a district's line, and the clear stretch before it
 
+// ---- what the street puts in the way, and the power-ups
+const LAY_AHEAD = [115, 150];                        // metres ahead: past the drawn road (about 87 m), so nothing appears in view
+const OBSTACLES = ['oil', 'pothole', 'roadworks', 'cargo'];
+const FREEZE_ANIMAL = 1;                             // seconds
+const OIL_S = 1, POTHOLE_KEEP = 2 / 3, VEER_S = 0.5, VEER_M = 3;   // oil lasts 1 s past it; a pothole leaves two-thirds of the speed; cargo: 3 m over 0.5 s
+const BOLT_AT = 26, HORN_REACH = 60, NEAR_MISS = 1;  // metres: an animal bolts as the taxi reaches it, or at the horn; a near miss
+const POWER_S = [20, 40], TIME_BONUS = 20, FAST_S = 10, FAST_K = 1.2;
+const POWERS = ['time', 'fare', 'speed', 'shield'];  // and 雙 ('double') 1 in 12
+const TOKEN_REACH = 0.8;                             // metres: half a power-up's width, as far as collecting it goes
+
 // how busy a zone is (the gameplay note's table): n counts zones from round 1's Tsim Sha Tsui; Practice stays at 0
 const zoneRow = (n) => ({ vehicles: Math.min(40, 15 + 5 * n), obstacles: Math.min(10, 3 + n), animals: Math.min(4, 1 + n), timeForFare: 35 - n });
 
@@ -61,7 +71,9 @@ CityNights.game({
   music: [{ data: window.MIDNIGHT_FARE_DASH, districts: [0, 1] }, { data: window.METER_RUNNING_HIGH, districts: [2, 3] }],
 
   start(cn) {
-    const g = { zone: 0, round: 1, clock: CLOCK_START, lives: LIVES, freeze: 0, oil: 0, phase: 'none', wait: 0, trip: null, fares: 0, take: 0, pay: 0, payLeft: 0 };
+    const g = { zone: 0, round: 1, clock: CLOCK_START, lives: LIVES, freeze: 0, oil: 0, phase: 'none', wait: 0, trip: null, fares: 0, take: 0, pay: 0, payLeft: 0,
+      held: 0, veer: 0, veerBy: 0, fast: 0, nextObstacle: 0, nextAnimal: 0, nextPower: cn.rand(POWER_S[0], POWER_S[1]) };
+    cn.street.taxi.carry = { speed: null, shield: false, fare: null };
     cn.meter.lives = LIVES;
     cn.meter.tip = null;
     cn.meter.round = cn.mode === 'practice' ? null : 1;
@@ -79,22 +91,28 @@ CityNights.game({
     g.clock = Math.max(0, g.clock - dt);
     cn.meter.time = g.clock;
     if (g.clock === 0) { taxi.speed = 0; cn.gameOver(); return; }
-    if (hornPressed(cn)) horn(cn);
-    if (g.freeze > 0) { g.freeze -= dt; taxi.speed = 0; return; }
+    if (hornPressed(cn)) { horn(cn); scareAnimals(g, cn); }
+    if (g.freeze > 0) { g.freeze -= dt; taxi.speed = g.freeze > 0 ? 0 : g.held; return; }
     drive(g, cn, dt);
     loopStep(g, cn);
     payStep(g, cn, dt);
     bayStep(g, cn, dt);
+    layStep(g, cn, dt);
     moveTraffic(g, cn, dt);
     hitTraffic(g, cn);
+    if (g.freeze <= 0) hitObstacles(g, cn);
+    if (g.freeze <= 0) animalStep(g, cn);
+    tokenStep(g, cn);
   }
 });
 
 /* ----- the taxi: speeds up by itself; the player steers and brakes ----- */
 function braking(cn) { return cn.input.down || (cn.input.pointer.down && cn.input.pointer2.down); }   // two thumbs down: one steers, one holds
 function drive(g, cn, dt) {
-  const taxi = cn.street.taxi;
-  taxi.speed = braking(cn) ? Math.max(0, taxi.speed - BRAKE * dt) : Math.min(TOP, taxi.speed + ACCEL * dt);
+  const taxi = cn.street.taxi, slick = g.oil > 0 ? 2 : 1, top = g.fast > 0 ? TOP * FAST_K : TOP;   // oil: steering and braking twice as strong
+  if (g.oil > 0) g.oil -= dt;
+  if (g.fast > 0) { g.fast -= dt; taxi.carry.speed = g.fast > 0 ? g.fast / FAST_S : null; }
+  taxi.speed = braking(cn) ? Math.max(0, taxi.speed - BRAKE * slick * dt) : taxi.speed > top ? Math.max(top, taxi.speed - ACCEL * dt) : Math.min(top, taxi.speed + ACCEL * dt);
   taxi.z += taxi.speed * dt;
   rideStep(g, cn, taxi.speed * dt);
   let steer = 0;
@@ -102,6 +120,8 @@ function drive(g, cn, dt) {
   if (cn.input.right) steer += STEER * dt;
   if (cn.input.pointer.down) steer += cn.input.pointer.dx / cn.W * 2;   // either thumb steers
   if (cn.input.pointer2.down) steer += cn.input.pointer2.dx / cn.W * 2;
+  steer *= slick;
+  if (g.veer > 0) { steer += g.veerBy * dt / VEER_S; g.veer -= dt; }   // spilt cargo pushes it away from the kerb
   taxi.x = cn.clamp(taxi.x + steer, -X_MAX, X_MAX);
 }
 
@@ -119,15 +139,19 @@ function setTraffic(g, cn) {
   for (const car of st.cars) {
     car.want = cn.rand(CAR_KMH[0], CAR_KMH[1]) / 3.6;
     car.speed = car.want;
+    car.lane = car.x;
     if (st.gap(taxi.z, car.z) < CAR_CLEAR) car.z += CAR_CLEAR;
   }
 }
 function moveTraffic(g, cn, dt) {
-  const st = cn.street, cars = st.cars;
+  const st = cn.street, cars = st.cars, works = st.obstacles.filter((o) => o.kind === 'roadworks');
   for (const car of cars) {
+    // roadworks ahead in its lane: it moves over to the middle one
+    for (const w of works) if (Math.abs(car.lane - w.x) < 0.4 && st.gap(car.z, w.z) < 45) car.lane = st.lanes[1];
+    car.x += cn.clamp(car.lane - car.x, -0.5 * dt, 0.5 * dt);
     let speed = car.want;
     for (const other of cars) {
-      if (other === car || other.x !== car.x) continue;
+      if (other === car || Math.abs(other.x - car.x) > 0.3) continue;
       const ahead = st.gap(car.z, other.z);
       if (ahead < CAR_GAP + st.size(car.kind).length) speed = Math.min(speed, other.speed);
     }
@@ -144,20 +168,31 @@ function hitTraffic(g, cn) {
     const S = st.size(car.kind), ahead = st.gap(taxi.z, car.z);
     const along = ahead < L.length || ahead > st.length - S.length;
     const side = Math.abs(taxi.x - car.x) * st.width / 2 < (L.width + S.width) / 2 * 0.92;
-    if (along && side) { crash(g, cn, car.z, (taxi.x + car.x) / 2, 'vehicle', car); return; }
+    if (along && side) {
+      const clear = () => { car.z = st.taxi.z + cn.rand(250, 450); };   // cleared away, and back far ahead, so the road doesn't empty
+      if (shieldTakes(cn, car.z, (taxi.x + car.x) / 2)) clear();
+      else { crash(g, cn, car.z, (taxi.x + car.x) / 2, 'vehicle'); cn.after(0.3, clear); }
+      return;
+    }
   }
 }
-function crash(g, cn, z, x, kind, what) {
+// 保: one free crash, with the SAFE! sign and no crash pop, freeze, or life or tip lost
+function shieldTakes(cn, z, x) {
+  const carry = cn.street.taxi.carry;
+  if (!carry.shield) return false;
+  carry.shield = false;
+  cn.street.safe(z, x);
+  return true;
+}
+function crash(g, cn, z, x, kind) {
   const st = cn.street;
   st.crash(z, x);
   cn.sfx.crash(kind);
   halveTip(g, cn);
   g.lives--;
   cn.meter.lives = g.lives;
-  g.freeze = FREEZE_CRASH;
+  g.freeze = FREEZE_CRASH; g.held = 0;
   st.taxi.speed = 0;
-  // what was hit is cleared away under the pop
-  if (what) cn.after(0.3, () => { what.z = st.taxi.z + cn.rand(250, 450); });   // and comes back far ahead, so the road doesn't empty
   if (g.lives === 0) cn.gameOver(FREEZE_CRASH / 2);
 }
 
@@ -169,6 +204,7 @@ function zoneDone(g, cn) {
   const st = cn.street, n = st.districts.length, next = st.districts[(g.zone + 1) % n], round = Math.floor((g.zone + 1) / n) + 1;
   st.stop = null; st.pin = null;
   g.phase = 'none';
+  clearRoad(cn);
   cn.zoneChange({ take: g.take, round, to: next.start }, () => {
     // under the title: the new zone, its traffic, its first passenger, and the clock restarted
     g.zone++; g.round = round; g.fares = 0; g.take = 0; g.clock = CLOCK_START;
@@ -185,6 +221,120 @@ function loopStep(g, cn) {
   if (st.taxi.z < zoneEnd(g, cn)) return;
   st.loop();
   if (st.stop) st.stop.z -= st.districts[0].length;
+  clearRoad(cn);   // what is on the road is all behind the taxi by now
+}
+
+/* ----- what is laid on the road: never in a clear stretch or a tunnel, and well ahead, by seconds of driving ----- */
+function clearRoad(cn) { const st = cn.street; st.obstacles = []; st.animals = []; st.tokens = []; }
+function roadFree(g, cn, z, length) {
+  const st = cn.street, L = st.districts[0].length;
+  for (let d = 0; d <= length; d += 5) { if ((((z + d + TUNNEL_HALF + CLEAR) % L) + L) % L < CLEAR + TUNNEL_HALF * 2) return false; }
+  if (competitive(cn) && z + length >= zoneEnd(g, cn)) return false;
+  return true;
+}
+function layStep(g, cn, dt) {
+  const st = cn.street, taxi = st.taxi, row = zoneRow(g.zone), z = () => taxi.z + cn.rand(LAY_AHEAD[0], LAY_AHEAD[1]);
+  const moving = taxi.speed * dt / TOP;   // seconds of driving at the top speed
+  g.nextObstacle -= moving; g.nextAnimal -= moving; g.nextPower -= moving;
+  if (g.nextObstacle <= 0) {
+    const kind = cn.pick(OBSTACLES), at = z(), size = st.size(kind);
+    // roadworks close a kerbside lane; nothing in a bay's lane near the bay, or near another obstacle
+    const lanes = kind === 'roadworks' ? [st.lanes[0], st.lanes[2]] : st.lanes;
+    const bay = st.stop && Math.abs(st.stop.z - at) < 30, x = cn.pick(bay ? lanes.filter((l) => l !== st.lanes[0]) : lanes);
+    if (roadFree(g, cn, at, size.length) && !st.obstacles.some((o) => Math.abs(o.z - at) < 25)) {
+      st.obstacles = st.obstacles.concat({ kind, z: at, x });
+      g.nextObstacle = 60 / row.obstacles * cn.rand(0.7, 1.3);
+    } else g.nextObstacle = 1;   // no room here: try again a little further on
+  }
+  if (g.nextAnimal <= 0) {
+    const at = z(), kind = cn.pick(['boar', 'dog', 'cat', 'chickens']);
+    if (roadFree(g, cn, at, 3)) {
+      st.animals = st.animals.concat({ kind, z: at, x: cn.rand(-0.6, 0.6), face: cn.pick([-1, 1]) });
+      g.nextAnimal = 60 / row.animals * cn.rand(0.7, 1.3);
+    } else g.nextAnimal = 1;
+  }
+  if (g.nextPower <= 0) {
+    const at = z();
+    if (roadFree(g, cn, at, 2)) {
+      st.tokens = st.tokens.concat({ z: at, x: cn.pick(st.lanes), kind: cn.randInt(1, 12) === 1 ? 'double' : cn.pick(POWERS) });
+      g.nextPower = cn.rand(POWER_S[0], POWER_S[1]);
+    } else g.nextPower = 1;
+  }
+  // gone behind
+  const kept = (o) => taxi.z - o.z < 30;
+  if (!st.obstacles.every(kept)) st.obstacles = st.obstacles.filter(kept);
+  if (!st.animals.every(kept)) st.animals = st.animals.filter(kept);
+  if (!st.tokens.every(kept)) st.tokens = st.tokens.filter(kept);
+}
+// the taxi over something on the road: along (its length on the road) and across
+function over(cn, o, length, width) {
+  const st = cn.street, taxi = st.taxi, L = st.size('taxi');
+  if (taxi.z + L.length < o.z || taxi.z > o.z + length) return false;
+  return Math.abs(taxi.x - o.x) * st.width / 2 < (L.width + width) / 2;
+}
+function hitObstacles(g, cn) {
+  const st = cn.street, taxi = st.taxi, L = st.size('taxi');
+  for (const o of st.obstacles) {
+    if (o.done) continue;
+    const size = st.size(o.kind);
+    if (o.kind === 'roadworks') { if (hitWorks(g, cn, o)) return; continue; }
+    if (!over(cn, o, size.length, size.width)) continue;
+    o.done = true;
+    if (o.kind === 'oil') g.oil = OIL_S + size.length / Math.max(1, taxi.speed);
+    else if (o.kind === 'pothole') taxi.speed *= POTHOLE_KEEP;
+    else if (o.kind === 'cargo') { g.veer = VEER_S; g.veerBy = (taxi.x < 0 ? 1 : -1) * VEER_M / (st.width / 2); }
+  }
+}
+// roadworks: the cones lead out from the kerb to the lane's far side over 7 m, then the barriers
+function hitWorks(g, cn, o) {
+  const st = cn.street, taxi = st.taxi, L = st.size('taxi'), front = taxi.z + L.length, into = front - o.z;
+  if (into < 0 || taxi.z > o.z + 8) return false;
+  const kerb = o.x < 0 ? -1 : 1, edge = o.x + kerb * -0.333, reach = kerb + (edge - kerb) * Math.min(1, into / 7);   // across the road, -1 to 1
+  const side = taxi.x + kerb * L.width / st.width;   // the taxi's kerbside
+  if (kerb < 0 ? side > reach : side < reach) return false;
+  const clear = () => { st.obstacles = st.obstacles.filter((w) => w !== o); };
+  if (shieldTakes(cn, o.z + Math.min(7, into), taxi.x)) { clear(); return false; }
+  crash(g, cn, o.z + Math.min(7, into), taxi.x, 'obstacle');
+  // cleared under the pop, and the taxi moved into the open lane
+  cn.after(0.3, () => { clear(); st.place({ x: st.lanes[1] }); });
+  return true;
+}
+/* ----- animals: they always escape. Sounding the horn, or the taxi coming, makes them bolt; a hit or near miss costs 1 s and half the tip ----- */
+function bolt(cn, an) { if (an.bolt) return; an.bolt = an.face; cn.sfx.animal(an.kind); }
+function scareAnimals(g, cn) {
+  const st = cn.street;
+  for (const an of st.animals) if (st.gap(st.taxi.z, an.z) < HORN_REACH) bolt(cn, an);
+}
+function animalStep(g, cn) {
+  const st = cn.street, taxi = st.taxi, L = st.size('taxi');
+  for (const an of st.animals) {
+    const ahead = an.z - taxi.z;
+    if (ahead > 0 && ahead < BOLT_AT) bolt(cn, an);
+    if (an.done || an.gone) continue;
+    const S = st.size(an.kind);
+    if (ahead > L.length || ahead < -S.length) continue;
+    if (Math.abs(an.x - taxi.x) * st.width / 2 - (L.width + S.width) / 2 >= NEAR_MISS) continue;
+    an.done = true;
+    if (shieldTakes(cn, an.z, taxi.x)) continue;
+    g.held = taxi.speed; g.freeze = FREEZE_ANIMAL;
+    taxi.speed = 0;
+    halveTip(g, cn);
+    return;
+  }
+}
+/* ----- power-ups ----- */
+function tokenStep(g, cn) {
+  const st = cn.street, taxi = st.taxi;
+  for (const tk of st.tokens) {
+    if (tk.got || !over(cn, tk, 0, TOKEN_REACH * 2)) continue;
+    tk.got = true;
+    const carry = taxi.carry;
+    if (tk.kind === 'time') g.clock = Math.min(CLOCK_MAX, g.clock + TIME_BONUS);
+    else if (tk.kind === 'speed') { g.fast = FAST_S; carry.speed = 1; }
+    else if (tk.kind === 'shield') carry.shield = true;
+    else if (g.trip) { g.trip.boost = tk.kind; carry.fare = tk.kind; }   // 錢 or 雙: the newest replaces the older; with no passenger aboard, wasted
+  }
+  if (st.tokens.some((tk) => tk.got)) st.tokens = st.tokens.filter((tk) => !tk.got);
 }
 
 /* ----- bays: one at a time, never in a clear stretch or a tunnel. A place that would be goes just past the tunnel's exit ----- */
@@ -285,6 +435,7 @@ function droppedOff(g, cn) {
   g.trip = null;
   cn.meter.tip = null;
   st.taxi.hired = false;
+  st.taxi.carry.fare = null;
   st.stop.ring = false;
   st.pin = null;
   g.phase = 'paid'; g.wait = competitive(cn) && g.fares >= ZONE_FARES ? RECEIPT_S : NEXT_S;
