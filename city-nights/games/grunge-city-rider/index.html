@@ -41,6 +41,7 @@ const IN_BAY = 0.75;                                 // how much of the taxi mus
 const PASSENGER_KINDS = ['plain', 'case', 'bags'];
 const BOARD_S = 0.45, NEXT_S = 0.6;                  // the passenger fading in; the bay staying under the taxi before the next passenger
 const PAY_S = 0.8;                                   // the meter counts up what the slip adds
+const ZONE_FARES = 5, RECEIPT_S = 2.5;               // fares to clear a zone; the fifth's receipt goes back in before the zone change
 const TUNNEL_HALF = 90, CLEAR = 40;                  // metres: a tunnel each side of a district's line, and the clear stretch before it
 
 // how busy a zone is (the gameplay note's table): n counts zones from round 1's Tsim Sha Tsui; Practice stays at 0
@@ -81,6 +82,7 @@ CityNights.game({
     if (hornPressed(cn)) horn(cn);
     if (g.freeze > 0) { g.freeze -= dt; taxi.speed = 0; return; }
     drive(g, cn, dt);
+    loopStep(g, cn);
     payStep(g, cn, dt);
     bayStep(g, cn, dt);
     moveTraffic(g, cn, dt);
@@ -155,8 +157,34 @@ function crash(g, cn, z, x, kind, what) {
   g.freeze = FREEZE_CRASH;
   st.taxi.speed = 0;
   // what was hit is cleared away under the pop
-  if (what) cn.after(0.3, () => { st.cars = st.cars.filter((c) => c !== what); });
+  if (what) cn.after(0.3, () => { what.z = st.taxi.z + cn.rand(250, 450); });   // and comes back far ahead, so the road doesn't empty
   if (g.lives === 0) cn.gameOver(FREEZE_CRASH / 2);
+}
+
+/* ----- zones (Competitive): a zone is a district. Five fares clear it; the zone change's title hides the jump to the next one ----- */
+const competitive = (cn) => cn.mode !== 'practice';
+const zoneDistrict = (g, cn) => cn.street.districts[g.zone % cn.street.districts.length];
+const zoneEnd = (g, cn) => { const d = zoneDistrict(g, cn); return d.z + d.length; };
+function zoneDone(g, cn) {
+  const st = cn.street, n = st.districts.length, next = st.districts[(g.zone + 1) % n], round = Math.floor((g.zone + 1) / n) + 1;
+  st.stop = null; st.pin = null;
+  g.phase = 'none';
+  cn.zoneChange({ take: g.take, round, to: next.start }, () => {
+    // under the title: the new zone, its traffic, its first passenger, and the clock restarted
+    g.zone++; g.round = round; g.fares = 0; g.take = 0; g.clock = CLOCK_START;
+    cn.meter.round = round; cn.meter.fares = 0; cn.meter.time = g.clock;
+    setTraffic(g, cn);
+    newPassenger(g, cn);
+  });
+}
+// a zone that reaches the end of its district comes out at the start of the same one and carries on (Tunnel). The kit moves the
+// taxi and the traffic; what the game has laid ahead moves with them
+function loopStep(g, cn) {
+  if (!competitive(cn)) return;
+  const st = cn.street;
+  if (st.taxi.z < zoneEnd(g, cn)) return;
+  st.loop();
+  if (st.stop) st.stop.z -= st.districts[0].length;
 }
 
 /* ----- bays: one at a time, never in a clear stretch or a tunnel. A place that would be goes just past the tunnel's exit ----- */
@@ -173,8 +201,10 @@ function newPassenger(g, cn) {
 function newDropoff(g, cn, seconds) {
   const st = cn.street, z = bayPlace(cn, st.taxi.z + cn.rand(seconds[0], seconds[1]) * TOP);
   st.stop = { kind: 'dropoff', z, passenger: null, waiting: false };
-  // the destination: a sign on the left near the bay, so the player can spot it on arrival
-  const near = st.signs(z - 20, z + 30), left = near.filter((s) => s.side < 0 && s.zh);
+  // the destination: a sign on the left near the bay, so the player can spot it on arrival (past the line, a Competitive zone
+  // loops: the bay will be that far on from the district's start)
+  const at = z - (competitive(cn) && z >= zoneEnd(g, cn) ? st.districts[0].length : 0);
+  const near = st.signs(at - 20, at + 30), left = near.filter((s) => s.side < 0 && s.zh);
   st.pin = { name: ((left[0] || near.find((s) => s.zh)) || { zh: '明月酒店' }).zh, metres: Math.round(z + 5 - st.taxi.z) };
   g.phase = 'dropoff';
 }
@@ -190,7 +220,11 @@ function bayStep(g, cn, dt) {
   const st = cn.street, sp = st.stop, taxi = st.taxi;
   if (g.phase === 'boarding' || g.phase === 'paid') {
     g.wait -= dt;
-    if (g.wait <= 0) { if (g.phase === 'boarding') newDropoff(g, cn, DROPOFF_S); else newPassenger(g, cn); }
+    if (g.wait <= 0) {
+      if (g.phase === 'boarding') newDropoff(g, cn, DROPOFF_S);
+      else if (competitive(cn) && g.fares >= ZONE_FARES) zoneDone(g, cn);
+      else newPassenger(g, cn);
+    }
     return;
   }
   if (!sp) return;
@@ -253,7 +287,7 @@ function droppedOff(g, cn) {
   st.taxi.hired = false;
   st.stop.ring = false;
   st.pin = null;
-  g.phase = 'paid'; g.wait = NEXT_S;
+  g.phase = 'paid'; g.wait = competitive(cn) && g.fares >= ZONE_FARES ? RECEIPT_S : NEXT_S;
 }
 function payStep(g, cn, dt) {
   if (g.pay <= 0) return;
