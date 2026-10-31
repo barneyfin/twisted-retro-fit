@@ -1,4 +1,4 @@
-/* City Nights 0.11.3 — runtime
+/* City Nights 0.11.4 — runtime
    One file, no dependencies. Exposes window.CityNights. Pair it with city-nights.css.
    The shell is copied from Retro Kit's runtime (kit/retro-kit.js) and restyled to the City Nights design system;
    the street is the City Nights speed test's (city-nights/speed-test/src).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.11.3';
+  const VERSION = '0.11.4';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -823,11 +823,11 @@
       road:{near:'#30291c', far:'#4a3a26', lane:'#cdbf9e', yellow:'#cfa13a', pave:'#3a2f22', paveFar:'#4b3b29', kerb:'#6e5c40', cross:'#bdb39a'},
       shop:['#f3d49a','#c9ad78','#a3dccc','#f2b56b','#e8c27c','#c9e3a8'], shutter:'#2e2a24',
       awning:'#1c140d', win:'#e9b862', winWhite:'#d6e4dc', winBlue:'#93aee6', winDim:'#1f1810',
-      lamp:'#ffb84d', poolA:0.34, pole:'#16110c',
+      lamp:'#ffb84d', poolA:0.34 * 2 / 3, pole:'#16110c',   // poolA and reflect: a third down, so the bays show (Barney, 31 October 2026)
       fog:{c:'#3c2d1d', a:0.55, spread:0.16},
       bloom:{a:0.8, b:0.5}, vignette:0.55,
       sign:{glow:0.27},
-      reflect:0.34,
+      reflect:0.34 * 2 / 3,
       grain:[{tile:'mottle', blend:'overlay', a:0.95},{tile:'sparkle', blend:'screen', a:0.85}],
       swatches:[['Night black','#060504'],['Kerb brown','#3a2f22'],['Sodium amber','#ffb84d'],['Lightbox cream','#f4e6c0'],['Taxi red','#c4241c'],['Meter red','#ff3b26'],['Neon teal','#3fe6d4'],['Neon pink','#ff4fa8']]
     };
