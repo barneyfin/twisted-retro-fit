@@ -216,7 +216,7 @@ window.CityNights = (function () {
     // a picture lying flat on the road from d0 (near) to d1 (far), x0 to x1 across; drawn row by row so the perspective is true
     function decal(g, pt, tex, d0, d1, x0, x1, alpha, blend) {
       // rows meet on whole device pixels, so nothing is drawn twice (which would show as stripes in a blended glow)
-      var rows = 160, m = g.getTransform(), ky = m.d || 1, oy = m.f || 0, snap = function (y) { return (Math.round(y * ky + oy) - oy) / ky; };
+      var rows = 640, m = g.getTransform(), ky = m.d || 1, oy = m.f || 0, snap = function (y) { return (Math.round(y * ky + oy) - oy) / ky; };
       g.save(); g.globalAlpha = alpha == null ? 1 : alpha; if (blend) g.globalCompositeOperation = blend;
       var start = 0, top = null;
       for (var i = 0; i < rows; i++) {
@@ -225,8 +225,11 @@ window.CityNights = (function () {
         if (!pa || !pb || !qa || !qb) { start = i + 1; continue; }
         var y0 = snap(pa.y), y1 = snap(pb.y);
         if (y1 <= y0) continue;                                   // too thin yet: carry this row into the next
-        var xa = (pa.x + pb.x) / 2, xb = (qa.x + qb.x) / 2;
-        g.drawImage(tex, 0, tex.height * t0, tex.width, Math.max(1, tex.height * (t1 - t0)), xa, y0, xb - xa, y1 - y0);
+        // each row is drawn sheared along the road's edge rather than as a rectangle, so a picture's sides stay straight
+        // close to the camera instead of stepping (version 0.6.0, for the bay's bold edges)
+        var h = y1 - y0, w = ((qa.x - pa.x) + (qb.x - pb.x)) / 2;
+        g.save(); g.transform(1, 0, (pb.x - pa.x) / h, 1, pa.x, y0);
+        g.drawImage(tex, 0, tex.height * t0, tex.width, Math.max(1, tex.height * (t1 - t0)), 0, 0, w, h); g.restore();
         start = i + 1;
       }
       g.restore();
@@ -510,28 +513,72 @@ window.CityNights = (function () {
       return p;
     }
 
-    /* ---------- THE STOP ZONE: a painted bay, 3 m across and 10 m along, in the kerbside lane (Barney, option A) ----------
-       kind 'pickup': tube-teal, 上客 PICK-UP; 'dropoff': tube-pink, 落客 DROP-OFF. */
+    /* ---------- THE STOP ZONE: a bay 3 m across and 10 m along the kerbside lane, with a lit sign and three lit posts on the
+       kerb (Barney, 29 October 2026: option A, the painted bay; 31 October 2026, from play-testing on a phone: bold paint,
+       the words moved off the road onto a low kerb sign at the bay's start, and kerb posts along its far half).
+       kind 'pickup': tube-teal, 上客 PICK-UP; 'dropoff': tube-pink, 落客 DROP-OFF. Nothing in it flashes or pulses. */
     var BAY = { pickup: ['tube-teal', 'tube-core-teal', '上客', 'PICK-UP'], dropoff: ['tube-pink', 'tube-core-pink', '落客', 'DROP-OFF'] };
+    function mixHex(c, d, t) {   // two #rrggbb colours mixed, t of the way from c to d
+      var a = parseInt(c.slice(1), 16), e = parseInt(d.slice(1), 16), f = function (s) { return Math.round(((a >> s) & 255) * (1 - t) + ((e >> s) & 255) * t); };
+      return '#' + ((1 << 24) + (f(16) << 16) + (f(8) << 8) + f(0)).toString(16).slice(1);
+    }
+    // the bay's pictures, made once: the paint, its glow and its light on the road (lying flat), the sign and a post (upright)
     function bay(kind) {
       var b = BAY[kind] || BAY.pickup, c0 = col(b[0]), c1 = col(b[1]);
-      var W = 300, H = 1000, c = mk(W, H), g = c.getContext('2d'), lw = 16;   // 100 pixels per metre
-      g.fillStyle = rgba(c0, 0.13); g.fillRect(0, 0, W, H);                   // a faint wash of the colour
-      g.fillStyle = rgba(c0, 0.95); g.fillRect(0, 0, W, lw); g.fillRect(0, H - lw, W, lw);   // solid ends, dashed sides
-      for (var y = 0; y < H; y += 80) { g.fillRect(0, y, lw, 50); g.fillRect(W - lw, y, lw, 50); }
-      g.save(); g.translate(W / 2, H * 0.5); g.scale(1, 2.6); g.fillStyle = rgba(c1, 0.92); g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.font = '700 92px "Noto Sans TC", sans-serif'; g.fillText(b[2], 0, -40);   // stretched along the road, as road lettering is
-      g.font = '700 54px Antonio, sans-serif'; if ('letterSpacing' in g) g.letterSpacing = '4px'; g.fillText(b[3], 0, 40);
-      g.restore();
+      // the paint, 100 pixels per metre: a deep fill of the colour, darkened towards the road so a street lamp's light can't
+      // turn it pale; bold bars across it; solid 0.3 m edges all round. No words on the road: they are on the sign.
+      var W = 300, H = 1000, c = mk(W, H), g = c.getContext('2d'), e = mk(W, H), eg = e.getContext('2d'), lw = 30;
+      g.fillStyle = rgba(mixHex(c0, col('case'), 0.45), 0.6); g.fillRect(0, 0, W, H);
+      g.fillStyle = rgba(c0, 0.55);
+      for (var y = -W; y < H + W; y += 100) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y - W * 0.55); g.lineTo(W, y - W * 0.55 + 34); g.lineTo(0, y + 34); g.closePath(); g.fill(); }
+      var edges = function (gg) { gg.fillStyle = c0; gg.fillRect(0, 0, W, lw); gg.fillRect(0, H - lw, W, lw); gg.fillRect(0, 0, lw, H); gg.fillRect(W - lw, 0, lw, H); };
+      edges(g); edges(eg);   // the glow is made from the edges alone, so the middle keeps its colour
       var spill = mk(200, 200), sg = spill.getContext('2d'), sgr = sg.createRadialGradient(100, 100, 0, 100, 100, 100);   // fades to nothing before its edges
-      sgr.addColorStop(0, rgba(c0, 0.35)); sgr.addColorStop(1, rgba(c0, 0)); sg.fillStyle = sgr; sg.fillRect(0, 0, 200, 200);
-      return { paint: c, glow: blurred(c, 10), spill: spill };
+      sgr.addColorStop(0, rgba(c0, 0.22)); sgr.addColorStop(1, rgba(c0, 0)); sg.fillStyle = sgr; sg.fillRect(0, 0, 200, 200);
+      return { paint: c, glow: blurred(e, 12), spill: spill, sign: baySign(b, c0, c1), post: bayPost(c0, c1) };
     }
-    // draw a bay made by bay(): its light on the wet road, the paint, then the paint's glow
+    // the sign: a low lightbox on two legs, square to the traffic, at the bay's start. Its panel is 1.6 m across and 1 m tall,
+    // from 1.1 m to 2.1 m up, so the pin's tag (TargetPin) never sits on it; neon-board inside the bay's tube, 上客 PICK-UP
+    // or 落客 DROP-OFF in the tube's core colour. 100 pixels per metre; ax, ay is the middle of its foot.
+    function baySign(b, c0, c1) {
+      var P = 100, c = mk(3 * P, 3 * P), g = c.getContext('2d'), cx = 1.5 * P, foot = 2.75 * P;
+      var X = function (x) { return cx + x * P; }, Y = function (y) { return foot - y * P; };
+      g.fillStyle = col('pole'); g.fillRect(X(-0.62), Y(1.15), 0.09 * P, 1.15 * P); g.fillRect(X(0.53), Y(1.15), 0.09 * P, 1.15 * P);
+      g.save(); g.shadowColor = rgba(c0, 0.8); g.shadowBlur = 0.45 * P; g.fillStyle = col('neon-board'); g.fillRect(X(-0.8), Y(2.1), 1.6 * P, P); g.restore();
+      g.fillStyle = col('neon-board'); g.fillRect(X(-0.8), Y(2.1), 1.6 * P, P);
+      var tube = function (draw, w) {
+        g.save(); g.lineJoin = 'round'; g.shadowColor = rgba(c0, 0.95); g.shadowBlur = 0.16 * P; g.strokeStyle = c0; g.lineWidth = w * P; draw(); g.restore();
+        g.save(); g.strokeStyle = c1; g.lineWidth = w * 0.4 * P; draw(); g.restore();
+      };
+      tube(function () { g.strokeRect(X(-0.71), Y(2.01), 1.42 * P, 0.82 * P); }, 0.055);
+      g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+      g.font = '700 ' + 0.46 * P + 'px "Noto Sans TC", sans-serif';
+      g.save(); g.shadowColor = rgba(c0, 0.95); g.shadowBlur = 0.14 * P; g.fillStyle = c1; g.fillText(b[2], X(0), Y(1.48)); g.restore();
+      g.font = '700 ' + 0.18 * P + 'px Antonio, sans-serif'; if ('letterSpacing' in g) g.letterSpacing = 0.025 * P + 'px';
+      g.fillStyle = c1; g.fillText(b[3], X(0), Y(1.25)); if ('letterSpacing' in g) g.letterSpacing = '0px';
+      return { c: c, ppm: P, ax: cx, ay: foot };
+    }
+    // a kerb post: dark, 1.2 m tall and 0.2 m across, with a steady band of the bay's light near its top. 200 pixels per metre.
+    function bayPost(c0, c1) {
+      var P = 200, c = mk(0.6 * P, 1.4 * P), g = c.getContext('2d'), cx = 0.3 * P, foot = 1.35 * P, w = 0.2 * P, h = 1.2 * P;
+      g.fillStyle = col('pole'); g.fillRect(cx - w / 2, foot - h, w, h);
+      g.save(); g.shadowColor = rgba(c0, 0.95); g.shadowBlur = 0.12 * P; g.fillStyle = c0; g.fillRect(cx - w / 2 - 0.01 * P, foot - 0.95 * h, w + 0.02 * P, 0.36 * h); g.restore();
+      g.fillStyle = c1; g.fillRect(cx - w * 0.28, foot - 0.91 * h, w * 0.56, 0.28 * h);
+      g.fillStyle = rgba('#ffffff', 0.25); g.fillRect(cx - w / 2, foot - h, w, 0.04 * P);   // the cap
+      return { c: c, ppm: P, ax: cx, ay: foot };
+    }
+    // draw a bay made by bay() on the road: its light on the wet road, the paint, then the edges' glow
     function drawBay(g, pt, b, d0, d1, x0, x1) {
-      decal(g, pt, b.spill, d0 - 3, d1 + 3, x0 - 1.5, x1 + 1.5, 0.55, 'lighter');
-      decal(g, pt, b.paint, d0, d1, x0, x1, 0.88);
-      decal(g, pt, b.glow, d0, d1, x0, x1, 0.6, 'lighter');
+      decal(g, pt, b.spill, d0 - 3, d1 + 3, x0 - 1.5, x1 + 1.5, 0.45, 'lighter');
+      decal(g, pt, b.paint, d0, d1, x0, x1, 0.95);
+      decal(g, pt, b.glow, d0, d1, x0, x1, 0.75, 'lighter');
+    }
+    // where the bay's upright parts stand, for the game to stand with the street's other upright things, far to near:
+    // the sign 0.4 m before the bay's start, 0.85 m in from its kerb edge (x0); a post at 5, 7.5 and 10 m along, 0.3 m in.
+    // Each: { spr: b.sign or b.post, d, x } -> street.stand(g, pt, it.spr, it.d, it.x).
+    function bayStands(b, d0, x0) {
+      return [{ spr: b.post, d: d0 + 10, x: x0 - 0.3 }, { spr: b.post, d: d0 + 7.5, x: x0 - 0.3 }, { spr: b.post, d: d0 + 5, x: x0 - 0.3 },
+        { spr: b.sign, d: d0 - 0.4, x: x0 - 0.85 }];
     }
 
     // ---- the tunnel at every district line: the portal's face (Barney, 30 October 2026: B, under a tower, 夜光隧道 Nightglow
@@ -605,10 +652,10 @@ window.CityNights = (function () {
       PPM: PPM, stand: stand, decal: decal, shadow: shadow, box: box,
       boar: boar, dog: dog, cat: cat, chicken: chicken, crate: crate,
       oil: oil, pothole: pothole, cone: cone, roadworks: roadworks, cargo: cargo,
-      passenger: passenger, pool: pool, bay: bay, drawBay: drawBay, tunnelFace: tunnelFace,
+      passenger: passenger, pool: pool, bay: bay, drawBay: drawBay, bayStands: bayStands, tunnelFace: tunnelFace,
       // true sizes in metres (Barney, 29 October 2026: true size)
       sizes: { boar: [1.4, 0.9], dog: [1.0, 0.62], cat: [0.5, 0.3], chicken: [0.45, 0.4], crate: [0.7, 0.45], oil: [2.8, 6.5], pothole: [1.9, 3.2],
-        barriers: [3.15, 0.95], cone: [0.4, 0.72], cargo: [2.6, 3.2], passenger: [0.6, 1.7], pool: [2.8, 2.8], bay: [3, 10],
+        barriers: [3.15, 0.95], cone: [0.4, 0.72], cargo: [2.6, 3.2], passenger: [0.6, 1.7], pool: [2.8, 2.8], bay: [3, 10], baySign: [1.6, 2.1], bayPost: [0.2, 1.2],
         tunnel: [12, 4.8], tunnelFace: [13.5, 36] }
     };
   })();
@@ -834,7 +881,8 @@ window.CityNights = (function () {
       }
       g.restore();
     }
-    // ---- the touch zones on a phone: either thumb, in either zone (drag to steer, hold to brake, a quick tap for the horn).
+    // ---- the touch zones on a phone: where touches count. What a touch does is the game's: in Grunge City Rider the side it lands
+    // on decides, until it lifts (left of the taxi drags to steer, right holds to brake; a quick tap on either side is the horn).
     // Each runs from the top of the meter's case to the bottom of the screen: one from the left edge to the taxi, one from the
     // taxi to the right edge. A touch that starts in a zone keeps counting wherever it moves. Returns the two rectangles.
     function touchZones(viewW, viewH, meterTop, taxiLeft, taxiRight) {
@@ -846,5 +894,5 @@ window.CityNights = (function () {
       times: { receiptIn: 0.25, receiptHold: 2, receiptOut: 0.25, zoneIn: 0.4, zoneHold: 1, zoneSwap: 0.6, zoneOut: 0.4, ringFade: 0.3 } };
   })();
 
-  return { digits: digits, mountDigits: mountDigits, fare: fare, crashPop: POP, drawCrashPop: drawCrashPop, street: street, hud: hud, version: '0.5.0' };
+  return { digits: digits, mountDigits: mountDigits, fare: fare, crashPop: POP, drawCrashPop: drawCrashPop, street: street, hud: hud, version: '0.6.0' };
 })();

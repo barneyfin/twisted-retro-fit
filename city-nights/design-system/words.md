@@ -73,8 +73,8 @@ Every Chinese word City Nights shows. A Cantonese reader checks this list before
 | --- | --- | --- |
 | 道路工程 | Roadworks sign, ROAD WORKS | Road works (dou6 lou6 gung1 cing4). |
 | 易碎 | Spilt cargo boxes | Fragile (ji6 seoi3), as printed on boxes. |
-| 上客 | Pick-up bay, PICK-UP | Pick up passengers (soeng5 haak3). 上 alone is on the pin over a pick-up. |
-| 落客 | Drop-off bay, DROP-OFF | Drop off passengers (lok6 haak3), as on Hong Kong drop-off signs. 落 alone is on the pin over a drop-off. |
+| 上客 | The pick-up bay's sign, PICK-UP | Pick up passengers (soeng5 haak3). 上 alone is on the pin over a pick-up. |
+| 落客 | The drop-off bay's sign, DROP-OFF | Drop off passengers (lok6 haak3), as on Hong Kong drop-off signs. 落 alone is on the pin over a drop-off. |
 
 ## The tunnel
 

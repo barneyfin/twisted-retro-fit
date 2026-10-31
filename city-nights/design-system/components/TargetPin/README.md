@@ -22,6 +22,7 @@ CityNights.hud.pin(g, x, y, k, m, { kind: 'drop', name: '明月酒店', metres: 
 - **The pin**: a teardrop on `neon-board` in a 3.6 tube (`tube-pink` for a drop-off, `tube-teal` for a pick-up) with its 1.3 core (`tube-core-pink`, `tube-core-teal`) and the tube's glow; 落 or 上 in Noto Sans TC Bold, 17px, in the core colour. Its point is on the spot.
 - **The tag**, on the kerb side (left) of the pin: `neon-board`, 6px corners, a 2px tube ring with its glow; the name in `pin-name` (drop-offs only) over the metres in `pin-metres` ("300 M"), right-aligned, in the core colour.
 - **Destinations are named after the street's own signs** (Barney, 30 October 2026), so the name needs no new characters and the player can spot the sign on arrival.
+- **The bay's sign** stands low, from 1.1 m to 2.1 m up, so the tag never sits on it (StopZone, 31 October 2026).
 - **Inside the bay** (three-quarters of the taxi in it) the pin keeps no tag; it goes when the stop counts. After a pick-up the pink pin appears over the drop-off; after a drop-off the next teal pin appears with the next passenger.
 - **Missed drop-off**: the pin moves on to the new bay ahead with its new distance.
 - **Why it is in the street**: the taxi hides a bay in its own lane from about 20 m, and hides almost all of it once inside, so the pin marks it from far off. It stands above the horizon most of the time, clear of the lane ahead.

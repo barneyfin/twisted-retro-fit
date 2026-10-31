@@ -1,4 +1,4 @@
-<!-- @dsCard group="World" height=840 width=960 subtitle="One bay, two colours: on the street, drawn live in the kerbside lane, then the bay's ring once three-quarters of the taxi is inside" -->
+<!-- @dsCard group="World" height=1056 width=960 subtitle="One bay, two colours: bold paint, a low lit sign at its start and three lit posts along its far half; drawn live, in the bay with its ring, and on a phone" -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -14,18 +14,22 @@ body{margin:0;background:var(--night-black)}
 </style>
 </head>
 <body>
-<div class="stage" style="height:840px">
-  <img src="/_blob/ed15cb20b576926117f1f9c15f642c22" alt="On the street: the teal pick-up bay in the left-hand lane, lettered 上客 PICK-UP" style="left:0px;top:0px;width:480px;height:270px">
-  <img src="/_blob/38bc1e349cd1006239cb078f39724d5f" alt="On the street: the pink drop-off bay in the left-hand lane, lettered 落客 DROP-OFF" style="left:480px;top:0px;width:480px;height:270px">
+<div class="stage" style="height:1056px">
+  <img src="/_blob/b9ce6116954746f8b4350447d3e7c0a5" alt="On the street: the teal pick-up bay in the left-hand lane, its 上客 PICK-UP sign at the start and three lit posts along the far half, a passenger with a suitcase waiting" style="left:0px;top:0px;width:480px;height:270px">
+  <img src="/_blob/6626581b38ba323def13e5b00e711975" alt="On the street: the pink drop-off bay in the left-hand lane, its 落客 DROP-OFF sign at the start and three lit posts along the far half" style="left:480px;top:0px;width:480px;height:270px">
   <canvas id="c1" style="left:0;top:270px;width:480px;height:300px"></canvas>
   <canvas id="c2" style="left:480px;top:270px;width:480px;height:300px"></canvas>
   <span class="tag" style="left:10px;top:10px">On the street</span>
   <span class="tag" style="left:10px;top:280px">Pick-up · tube-teal · <span class="zh">上客</span> PICK-UP</span>
   <span class="tag" style="left:490px;top:280px">Drop-off · tube-pink · <span class="zh">落客</span> DROP-OFF</span>
-  <img src="/_blob/543158efeeea9bbfada604101d1569aa" alt="The taxi three-quarters inside the teal pick-up bay, the bay's teal ring of light on the road round it" style="left:0;top:570px;width:480px;height:270px">
-  <img src="/_blob/81eea484599ba0d10ede32d1197a363e" alt="The taxi braking inside the pink drop-off bay, the bay's pink ring round it" style="left:480px;top:570px;width:480px;height:270px">
+  <img src="/_blob/d0e6debff986d99127a181b05a4a9332" alt="The taxi three-quarters inside the teal pick-up bay, the bay's teal ring of light on the road round it" style="left:0;top:570px;width:480px;height:270px">
+  <img src="/_blob/f6bb946992844989d37d457adc53b6a0" alt="The taxi braking inside the pink drop-off bay, the bay's pink ring round it, the sign beside it on the left" style="left:480px;top:570px;width:480px;height:270px">
   <span class="tag" style="left:10px;top:580px">In the bay: its ring (<code>CityNights.hud.bayRing</code>)</span>
-  <span class="tag" style="left:490px;top:580px">Only paint by the rear wheels still shows</span>
+  <span class="tag" style="left:490px;top:580px">The taxi hides the paint; the sign and posts still show</span>
+  <img src="/_blob/1e7e46615ecb1f8a26e11262589a1bf6" alt="On a phone: the teal pick-up bay 12 m ahead under a street lamp, its sign readable, the passenger waving" style="left:0;top:840px;width:480px;height:216px">
+  <img src="/_blob/192548154a2690a90312c083d385336c" alt="On a phone: the taxi in the bay's lane 20 m short of the pink drop-off bay; the sign and posts show over its roof" style="left:480px;top:840px;width:480px;height:216px">
+  <span class="tag" style="left:10px;top:850px">On a phone, 12 m ahead, under a lamp</span>
+  <span class="tag" style="left:490px;top:850px">In the bay's lane, 20 m short: over the roof</span>
 </div>
 <script>
 (function () {
@@ -56,7 +60,8 @@ body{margin:0;background:var(--night-black)}
   function draw() {
     [['c1', 'pickup'], ['c2', 'dropoff']].forEach(function (a) {
       var g = canvasFor(a[0], 480, 300), pt = cam(480, 300, -1.2, 1.35); street(g, 480, 300, pt);
-      S.drawBay(g, pt, S.bay(a[1]), 2.5, 12.5, -4.85, -1.85);
+      var b = S.bay(a[1]); S.drawBay(g, pt, b, 4, 14, -4.85, -1.85);
+      S.bayStands(b, 4, -4.85).forEach(function (it) { S.stand(g, pt, it.spr, it.d, it.x); });   // far to near: the posts, then the sign
     });
   }
 })();
