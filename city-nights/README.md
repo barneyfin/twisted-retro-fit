@@ -154,25 +154,25 @@ With everything on screen, the time to draw a frame is the same as the street al
 
 ### Results, 31 October 2026 (kit 0.11.3, the tunnels, Chrome 156)
 
-Measured on the Pixel so far, in full screen with its screen at 120 Hz, from the copy of the test page without the soundtracks. The computer's results are still to come.
+The Pixel in full screen with its screen at 120 Hz, from the copy of the test page without the soundtracks; the computer from the page with both.
 
-| Pixel 11 Pro XL | Kit 0.11.3 |
-|---|---|
-| Street alone, with a crash pop, with street pieces | 120 fps, about 3.1 ms, each |
-| With the whole play screen | 120 fps, about 3.2 ms |
-| Slowest 1 frame in 20 came | 9 ms apart |
-| Zone change's cross-fade | 120 fps, slowest frame 9 ms |
-| Slowest frame of the whole zone change | 10 ms |
-| **Through a tunnel** | **120 fps, about 2.1 ms, slowest frame 20 ms** |
-| **The loop's jump** | **slowest frame 10 ms** |
-| Crash pop words drawn | 156 ms, 1329 × 861 each |
-| Picture | 1803 × 810, 4× smoothing |
-| Targets | pass |
-| Building the street when the page opens | 3.17 s (planning it 61 ms, its first pieces 19 ms) |
-| Start game worked, and the first picture | 3.36 s after opening |
-| Graphics memory in all (the kit's count) | 260 MB: street shapes 2.6, other buffers 0.4, textures 190, picture buffers 67 |
+| | Computer, RTX 5080 | Pixel 11 Pro XL |
+|---|---|---|
+| Street alone, with a crash pop, with street pieces | 60 fps, under 2.1 ms, each | 120 fps, about 3.1 ms, each |
+| With the whole play screen | 60 fps, under 2.1 ms | 120 fps, about 3.2 ms |
+| Slowest 1 frame in 20 came | 17 ms apart | 9 ms apart |
+| Zone change's cross-fade | 60 fps, slowest frame 17 ms | 120 fps, slowest frame 9 ms |
+| Slowest frame of the whole zone change | 17 ms | 10 ms |
+| **Through a tunnel** | **60 fps, under 2.1 ms, slowest frame 17 ms** | **120 fps, about 2.1 ms, slowest frame 20 ms** |
+| **The loop's jump** | **slowest frame 17 ms** | **slowest frame 10 ms** |
+| Crash pop words drawn | 38 ms, 2859 × 1853 each | 156 ms, 1329 × 861 each |
+| Picture | 1632 × 810, 4× smoothing | 1803 × 810, 4× smoothing |
+| Targets | pass | pass |
+| Building the street when the page opens | 777 ms (planning it 34 ms, its first pieces 6 ms) | 3.17 s (planning it 61 ms, its first pieces 19 ms) |
+| Start game worked, and the first picture | 0.89 s after opening | 3.36 s after opening |
+| Graphics memory in all (the kit's count) | 243 to 253 MB: street shapes 3.5 to 4.5, other buffers 0.4, textures 178 to 188, picture buffers 61 | 260 MB: street shapes 2.6, other buffers 0.4, textures 190, picture buffers 67 |
 
-A frame takes less to draw inside a tunnel than on the street. The loop's jump, making its new pieces there and then, held up no frame that shows: 10 ms against 8.3 ms for one refresh of the screen, and Barney could not see it in scene 12. The face fitted on the atlas's existing pages: textures are 190 MB, as on kit 0.10.1. Opening is 3.36 s against 3.06 s and 3.27 s on earlier kits, about the variation between runs.
+A frame takes less to draw inside a tunnel than on the street. The loop's jump, making its new pieces there and then, held up no frame that shows: 10 ms against 8.3 ms for one refresh of the screen, and Barney could not see it in scene 12. The face fitted on the atlas's existing pages: textures are 190 MB, as on kit 0.10.1. Opening is 3.36 s against 3.06 s and 3.27 s on earlier kits, about the variation between runs. The computer opens as quickly as before the tunnels (0.94 s and 1.05 s on kit 0.10). An earlier run with a game running stalled for over 2 s at a time, so the check needs the computer otherwise idle. Chrome's Task Manager has not been read on this kit.
 
 ### Checks on the tunnels (kit 0.11.3)
 
