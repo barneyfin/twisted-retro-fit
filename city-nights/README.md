@@ -43,7 +43,7 @@ The template, as it is, drives up the street through traffic: a working game to 
 | 4 Crash | The taxi runs into each kind of vehicle in turn, then roadworks: the crash pop, the brake lights and the two crash sounds. The words come in turn, CRASH!, SMASH!, BANG!, then one the kit picks at random (as a game gets it); press C, S or B to choose the next word, R for a random one. The plaque shows how long the crash pop's three words took to draw. |
 | 5 Vehicles | Every vehicle in every colour, keeping pace with the taxi. |
 | 6 Street | The street's pieces, laid out ahead of the taxi each lap: roadworks closing the left lane, an oil slick, spilt cargo and a flooded pothole; the wild boar, the stray dog, the street cat and the market chickens, each bolting for the kerb as the taxi comes; a passenger waving at the pick-up bay (plain, with a suitcase, then with shopping, one each lap), then the drop-off bay. ↓ slows down. |
-| 7 Long street | Each district in turn, from 40 m before its edge, for 15 seconds at 84 km/h (快's speed) with traffic, while the street is made a piece at a time; then again. After all four, about a minute, the plaque shows the frame rate, the slowest frames, and how many pieces of street were made and how long each took. On a phone this is the way to see every district. |
+| 7 Long street | Each district in turn, from 150 m before its edge (60 m before its tunnel's portal), for 15 seconds at 84 km/h (快's speed) with traffic, while the street is made a piece at a time; then again. After all four, about a minute, the plaque shows the frame rate, the slowest frames, and how many pieces of street were made and how long each took. On a phone this is the way to see every district. |
 | 8 Play screen | Grunge City Rider's play screen (design system v10), a state at a time, 3.5 seconds each, named on the plaque: mid-fare with everything at once (lives, the tip counting, the caption's round line and lamps, the drop-off pin far off, the 快 保 雙 badges with 快 emptying and 保's ring, the roof sign out); a fare paid (the receipt slip); a pick-up ahead (the teal pin, counting down); in the bay (the bay's ring, 保's ring stepping aside, the pin with no tag); getting in (the passenger fading, the roof sign going out); the tip halved and the tip lost (their receipts, the tip's dashes); lives from 3 to 0 and the lamps from 0 to 5. |
 | 9 Moments | Each in turn, laid out ahead of the taxi: the shielded hit on a car (the SAFE! sign over the taxi's roof, the car cleared away, 保's badge and ring gone, no freeze), the shielded hit on roadworks (the SAFE! sign over the barrier), a crash into roadworks (the crash pop, the barriers cleared away, the taxi moved into the open lane in the pop's first second), and the zone change (the street dims, the caption grows into the title of the district finished with its lamps and takings, the taxi jumps to the next district, the title of the new one and its round, then back into the caption). |
 | 0 Touch | The touch zones outlined (only here; nothing marks them in a game): from the top of the meter's case down, either side of the taxi. A touch that starts outside them does nothing, so here a tap over the street does not change scene. Drag in either to steer (either thumb), two thumbs down to slow; a tap inside an outline goes to the next scene, Sound. |
@@ -56,9 +56,9 @@ Pause (Esc, or the pause tile) and Settings work as in any game, so every screen
 
 ## The speed check
 
-Scene 2 repeats the speed test's Mong Kok measurement, now on the finished kit. It starts by itself: the taxi goes to the edge of Mong Kok and drives through it at 68 km/h, four times, about 32 seconds in all with the zone change at the end. For the first part every frame is timed (the frame rate); for the next 3 seconds each frame is drawn eight times over, so the picture slows down on purpose while it works out how long one frame takes to draw. The second run does the same with a crash pop lit all the while (a new one each second), the third with street pieces on screen: roadworks, oil, spilt cargo, a pothole, the chickens and the boar, and a passenger at the pick-up bay; and the fourth with the whole play screen on top of those (the pin, the badges, 保's ring, the caption's round line and lamps, the meter with lives and the tip, and a receipt always showing). Each run starts again from the edge of Mong Kok, so all four are measured on the same street. Last comes a zone change, whose frames are timed: its cross-fade draws two pictures a frame, and its jump makes new pieces of street. Leave the page alone until the plaque shows the result.
+Scene 2 repeats the speed test's Mong Kok measurement, now on the finished kit. It starts by itself: the taxi goes to the edge of Mong Kok and drives through it at 68 km/h, four times, then times a zone change and a run through a tunnel: about 50 seconds in all. For the first part every frame is timed (the frame rate); for the next 3 seconds each frame is drawn eight times over, so the picture slows down on purpose while it works out how long one frame takes to draw. The second run does the same with a crash pop lit all the while (a new one each second), the third with street pieces on screen: roadworks, oil, spilt cargo, a pothole, the chickens and the boar, and a passenger at the pick-up bay; and the fourth with the whole play screen on top of those (the pin, the badges, 保's ring, the caption's round line and lamps, the meter with lives and the tip, and a receipt always showing). Each run starts again from the edge of Mong Kok, so all four are measured on the same street. Next comes a zone change, whose frames are timed: its cross-fade draws two pictures a frame, and its jump makes new pieces of street. Last comes a run through a tunnel: the approach, inside, the loop at the district line and coming out, every frame timed, then a frame timed deep inside. Leave the page alone until the plaque shows the result.
 
-Close any other copy of the page first (two copies fight over the graphics chip), and use Chrome. The result names the frame rate and the time to draw a frame for each run (the street alone, with a crash pop, with street pieces, with the whole play screen); the zone change's cross-fade frame rate and its slowest frames; whether each target passes (on all four runs); how long the crash pop's three words took to draw; the picture size and smoothing, the browser and the graphics chip. The targets, as in the speed test:
+Close any other copy of the page first (two copies fight over the graphics chip), and use Chrome. The result names the frame rate and the time to draw a frame for each run (the street alone, with a crash pop, with street pieces, with the whole play screen, through a tunnel); the zone change's cross-fade frame rate and its slowest frames; the loop's slowest frame; whether each target passes (on all five runs); how long the crash pop's three words took to draw; the picture size and smoothing, the browser and the graphics chip. The targets, as in the speed test:
 
 - **Phone**: at least 30 frames a second, and each frame drawn in 25 ms or less.
 - **Computer**: 60 frames a second.
@@ -69,7 +69,7 @@ The check waits until Automatic (below) has finished timing the picture. To run 
 
 **Graphics memory and opening times** (kit 0.7): the plaque's fourth line, in scenes 1, 2 and 7, shows what the kit has put on the graphics chip, in MB (the street's shapes, other buffers, textures, and the picture's buffers), and three times from opening the page: how long building the street took, when Start game began to work, and when the first street picture showed. It is the kit's own count of what it asked for; on the computer, Chrome's Task Manager (Shift+Esc, the GPU memory column) shows what the driver really uses.
 
-Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips while each frame is drawn eight times (four times in the check, 3 seconds each); the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
+Check that the result names the device's own graphics chip. "Microsoft Basic Render Driver" (or "SwiftShader") means Chrome is drawing without it, and the numbers are meaningless: restart Chrome completely, and check `chrome://gpu` says WebGL2 is hardware accelerated. The frame rate in the plaque's top line dips while each frame is drawn eight times (five times in the check, 3 seconds each); the result line is the one to read. Chrome on Android always names itself "Android 10", whatever the phone runs.
 
 ### Results, 29 October 2026 (kit 0.4, Mong Kok, Chrome 156)
 
@@ -152,6 +152,32 @@ The computer ran the page with both soundtracks; the Pixel ran a copy without th
 
 With everything on screen, the time to draw a frame is the same as the street alone on both devices, and the zone change's cross-fade and its jump held up no frame. The computer's 228 MB includes the two decoded soundtracks, about 119 MB worked out from their length (337 s of stereo); the footprint was not read without them. Its 153 MB is what Chrome reports the page really using on the graphics chip, against the 254 MB the kit asked for, a reading taken on one run. Opening times vary from run to run. On the Pixel with both soundtracks (kit 0.10.2), Barney saw no glitch through scene 11's jumps and switches, the music did not stutter at a switch, and the page opened with the street built in 2.98 s (planning it 56 ms, its first pieces 22 ms) and Start game working at 3.23 s, against 3.06 s without the soundtracks: about the variation between any two runs. Its speed check, in full screen with both soundtracks: 120 fps on all four runs, about 3.2 ms a frame, slowest 1 frame in 20 came 9 ms apart; the zone change's cross-fade at 120 fps, its slowest frame 12 ms; crash pop words drawn in 121 ms, 1329 × 861 each; a 1803 × 810 picture with 4× smoothing; both targets pass; 262 MB of graphics memory by the kit's count (street shapes 4.4, other buffers 0.4, textures 190, picture buffers 67). The soundtracks made no difference to the frames.
 
+### Results, 31 October 2026 (kit 0.11.3, the tunnels, Chrome 156)
+
+Measured on the Pixel so far, in full screen with its screen at 120 Hz, from the copy of the test page without the soundtracks. The computer's results are still to come.
+
+| Pixel 11 Pro XL | Kit 0.11.3 |
+|---|---|
+| Street alone, with a crash pop, with street pieces | 120 fps, about 3.1 ms, each |
+| With the whole play screen | 120 fps, about 3.2 ms |
+| Slowest 1 frame in 20 came | 9 ms apart |
+| Zone change's cross-fade | 120 fps, slowest frame 9 ms |
+| Slowest frame of the whole zone change | 10 ms |
+| **Through a tunnel** | **120 fps, about 2.1 ms, slowest frame 20 ms** |
+| **The loop's jump** | **slowest frame 10 ms** |
+| Crash pop words drawn | 156 ms, 1329 × 861 each |
+| Picture | 1803 × 810, 4× smoothing |
+| Targets | pass |
+| Building the street when the page opens | 3.17 s (planning it 61 ms, its first pieces 19 ms) |
+| Start game worked, and the first picture | 3.36 s after opening |
+| Graphics memory in all (the kit's count) | 260 MB: street shapes 2.6, other buffers 0.4, textures 190, picture buffers 67 |
+
+A frame takes less to draw inside a tunnel than on the street. The loop's jump, making its new pieces there and then, held up no frame that shows: 10 ms against 8.3 ms for one refresh of the screen, and Barney could not see it in scene 12. The face fitted on the atlas's existing pages: textures are 190 MB, as on kit 0.10.1. Opening is 3.36 s against 3.06 s and 3.27 s on earlier kits, about the variation between runs.
+
+### Checks on the tunnels (kit 0.11.3)
+
+Barney looked on his Pixel: the portal, the inside and the exit look the same as the design system's version 12 boards; he could not see the loop's jump in scene 12; the rain's fade sounds right. In the app's own browser: the build's font and character checks pass (123 characters); the strips are continuous and the lane signals steady, as there is nothing in them that changes. Calling the loop, and keeping bays, power-ups, obstacles, animals and passengers out of the clear stretches and the tunnels, are left to the game.
+
 ### Checks before handing back (kit 0.10.2)
 
 Checked in the app's own browser, with the page's sound silenced:
@@ -164,6 +190,15 @@ Checked in the app's own browser, with the page's sound silenced:
 - **The fonts** in `kit\fonts\` are the design system's, and the build's font and character checks pass (122 characters).
 
 Barney compared each piece side by side with the design system's previews and the canvas row: good.
+
+## The tunnels (kit 0.11)
+
+夜光隧道 Nightglow Tunnel stands at every district line (design system v12, `design-system/components/Tunnel`), 180 m long with the line in its middle.
+
+- **The street round it**: the road runs straight from 40 m before each portal to the exit, so all four tunnels are the same (Barney's choice, 30 October 2026; a bend reaching that stretch is left out whole). That 40 m is the clear stretch: no hanging signs, cables or side streets. Nothing of the street's is inside, and nobody walks in it or within 30 m of it. A game keeps its bays, power-ups, obstacles, animals and passengers out of both.
+- **The inside** is made from the place in the tunnel, not along the street: walls, ceiling, road, walkways and two continuous light strips. The far end is lost in `tunnel-haze` by about 80 m; the exit's light spills over the last 16 m. The taxi and the traffic are lit about half as bright inside, changing over about a second as a mouth fills the view, and the rain drops to a fifth (Barney's choice).
+- **The jumps**: a zone starts at `street.districts[i].start`, 20 m before the exit of the tunnel at the district's start (a starting figure). `street.loop()`, called in the update where the taxi crosses the line at the end of its zone, takes the taxi and the traffic back one district, so it comes out at the start of the same district. Compared pixel by pixel in the app's browser, the picture differs by 0.1 to 0.6 out of 255 on average across the jump, close to the shimmer between two frames in one place.
+- **Known differences**: the signs and lane signals on the portal's face share the buildings' grain, because they are one picture (the handover accepts this). 健康藥房's neon on the face has no pale core: the design system's code asks for `tube-core-green`, which is not among its tokens. It is copied as it is.
 
 ## The long street (kit 0.7)
 

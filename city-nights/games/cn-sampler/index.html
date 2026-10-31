@@ -112,17 +112,20 @@ const mongKok = (cn) => cn.street.districts[3].z + 95;   // metres: just past th
    device can't keep up with the screen, and the gap divided by eight is the time to draw one frame. Then the same
    again with a crash pop lit all the while (a new one each second), again with street pieces on screen, and again with
    Grunge City Rider's whole play screen on top of them (pin, badges, 保's ring, the caption's round line, a receipt
-   always showing, traffic), to show what each costs. Last, a zone change, timing its frames. */
+   always showing, traffic), to show what each costs. Then a zone change, timing its frames. Last, a run through a tunnel:
+   the approach, inside, the loop at the district line and coming out, every frame timed; then a frame timed deep inside. */
 const LOADN = 8;
-const CHECK = [   // the parts in order and how long each lasts in seconds; run 0 is the street alone, 1 with a crash pop, 2 with pieces, 3 the whole play screen
+const CHECK = [   // the parts in order and how long each lasts in seconds; run 0 is the street alone, 1 with a crash pop, 2 with pieces, 3 the whole play screen, 4 through a tunnel
   { name: 'settle', t: 0.7, run: 0 }, { name: 'fps', t: 3.5, run: 0 }, { name: 'rest', t: 0.4, run: 0 }, { name: 'load', t: 2.5, run: 0 },
   { name: 'rest', t: 0.6, run: 1 }, { name: 'fps', t: 3.5, run: 1 }, { name: 'rest', t: 0.4, run: 1 }, { name: 'load', t: 2.5, run: 1 },
   { name: 'rest', t: 0.6, run: 2 }, { name: 'fps', t: 3.5, run: 2 }, { name: 'rest', t: 0.4, run: 2 }, { name: 'load', t: 2.5, run: 2 },
   { name: 'rest', t: 0.6, run: 3 }, { name: 'fps', t: 3.5, run: 3 }, { name: 'rest', t: 0.4, run: 3 }, { name: 'load', t: 2.5, run: 3 },
-  { name: 'rest', t: 0.4, run: 3 }, { name: 'zone', t: 0, run: 3 }
+  { name: 'rest', t: 0.4, run: 3 }, { name: 'zone', t: 0, run: 3 },
+  { name: 'rest', t: 0.6, run: 4 }, { name: 'tube', t: 0, run: 4 }, { name: 'rest', t: 0.4, run: 4 }, { name: 'load', t: 2.5, run: 4 }
 ];
+const CHECK_TUBE_LEAD = 150, CHECK_TUBE_OUT = 95, CHECK_TUBE_DEEP = 70;   // metres: from before the line, past the district's start, and before the line again
 const CHECK_SLIP = 1.8;   // seconds between receipts: each holds for 2, so one is always showing
-const RUN_NAMES = ['', ', with a crash pop lit', ', with street pieces', ', with the whole play screen'];
+const RUN_NAMES = ['', ', with a crash pop lit', ', with street pieces', ', with the whole play screen', ', through a tunnel'];
 const fmt = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d) : '–');
 const median = (a) => { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
 const pct = (a, p) => { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
@@ -175,6 +178,9 @@ CityNights.game({
       : scene === 'Touch' ? (cn.input.down || (cn.input.pointer.down && cn.input.pointer2.down) ? 3 : 10)   // two thumbs down: one steers, one holds
       : c.wait > 0 ? 0 : Math.min(12, taxi.speed + 8 * dt);
     taxi.z += taxi.speed * dt;
+    // the speed check's run through a tunnel loops at the line, in this update, as a game does
+    const tb = g.check && g.check.tube;
+    if (tb && taxi.z >= tb.line) { cn.street.loop(); tb.looped = true; tb.left = 0.5; tb.slow = 0; }
     if (scene === 'Play screen') playStep(g, cn, dt);
     if (scene === 'Moments') momentStep(g, cn, dt);
     if (scene === 'Sound') soundStep(g, cn, dt);
@@ -283,7 +289,7 @@ function setScene(g, cn, i) {
     st.cars = g.traffic;
     if (scene === 'Mong Kok') {
       // i: the part of CHECK under way (-1 while waiting for Automatic); runs: the frames of each run
-      g.check = { i: -1, t: 0, prev: null, popT: 0, slipT: 0, zone: null, fading: false, runs: [0, 1, 2, 3].map(() => ({ fps: [], load: [] })) };
+      g.check = { i: -1, t: 0, prev: null, popT: 0, slipT: 0, zone: null, fading: false, tube: null, runs: [0, 1, 2, 3, 4].map(() => ({ fps: [], load: [] })) };
       jumpTo(cn, mongKok(cn));
     }
   } else if (scene === 'Moments') {
@@ -531,13 +537,20 @@ function runCheck(g, cn, real) {
   // the gap recorded belongs to the frame drawn before it, so each one is filed under the part that frame was drawn in
   if (c.prev.name === 'fps' || c.prev.name === 'load') c.runs[c.prev.run][c.prev.name].push(real * 1000);
   if (c.prev.name === 'zone') { c.zone.all.push(real * 1000); if (c.fading) c.zone.fade.push(real * 1000); }
+  if (c.prev.name === 'tube' && c.tube) {
+    if (c.tube.skip > 0) c.tube.skip--; else { c.runs[4].fps.push(real * 1000); c.tube.most = Math.max(c.tube.most, real * 1000); }   // the frames after the jump to it make new pieces: not counted
+    if (c.tube.left > 0) { c.tube.left -= real; c.tube.slow = Math.max(c.tube.slow, real * 1000); }
+  }
   // a part ends when its time is up; a load part also waits for at least 4 frames (for 6 seconds more at most)
   c.t += real;
   const part = CHECK[c.i];
-  // the zone change's part ends when the zone change does
-  if (part.name === 'zone' ? c.zone && !cn.zoning : c.t >= part.t && !(part.name === 'load' && c.runs[part.run].load.length < 4 && c.t < part.t + 6)) {
+  // the zone change's part ends when the zone change does, and the tunnel's when the taxi has looped and come out
+  if (part.name === 'zone' ? c.zone && !cn.zoning : part.name === 'tube' ? c.tube && c.tube.looped && cn.street.taxi.z >= c.tube.d.z + CHECK_TUBE_OUT : c.t >= part.t && !(part.name === 'load' && c.runs[part.run].load.length < 4 && c.t < part.t + 6)) {
     c.i++; c.t = 0;
-    if (CHECK[c.i] && CHECK[c.i].run !== part.run) jumpTo(cn, mongKok(cn));   // each run drives through Mong Kok from its edge
+    const next = CHECK[c.i];
+    if (next && next.run !== part.run && next.run < 4) jumpTo(cn, mongKok(cn));   // each of those runs drives through Mong Kok from its edge
+    if (next && next.run === 4 && part.run === 3) checkClear(cn);
+    if (next && next.run === 4 && next.name === 'load') jumpTo(cn, c.tube.line - CHECK_TUBE_DEEP);   // timing a frame deep inside
   }
   const now = CHECK[c.i];
   if (!now) { finishCheck(g, cn); return; }
@@ -548,7 +561,9 @@ function runCheck(g, cn, real) {
     // a crash pop a few metres ahead, a new one each second (each lasts one), so one is always lit
     c.popT -= real;
     if (c.popT <= 0) { st.crash(z + 14, st.taxi.x); c.popT = 0.95; }
-  } else if (now.run >= 2) {
+  } else if (now.name === 'tube') {
+    if (!c.tube) { const d = st.districts[0]; c.tube = { d, line: d.z + d.length, looped: false, left: 0, slow: 0, most: 0, skip: 4 }; jumpTo(cn, c.tube.line - CHECK_TUBE_LEAD); }
+  } else if (now.run === 2 || now.run === 3) {
     // the pieces kept ahead of the taxi, all on screen at once
     if (!st.stop) {
       st.obstacles = CHECK_PIECES.obstacles.map(([kind, d, lane]) => ({ kind, z: z + d, x: st.lanes[lane], d }));
@@ -569,12 +584,15 @@ function runCheck(g, cn, real) {
     c.fading = cn.picture.zoneFading;
   }
 }
-function stopCheck(g, cn, why) {
-  g.check = null;
-  cn.picture.repeat = 1;
+function checkClear(cn) {
   clearPieces(cn);
   Object.assign(cn.meter, { lives: null, tip: null, round: null, fares: 0 });
   cn.street.pin = null; cn.street.taxi.hired = false; cn.street.taxi.carry = null;
+}
+function stopCheck(g, cn, why) {
+  g.check = null;
+  cn.picture.repeat = 1;
+  checkClear(cn);
   if (why) g.result = [why, ''];
 }
 // a run's frame rate, the slowest 1 frame in 20, and the time to draw a frame; if the device kept up with the screen
@@ -584,14 +602,14 @@ function score(run) {
   return { avg: run.fps.length / (tot / 1000), slow: pct(run.fps, 0.95), cost: median(run.load) / LOADN, sat: median(run.load) > median(run.fps) * 1.3 };
 }
 function finishCheck(g, cn) {
-  const c = g.check, p = cn.picture, all = c.runs.map(score), [a, b, d, s] = all, z = c.zone;
+  const c = g.check, p = cn.picture, all = c.runs.map(score), [a, b, d, s, u] = all, z = c.zone, tb = c.tube;
   stopCheck(g, cn);
   const phone = all.every((r) => r.avg >= 29.5 && r.cost <= 25) ? 'pass' : 'below', computer = all.every((r) => r.avg >= 58) ? 'pass' : 'below';
   const ms = (r) => (r.sat ? 'about ' : 'under ') + '<b>' + fmt(r.cost, 1) + ' ms</b>';
   g.result = [
     '<b>' + fmt(a.avg) + ' fps</b> in Mong Kok, each frame drawn in ' + ms(a) + '; slowest 1 in 20 came ' + fmt(a.slow) + ' ms apart. With a crash pop lit: <b>' + fmt(b.avg) + ' fps</b>, ' + ms(b) +
       '. With street pieces: <b>' + fmt(d.avg) + ' fps</b>, ' + ms(d) + '. With the whole play screen: <b>' + fmt(s.avg) + ' fps</b>, ' + ms(s) +
-      '. Zone change: its cross-fade <b>' + fmt(z.fade.length / (z.fade.reduce((u, v) => u + v, 0) / 1000 || 1)) + ' fps</b>, slowest ' + fmt(Math.max(0, ...z.fade)) + ' ms; slowest frame of the whole change ' + fmt(Math.max(0, ...z.all)) + ' ms.',
+      '. Zone change: its cross-fade <b>' + fmt(z.fade.length / (z.fade.reduce((u, v) => u + v, 0) / 1000 || 1)) + ' fps</b>, slowest ' + fmt(Math.max(0, ...z.fade)) + ' ms; slowest frame of the whole change ' + fmt(Math.max(0, ...z.all)) + ' ms. Through a tunnel: <b>' + fmt(u.avg) + ' fps</b>, ' + ms(u) + ', slowest frame ' + fmt(tb.most) + ' ms; the loop: slowest frame <b>' + fmt(tb.slow) + ' ms</b>.',
     'Phone target (30 fps, 25 ms): <b>' + phone + '</b> · Computer target (60 fps): <b>' + computer + '</b> · ' + popMade(p) + ' · ' + p.width + ' × ' + p.height + ', ' + (p.smoothing ? p.smoothing + '× smoothing' : 'no smoothing') + ' · ' + browserName() + ' · ' + (p.chip || 'unknown chip')
   ];
 }
@@ -638,8 +656,8 @@ function showReadout(g, cn) {
     else if (!part) note = 'Speed check: waiting for Automatic to finish timing the picture…';
     else {
       const timing = part.name === 'load' || (part.name === 'rest' && CHECK[c.i - 1].name === 'fps');
-      note = 'Speed check' + RUN_NAMES[part.run] + ': ' + (part.name === 'zone' ? 'timing a zone change.' : timing ? 'timing a frame. The picture slows down on purpose.'
-        : 'measuring every frame. Leave the page alone for about ' + (32 - part.run * 7) + ' seconds.');
+      note = 'Speed check' + RUN_NAMES[part.run] + ': ' + (part.name === 'zone' ? 'timing a zone change.' : part.name === 'tube' ? 'driving through, looping at the line, and coming out.' : timing ? 'timing a frame. The picture slows down on purpose.'
+        : 'measuring every frame. Leave the page alone for about ' + (50 - part.run * 9) + ' seconds.');
     }
   } else if (scene === 'Street') {
     note += ' Passenger: ' + PASSENGERS[g.lay.lap % PASSENGERS.length][1] + '.';
