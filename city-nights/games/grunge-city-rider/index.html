@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grunge City Rider</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files, the fonts and their licences into dist/grunge-city-rider.html. Keep data-cn-inline. -->
+<link rel="stylesheet" href="../../kit/city-nights.css" data-cn-inline>
+<script src="../../kit/city-nights.js" data-cn-inline></script>
+<!-- The two soundtracks, shared with the kit's test page -->
+<script src="../../music/grunge-city-rider.js" data-cn-inline></script>
+</head>
+<body>
+<script>
+/* GRUNGE CITY RIDER: a night-shift taxi up Nathan Road. City Nights' pilot game.
+   The rules are in city-nights/GAMEPLAY-grunge-city-rider.md; numbers marked there as starting figures are Barney's first
+   guesses, kept together here to be tuned once he has played. */
+
+// ---- driving
+const TOP_KMH = 70, TOP = TOP_KMH / 3.6;   // the top speed, metres a second
+const ACCEL = TOP / 4;                     // back to the top speed in about 4 s
+const BRAKE = 14;                          // metres a second, each second, holding the brake
+const STEER = 1.5;                         // across the road a second (the road is -1 to 1)
+const X_MAX = 0.85;
+
+// ---- the clock and the lives
+const CLOCK_START = 50, CLOCK_MAX = 99, LIVES = 3;
+const FREEZE_CRASH = 3;                    // seconds
+
+// ---- traffic
+const TRAFFIC_SPAN_KM = 0.56;              // the kit keeps traffic in this stretch round the taxi
+const CAR_KMH = [30, 55];
+const CAR_GAP = 14;                        // metres: a car keeps this far behind the one ahead in its lane
+const CAR_CLEAR = 40;                      // metres: none starts nearer the taxi than this
+
+// how busy a zone is (the gameplay note's table): n counts zones from round 1's Tsim Sha Tsui; Practice stays at 0
+const zoneRow = (n) => ({ vehicles: Math.min(40, 15 + 5 * n), obstacles: Math.min(10, 3 + n), animals: Math.min(4, 1 + n), timeForFare: 35 - n });
+
+CityNights.game({
+  id: 'grunge-city-rider',
+  title: ['Grunge City', 'Rider'],
+  zh: '夜更的士',
+  keys: [['←', '→', 'Steer'], ['↓', 'Brake'], ['Space', 'Horn'], ['Esc', 'Pause']],
+  touch: 'Drag to steer · Hold with your other thumb to brake',
+  touchZones: true,
+  modes: [
+    { id: 'competitive', label: 'Competitive', description: 'Five fares a district, each one busier' },
+    { id: 'practice', label: 'Practice', description: 'The same easy traffic all the way' }
+  ],
+  music: [{ data: window.MIDNIGHT_FARE_DASH, districts: [0, 1] }, { data: window.METER_RUNNING_HIGH, districts: [2, 3] }],
+
+  start(cn) {
+    const g = { zone: 0, round: 1, clock: CLOCK_START, lives: LIVES, freeze: 0, oil: 0 };
+    cn.meter.lives = LIVES;
+    cn.meter.tip = null;
+    cn.meter.round = cn.mode === 'practice' ? null : 1;
+    cn.meter.fares = 0;
+    cn.meter.time = g.clock;
+    setTraffic(g, cn);
+    return g;
+  },
+
+  update(g, cn) {
+    if (cn.ending) return;
+    const dt = 1 / 60, st = cn.street, taxi = st.taxi;
+    // the clock runs all the while, through a freeze too
+    g.clock = Math.max(0, g.clock - dt);
+    cn.meter.time = g.clock;
+    if (g.clock === 0) { taxi.speed = 0; cn.gameOver(); return; }
+    if (hornPressed(cn)) horn(cn);
+    if (g.freeze > 0) { g.freeze -= dt; taxi.speed = 0; return; }
+    drive(g, cn, dt);
+    moveTraffic(g, cn, dt);
+    hitTraffic(g, cn);
+  }
+});
+
+/* ----- the taxi: speeds up by itself; the player steers and brakes ----- */
+function braking(cn) { return cn.input.down || (cn.input.pointer.down && cn.input.pointer2.down); }   // two thumbs down: one steers, one holds
+function drive(g, cn, dt) {
+  const taxi = cn.street.taxi;
+  taxi.speed = braking(cn) ? Math.max(0, taxi.speed - BRAKE * dt) : Math.min(TOP, taxi.speed + ACCEL * dt);
+  taxi.z += taxi.speed * dt;
+  let steer = 0;
+  if (cn.input.left) steer -= STEER * dt;
+  if (cn.input.right) steer += STEER * dt;
+  if (cn.input.pointer.down) steer += cn.input.pointer.dx / cn.W * 2;   // either thumb steers
+  if (cn.input.pointer2.down) steer += cn.input.pointer2.dx / cn.W * 2;
+  taxi.x = cn.clamp(taxi.x + steer, -X_MAX, X_MAX);
+}
+
+/* ----- the horn: Space, or a quick tap with either thumb ----- */
+function hornPressed(cn) { return cn.input.keyPressed('Space') || cn.input.tap; }
+function horn(cn) {
+  cn.sfx.tone({ type: 'square', f: 392, dur: 0.28, vol: 0.14 });
+  cn.sfx.tone({ type: 'square', f: 494, dur: 0.28, vol: 0.12 });
+}
+
+/* ----- traffic: drives the same way, keeps to its lane, and never drives through the car ahead ----- */
+function setTraffic(g, cn) {
+  const st = cn.street, row = zoneRow(g.zone), taxi = st.taxi;
+  st.cars = st.traffic(Math.round(row.vehicles * TRAFFIC_SPAN_KM), 808 + g.zone);
+  for (const car of st.cars) {
+    car.want = cn.rand(CAR_KMH[0], CAR_KMH[1]) / 3.6;
+    car.speed = car.want;
+    if (st.gap(taxi.z, car.z) < CAR_CLEAR) car.z += CAR_CLEAR;
+  }
+}
+function moveTraffic(g, cn, dt) {
+  const st = cn.street, cars = st.cars;
+  for (const car of cars) {
+    let speed = car.want;
+    for (const other of cars) {
+      if (other === car || other.x !== car.x) continue;
+      const ahead = st.gap(car.z, other.z);
+      if (ahead < CAR_GAP + st.size(car.kind).length) speed = Math.min(speed, other.speed);
+    }
+    car.speed = speed;
+  }
+  for (const car of cars) car.z += car.speed * dt;
+  st.recycle(cars);
+}
+
+/* ----- crashes ----- */
+function hitTraffic(g, cn) {
+  const st = cn.street, taxi = st.taxi, L = st.size('taxi');
+  for (const car of st.cars) {
+    const S = st.size(car.kind), ahead = st.gap(taxi.z, car.z);
+    const along = ahead < L.length || ahead > st.length - S.length;
+    const side = Math.abs(taxi.x - car.x) * st.width / 2 < (L.width + S.width) / 2 * 0.92;
+    if (along && side) { crash(g, cn, car.z, (taxi.x + car.x) / 2, 'vehicle', car); return; }
+  }
+}
+function crash(g, cn, z, x, kind, what) {
+  const st = cn.street;
+  st.crash(z, x);
+  cn.sfx.crash(kind);
+  g.lives--;
+  cn.meter.lives = g.lives;
+  g.freeze = FREEZE_CRASH;
+  st.taxi.speed = 0;
+  // what was hit is cleared away under the pop
+  if (what) cn.after(0.3, () => { st.cars = st.cars.filter((c) => c !== what); });
+  if (g.lives === 0) cn.gameOver(FREEZE_CRASH / 2);
+}
+</script>
+</body>
+</html>
