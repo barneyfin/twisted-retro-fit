@@ -32,6 +32,7 @@ const TRAFFIC_SPAN_KM = 0.56;              // the kit keeps traffic in this stre
 const CAR_KMH = [30, 55];
 const CAR_GAP = 14;                        // metres: a car keeps this far behind the one ahead in its lane
 const CAR_CLEAR = 40;                      // metres: none starts nearer the taxi than this
+const HONK_M = 0.5, HONK_AGAIN = 6;        // it honks when the taxi passes within 0.5 m, and not again for 6 s
 
 // ---- fares
 const PASSENGER_S = [5, 15], DROPOFF_S = [15, 25];   // seconds of driving ahead: a passenger, and the drop-off after a pick-up
@@ -100,6 +101,7 @@ CityNights.game({
     layStep(g, cn, dt);
     moveTraffic(g, cn, dt);
     hitTraffic(g, cn);
+    if (g.freeze <= 0) honkStep(cn);
     if (g.freeze <= 0) hitObstacles(g, cn);
     if (g.freeze <= 0) animalStep(g, cn);
     tokenStep(g, cn);
@@ -130,6 +132,37 @@ function hornPressed(cn) { return cn.input.keyPressed('Space') || cn.input.tap; 
 function horn(cn) {
   cn.sfx.tone({ type: 'square', f: 392, dur: 0.28, vol: 0.14 });
   cn.sfx.tone({ type: 'square', f: 494, dur: 0.28, vol: 0.12 });
+}
+
+/* ----- the game's other sounds (the engine, the sound bed, the crashes and the animals are the kit's) ----- */
+function sayDoor(cn) {   // the passenger getting in: the door, and the meter's bell
+  cn.sfx.noise({ dur: 0.1, vol: 0.3, from: 900, to: 140 });
+  cn.sfx.noise({ dur: 0.08, vol: 0.22, from: 700, to: 120, delay: 0.16 });
+  cn.sfx.tone({ type: 'triangle', f: 1175, dur: 0.14, vol: 0.14, delay: 0.26 });
+}
+function sayPaid(cn) {   // a fare paid: the meter printing and its till
+  for (let i = 0; i < 4; i++) cn.sfx.noise({ dur: 0.03, vol: 0.12, from: 5000, to: 2200, delay: i * 0.05 });
+  cn.sfx.tone({ type: 'triangle', f: 1319, dur: 0.12, vol: 0.2, delay: 0.2 });
+  cn.sfx.tone({ type: 'triangle', f: 1760, dur: 0.3, vol: 0.2, delay: 0.3 });
+}
+function sayTipLost(cn) { cn.sfx.tone({ type: 'triangle', f: 520, to: 200, dur: 0.32, vol: 0.2 }); }
+function saySafe(cn) {   // 保 takes the hit: a soft thump and a ring
+  cn.sfx.noise({ dur: 0.14, vol: 0.3, from: 1400, to: 200 });
+  cn.sfx.tone({ type: 'sine', f: 880, to: 1320, dur: 0.3, vol: 0.2 });
+}
+function honk(cn) {   // another vehicle, as the taxi passes too close
+  const f = cn.rand(300, 430), dur = cn.rand(0.22, 0.42);
+  cn.sfx.tone({ type: 'square', f, dur, vol: 0.09 });
+  cn.sfx.tone({ type: 'square', f: f * 1.26, dur, vol: 0.08 });
+}
+function honkStep(cn) {
+  const st = cn.street, taxi = st.taxi, L = st.size('taxi');
+  for (const car of st.cars) {
+    if (car.honked && cn.time < car.honked) continue;
+    const S = st.size(car.kind), ahead = st.gap(taxi.z, car.z), along = ahead < L.length + 2 || ahead > st.length - S.length - 2;
+    const clear = Math.abs(taxi.x - car.x) * st.width / 2 - (L.width + S.width) / 2;
+    if (along && clear < HONK_M) { car.honked = cn.time + HONK_AGAIN; honk(cn); return; }
+  }
 }
 
 /* ----- traffic: drives the same way, keeps to its lane, and never drives through the car ahead ----- */
@@ -182,6 +215,7 @@ function shieldTakes(cn, z, x) {
   if (!carry.shield) return false;
   carry.shield = false;
   cn.street.safe(z, x);
+  saySafe(cn);
   return true;
 }
 function crash(g, cn, z, x, kind) {
@@ -328,6 +362,7 @@ function tokenStep(g, cn) {
   for (const tk of st.tokens) {
     if (tk.got || !over(cn, tk, 0, TOKEN_REACH * 2)) continue;
     tk.got = true;
+    cn.sfx('pickup');
     const carry = taxi.carry;
     if (tk.kind === 'time') g.clock = Math.min(CLOCK_MAX, g.clock + TIME_BONUS);
     else if (tk.kind === 'speed') { g.fast = FAST_S; carry.speed = 1; }
@@ -396,6 +431,7 @@ function pickedUp(g, cn) {
   st.taxi.hired = true;
   g.trip = { fare: 0, k: 1, over: false, boost: null };
   cn.meter.tip = 0;
+  sayDoor(cn);
   g.phase = 'boarding'; g.wait = BOARD_S;
 }
 const tipOf = (g) => (g.trip.over ? 0 : g.trip.fare * TIP_SHARE * g.trip.k);
@@ -412,6 +448,7 @@ function missedDropoff(g, cn) {
   g.trip.over = true;
   cn.meter.tip = 'lost';
   cn.receipt({ head: 'TIP', lines: [['小費', 'TIP', was.toFixed(2), 'struck']] });
+  sayTipLost(cn);
 }
 function halveTip(g, cn) {
   if (!g.trip || g.trip.over) return;
@@ -426,6 +463,7 @@ function droppedOff(g, cn) {
   if (share) lines.push(t.boost === 'double' ? ['雙', '+100%', boost.toFixed(2)] : ['錢', '+20%', boost.toFixed(2)]);
   lines.push(['', '', 'HK$ ' + (t.fare + tip + boost).toFixed(2), 'total']);
   cn.receipt({ head: 'RECEIPT', lines });
+  sayPaid(cn);
   // the meter counts up by what the slip adds
   g.pay += tip + boost; g.payLeft = PAY_S;
   g.take += t.fare + tip + boost;

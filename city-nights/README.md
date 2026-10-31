@@ -1,12 +1,12 @@
 # City Nights
 
-The arcade's second style kit: a real Hong Kong street at night, after Barney's photo series *Hong Kong City Nights*. Warm amber streets under a wall of lightbox and neon signs, grain and glow, ghosted people, traffic. Games look into the screen, down the street. The pilot game, **Grunge City Rider** (a taxi game), comes in phase 4.
+The arcade's second style kit: a real Hong Kong street at night, after Barney's photo series *Hong Kong City Nights*. Warm amber streets under a wall of lightbox and neon signs, grain and glow, ghosted people, traffic. Games look into the screen, down the street. The pilot game is **Grunge City Rider** (a taxi game): `dist\grunge-city-rider.html`, its rules in `GAMEPLAY-grunge-city-rider.md`, its starting figures together at the top of `games\grunge-city-rider\index.html`, for tuning.
 
 It is not Retro Kit: it has its own look, its own drawing (WebGL2) and its own folder. The rules for every kit and game are in `ARCADE.md` at the top of the repository; City Nights' own rulebook is its design system (`design-system\README.md`).
 
 ## Play a game
 
-Double-click any City Nights file in `dist\` (`cn-sampler.html`, `cn-empty.html`, and the games as they come). Each one is a single self-contained file: it works offline and can be copied anywhere. It needs a browser with WebGL2, which every current Chrome, Safari, Edge and Firefox has; an older browser gets a message saying so.
+Double-click any City Nights file in `dist\` (`grunge-city-rider.html`, `cn-sampler.html`, `cn-empty.html`). Each one is a single self-contained file: it works offline and can be copied anywhere. It needs a browser with WebGL2, which every current Chrome, Safari, Edge and Firefox has; an older browser gets a message saying so.
 
 City Nights games are not on the arcade's website yet: `site\build.py` learns them in phase 4.
 

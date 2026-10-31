@@ -123,6 +123,17 @@ The design system is the spec, so each of these is designed there first, then co
 2. **The game** in `city-nights/games/grunge-city-rider/`.
 3. **The website**: `site/build.py` learns City Nights games and shows a score saved in cents as a fare; a card for Grunge City Rider with a 16:9 picture of it in play.
 
+## Decided while building the game (Claude Code, 31 October 2026: for Barney to overrule)
+
+- Practice shows no round line or lamps on the caption: it has no rounds.
+- Animals bolt from 26 m, or at the horn within 60 m. One bolting for the kerb usually gets clear; the ones that cost anything run across the taxi's path.
+- The roadworks' cones count as the crash from where they start, not only the barriers.
+- After an animal's 1 s freeze the taxi carries on at the speed it had; after a crash, from a stop.
+- A vehicle hit comes back 250 to 450 m ahead, so the road doesn't empty. Traffic moves to the middle lane before roadworks.
+- A vehicle honks when the taxi passes within 0.5 m of it, and not again for 6 s.
+- The fifth fare's receipt goes back in (2.5 s, still driving) before the zone change.
+- Steering 1.5 of the road's half-widths a second, braking 14 m/s², bays and items laid 115 to 150 m ahead.
+
 ## What could not be checked
 
 The scores, times and distances above are worked out from the rules, not measured: no game exists yet. Speed, opening time, memory and the music switch can only be measured on Barney's devices.
