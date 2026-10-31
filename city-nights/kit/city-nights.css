@@ -207,6 +207,8 @@
   --pop-time: 1s;
   --pop-box: 1080px 700px;
   --bay-size: 3m 10m;
+  --bay-sign-size: 1.6m 1m;
+  --bay-post-size: 0.2m 1.2m;
   --lamp-time: 0.5s;
   --wave-time: 0.4s;
   --font-display: "Antonio", "Arial Narrow", "Roboto Condensed", sans-serif;

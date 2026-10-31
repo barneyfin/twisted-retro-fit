@@ -33,7 +33,7 @@ The template, as it is, drives up the street through traffic: a working game to 
 
 ## The test page
 
-`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **9**, **0**, **-** and **=** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate, the kit's version and the picture it is drawing; in scenes 1, 2 and 7 a fourth line shows the graphics memory and the opening times (the speed check, below).
+`dist\cn-sampler.html` shows every part of the kit. Press **Start game**; in play, keys **1** to **9**, **0**, **-**, **=**, **[** and **]** change scene (on a phone, tap the street for the next one). A plaque at the top left names the scene and shows the frame rate, the kit's version and the picture it is drawing; in scenes 1, 2, 7 and 14 a fourth line shows the graphics memory and the opening times (the speed check, below).
 
 | Scene | What it shows |
 |---|---|
@@ -49,6 +49,8 @@ The template, as it is, drives up the street through traffic: a working game to 
 | 0 Touch | The touch zones outlined (only here; nothing marks them in a game): from the top of the meter's case down, either side of the taxi. A touch that starts outside them does nothing, so here a tap over the street does not change scene. Drag in either to steer (either thumb), two thumbs down to slow; a tap inside an outline goes to the next scene, Sound. |
 | - Sound | A jump along the street, under a zone title as in a game, to 10 seconds before a district line where the music switches: into Yau Ma Tei (Meter Running High), then next time from Mong Kok round into Tsim Sha Tsui (Midnight Fare Dash). The plaque names what is happening and shows the slowest frame after the jump and after the music switches, and a log by the meter's reading of the jumps, the switches and any slow frame. Then 32 seconds for the new track to build, since both start very quietly, then the city sound bed a step louder every 9 seconds (0, 0.15, 0.25, 0.35, 0.5, 0.7; the plaque names the step). For choosing the sound bed's loudness by ear; leaving the scene puts it back. |
 | = Tunnel | A loop on demand: a zone title puts the taxi 150 m before a district's end; it drives through the portal, loops at the district line, and comes out at the start of the same district; then the next district. Nothing in view should change at the loop, the caption should stay and the traffic should carry on. The plaque counts the loops and shows the slowest frame after the last. |
+| [ Bays | The stop bay (design system v13), a still every 3 seconds, named on the plaque: at 35, 20 and 12 m ahead, from the middle lane and from its own, then with the taxi three-quarters in and all the way in; teal and pink; with a street lamp over its middle and midway between two. Steering still works. On a phone, the first two stills also show Grunge City Rider's touch hint, "Left: drag to steer · Right: hold to brake", as a sample: this page itself keeps either thumb. |
+| ] Bay drive | Mong Kok at 70 km/h with traffic, a bay every 140 m, teal and pink in turn, each staying until the taxi has passed it. Every frame is timed, and each minute the plaque shows the frame rate, the slowest 1 frame in 20 and the slowest of all. |
 
 On a phone held sideways, the meter, the district caption and the receipt slip keep clear of the camera and the screen's rounded corners (the safe-area insets, as the design system's README asks), as the tiles always have.
 
@@ -178,6 +180,38 @@ A frame takes less to draw inside a tunnel than on the street. The loop's jump, 
 
 Barney looked on his Pixel: the portal, the inside and the exit look the same as the design system's version 12 boards; he could not see the loop's jump in scene 12; the rain's fade sounds right. In the app's own browser: the build's font and character checks pass (123 characters); the strips are continuous and the lane signals steady, as there is nothing in them that changes. Calling the loop, and keeping bays, power-ups, obstacles, animals and passengers out of the clear stretches and the tunnels, are left to the game.
 
+### Results, 31 October 2026 (kit 0.12.0, the bays, Chrome 156)
+
+The Pixel in full screen with its screen at 120 Hz, from the copy of the test page without the soundtracks. The computer was not run on this kit.
+
+| | Pixel 11 Pro XL, kit 0.12.0 | Pixel, kit 0.11.3 |
+|---|---|---|
+| **Bay drive (scene 14): a minute at 70 km/h with traffic and bays coming and going** | **120 fps, slowest 1 frame in 20 came 9 ms apart, the slowest of all 12 ms** | no such scene |
+| Street alone, with a crash pop | 120 fps, about 3.1 ms, each | 120 fps, about 3.1 ms, each |
+| With street pieces, with the whole play screen | 120 fps, about 3.2 ms, each | 120 fps, about 3.1 and 3.2 ms |
+| Slowest 1 frame in 20 came | 9 ms apart | 9 ms apart |
+| Zone change's cross-fade | 120 fps, slowest frame 11 ms | 120 fps, slowest frame 9 ms |
+| Slowest frame of the whole zone change | 11 ms | 10 ms |
+| Through a tunnel | 120 fps, about 2.1 ms, slowest frame 12 ms | 120 fps, about 2.1 ms, slowest frame 20 ms |
+| The loop's jump | slowest frame 9 ms | slowest frame 10 ms |
+| Crash pop words drawn | 116 ms, 1329 × 861 each | 156 ms, 1329 × 861 each |
+| Picture | 1803 × 810, 4× smoothing | 1803 × 810, 4× smoothing |
+| Targets | pass | pass |
+| Building the street when the page opens | 3.48 s (planning it 67 ms, its first pieces 21 ms) | 3.17 s (planning it 61 ms, its first pieces 19 ms) |
+| Start game worked, and the first picture | 3.71 s after opening | 3.36 s after opening |
+| Graphics memory in all (the kit's count) | 260 MB in the speed check, 262 MB in Bay drive: street shapes 2.3 and 3.6, other buffers 0.4, textures 190 and 191, picture buffers 67 | 260 MB: street shapes 2.6, other buffers 0.4, textures 190, picture buffers 67 |
+
+The bays cost no speed that shows: the slowest frame in a minute of them came 12 ms apart, against 8.3 ms for one refresh of the screen. The four new upright pictures fitted on the atlas's existing pages, so textures barely move. Opening, at 3.71 s, is the slowest so far (3.06 to 3.36 s on earlier kits). That is one run, so it can't say whether the bays' pictures or the variation between runs account for it. Chrome's Task Manager was not read on this kit.
+
+### Checks on the bays (kit 0.12.0)
+
+In the app's own browser, at phone sizes, with made-up touches: at 35 m only the pin shows; from about 20 m the sign and posts show, over the taxi's roof from the bay's lane; at 12 m 上客 and 落客 read well, PICK-UP and DROP-OFF are small; the pin's tag stays clear of the sign; the bold edges and bars are clean with the taxi in the bay; two pick-ups and two drop-offs ran through the real game. The hint fits on one line at 740 × 360 and goes at the first touch. All 14 scenes and the speed check ran with no errors, and the build's font and character checks pass. Barney played the side rule on his Pixel (it works well) and approved the first pictures of the bay. The side by side with the design system's StopZone preview and version 13 boards has not been reported yet.
+
+**Known differences:**
+- A street lamp can stand in front of the sign, depending on where a bay falls: in scene 13's "under a street lamp" stills at 20 m its pole part-hides the sign's first character.
+- People on the pavement can overlap the sign. Whether someone nearer is always drawn in front of it was not checked.
+- The sign's legs and the posts' dark bodies are at the signs' level of grain, because they share pictures with their lights (the handover accepts this). No difference shows in the app's pictures; Barney's screen is the better test.
+
 ### Checks before handing back (kit 0.10.2)
 
 Checked in the app's own browser, with the page's sound silenced:
@@ -190,6 +224,10 @@ Checked in the app's own browser, with the page's sound silenced:
 - **The fonts** in `kit\fonts\` are the design system's, and the build's font and character checks pass (122 characters).
 
 Barney compared each piece side by side with the design system's previews and the canvas row: good.
+
+## The stop bays (kit 0.12)
+
+The bay was redrawn to stand out on a phone (design system v13, `design-system/components/StopZone`): bold paint with no words on the road, a low lit sign at its start and three lit posts along its far half. The drawing code is copied word for word from the design system's `bundle.js`; the paint is drawn in 160 rows so its diagonal bars stay straight close to the camera. Two things are the kit's own, added at Barney's wish or to make the first work: a bay the game replaces with one further on stays until the taxi has passed it, so its sign and posts don't vanish in full view, and `street.stop = null` clears a bay at once. Nothing else in the kit's API changes.
 
 ## The tunnels (kit 0.11)
 
