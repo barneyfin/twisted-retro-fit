@@ -22,7 +22,7 @@ Two, in this order, each with its own high-score table. The website's card shows
 - The taxi speeds up to its top speed by itself: **70 km/h** (*starting figure*), the same in every zone. It gets back to 70 km/h in **about 4 s** after a stop (*starting figure*).
 - The player steers, brakes and sounds the horn.
 - **Keyboard**: the kit's keys. ← → (or A, D) steer, ↓ (or S) brakes, Space is the horn, Esc pauses.
-- **Phone**: drag to steer, hold with the other thumb to brake, a quick tap with the other thumb for the horn. The touch hint stays "Drag to steer · Hold with your other thumb to brake" (two actions at most).
+- **Phone**: the side a thumb lands on says what it does, for as long as it stays down, wherever it skids (Barney's choice, 31 October 2026: thumbs skid on his Pixel). Left of the taxi drags to steer; right of the taxi held for 0.18 s brakes, on its own too. A quick tap with either thumb is the horn, which is why braking waits 0.18 s. The touch zones themselves don't change. This differs from the design system's TouchZones ("either thumb, in either zone"): if it plays well, Barney will have his Claude app project update the design system. Until then the touch hint stays "Drag to steer · Hold with your other thumb to brake" (two actions at most).
 - The horn is for fun, and it makes animals bolt.
 
 ## Zones, rounds and the clock (Competitive)
@@ -133,6 +133,16 @@ The design system is the spec, so each of these is designed there first, then co
 - A vehicle honks when the taxi passes within 0.5 m of it, and not again for 6 s.
 - The fifth fare's receipt goes back in (2.5 s, still driving) before the zone change.
 - Steering 1.5 of the road's half-widths a second, braking 14 m/s², bays and items laid 115 to 150 m ahead.
+
+## Barney's first changes after playing (31 October 2026)
+
+- The horn much louder.
+- No obstacles or animals in a bay or within 10 m of it, in any lane.
+- Steering 10% more responsive, on keys and on a phone.
+- 3 s when nothing can hit the taxi, after a crash's freeze ends. (Vehicles, roadworks and animals; oil, potholes and cargo still act. Nothing shows it yet.)
+- No crash with a vehicle out of sight: the taxi only hits one whose rear is level with it or ahead, and traffic behind slows for the taxi.
+- While testing, 30 s extra on the clock at the start of a game (80 s, not the zones after).
+- Bay markings: Barney asked for them to be much more visible, then found the road's light reflections were what hid them. The reflections went down by a third in the kit (0.11.4). The bays are still hard to see on his Pixel, less so on his tablet and easier on a computer, so they go back to the design system to stand out more.
 
 ## What could not be checked
 
