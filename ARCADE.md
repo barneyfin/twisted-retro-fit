@@ -22,7 +22,7 @@ Retro Kit's split between World (the playfield) and Interface (glass panels arou
 
 ## Arcade rules (every kit, every game)
 
-- Every game is one self-contained HTML file that works offline. The kit, fonts and code are copied in. No network requests, no outside libraries and no image files. The only extra allowed is a soundtrack MP3 that Barney supplies, built into the file (a City Nights game may have two).
+- Every game is one self-contained HTML file that works offline. The kit, fonts and code are copied in. No network requests, no outside libraries and no image files. The only extra allowed is a soundtrack MP3 that Barney supplies, built into the file (a City Nights or Lantern Box game may have two).
 - Controls are desktop keyboard and phone touch (phone held sideways). No gamepad. Players are adults and teens.
 - Names and art are invented. Mechanics may be borrowed from classic games; titles, characters, logos, music and recognisable looks may not. If a design starts to resemble a famous character, change it.
 - Each kit has its own identity. It must not look like another kit in the arcade, nor like a style that is everywhere today.
@@ -54,7 +54,8 @@ None are open at the moment.
 
 - **The arcade's name**: Twisted Retro Fit (Barney, 2026-10-25).
 - **Arcade front page**: a website in `site/` with a card for every game, published to GitHub Pages from this public repository by a GitHub Action on every push to `main` (Barney, 2026-10-25).
-- **Folder layout**: one repo, Retro Games, with each kit in its own place: Retro Kit in `kit/` and `games/`, City Nights in `city-nights/`. The repo keeps its name for now (Barney, 2026-10-28).
+- **Folder layout**: one repo, Retro Games, with each kit in its own place: Retro Kit in `kit/` and `games/`, City Nights in `city-nights/`, Lantern Box in `lantern-box/` (added 2026-11-01). The repo keeps its name for now (Barney, 2026-10-28).
 - **Shared core**: City Nights starts from a copy of Retro Kit's game shell and build, restyled, with its own drawing. A core shared by every kit is revisited when a third kit is planned (Barney, 2026-10-28).
+- **Shared core, third kit**: Lantern Box starts from a copy of Retro Kit's game shell and build, restyled, with its own drawing. A core shared by every kit is planned as its own job once Gloam Hallow is playable (Barney, 2026-11-01).
 - **Settings and high scores**: settings are shared across the whole arcade; high scores are kept per game, in Retro Kit's format, so the website shows every game's best (Barney, 2026-10-28).
-- **Soundtracks**: a City Nights game may have two soundtrack MP3s instead of one, switched as the street changes district. Each adds about 5.5 MB to the game's file (Barney, 2026-10-29).
+- **Soundtracks**: a City Nights game may have two soundtrack MP3s instead of one, switched as the street changes district. Each adds about 5.5 MB to the game's file (Barney, 2026-10-29). A Lantern Box game may also have two, switched as its gameplay decides (Barney, 2026-11-01).
