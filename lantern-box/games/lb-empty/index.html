@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lantern Box game</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files, the fonts and their licences into dist/<game>.html. Keep data-lb-inline. -->
+<link rel="stylesheet" href="../../kit/lantern-box.css" data-lb-inline>
+<script src="../../kit/lantern-box.js" data-lb-inline></script>
+</head>
+<body>
+<script>
+/* LB EMPTY — the empty Lantern Box game: a straight copy of kit/template.html, kept to prove a new game
+   made from the template builds with no warnings. Copy the template, not this file, to start a game.
+   The kit's rules: ARCADE.md and lantern-box/design-system/README.md.
+   Build:  python lantern-box/kit/build.py <name>   (the game is finished only when it builds with no warnings) */
+LanternBox.game({
+  id: 'lb-empty',                 // the folder name: lowercase-with-hyphens; high scores are saved under it
+  title: ['Lantern Box', 'Empty'], // an invented name, in sentence case, broken over two lines where it reads best
+
+  // New game: build and return this game's state.
+  start(lb) {
+    return {};
+  },
+
+  // Rules: called 60 times a second during play.
+  update(g, lb) {
+  },
+
+  // Picture: called every frame.
+  draw(ctx, g, lb) {
+  },
+});
+</script>
+</body>
+</html>
