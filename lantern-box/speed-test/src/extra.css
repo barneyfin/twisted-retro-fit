@@ -1,0 +1,26 @@
+.badge{position:absolute;bottom:10px;right:12px;font-size:13px;line-height:1.3;padding:3px 8px;border-radius:6px;background:rgba(8,6,10,.74);color:#f3eef5;font-variant-numeric:tabular-nums;pointer-events:none}
+.stage:fullscreen{aspect-ratio:auto;width:100vw;height:100vh;max-width:none;border-radius:0;border:0}
+.stage:-webkit-full-screen{aspect-ratio:auto;width:100vw;height:100vh;max-width:none;border-radius:0;border:0}
+.go{appearance:none;border:0;background:var(--moon);color:var(--moon-ink);font:inherit;font-weight:700;font-size:15px;padding:8px 14px;min-height:40px;border-radius:8px;cursor:pointer}
+.go:focus-visible{outline:2px solid var(--moon);outline-offset:2px}
+.go:disabled,.seg button:disabled{opacity:.45;cursor:not-allowed}
+.tog.plain::before{content:none}
+.results{display:grid;gap:12px}
+.results[hidden]{display:none}
+.tablewrap{overflow-x:auto}
+.results table{border-collapse:collapse;font-variant-numeric:tabular-nums;min-width:560px}
+.results th,.results td{text-align:left;padding:7px 18px 7px 0;border-bottom:1px solid var(--line)}
+.results thead th{font-size:13px;color:var(--muted);font-weight:500}
+.results tbody th{font-weight:500}
+.verdict{margin:0;padding-left:1.2em;display:grid;gap:6px}
+.verdict b{color:var(--moon);font-weight:500}
+.verdict em{font-style:normal;font-weight:700;color:#ffb38a}
+.resline{margin:0;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;font-size:14px;overflow-wrap:anywhere;user-select:all;max-width:100ch}
+code{font-size:14px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.stage .ov{display:none;position:absolute;left:12px;bottom:10px;right:110px;gap:8px;align-items:center;flex-wrap:wrap}
+.stage.fill .ov,.stage:fullscreen .ov,.stage:-webkit-full-screen .ov{display:flex}
+.stage .ov .tog{background:rgba(25,22,29,.88)}
+.ovstat{font-size:13px;color:#f3eef5;background:rgba(8,6,10,.74);padding:3px 8px;border-radius:6px}
+.ovstat:empty{display:none}
+.stage.fill{position:fixed;inset:0;z-index:50;width:100vw;height:100vh;height:100dvh;max-width:none;aspect-ratio:auto;border-radius:0;border:0;margin:0}
+html.noscroll,html.noscroll body{overflow:hidden}

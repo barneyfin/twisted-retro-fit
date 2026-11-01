@@ -1,0 +1,84 @@
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Twisted Retro Fit · Lantern Box kit · phase 1 · speed test 1 · 1 November 2026</p>
+    <h1>Speed test</h1>
+    <p class="lede">Gloam Hallow's four places, drawn <em>the kit way</em>: each layer of scenery is painted once, in pieces, and then only slid as the camera moves. A crowd of monsters and the place's boss load the picture, and the camera rises and falls by half a screen, as it will when the wanderer climbs. Run the test on your Pixel and your computer, in Chrome.</p>
+  </header>
+
+  <section class="stage-box" aria-label="The speed test">
+    <div class="stage" id="stageBox">
+      <canvas id="stage" role="img" aria-label="Speed test"></canvas>
+      <span class="badge" id="badge" aria-hidden="true">… fps</span>
+      <div class="ov" id="ov">
+        <button type="button" class="go" id="runIn" data-lock>Run the test</button>
+        <button type="button" class="tog plain" id="exitBtn">Exit full screen</button>
+        <span class="ovstat" id="ovStat" aria-live="polite"></span>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="group"><span class="glabel" id="lvlLab">Place</span>
+        <div class="seg" role="group" aria-labelledby="lvlLab">
+          <button type="button" id="lvNight" aria-pressed="true" data-lock>Night</button><button type="button" id="lvStorm" aria-pressed="false" data-lock>Blood-red rain</button><button type="button" id="lvDawn" aria-pressed="false" data-lock>Dawn</button><button type="button" id="lvMist" aria-pressed="false" data-lock>Mist</button>
+        </div></div>
+      <div class="group"><span class="glabel" id="wayLab">Drawing</span>
+        <div class="seg" role="group" aria-labelledby="wayLab">
+          <button type="button" id="wayKit" aria-pressed="true" data-lock>Kit way</button><button type="button" id="wayMock" aria-pressed="false" data-lock>Mock-up way</button>
+        </div></div>
+      <div class="group"><span class="glabel">Load</span>
+        <div class="row">
+          <button type="button" class="tog" id="crowdBtn" aria-pressed="true" data-lock>Crowd and boss</button>
+          <button type="button" class="tog" id="riseBtn" aria-pressed="true" data-lock>Camera rises</button>
+        </div></div>
+      <div class="group"><span class="glabel" id="scLab">Screen</span>
+        <div class="seg" role="group" aria-labelledby="scLab">
+          <button type="button" id="scWide" aria-pressed="true" data-lock>16:9</button><button type="button" id="scPhone" aria-pressed="false" data-lock>Phone sideways</button>
+        </div></div>
+      <div class="group"><span class="glabel">Test</span>
+        <div class="row">
+          <button type="button" class="go" id="runBtn" data-lock>Run the test</button>
+          <button type="button" class="tog plain" id="fsBtn">Full screen</button>
+        </div></div>
+    </div>
+    <p class="readout" id="readout" aria-live="polite">Drawing the scene…</p>
+  </section>
+
+  <section class="results" id="results" hidden aria-label="Result">
+    <h2>Result</h2>
+    <div class="tablewrap"><table id="resTable"></table></div>
+    <ul class="verdict" id="verdict"></ul>
+    <p class="small">The line to send back:</p>
+    <p class="resline" id="resLine"></p>
+    <div class="row"><button type="button" class="tog plain" id="copyBtn">Copy the result</button><span class="small" id="copyMsg" aria-live="polite"></span></div>
+  </section>
+
+  <section class="three" aria-label="About the test">
+    <div class="block">
+      <h2>How to run it</h2>
+      <ol>
+        <li>Close any other copy of this page, including in the Claude app: two copies fight over the graphics chip.</li>
+        <li>Open it in Chrome. On the phone, hold it sideways and tap <b>Full screen</b> first.</li>
+        <li>Tap <b>Run the test</b> and leave it alone for about half a minute. It spends 8 seconds in each place.</li>
+        <li>Copy the result line, or take a screenshot, and send it back.</li>
+        <li>For a comparison, switch to <b>Mock-up way</b> and run it again. That's the directions page's method, with the same crowd.</li>
+      </ol>
+    </div>
+    <div class="block">
+      <h2>What it measures</h2>
+      <ul>
+        <li><b>Frames a second</b> while it draws normally. A screen's own limit is usually 60.</li>
+        <li><b>A frame drawn in:</b> for the last 2.5 seconds in each place it draws every frame eight times over, so the picture slows on purpose. Each of the eight is the next frame of play, so monsters change pose and new scenery is painted as often as in play. The gap between screen updates, divided by eight, is how long one frame takes to draw. "Under" means the device kept up with the screen even then.</li>
+        <li><b>Slowest 5% of frames:</b> only one frame in twenty takes longer than this. <b>Longest frame:</b> the single worst one, usually when a new piece of scenery is painted. Hitches show up in these two.</li>
+        <li><b>Processor per frame:</b> the share of the work the browser's own clock sees. The graphics chip's share comes on top.</li>
+      </ul>
+    </div>
+    <div class="block">
+      <h2>Notes</h2>
+      <ul>
+        <li>The targets (PRD criterion 1): on the Pixel, at least 30 fps with each frame drawn in 25 ms or less; on the computer, 60 fps. The iPhone, the HP laptop, the Fire tablet and the AMD graphics are measured and reported only.</li>
+        <li>The crowd and the boss only load the picture: they don't fight. The camera's rise is a starting figure, and only the kit way rises.</li>
+        <li>If a device falls short, add <code>#res1</code> to the end of the link (ordinary sharpness) and reload.</li>
+        <li>A phone slows down as it warms up over minutes of play. This test shows a cool phone.</li>
+      </ul>
+    </div>
+  </section>
+</div>
