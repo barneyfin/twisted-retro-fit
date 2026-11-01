@@ -1,0 +1,48 @@
+<!-- @dsCard group="World" height=300 width=760 subtitle="Standing and walking, edged in each place's light" -->
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Wanderer</title>
+<style>
+body{margin:0;background:var(--ink);color:var(--text)}
+
+.wrap{display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.bar .lb-btn{height:34px;padding:0 14px;font-size:15px}
+.bar .lb-btn[aria-pressed="true"]{border-color:var(--brass);color:var(--heading)}
+.bar .sp{flex-grow:1}
+canvas{display:block;width:100%;background:var(--ink)}
+.cap{margin:0;font:400 13px/16px var(--font-text);color:var(--text-3)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid figure{margin:0;display:flex;flex-direction:column;gap:4px}
+
+</style>
+</head>
+<body>
+<div class="lb-ui wrap">
+<div class="bar"><span class="cap">LanternBox.world.drawWanderer</span><span class="sp"></span><button class="lb-btn" type="button" id="play" aria-pressed="false">Play</button></div><canvas id="cv" style="height:240px" aria-label="The wanderer in the four places"></canvas>
+</div>
+<script>
+
+const L=window.LanternBox&&window.LanternBox.world,RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function ready(f){const F=document.fonts;(F&&F.load?Promise.all([F.load('12px "Alegreya Sans"'),F.load('24px "IM Fell English"')]).catch(()=>{}):Promise.resolve()).then(f);}
+function fit(cv){const d=Math.min(2,window.devicePixelRatio||1);window._d=d;const r=cv.getBoundingClientRect();cv.width=Math.max(10,Math.round(r.width*d));cv.height=Math.max(10,Math.round(r.height*d));}
+/* picture rows y0..y1 fill the canvas; returns the canvas width in picture pixels */
+function pic(cv,y0,y1){const c=cv.getContext('2d'),s=cv.height/(y1-y0);c.setTransform(s,0,0,s,0,-y0*s);window._s=s;return cv.width/s;}
+function sky(c,lv,W,y0,y1){const k=L.pal.SKY[lv],g=c.createLinearGradient(0,0,0,470);g.addColorStop(0,k[0]);g.addColorStop(.45,k[1]);g.addColorStop(.8,k[2]);g.addColorStop(1,k[3]);c.fillStyle=g;c.fillRect(0,y0,W,y1-y0);}
+function ground(c,W,wx0,y1){c.fillStyle=L.pal.INK;c.beginPath();c.moveTo(0,y1+10);for(let x=0;x<=W+6;x+=6)c.lineTo(x,L.GROUND(wx0+x));c.lineTo(W+6,y1+10);c.closePath();c.fill();}
+function label(c,txt,X,Y){c.save();c.font=(12*(window._d||1)/(window._s||1)).toFixed(2)+'px "Alegreya Sans",sans-serif';c.textAlign='center';c.textBaseline='top';c.fillStyle='#c9a25a';c.fillText(txt,X,Y);c.restore();}
+function player(btn,draw){let on=false,t0=0,id=0;const loop=n=>{draw((n-t0)/1000);id=requestAnimationFrame(loop);};
+  btn.addEventListener('click',()=>{on=!on;btn.setAttribute('aria-pressed',String(on));btn.textContent=on?'Pause':'Play';if(on){t0=performance.now()-btn._t*1000;id=requestAnimationFrame(loop);}else{cancelAnimationFrame(id);}});btn._t=0;return t=>{btn._t=t;};}
+function places(bar,cb){const names={night:'Night',storm:'Blood-red rain',dawn:'Dawn',mist:'Mist'};bar.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{bar.querySelectorAll('[data-lv]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));cb(b.dataset.lv);}));}
+
+const cv=document.getElementById('cv');
+function draw(t){const c=cv.getContext('2d'),W=pic(cv,330,500),n=4,cw=W/n;
+  L.PLACES.forEach((k,i)=>{c.save();c.beginPath();c.rect(i*cw,330,cw,170);c.clip();sky(c,k,W,330,500);c.translate(i*cw,0);ground(c,cw,i*400,500);
+    const X=cw*0.5,Y=L.GROUND(i*400+X)+1;L.drawWanderer(c,X,Y,t,i%2===1,1,RM,L.places[k].edge);c.restore();
+    label(c,L.places[k].name+(i%2?' · walking':' · standing'),i*cw+cw/2,483);});}
+ready(()=>{fit(cv);draw(0.37);const tick=player(document.getElementById('play'),t=>{draw(0.37+t);tick(t);});});
+</script>
+</body>
+</html>

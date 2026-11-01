@@ -1,0 +1,19 @@
+<!-- @dsCard group="Title" height=120 width=360 subtitle="Sound on, sound off, full screen" -->
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>ArchTile</title>
+<style>
+body{margin:0;background:var(--ink)}
+.stage{position:relative;overflow:hidden;background:var(--ink)}
+.stage>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cap{margin:0;padding:8px 2px 6px;font:500 13px/16px var(--font-text);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+
+</style>
+</head>
+<body>
+<div class="stage lb-ui " style="width:360px;height:120px"><div style="position:absolute;left:40px;top:38px;width:280px"><div class="lb-arch-tiles"><button class="lb-arch-tile" type="button" aria-label="Sound on" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 H8 L13 5 V19 L8 15 H4 Z"/><path d="M16.5 9.5 Q18.5 12 16.5 14.5"/><path d="M19 7 Q22.5 12 19 17"/></svg></button><button class="lb-arch-tile" type="button" aria-label="Sound off" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 H8 L13 5 V19 L8 15 H4 Z"/><path d="M17 9.5 L22 14.5 M22 9.5 L17 14.5"/></svg></button><button class="lb-arch-tile" type="button" aria-label="Full screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15"/></svg></button></div></div></div>
+<script>/* static preview */</script>
+</body>
+</html>

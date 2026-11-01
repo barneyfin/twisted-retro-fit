@@ -1,0 +1,57 @@
+<!-- @dsCard group="World" height=320 width=960 subtitle="Candle, lanterns, lamps, shrine, string lights, windows, potion" -->
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Lights</title>
+<style>
+body{margin:0;background:var(--ink);color:var(--text)}
+
+.wrap{display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.bar .lb-btn{height:34px;padding:0 14px;font-size:15px}
+.bar .lb-btn[aria-pressed="true"]{border-color:var(--brass);color:var(--heading)}
+.bar .sp{flex-grow:1}
+canvas{display:block;width:100%;background:var(--ink)}
+.cap{margin:0;font:400 13px/16px var(--font-text);color:var(--text-3)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid figure{margin:0;display:flex;flex-direction:column;gap:4px}
+
+</style>
+</head>
+<body>
+<div class="lb-ui wrap">
+<div class="bar"><span class="cap">LanternBox.world.parts, at Night</span><span class="sp"></span><button class="lb-btn" type="button" id="play" aria-pressed="false">Play</button></div><canvas id="cv" style="height:260px" aria-label="The glow points"></canvas>
+</div>
+<script>
+
+const L=window.LanternBox&&window.LanternBox.world,RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function ready(f){const F=document.fonts;(F&&F.load?Promise.all([F.load('12px "Alegreya Sans"'),F.load('24px "IM Fell English"')]).catch(()=>{}):Promise.resolve()).then(f);}
+function fit(cv){const d=Math.min(2,window.devicePixelRatio||1);window._d=d;const r=cv.getBoundingClientRect();cv.width=Math.max(10,Math.round(r.width*d));cv.height=Math.max(10,Math.round(r.height*d));}
+/* picture rows y0..y1 fill the canvas; returns the canvas width in picture pixels */
+function pic(cv,y0,y1){const c=cv.getContext('2d'),s=cv.height/(y1-y0);c.setTransform(s,0,0,s,0,-y0*s);window._s=s;return cv.width/s;}
+function sky(c,lv,W,y0,y1){const k=L.pal.SKY[lv],g=c.createLinearGradient(0,0,0,470);g.addColorStop(0,k[0]);g.addColorStop(.45,k[1]);g.addColorStop(.8,k[2]);g.addColorStop(1,k[3]);c.fillStyle=g;c.fillRect(0,y0,W,y1-y0);}
+function ground(c,W,wx0,y1){c.fillStyle=L.pal.INK;c.beginPath();c.moveTo(0,y1+10);for(let x=0;x<=W+6;x+=6)c.lineTo(x,L.GROUND(wx0+x));c.lineTo(W+6,y1+10);c.closePath();c.fill();}
+function label(c,txt,X,Y){c.save();c.font=(12*(window._d||1)/(window._s||1)).toFixed(2)+'px "Alegreya Sans",sans-serif';c.textAlign='center';c.textBaseline='top';c.fillStyle='#c9a25a';c.fillText(txt,X,Y);c.restore();}
+function player(btn,draw){let on=false,t0=0,id=0;const loop=n=>{draw((n-t0)/1000);id=requestAnimationFrame(loop);};
+  btn.addEventListener('click',()=>{on=!on;btn.setAttribute('aria-pressed',String(on));btn.textContent=on?'Pause':'Play';if(on){t0=performance.now()-btn._t*1000;id=requestAnimationFrame(loop);}else{cancelAnimationFrame(id);}});btn._t=0;return t=>{btn._t=t;};}
+function places(bar,cb){const names={night:'Night',storm:'Blood-red rain',dawn:'Dawn',mist:'Mist'};bar.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{bar.querySelectorAll('[data-lv]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));cb(b.dataset.lv);}));}
+
+const cv=document.getElementById('cv'),p=L.parts;let house=null;
+function draw(t){const c=cv.getContext('2d'),W=pic(cv,300,500),u=W/960,G=x=>L.GROUND(x),k=0.8;sky(c,'night',W,300,500);ground(c,W,0,500);
+  const xs=[50,135,225,325,420].map(v=>v*u);
+  p.drawCandle(c,xs[0],G(xs[0])+4,t,RM);label(c,'candle',xs[0],484);
+  p.drawShrine(c,xs[1],G(xs[1])+2,t,RM);label(c,'shrine',xs[1],484);
+  p.drawPost(c,xs[2],G(xs[2]),true,L.pal.GOLD_LIGHT);label(c,'post lantern',xs[2]+10,484);
+  p.drawStreetLamp(c,xs[3],G(xs[3]),L.pal.GOLD_LIGHT);label(c,'street lamp',xs[3],484);
+  p.drawPotion(c,xs[4],G(xs[4]),t,RM);label(c,'potion',xs[4],484);
+  if(!house)house=p.building('cottage',p.rng32(p.hsh(6,2,5)),{w:132,h:58,wing:true,detail:2,door:true},Math.min(2,cv.height/200));
+  const hx=600*u,hy=G(hx)+6;p.drawSprite(c,house,hx,hy,k,false);p.fillHoles(c,house,hx,hy,k,p.rng32(7),{litP:1,win:L.pal.GOLD_LIGHT,a:0.95,bar:L.pal.INK,dark:'#1a1218',crack:true});
+  if(house.lampAt)p.drawWallLamp(c,hx+house.lampAt[0]*k,hy+house.lampAt[1]*k,t,RM);label(c,'lit windows, door, bracket lantern',hx,484);
+  const ax=hx+(house.anchor?house.anchor[0]*k:40),ay=hy+(house.anchor?house.anchor[1]*k:-50),bx=900*u,by=G(bx)-104;
+  p.drawPost(c,bx-2,G(bx-2),false,L.pal.GOLD_LIGHT);c.lineWidth=1;c.strokeStyle=L.pal.INK;const qx=(ax+bx)/2,qy=Math.max(ay,by)+34;c.beginPath();c.moveTo(ax,ay);c.quadraticCurveTo(qx,qy,bx,by);c.stroke();p.drawFairy(c,[ax,ay,qx,qy,bx,by,7],t,'night');
+  label(c,'string lights',870*u,484);}
+ready(()=>{fit(cv);draw(0.6);const tick=player(document.getElementById('play'),t=>{draw(0.6+t);tick(t);});});
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!-- @dsCard height=300 -->
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Lantern Box</title>
+<style>
+body{margin:0;background:var(--ink)}
+.cover{position:relative;width:960px;height:300px;overflow:hidden;background:var(--ink)}
+.cover svg{position:absolute;left:0;top:0}
+.b-sky{fill:var(--night-sky-2)}
+.b-brass{fill:var(--brass)}
+.b-gold{fill:var(--gold-light)}
+.b-ember{fill:var(--ember)}
+.b-witch{fill:var(--witch-core)}
+.cut{fill:var(--ink)}
+.text{position:absolute;left:40px;bottom:30px;max-width:440px;display:flex;flex-direction:column;gap:14px}
+.name{margin:0;font:400 104px/0.95 var(--font-display);color:var(--title-letter);text-shadow:var(--glow-title)}
+.tag{margin:0;font:400 14px/20px var(--font-text);color:var(--text-3)}
+</style>
+</head>
+<body>
+<div class="cover">
+  <svg aria-hidden="true" width="960" height="300" viewBox="0 0 960 300">
+    <!--
+      blocks: night-sky-2 slab 168x264 (bleeds off the top), brass plaque 144x112, gold-light 72x72, ember 112x44 (bleeds right), witch-core 56x44; sides multiples of space-2 (8px)
+      arrangement: one tall slab with satellites, like the paper theatre's layers: the sky slab behind, the brass plaque and the lights in front, the danger and witch-light kept small
+      pattern: a lancet arch cut from the slab in ink, its foot torn: the title screen's arch, "a gothic arch cut from black card, lit from behind" (README, The lancet arch)
+      steps: corners cut by chamfer-plaque (10px) and chamfer-control (6px); gaps space-5 (14px) rounded to 16; the arch 104 wide, its springing at 40% of its height as in bundle.css
+    -->
+    <polygon class="b-sky" points="496,-10 664,-10 664,244 654,254 506,254 496,244"></polygon>
+    <path class="cut" d="M528 254 L528 150 Q528 104 580 72 Q632 104 632 150 L632 254 L624 249 L616 254 L606 248 L596 254 L586 249 L576 254 L566 248 L556 254 L546 249 L536 254 Z"></path>
+    <polygon class="b-brass" points="690,40 814,40 824,50 824,142 814,152 690,152 680,142 680,50"></polygon>
+    <polygon class="b-gold" points="846,40 906,40 912,46 912,106 906,112 846,112 840,106 840,46"></polygon>
+    <polygon class="b-ember" points="846,128 970,128 970,172 846,172 840,166 840,134"></polygon>
+    <polygon class="b-witch" points="686,168 730,168 736,174 736,206 730,212 686,212 680,206 680,174"></polygon>
+  </svg>
+  <div class="text">
+    <h1 class="name">Lantern<br>Box</h1>
+    <p class="tag">Backlit cut-out silhouettes in layered, coloured air, for side-on games.</p>
+  </div>
+</div>
+<script>/* static cover */</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!-- @dsCard group="Plaque" height=120 width=640 subtitle="Volume at 80%" -->
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Slider</title>
+<style>
+body{margin:0;background:var(--ink)}
+.stage{position:relative;overflow:hidden;background:var(--ink)}
+.stage>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cap{margin:0;padding:8px 2px 6px;font:500 13px/16px var(--font-text);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+
+</style>
+</head>
+<body>
+<div class="stage lb-ui " style="width:640px;height:120px"><div style="position:absolute;left:36px;top:20px;width:568px"><div class="lb-plaque"><div class="lb-face" style="padding:18px 22px"><div class="lb-setting is-first" style="height:40px"><label class="lb-setting-name" for="vol" style="width:140px">Volume</label><input class="lb-slider" id="vol" type="range" min="0" max="100" value="80"><span class="lb-value" id="volv" style="width:44px">80%</span></div></div></div></div></div>
+<script>const v=document.getElementById('vol'),o=document.getElementById('volv');v.addEventListener('input',()=>{o.textContent=v.value+'%';});</script>
+</body>
+</html>

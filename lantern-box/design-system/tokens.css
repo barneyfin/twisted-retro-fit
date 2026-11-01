@@ -1,0 +1,195 @@
+/* Lantern Box — generated from tokens.json */
+:root, [data-theme="lantern"] {
+  --ink: #060508;
+  --plaque-face: rgba(14,9,11,0.95);
+  --hud-face: rgba(12,7,9,0.78);
+  --tile-face: rgba(12,7,9,0.82);
+  --brass: #c9a25a;
+  --brass-dim: #8a7046;
+  --brass-deep: #5a4a36;
+  --rule-dark: #3a3026;
+  --rule-row: #2e2620;
+  --heading: #f1d79a;
+  --text: #efe6d8;
+  --text-2: #d8c9b0;
+  --text-3: #b9ab97;
+  --text-dim: #8a7a66;
+  --on-brass: #1b1508;
+  --wisp-label: #c9b48c;
+  --track: rgba(201,162,90,0.16);
+  --track-line: rgba(201,162,90,0.35);
+  --health-top: #e0574a;
+  --health-low: #b52b22;
+  --mana-top: #5fdcca;
+  --mana-low: #2a9f8f;
+  --brass-wash: rgba(201,162,90,0.14);
+  --brass-tint: rgba(201,162,90,0.1);
+  --brass-glow: rgba(255,190,100,0.35);
+  --scrim: rgba(6,5,8,0.6);
+  --scrim-title: rgba(6,5,8,0.3);
+  --focus: var(--heading);
+  --arch-edge: #ffcf8a;
+  --arch-glow: rgba(255,170,90,0.75);
+  --arch-glow-far: rgba(255,140,70,0.45);
+  --title-letter: #ffd9a0;
+  --title-glow: rgba(255,190,110,0.9);
+  --title-glow-far: rgba(255,150,80,0.6);
+  --title-selected: #ffe2a8;
+  --title-selected-glow: rgba(255,190,100,0.95);
+  --title-item: #cdbfa8;
+  --title-hint: #a89a85;
+  --title-key-line: #6a5436;
+  --title-key: #e6d8c0;
+  --rotate-glow: #3a2140;
+  --gold-light: #ffcf6a;
+  --lamp-glass: #ffdf9a;
+  --string-light: #fff1c8;
+  --string-light-storm: #ffc9a8;
+  --string-glow: #ffd27a;
+  --window-dark: #1a1218;
+  --lantern-glow: #ffc96a;
+  --wanderer-scarf: #b3261e;
+  --potion: #e0473c;
+  --ember: #ff7a3a;
+  --ember-glow: #ff5a1f;
+  --ember-hot: #ffc27a;
+  --ember-eye-core: #ffd9a0;
+  --bone: #d8ccb6;
+  --witch-core: #d2f29a;
+  --witch-mid: #a6d862;
+  --witch-glow: #86c94a;
+  --witch-intense: #ecffc4;
+  --wisp-pale: #f4f7ff;
+  --wisp-pale-glow: #c8d6ff;
+  --wisp-gold: #fff3d0;
+  --wisp-gold-glow: #ffe7a8;
+  --night-sky-1: #1b0f2e;
+  --night-sky-2: #57284f;
+  --night-sky-3: #c06844;
+  --night-sky-4: #eea05c;
+  --night-air: #b8644e;
+  --night-haze: #ffb066;
+  --night-edge: rgba(255,231,184,0.9);
+  --storm-sky-1: #0f0507;
+  --storm-sky-2: #370c14;
+  --storm-sky-3: #74201f;
+  --storm-sky-4: #9c3a28;
+  --storm-air: #6e1f1f;
+  --storm-haze: #ff5a3a;
+  --storm-edge: rgba(255,206,184,0.85);
+  --dawn-sky-1: #0a1530;
+  --dawn-sky-2: #22406c;
+  --dawn-sky-3: #6a8cb8;
+  --dawn-sky-4: #c2cfe0;
+  --dawn-air: #6a82a8;
+  --dawn-haze: #d2e0f4;
+  --dawn-edge: rgba(214,228,255,0.9);
+  --mist-sky-1: #55654f;
+  --mist-sky-2: #81907a;
+  --mist-sky-3: #aab59a;
+  --mist-sky-4: #ccd3b8;
+  --mist-air: #a6b195;
+  --mist-haze: #e8eed6;
+  --mist-edge: rgba(236,242,214,0.85);
+  --moon: #ffe2a6;
+  --moon-halo: #ffae63;
+  --dawn-hollows: #dfe8f6;
+  --mist-band: #eef2dc;
+  --boss-night-veil-top: #dcbfe4;
+  --boss-night-veil-bot: #f6cfae;
+  --boss-night-core-top: #f4e2f2;
+  --boss-night-core-bot: #ffe2c6;
+  --boss-night-shade: #a882ad;
+  --boss-night-deep: #6c4a78;
+  --boss-night-claw: #f1dcea;
+  --boss-night-claw-shade: #b991b6;
+  --boss-storm-bone: #e8bcb9;
+  --boss-storm-bone-shade: #b0717a;
+  --boss-storm-bone-deep: #5e2232;
+  --boss-storm-socket: #22070e;
+  --boss-storm-tent: #b4566f;
+  --boss-storm-tent-light: #ef9fb1;
+  --boss-storm-tent-shade: #6a2640;
+  --boss-storm-sucker: #f6c6cf;
+  --boss-dawn-robe: #6b84bb;
+  --boss-dawn-robe-shade: #3e5288;
+  --boss-dawn-robe-light: #a9bbe0;
+  --boss-dawn-skin: #b4d0d6;
+  --boss-dawn-skin-shade: #7c9ea8;
+  --boss-dawn-hat: #3d4d80;
+  --boss-dawn-hat-shade: #283460;
+  --boss-dawn-band: #eaa58b;
+  --boss-dawn-hair: #1b2034;
+  --boss-dawn-iron: #232b40;
+  --boss-dawn-iron-light: #56638a;
+  --boss-dawn-straw: #e8c69f;
+  --boss-dawn-straw-shade: #b48c68;
+  --boss-dawn-handle: #4a3a2c;
+  --boss-mist-bark: #707b60;
+  --boss-mist-bark-shade: #434b38;
+  --boss-mist-bark-deep: #232a1d;
+  --boss-mist-bark-light: #a9b48f;
+  --boss-mist-moss: #9fbb52;
+  --boss-night-aura: #f0c9e0;
+  --boss-storm-aura: #ff8fa6;
+  --boss-dawn-aura: #bcd2ff;
+  --boss-mist-aura: #f8ffc8;
+  --shadow-arch-tile: 0 0 0 1px rgba(255,207,138,0.7), 0 0 14px rgba(255,170,90,0.6);
+  --shadow-slot: 0 0 14px rgba(255,190,100,0.35);
+  --glow-title: 0 0 10px rgba(255,190,110,0.9), 0 0 28px rgba(255,150,80,0.6);
+  --glow-title-item: 0 0 12px rgba(255,190,100,0.95);
+  --glow-score: 0 0 18px rgba(255,190,100,0.35);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 10px;
+  --space-4: 12px;
+  --space-5: 14px;
+  --space-6: 18px;
+  --space-7: 22px;
+  --item-height: 46px;
+  --target: 44px;
+  --chamfer-plaque: 10px;
+  --chamfer-hud: 8px;
+  --chamfer-control: 6px;
+  --radius-key: 3px;
+  --radius-arch-tile: 22px;
+  --arch-filter: drop-shadow(0 0 2px #ffcf8a) drop-shadow(0 0 16px rgba(255,170,90,0.75)) drop-shadow(0 0 40px rgba(255,140,70,0.45));
+  --picture-height: 540px;
+  --ground-line: 468px;
+  --puppet-steps: 8;
+  --strip-repeat: 1900px;
+  --night-tints: 0.52 0.45 0.31 0.24;
+  --storm-tints: 0.52 0.45 0.31 0.14;
+  --dawn-tints: 0.62 0.5 0.34 0.22;
+  --mist-tints: 0.9 0.77 0.57 0.42;
+  --parallax: 0.12 0.28 0.5 0.76 1 1.35;
+  --camera-rise: 270px;
+  --font-display: "IM Fell English", Georgia, "Times New Roman", serif;
+  --font-text: "Alegreya Sans", "Gill Sans", Calibri, sans-serif;
+}
+.title-xl { font-family: var(--font-display); font-size: 62px; line-height: 0.95; font-weight: 400; }
+.heading { font-family: var(--font-display); font-size: 36px; line-height: 1; font-weight: 400; }
+.heading-phone { font-family: var(--font-display); font-size: 30px; line-height: 1; font-weight: 400; }
+.initial { font-family: var(--font-display); font-size: 52px; line-height: 1; font-weight: 400; }
+.title-item { font-family: var(--font-text); font-size: 22px; line-height: 46px; font-weight: 400; }
+.menu { font-family: var(--font-text); font-size: 20px; line-height: 46px; font-weight: 400; }
+.setting { font-family: var(--font-text); font-size: 19px; line-height: 24px; font-weight: 500; }
+.button { font-family: var(--font-text); font-size: 18px; line-height: 44px; font-weight: 700; }
+.body { font-family: var(--font-text); font-size: 17px; line-height: 1.4; font-weight: 400; }
+.segment { font-family: var(--font-text); font-size: 16px; line-height: 40px; font-weight: 400; }
+.note { font-family: var(--font-text); font-size: 15px; line-height: 1.3; font-weight: 400; }
+.hint { font-family: var(--font-text); font-size: 14px; line-height: 20px; font-weight: 400; }
+.label { font-family: var(--font-text); font-size: 13px; line-height: 16px; font-weight: 500; letter-spacing: 0.12em; }
+.flag { font-family: var(--font-text); font-size: 15px; line-height: 18px; font-weight: 700; letter-spacing: 0.14em; }
+.unit { font-family: var(--font-text); font-size: 16px; line-height: 20px; font-weight: 400; letter-spacing: 0.08em; }
+.score-xl { font-family: var(--font-text); font-size: 64px; line-height: 1; font-weight: 700; }
+.counter { font-family: var(--font-text); font-size: 23px; line-height: 1; font-weight: 700; }
+.best { font-family: var(--font-text); font-size: 19px; line-height: 1; font-weight: 700; letter-spacing: 0.02em; }
+.table-score { font-family: var(--font-text); font-size: 18px; line-height: 28px; font-weight: 700; }
+.counter-label { font-family: var(--font-text); font-size: 11px; line-height: 14px; font-weight: 400; letter-spacing: 0.14em; }
+@font-face { font-family: "IM Fell English"; src: url("fonts/IMFellEnglish-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("fonts/AlegreyaSans-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("fonts/AlegreyaSans-Medium.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("fonts/AlegreyaSans-Bold.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
