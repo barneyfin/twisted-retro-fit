@@ -66,7 +66,7 @@ It is **neither Retro Kit nor City Nights**. Do not use the `retro-kit` skill or
 
 ## Phase 3: the steps
 
-Each step ends with a check-in: tell Barney what you built, what you checked, what you could not check, and write a commit message for it (below). He reviews before the next step.
+Each step ends with a check-in: tell Barney what you built, what you checked, what you could not check, and write a commit message for it (below). He reviews before the next step, and you commit when he says yes.
 
 - **3a. Skeleton.** `lantern-box/kit/` with the fonts and licences, `build.py` (copied from Retro Kit's and adapted: one offline file per game in `dist/`, fonts embedded, rule checks), `template.html`, and an empty game that builds. Build checks: no network requests, no image files, no colour codes in games (named colours only), the photosensitivity limits where they can be checked.
 - **3b. The shell.** `lantern-box.js` and `lantern-box.css`, copied from Retro Kit's shell and restyled to the design system: title (the arch, the menu, Best, the arch tiles, key hints), pause, settings, game over (with the Continue rule above), initials (the phone's tap-a-letter layout too), high scores (two columns of five on a phone), the rotate notice, sound effects (Retro Kit's set), saving, full screen (filling the frame where full screen is refused, as the speed test does inside the Claude app). Over a plain dark backdrop for now.
@@ -102,7 +102,7 @@ About 9 ms of headroom on the phone in its worst place. Claude's suggestions for
 ## Working with Barney
 
 - He is a GP partner learning to build software, on Windows. Explain what you did and why in a few plain sentences, and always say what you could not test.
-- **Git is his.** Never commit, push or create branches. At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM53 was this handover; use CM54 next) and give him the commands for PowerShell one at a time, with the full path, the output to expect and what to do if it fails. He moves the file into `.git` and runs `git commit -F .git\CM<n>.txt`.
+- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule; use CM56 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
 - Python on his PC: `C:\Users\barne\AppData\Local\Programs\Python\Python312\python.exe`. The repo: `C:\Users\barne\Documents\Calude Code\Retro Games` (the folder really is spelt "Calude").
 - **Speed can only be measured on his devices** (Chrome on his computer and on his Pixel). Close any other copy of a page before measuring.
 - **The design system is the spec.** If the code needs something it does not cover, or a rule seems wrong, stop and ask Barney. Design changes are made in the design system first (in his Claude app project), then the copy here is refreshed.

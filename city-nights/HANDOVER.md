@@ -80,7 +80,7 @@ Retro Kit's `kit/` and `games/` are not touched (PRD criterion 7). `site/build.p
 ## Working with Barney
 
 - He is a GP partner learning to build software, on Windows. Explain what you did and why in a few plain sentences, and always say what you could not test.
-- **Git is his.** Never commit, push or create branches. At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM10 was the last; use CM11 next) and give him the commands for PowerShell one at a time, with the full path, the output to expect and what to do if it fails. He moves the file into `.git` and runs `git commit -F .git\CM<n>.txt`.
+- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (the next number after the highest in `.git`) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
 - Python on his PC: `C:\Users\barne\AppData\Local\Programs\Python\Python312\python.exe`. The repo: `C:\Users\barne\Documents\Calude Code\Retro Games` (the folder really is spelt "Calude").
 - **Speed can only be measured on his devices** (Chrome on his computer, with an RTX 5080, and on his Pixel 11 Pro XL). Close any other copy of a page before measuring: two copies fight over the graphics chip.
 - **The design system is the spec.** If the code needs something it does not cover, or a rule seems wrong, stop and ask Barney. Design changes are made in the design system first (in his Claude app project), then the copy here is refreshed.

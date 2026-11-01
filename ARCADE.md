@@ -42,7 +42,7 @@ Retro Kit's split between World (the playfield) and Interface (glass panels arou
 3. **Write a short PRD**: problem, success criteria, scope and what's out of scope, constraints, a phased plan, open questions. Nothing is built until Barney explicitly approves it.
 4. **Build in phases, with a review after each**: design system; code kit and test page; a pilot game; more games; skill, build checks and docs. After each phase, say what was checked and what could not be.
 5. **Prove the skill.** A fresh agent builds a game from the skill alone. If it stumbles, fix the skill, not the game.
-6. **Commit at the end of each phase.** Git is Barney's: he runs the commands.
+6. **Commit at the end of each phase.** Check in with Barney first; commit when he says yes. Push or create branches only when he asks.
 
 ## Open decisions
 
