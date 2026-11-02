@@ -869,7 +869,10 @@ class Scene{
     const crest=this.ver<5?(o.level==="storm"?0.32:0.5):LV[o.level].crest;
     if(L===1&&crest>0){x.strokeStyle=rgba(haze,crest);x.lineWidth=1.4;x.beginPath();for(let sx=-10;sx<=W+10;sx+=4){const yy=yfn(sx+lx);sx<=-10?x.moveTo(sx,yy):x.lineTo(sx,yy);}x.stroke();}
     const dark=mixc(INK,air,tint*0.55);
+    // doors and windows end at the ground line: each building stands a little into its ground, and its holes must not show on the hill
+    x.save();x.beginPath();x.moveTo(-10,-20);x.lineTo(W+10,-20);for(let sx=W+10;sx>-14;sx-=4)x.lineTo(sx,yfn(sx+lx));x.closePath();x.clip();
     for(const hs of houses)fillHoles(x,hs.sp,hs.X,hs.Y,hs.k,rng32(hs.seed),{litP:o.litP,win:o.win,a:hs.a,bar:tinted,dark,crack:false});
+    x.restore();
     for(const fl of fairies)drawFairy(x,fl,t,o.level);
     if(eyes.length)drawTreeEyes(x,eyes,t,L,o.rm);
     if(set==="moor"&&L>=2){ // a faint lit edge along each lower hill, so the rises and dips read
@@ -2182,7 +2185,7 @@ function splash(ctx, place, X, Y, t, rm, seed) { // the place's splash of colour
   drawSplash(ctx, PLACE_SET[place] || "village5", "on", X, Y, t || 0, !!rm, seed || 0, "green", "intense");
 }
 return {
-  version: "4.0.0",
+  version: "5.0.0",
   world: {
     LH: LH, GROUND: gY, PLACES: ["night", "storm", "dawn", "mist"], places: LV, bossNames: BOSS_NAME,
     pal: { INK: INK, SKY: SKY, AIR: AIR, HAZE: HAZE, MOON: MOON, MOONPAL: MOONPAL, CLOUD_PAL: CLOUD_PAL, EMBER: EMBER, WITCH: WITCH,

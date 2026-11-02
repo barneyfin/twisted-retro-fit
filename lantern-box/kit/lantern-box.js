@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.5.2';
+  const VERSION = '0.5.3';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -1206,7 +1206,10 @@ class Scene{
     const crest=this.ver<5?(o.level==="storm"?0.32:0.5):LV[o.level].crest;
     if(L===1&&crest>0){x.strokeStyle=rgba(haze,crest);x.lineWidth=1.4;x.beginPath();for(let sx=-10;sx<=W+10;sx+=4){const yy=yfn(sx+lx);sx<=-10?x.moveTo(sx,yy):x.lineTo(sx,yy);}x.stroke();}
     const dark=mixc(INK,air,tint*0.55);
+    // doors and windows end at the ground line: each building stands a little into its ground, and its holes must not show on the hill
+    x.save();x.beginPath();x.moveTo(-10,-20);x.lineTo(W+10,-20);for(let sx=W+10;sx>-14;sx-=4)x.lineTo(sx,yfn(sx+lx));x.closePath();x.clip();
     for(const hs of houses)fillHoles(x,hs.sp,hs.X,hs.Y,hs.k,rng32(hs.seed),{litP:o.litP,win:o.win,a:hs.a,bar:tinted,dark,crack:false});
+    x.restore();
     if(this.collect){this.collect.fairies.push(...fairies);this.collect.eyes.push(...eyes);}
     else{for(const fl of fairies)drawFairy(x,fl,t,o.level);
     if(eyes.length)drawTreeEyes(x,eyes,t,L,o.rm);}
