@@ -1,4 +1,4 @@
-/* Lantern Box 0.3 — runtime
+/* Lantern Box 0.4 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,12 +8,14 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
   const PHONE_W = 760;
-  const MAX_DPR = 2;          // above this the picture is drawn at 2x and enlarged smoothly
+  const MAX_DPR = 2;          // Picture, Best: above this the picture is drawn at 2x and enlarged smoothly
+  const BEST_LINES = 1440;    // Picture, Best: never more lines than this, however large the screen (the layers' memory grows with it)
+  const PLAIN_LINES = 810;    // Picture, Faster and Fastest: one picture pixel per screen point, and never more lines than this
   const TITLE_PACE = 40;      // lines a second the place moves behind the title arch
 
   /* ---------- Small helpers ---------- */
@@ -2818,13 +2820,41 @@ function makeTools(env){
       state.shakeT = Math.min(0.25, Math.max(state.shakeT, seconds == null ? 0.2 : seconds));
     }
 
+    /* ----- Picture: Best is the device's sharpness, Faster ordinary sharpness, Fastest that with the glows off whatever the
+       Effects setting says. Automatic starts at Best and times the first seconds of play, once a visit: after a second to
+       settle, two seconds of frames. While they come more than 25 ms apart on average (fewer than 40 a second) it steps down
+       a level and times again. ----- */
+    const LEVELS = ['best', 'faster', 'fastest'];
+    const AUTO_LIMIT = 0.025;
+    const auto = { level: 0, phase: 'wait', t: 0, n: 0, sum: 0 };   // phase: wait (for play), settle, time, done
+    const pictureLevel = () => (own.picture === 'auto' ? LEVELS[auto.level] : own.picture);
+    // gap: seconds since the last frame
+    function timePicture(gap) {
+      if (own.picture !== 'auto' || auto.phase === 'done' || state.screen !== 'play') return;
+      if (auto.phase === 'wait') { Object.assign(auto, { phase: 'settle', t: 0 }); return; }
+      if (gap > 0.25) return;   // a hitch (the window resized, the tab hidden), not the drawing
+      auto.t += gap;
+      if (auto.phase === 'settle') {
+        if (auto.t >= 1) Object.assign(auto, { phase: 'time', t: 0, n: 0, sum: 0 });
+        return;
+      }
+      auto.n++;
+      auto.sum += gap;
+      if (auto.t < 2) return;
+      if (auto.sum / auto.n > AUTO_LIMIT && auto.level < LEVELS.length - 1) {
+        auto.level++;
+        Object.assign(auto, { phase: auto.level < LEVELS.length - 1 ? 'settle' : 'done', t: 0 });
+        layout();
+      } else auto.phase = 'done';
+    }
+
     /* ----- The picture: 540 lines tall, its width following the window ----- */
     const V = { W: 960, k: 1, w: 0, h: 0, phone: false };
     function layout() {
       const w = root.clientWidth;
       const h = root.clientHeight;
       if (!w || !h) return;
-      const q = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      const q = pictureLevel() === 'best' ? Math.min(window.devicePixelRatio || 1, MAX_DPR, BEST_LINES / h) : Math.min(1, PLAIN_LINES / h);
       const bw = Math.max(1, Math.round(w * q));
       const bh = Math.max(1, Math.round(h * q));
       if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
@@ -3218,7 +3248,9 @@ function makeTools(env){
       const showPic = () => segBtns.forEach((b, i) => b.setAttribute('aria-pressed', PICTURES[i][0] === own.picture ? 'true' : 'false'));
       const choosePic = (id) => {
         own.picture = id;
+        if (id === 'auto') Object.assign(auto, { level: 0, phase: 'wait', t: 0 });   // it times again from the top
         applySettings();
+        layout();
         showPic();
         sfx('blip');
         if (nav && nav.items === items) nav.select(items.indexOf(picItem), true);
@@ -3696,15 +3728,18 @@ function makeTools(env){
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
     let speed = 1;
+    let forceRotate = false;   // the test page shows the rotate notice on any screen
     function frame(now) {
       requestAnimationFrame(frame);
-      const dt = Math.min(0.25, Math.max(0, (now - lastFrame) / 1000)) * speed;
+      const gap = Math.max(0, (now - lastFrame) / 1000);
+      const dt = Math.min(0.25, gap) * speed;
       lastFrame = now;
+      timePicture(gap);
       state.t += dt;
       if (root.clientWidth !== V.w || root.clientHeight !== V.h) layout();
       // checked every frame as well as on the event, in case a turn's event never comes
-      if (upright() === rotateEl.hidden) {
-        rotateEl.hidden = !upright();
+      if ((upright() || forceRotate) === rotateEl.hidden) {
+        rotateEl.hidden = !(upright() || forceRotate);
         if (!rotateEl.hidden) fitScreens();
       }
       if (state.screen === 'play' && upright()) pause();
@@ -3730,7 +3765,7 @@ function makeTools(env){
       W: () => V.W,
       t: () => (state.inGame ? state.time : state.t),
       rm: () => !!settings.reduceMotion,
-      fx: () => !!settings.effects
+      fx: () => !!settings.effects && pictureLevel() !== 'fastest'
     });
 
     /* ----- Public API handed to the game -----
@@ -3742,6 +3777,7 @@ function makeTools(env){
          the mana bar out. lb.sfx('name'), sfx.tone(o), sfx.noise(o). lb.music(0 or 1): the soundtrack to play.
        lb.shake(lines, seconds): the picture only, never under Reduce motion. lb.after(seconds, fn): a timer in game time.
        lb.settings: effects, reduceMotion, picture and the rest (read only). lb.screen, lb.time, lb.t.
+       lb.picture: the Picture level in use ('best', 'faster' or 'fastest') and the picture's width, height and sharpness.
        lb.rand, lb.randInt, lb.pick, lb.clamp, lb.lerp. lb.color('ember'): a named colour from the design system's tokens.
        lb.world draws the World. A frame: world.begin(ctx, { place: 'night', 'storm', 'dawn' or 'mist', camX, rise }), then the
          things on the path in the order they overlap, then world.end(). camX is the path's position at the picture's left
@@ -3759,6 +3795,7 @@ function makeTools(env){
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
       get settings() { return Object.assign({}, settings, { picture: own.picture }); },
+      get picture() { return { level: pictureLevel(), width: canvas.width, height: canvas.height, sharpness: V.k }; },
       get screen() { return state.screen; },
       get time() { return state.time; },
       get t() { return state.t; },
@@ -3796,7 +3833,9 @@ function makeTools(env){
       settings: settings,
       own: own,
       view: V,
+      auto: auto,
       music: music,
+      rotate: (on) => { forceRotate = !!on; },
       get nav() { return nav; },
       get game() { return state.game; },
       get speed() { return speed; },

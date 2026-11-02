@@ -7,38 +7,253 @@
 <!-- The kit. build.py copies both files, the fonts and their licences into dist/<game>.html. Keep data-lb-inline. -->
 <link rel="stylesheet" href="../../kit/lantern-box.css" data-lb-inline>
 <script src="../../kit/lantern-box.js" data-lb-inline></script>
+<style>
+/* the test page's own pieces, in the kit's plaques and buttons */
+.ls-readout{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:1;width:max-content;max-width:calc(100% - 480px);min-width:190px;pointer-events:none}
+.ls-readout>.lb-face{gap:0;padding:5px 12px 6px;font:500 13px/17px var(--font-text);color:var(--text-2);text-align:center;font-variant-numeric:tabular-nums}
+.ls-readout b{font-weight:700;color:var(--heading)}
+.ls-bar{position:fixed;left:12px;right:12px;bottom:10px;z-index:1;display:flex;flex-wrap:wrap;gap:6px;touch-action:manipulation}
+.ls-bar .lb-btn{height:var(--target);padding:0 11px;font-size:16px;background:var(--plaque-face)}
+.ls-bar[hidden],.ls-readout[hidden],.ls-panel[hidden]{display:none}
+.ls-panel{position:fixed;inset:0;z-index:1;display:flex;align-items:center;justify-content:center}
+.ls-panel>.lb-plaque{position:relative;flex:none;max-width:calc(100% - 12px);max-height:calc(100% - 12px);overflow:auto}
+.ls-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--space-3);row-gap:var(--space-1)}
+.ls-two .lb-item{padding:0 12px;font-size:18px}
+.ls-line{margin:0;font:400 13px/1.35 var(--font-text);color:var(--text-2);-webkit-user-select:text;user-select:text;overflow-wrap:anywhere}
+.ls-table td,.ls-table th{padding:0 8px 0 0;text-align:right;white-space:nowrap}
+.ls-table th:first-child,.ls-table td:first-child{text-align:left}
+.ls-table td{color:var(--text-2)}
+</style>
 </head>
 <body>
 <script>
-/* LB SAMPLER — Lantern Box's test page: the World's drawing parts, in play. Step 3c's start on it; step 3d adds every screen
-   and the frame-rate readout.
-   Keys: 1 2 3 4 a place · arrows walk and rise · C the crowd · M defeat the monsters · B defeat the boss. Or the buttons. */
+/* LB SAMPLER — Lantern Box's test page: every drawing part and every screen, with a frame-rate readout, and the speed check.
+   Keys: 1 2 3 4 a place · arrows walk and rise · C the crowd · D defeats · V the next part · T the speed check. Or the buttons.
+   It uses the kit's test hook (lb._debug) to open any screen; games do not. */
 const PLACE_NAMES = ['night', 'storm', 'dawn', 'mist'];
-const CROWD_GAP = 150;                 // a crowd is about eight monsters across the picture, and a boss
-const WALK = 2.4, RISE_STEP = 3, RISE_MAX = 270;
+const PLACE_LABEL = { night: 'Night', storm: 'Blood-red rain', dawn: 'Dawn', mist: 'Mist' };
+const CROWD = 8;                       // the speed target's crowd: eight monsters, a boss, the flyers and the rain
+const WALK = 2.4, RISE_STEP = 3, RISE_MAX = 270, RISE_EVERY = 8;
 const DEFEAT_MONSTER = 1.6, DEFEAT_BOSS = 2.2, REST = 1;   // seconds
+const WARM = 1.5, RUN = 4, LOAD = 2.5, TEST_PACE = 1;      // the speed check: seconds in each place, and lines a frame
+const SAMPLE_SCORES = [['MOR', 2480], ['VEX', 1960], ['BAR', 1120], ['OWL', 1040], ['RUE', 880], ['HEX', 760], ['ASH', 610], ['FEN', 450], ['IVY', 320], ['NOX', 180]];
 
-let bar = null;
-function buttons(g, lb) {
+let G = null, LB = null;                  // the state of the run, and the kit
+let bar = null, readout = null, panel = null;
+
+/* ---------- the parts: each drawing part in turn, with the camera still ---------- */
+function spread(lb, cam, n, i) { return cam + lb.W * (i + 0.7) / (n + 0.4); }
+const PARTS = [
+  { name: 'The whole scene', crowd: true },
+  { name: 'The place alone: its sky, flyers, weather and scenery' },
+  { name: 'The five monsters', draw(w, lb, g, cam) {
+    w.MONSTERS.forEach((kind, i) => w.monster({ kind, x: spread(lb, cam, 5, i), y: kind === 'bat2' ? 300 : undefined, ph: i * 0.7, id: 'p' + i }));
+  } },
+  { name: 'Each monster breaking into card pieces and a wisp', draw(w, lb, g, cam) {
+    const u = (lb.time % (DEFEAT_MONSTER + REST)) / DEFEAT_MONSTER;
+    w.MONSTERS.forEach((kind, i) => {
+      const o = { kind, x: spread(lb, cam, 5, i), y: kind === 'bat2' ? 300 : undefined, ph: i * 0.7, id: 'p' + i, seed: i };
+      w.monster(u <= 1 ? Object.assign(o, { defeat: u }) : o);
+    });
+  } },
+  { name: "The place's boss", draw(w, lb, g, cam) { w.boss({ x: cam + lb.W * 0.55 }); } },
+  { name: "The boss breaking up, with its golden wisp", draw(w, lb, g, cam) {
+    const u = (lb.time % (DEFEAT_BOSS + REST)) / DEFEAT_BOSS;
+    w.boss(u <= 1 ? { x: cam + lb.W * 0.55, defeat: u } : { x: cam + lb.W * 0.55 });
+  } },
+  { name: 'The wanderer, walking and standing', draw(w, lb, g, cam) {
+    w.wanderer(cam + lb.W * 0.3);
+    w.wanderer(cam + lb.W * 0.6, { walking: false, facing: -1 });
+  } },
+  { name: "The place's splash of colour", draw(w, lb, g, cam) { w.splash(cam + lb.W * 0.5, { seed: 1 }); } },
+  { name: 'The lights', draw(w, lb, g, cam) {
+    const x = (i) => spread(lb, cam, 6, i);
+    w.candle(x(0));
+    w.post(x(1));
+    w.streetLamp(x(2));
+    w.shrine(x(3));
+    w.potion(x(4));
+    w.wallLamp(x(5), w.ground(x(5)) - 90);
+    w.stringLights(x(0), 250, (x(0) + x(5)) / 2, 300, x(5), 250, 3);
+  } },
+];
+
+/* ---------- the speed check: each place in turn, with the crowd, as the speed target says ---------- */
+function device() { // the browser, the system and the graphics chip, as far as the browser says
+  const ua = navigator.userAgent;
+  const m = ua.match(/Silk\/([\d.]+)/) || ua.match(/Edg\/([\d.]+)/) || ua.match(/Firefox\/([\d.]+)/) || ua.match(/Chrome\/([\d.]+)/) || ua.match(/Version\/([\d.]+).*Safari/);
+  const br = m ? (/Silk/.test(m[0]) ? 'Silk' : /Edg/.test(m[0]) ? 'Edge' : /Firefox/.test(m[0]) ? 'Firefox' : /Chrome/.test(m[0]) ? 'Chrome' : 'Safari') + ' ' + m[1].split('.')[0] : 'a browser';
+  const am = ua.match(/Android ([\d.]+)/);
+  const os = am ? 'Android ' + am[1] : /iPhone|iPad/.test(ua) ? 'iOS' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
+  let gpu = '';
+  try {
+    const g = document.createElement('canvas').getContext('webgl');
+    if (g) {
+      const e = g.getExtension('WEBGL_debug_renderer_info');
+      gpu = String(e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER)).replace(/\s+/g, ' ').slice(0, 70);
+      const l = g.getExtension('WEBGL_lose_context');
+      if (l) l.loseContext();
+    }
+  } catch (e) { /* the readout goes without it */ }
+  return br + (os ? ' on ' + os : '') + (gpu ? ' · ' + gpu : '');
+}
+const pct = (a, p) => { if (!a.length) return 0; const b = a.slice().sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(p * b.length))]; };
+function startCheck(g, lb) {
+  closePanel();
+  Object.assign(g, { part: 0, crowd: true, autoWalk: false, rising: false, monsterAt: null, bossAt: null });
+  g.check = { i: 0, phase: 'warm', t0: performance.now(), res: [], cur: null };
+  g.place = 0;
+}
+function checkFrame(g, lb, now, gapMs, cpu) { // called once a frame
+  const T = g.check, el = (now - T.t0) / 1000;
+  if (T.phase === 'warm') {
+    if (el >= WARM) { T.phase = 'run'; T.t0 = now; T.cur = { place: PLACE_NAMES[T.i], gaps: [], cpu: [] }; }
+  } else if (T.phase === 'run') {
+    T.cur.gaps.push(gapMs);
+    T.cur.cpu.push(cpu);
+    if (el >= RUN) { T.phase = 'load'; T.t0 = now; T.loadStart = null; }
+  } else {
+    if (T.loadStart === null) { T.loadStart = now; T.loadFrames = 0; } else T.loadFrames++;
+    if (el >= LOAD) {
+      const c = T.cur, sum = c.gaps.reduce((a, b) => a + b, 0), gap = (now - T.loadStart) / Math.max(1, T.loadFrames);
+      c.fps = c.gaps.length * 1000 / sum;
+      c.slow = pct(c.gaps, 0.95);
+      c.max = Math.max(...c.gaps);
+      c.drawn = gap / 8;
+      c.keptUp = gap < 18;   // eight frames fitted inside one screen refresh, so the time is an upper limit
+      T.res.push(c);
+      T.i++;
+      if (T.i >= PLACE_NAMES.length) { finishCheck(g, lb); return; }
+      T.phase = 'warm';
+      T.t0 = now;
+      g.place = T.i;
+    }
+  }
+}
+function finishCheck(g, lb) {
+  const R = g.check.res, p = lb.picture;
+  g.check = null;
+  const ms = (c) => (c.keptUp ? 'under ' : '') + c.drawn.toFixed(1) + ' ms';
+  const phone = R.every((r) => r.fps >= 29.5 && r.drawn <= 25), computer = R.every((r) => r.fps >= 58);
+  const line = 'Lantern Box speed check, kit ' + lb.version + ' · ' + device() + ' · ' + p.width + ' × ' + p.height + ' at ' + p.sharpness.toFixed(2) + '× · Picture ' + lb.settings.picture + ' (' + p.level + ')' +
+    (lb.settings.reduceMotion ? ' · reduce motion' : '') + (lb.settings.effects ? '' : ' · effects off') + ' · ' +
+    R.map((r) => PLACE_LABEL[r.place].replace('Blood-red rain', 'Rain') + ' ' + Math.round(r.fps) + ' fps / ' + ms(r)).join(' · ') +
+    ' · slowest 5% ' + Math.round(Math.max(...R.map((r) => r.slow))) + ' ms · longest ' + Math.round(Math.max(...R.map((r) => r.max))) + ' ms · layers ' + Math.round(lb.world.stats.tileBytes / 1048576) + ' MB';
+  openPanel((face, close) => {
+    const h = document.createElement('h2');
+    h.className = 'lb-heading';
+    h.textContent = 'Speed check';
+    h.style.fontSize = '26px';
+    const t = document.createElement('table');
+    t.className = 'lb-scores ls-table';
+    t.style.fontSize = '15px';
+    t.innerHTML = '<thead><tr><th scope="col">Place</th><th scope="col">Frames a second</th><th scope="col">A frame drawn in</th><th scope="col">Slowest 5%</th><th scope="col">Longest</th></tr></thead><tbody>' +
+      R.map((r) => '<tr><td>' + PLACE_LABEL[r.place] + '</td><td>' + Math.round(r.fps) + '</td><td>' + ms(r) + '</td><td>' + Math.round(r.slow) + ' ms</td><td>' + Math.round(r.max) + ' ms</td></tr>').join('') + '</tbody>';
+    const v = document.createElement('p');
+    v.className = 'ls-line';
+    v.textContent = 'Phone target (30 fps, drawn in 25 ms): ' + (phone ? 'passes' : 'does not pass') + '. Computer target (60 fps): ' + (computer ? 'passes' : 'does not pass') + '.';
+    const l = document.createElement('p');
+    l.className = 'ls-line';
+    l.textContent = line;
+    const row = document.createElement('div');
+    row.className = 'lb-btns';
+    const copy = button('Copy the line', false, () => {
+      const done = () => { copy.textContent = 'Copied'; };
+      const pick = () => { const r = document.createRange(); r.selectNodeContents(l); const s = getSelection(); s.removeAllRanges(); s.addRange(r); copy.textContent = 'Selected: copy it'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(line).then(done, pick); else pick();
+    });
+    row.append(copy, button('Close', true, close));
+    face.style.gap = '8px';
+    face.style.padding = '12px 16px';
+    face.append(h, t, v, l, row);
+  }, Math.min(640, innerWidth - 12));
+  window.__lastCheck = line;
+}
+
+/* ---------- the test page's pieces ---------- */
+function button(label, primary, fn) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'lb-btn' + (primary ? ' is-primary' : '');
+  b.textContent = label;
+  b.addEventListener('click', () => { b.blur(); fn(); });
+  return b;
+}
+function closePanel() { if (panel) { panel.remove(); panel = null; } }
+function openPanel(fill, width) {
+  closePanel();
+  panel = document.createElement('div');
+  panel.className = 'lb-ui ls-panel';
+  const plaque = document.createElement('div');
+  plaque.className = 'lb-plaque' + (LB._debug.view.phone ? ' is-phone' : '');
+  plaque.style.width = width + 'px';
+  const face = document.createElement('div');
+  face.className = 'lb-face';
+  plaque.append(face);
+  panel.append(plaque);
+  fill(face, closePanel);
+  document.body.append(panel);
+}
+function seedScores() {
+  try { localStorage.setItem('retrokit.scores.lb-sampler', JSON.stringify(SAMPLE_SCORES.map((a) => ({ i: a[0], s: a[1] })))); } catch (e) { /* no saving here: the tables start empty */ }
+}
+function screensPanel(g, lb) {
+  const D = lb._debug;
+  const over = (score) => () => { seedScores(); D.setWisps(score); D.showGameOver(); };
+  const list = [
+    ['Pause', () => D.pause()],
+    ['Settings', () => { D.pause(); D.openSettings('paused'); }],
+    ['Game over: new best', over(2600)],
+    ['Game over: top ten', over(1120)],
+    ['Game over: the menu', over(100)],
+    ['Initials', () => { seedScores(); D.setWisps(1120); D.openInitials(); }],
+    ['High scores', () => { seedScores(); D.setWisps(1120); D.openScores(2, true); }],
+    ['No scores yet', () => { try { localStorage.removeItem('retrokit.scores.lb-sampler'); } catch (e) { /* none saved */ } D.openScores(-1, true); }],
+    ['Rotate notice', () => { D.rotate(true); setTimeout(() => D.rotate(false), 4000); }],
+    ['Title', () => { seedScores(); D.quit(); }],
+  ];
+  openPanel((face, close) => {
+    const h = document.createElement('h2');
+    h.className = 'lb-heading';
+    h.textContent = 'Screens';
+    h.style.fontSize = '26px';
+    const grid = document.createElement('div');
+    grid.className = 'ls-two';
+    list.forEach(([label, fn]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lb-item';
+      b.textContent = label;
+      b.addEventListener('click', () => { close(); fn(); });
+      grid.append(b);
+    });
+    const cancel = button('Close', true, close);
+    face.style.gap = '6px';
+    face.style.padding = '12px 14px';
+    face.append(h, grid, cancel);
+  }, Math.min(520, innerWidth - 12));
+}
+function buildPieces(g, lb) {
+  if (bar) bar.remove();
+  if (readout) readout.remove();
+  closePanel();
   bar = document.createElement('div');
-  bar.className = 'lb-ui lb-btns';
-  bar.style.cssText = 'position:fixed;left:12px;bottom:10px;display:flex;flex-wrap:wrap;gap:8px;touch-action:manipulation';
-  const add = (label, fn) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'lb-btn';
-    b.style.background = 'var(--plaque-face)';
-    b.textContent = label;
-    b.addEventListener('click', () => { fn(); b.blur(); });
-    bar.append(b);
-  };
-  add('Place', () => { g.place = (g.place + 1) % PLACE_NAMES.length; });
-  add('Walk', () => { g.autoWalk = !g.autoWalk; });
-  add('Rise', () => { g.rising = !g.rising; });
-  add('Crowd', () => { g.crowd = !g.crowd; });
-  add('Monsters', () => { g.monsterAt = 0; });
-  add('Boss', () => { g.bossAt = 0; });
-  document.body.append(bar);
+  bar.className = 'lb-ui ls-bar';
+  [
+    ['Place', () => { g.place = (g.place + 1) % PLACE_NAMES.length; }],
+    ['Walk', () => { g.autoWalk = !g.autoWalk; }],
+    ['Rise', () => { g.rising = !g.rising; }],
+    ['Crowd', () => { g.crowd = !g.crowd; }],
+    ['Defeat', () => { g.monsterAt = 0; g.bossAt = 0; }],
+    ['Hurt', () => { g.health = g.health <= 0 ? 1 : Math.round((g.health - 0.2) * 10) / 10; lb.hud.health(g.health); lb.hud.mana(g.health); }],
+    ['Parts', () => { g.part = (g.part + 1) % PARTS.length; }],
+    ['Screens', () => screensPanel(g, lb)],
+    ['Speed check', () => startCheck(g, lb)],
+  ].forEach(([label, fn]) => bar.append(button(label, false, fn)));
+  readout = document.createElement('div');
+  readout.className = 'lb-ui lb-plaque is-hud ls-readout';
+  readout.innerHTML = '<div class="lb-face"><div></div><div></div><div></div></div>';
+  document.body.append(bar, readout);
 }
 
 LanternBox.game({
@@ -46,50 +261,79 @@ LanternBox.game({
   title: ['Test', 'Page'],
 
   start(lb) {
-    const g = { place: 0, x: 600, facing: 1, walking: false, autoWalk: false, rise: 0, rising: false, crowd: true, monsterAt: null, bossAt: null };
-    if (bar) bar.remove();
-    buttons(g, lb);
+    LB = lb;
+    const g = { place: 0, x: 600, facing: 1, walking: false, autoWalk: false, rise: 0, rising: false, crowd: true, part: 0, monsterAt: null, bossAt: null, health: 1, check: null,
+      last: 0, fpsN: 0, fpsT: 0, cpuSum: 0, fps: 0, cpu: 0 };
+    G = g;
+    buildPieces(g, lb);
     return g;
   },
 
   update(g, lb) {
+    if (g.check) { g.x += TEST_PACE; g.walking = true; g.facing = 1; g.rise = RISE_MAX * (0.5 - 0.5 * Math.cos(2 * Math.PI * lb.time / RISE_EVERY)); return; }
     const i = lb.input;
     PLACE_NAMES.forEach((p, n) => { if (i.keyPressed('Digit' + (n + 1))) g.place = n; });
     if (i.keyPressed('KeyC')) g.crowd = !g.crowd;
-    if (i.keyPressed('KeyM')) g.monsterAt = 0;
-    if (i.keyPressed('KeyB')) g.bossAt = 0;
+    if (i.keyPressed('KeyD')) { g.monsterAt = 0; g.bossAt = 0; }
+    if (i.keyPressed('KeyV')) g.part = (g.part + 1) % PARTS.length;
+    if (i.keyPressed('KeyT')) startCheck(g, lb);
     const dir = g.autoWalk ? 1 : (i.right ? 1 : 0) - (i.left ? 1 : 0);
     g.walking = dir !== 0;
     if (dir) { g.facing = dir; g.x += dir * WALK; }
     if (i.up) g.rise = Math.min(RISE_MAX, g.rise + RISE_STEP);
     if (i.down) g.rise = Math.max(0, g.rise - RISE_STEP);
-    if (g.rising) g.rise = RISE_MAX * (0.5 - 0.5 * Math.cos(lb.time * Math.PI / 4));
+    if (g.rising) g.rise = RISE_MAX * (0.5 - 0.5 * Math.cos(2 * Math.PI * lb.time / RISE_EVERY));
     if (g.monsterAt != null && (g.monsterAt += 1 / 60) > DEFEAT_MONSTER + REST) g.monsterAt = null;
     if (g.bossAt != null && (g.bossAt += 1 / 60) > DEFEAT_BOSS + REST) g.bossAt = null;
   },
 
   draw(ctx, g, lb) {
-    if (bar) bar.hidden = lb.screen !== 'play';
-    const w = lb.world, camX = g.x - lb.W * 0.28;
-    w.begin(ctx, { place: PLACE_NAMES[g.place], camX, rise: g.rise });
-    const bossX = camX + lb.W * 0.74;
-    if (g.crowd) {
-      const a = Math.ceil((camX - 160) / CROWD_GAP), b = Math.floor((camX + lb.W + 160) / CROWD_GAP);
-      for (let j = a; j <= b; j++) {
-        const x = j * CROWD_GAP, kind = w.MONSTERS[((j % 5) + 5) % 5], ph = j * 0.77 + 0.3;
-        if (Math.abs(x - g.x) < 60 || Math.abs(x - bossX) < 130) continue;   // clear of the wanderer and the boss
-        const fly = kind === 'bat2', y = fly ? 232 + Math.sin(lb.time * 1.1 + j) * 22 : undefined;
-        const beaten = g.monsterAt != null && g.monsterAt <= DEFEAT_MONSTER;
-        if (g.monsterAt != null && !beaten) continue;   // gone, for a moment
-        w.monster({ kind, x, y, ph, id: 'c' + j, defeat: beaten ? g.monsterAt / DEFEAT_MONSTER : undefined, seed: j });
-      }
-      if (g.bossAt == null) w.boss({ x: bossX });
-      else if (g.bossAt <= DEFEAT_BOSS) w.boss({ x: bossX, defeat: g.bossAt / DEFEAT_BOSS });
+    const now = performance.now(), gapMs = g.last ? now - g.last : 16.7, playing = lb.screen === 'play';
+    g.last = now;
+    if (bar) { bar.hidden = !playing || !!g.check || !!panel; readout.hidden = !playing; }
+    // while the speed check times a frame, it draws eight in a row, each 1/60 s on from the last, so poses and layers change as often as in play
+    const reps = g.check && g.check.phase === 'load' ? 8 : 1, c0 = performance.now();
+    for (let r = 0; r < reps; r++) drawScene(ctx, g, lb, lb.time + r / 60, g.x + r * TEST_PACE);
+    const cpu = (performance.now() - c0) / reps;
+    if (!playing) return;
+    if (g.check) checkFrame(g, lb, now, gapMs, cpu);
+    g.fpsN++;
+    g.cpuSum += cpu;
+    if (now - g.fpsT >= 500) {
+      g.fps = g.fpsN * 1000 / (now - g.fpsT);
+      g.cpu = g.cpuSum / g.fpsN;
+      g.fpsN = 0; g.cpuSum = 0; g.fpsT = now;
+      showReadout(g, lb);
     }
-    w.wanderer(g.x, { walking: g.walking, facing: g.facing });
-    w.end();
   },
 });
+
+function drawScene(ctx, g, lb, t, x) {
+  const w = lb.world, camX = x - lb.W * 0.28, part = g.check ? PARTS[0] : PARTS[g.part];
+  w.begin(ctx, { place: PLACE_NAMES[g.place], camX, rise: g.rise, t });
+  if (part.draw) part.draw(w, lb, g, camX);
+  else if (part.crowd && g.crowd) {
+    const gap = lb.W / CROWD, first = Math.ceil(camX / gap), bossX = camX + lb.W * 0.74;
+    for (let j = first; j < first + CROWD; j++) {
+      const mx = j * gap, kind = w.MONSTERS[((j % 5) + 5) % 5], fly = kind === 'bat2';
+      const beaten = g.monsterAt != null && g.monsterAt <= DEFEAT_MONSTER;
+      if (g.monsterAt != null && !beaten) continue;   // gone, for a moment
+      w.monster({ kind, x: mx, y: fly ? 232 + Math.sin(t * 1.1 + j) * 22 : undefined, ph: j * 0.77 + 0.3, id: 'c' + j, defeat: beaten ? g.monsterAt / DEFEAT_MONSTER : undefined, seed: j });
+    }
+    if (g.bossAt == null) w.boss({ x: bossX });
+    else if (g.bossAt <= DEFEAT_BOSS) w.boss({ x: bossX, defeat: g.bossAt / DEFEAT_BOSS });
+  }
+  if (!part.draw) w.wanderer(x, { walking: g.walking, facing: g.facing });
+  w.end();
+}
+function showReadout(g, lb) {
+  const p = lb.picture, lines = readout.querySelectorAll('.lb-face>div');
+  lines[0].innerHTML = '<b>' + Math.round(g.fps) + ' fps</b> · processor ' + g.cpu.toFixed(1) + ' ms a frame';
+  lines[1].textContent = p.width + ' × ' + p.height + ' · ' + p.sharpness.toFixed(2) + '× · ' + p.level + (lb.settings.picture === 'auto' ? ' (automatic)' : '') + ' · layers ' + Math.round(lb.world.stats.tileBytes / 1048576) + ' MB';
+  lines[2].textContent = g.check
+    ? 'Speed check: ' + PLACE_LABEL[PLACE_NAMES[g.check.i]] + ', ' + (g.check.i + 1) + ' of 4. Please wait.'
+    : PLACE_LABEL[PLACE_NAMES[g.place]] + ' · ' + PARTS[g.part].name;
+}
 </script>
 </body>
 </html>
