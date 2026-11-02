@@ -65,7 +65,16 @@ Open the test page in Chrome with no other copy open, choose Start game, tap Spe
 - Phone: at least 30 frames a second, with each frame drawn in 25 ms or less.
 - Computer: 60 frames a second.
 
-Results are added here. The results from phase 1's speed test are in `speed-test/README.md`.
+Published copy (private to Barney): https://claude.ai/artifact/4U9Mbj734kYaNjFyFeY1ay
+
+### Results, 2 November 2026 (kit 0.4.0, Picture Automatic, which stayed at Best)
+
+| Device | Picture | Night | Blood-red rain | Dawn | Mist | Slowest 5% / longest | Layers |
+|---|---|---|---|---|---|---|---|
+| Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 79 fps / 12.5 ms | 58 / 14.8 ms | 83 / 12.3 ms | 74 / 13.1 ms | 25 / 26 ms | 107 MB |
+| Computer, Chrome 156 on Windows, RTX 5080 | 3004 × 1440 at 2.67× | 60 fps / under 2.1 ms | 60 / under 2.1 ms | 60 / under 2.1 ms | 60 / under 2.1 ms | 17 / 17 ms | 231 MB |
+
+Each cell is frames a second / time to draw one frame. Both pass their targets, in every place. "Under" means eight frames fitted inside one screen refresh, so the time is an upper limit. The Pixel reports its system as Android 10 to web pages, whatever it really runs. The iPhone, the HP laptop, the Fire HD 8 and the computer's AMD graphics are still to be measured (report only). The results from phase 1's speed test are in `speed-test/README.md`.
 
 ## Picture: Automatic, Best, Faster, Fastest
 
