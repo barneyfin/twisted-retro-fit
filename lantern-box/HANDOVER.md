@@ -53,13 +53,13 @@ It is **neither Retro Kit nor City Nights**. Do not use the `retro-kit` skill or
 
 **Settings** (shared across the arcade)
 - Rows, in order: Volume, Effects ("Glow round lights, eyes and splashes."), Reduce motion ("Flatter scenery, slower rain, no shaking."), Picture (Automatic, Best, Faster, Fastest; Automatic by default). No Solid panels row: plaques are already near solid.
-- Shared settings live in Retro Kit's `retrokit.settings` object (`volume`, `muted`, `effects`, `reduceMotion`, `solid`). Lantern Box reads and writes the ones it shows and leaves `solid` as it finds it. Picture is Lantern Box's own. Suggested: `lanternbox.settings`, as City Nights uses `citynights.settings`; confirm with Barney in 3b.
+- Shared settings live in Retro Kit's `retrokit.settings` object (`volume`, `muted`, `effects`, `reduceMotion`, `solid`). Lantern Box reads and writes the ones it shows and leaves `solid` as it finds it. Picture is Lantern Box's own, in `lanternbox.settings`, as City Nights uses `citynights.settings` (Barney, 2 November 2026).
 - Reduce motion: the drawing code already takes it (`rm`): backdrop layers at 0.4 of their parallax and the fore layer at 1.08, slower rain, clouds, mist and flyers, smooth half-speed puppet poses, no splash flicker. Never shake the screen with it on.
 - Effects: the drawing code has no switch for it; adding one is new work in 3c. Off draws lights, ember eyes and rims, splashes and wisps without their glow (no shadow blur, no halo gradients). Show Barney the result.
 - Picture: what Best, Faster and Fastest each change is not decided. Claude's suggestion, for Barney in 3d: Best at the device's sharpness (capped on very large screens), Faster at ordinary sharpness, Fastest at ordinary sharpness with Effects' glows off; Automatic times the first seconds of play and steps down a level while frames take longer than 25 ms.
 
 **Scores**
-- High scores per game in Retro Kit's format: a top-ten array of `{"s": <number>, "i": "<initials>"}`, `s` the wisps. City Nights saves under `retrokit.scores.<game id>`; the same is suggested here (Gloam Hallow's id `gloam-hallow`). Confirm with Barney in 3b.
+- High scores per game in Retro Kit's format: a top-ten array of `{"s": <number>, "i": "<initials>"}`, `s` the wisps. Saved under `retrokit.scores.<game id>`, as City Nights does, where the arcade website looks (Gloam Hallow's id `gloam-hallow`; Barney, 2 November 2026).
 
 **Fonts**
 - Use the files in `lantern-box/design-system/fonts/` (Fontsource's Latin cuts, 5.3.0: IM Fell English Regular; Alegreya Sans Regular, Medium and Bold) and their licences. Embed them in every game with the licences. Never link a font service from a game.
@@ -102,11 +102,15 @@ About 9 ms of headroom on the phone in its worst place. Claude's suggestions for
 ## Working with Barney
 
 - He is a GP partner learning to build software, on Windows. Explain what you did and why in a few plain sentences, and always say what you could not test.
-- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule; use CM56 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
+- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b; use CM57 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
 - Python on his PC: `C:\Users\barne\AppData\Local\Programs\Python\Python312\python.exe`. The repo: `C:\Users\barne\Documents\Calude Code\Retro Games` (the folder really is spelt "Calude").
 - **Speed can only be measured on his devices** (Chrome on his computer and on his Pixel). Close any other copy of a page before measuring.
 - **The design system is the spec.** If the code needs something it does not cover, or a rule seems wrong, stop and ask Barney. Design changes are made in the design system first (in his Claude app project), then the copy here is refreshed.
 - If something here is missing or unclear, ask rather than guess.
+
+## Soundtrack
+
+Barney's two MP3s for Gloam Hallow are in his Downloads folder: `C:\Users\barne\Downloads\Lantern_in_the_Moor.mp3` (2.4 minutes, 3.5 MB) and `The_Long_Vigil.mp3` (3 minutes, 4.3 MB). They go into the game's `music.js` in phase 4; together they add about 10 MB to the built file. Which place gets which track is decided with the gameplay.
 
 ## Still open (not phase 3)
 

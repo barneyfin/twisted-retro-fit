@@ -13,21 +13,33 @@
 /* LB EMPTY — the empty Lantern Box game: a straight copy of kit/template.html, kept to prove a new game
    made from the template builds with no warnings. Copy the template, not this file, to start a game.
    The kit's rules: ARCADE.md and lantern-box/design-system/README.md.
-   Build:  python lantern-box/kit/build.py <name>   (the game is finished only when it builds with no warnings) */
+   Build:  python lantern-box/kit/build.py <name>   (the game is finished only when it builds with no warnings)
+   The kit owns every screen outside play and the HUD; the game supplies its rules and its picture. Everything lb offers
+   is listed in lantern-box/kit/lantern-box.js under "Public API". This template only spends health to earn wisps,
+   so every screen can be reached: Space or a tap earns 10 wisps for a tenth of the health, and X or a second finger
+   ends the run at once. */
 LanternBox.game({
   id: 'lb-empty',                 // the folder name: lowercase-with-hyphens; high scores are saved under it
-  title: ['Lantern Box', 'Empty'], // an invented name, in sentence case, broken over two lines where it reads best
+  title: ['Empty', 'Game'],       // an invented name, in sentence case, on two short lines (about 9 letters each at most)
 
   // New game: build and return this game's state.
   start(lb) {
-    return {};
+    return { health: 1 };
   },
 
   // Rules: called 60 times a second during play.
   update(g, lb) {
+    if (lb.ending) return;
+    if (lb.input.pressed.fire || lb.input.tap) {
+      lb.addWisps(10);
+      g.health = Math.round((g.health - 0.1) * 10) / 10;
+      lb.hud.health(g.health);
+      if (g.health <= 0) lb.gameOver();
+    }
+    if (lb.input.pressed.alt || lb.input.pointer2.pressed) lb.gameOver(0);
   },
 
-  // Picture: called every frame.
+  // Picture: called every frame, in a picture 540 lines tall (lb.H) and lb.W wide. The kit has cleared it to ink.
   draw(ctx, g, lb) {
   },
 });
