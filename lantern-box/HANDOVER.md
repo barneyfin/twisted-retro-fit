@@ -104,7 +104,7 @@ About 9 ms of headroom on the phone in its worst place. Claude's suggestions for
 ## Working with Barney
 
 - He is a GP partner learning to build software, on Windows. Explain what you did and why in a few plain sentences, and always say what you could not test.
-- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off; use CM61 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
+- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off, CM61 the layer lift and contrast; use CM62 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
 - Python on his PC: `C:\Users\barne\AppData\Local\Programs\Python\Python312\python.exe`. The repo: `C:\Users\barne\Documents\Calude Code\Retro Games` (the folder really is spelt "Calude").
 - **Speed can only be measured on his devices** (Chrome on his computer and on his Pixel). Close any other copy of a page before measuring.
 - **The design system is the spec.** If the code needs something it does not cover, or a rule seems wrong, stop and ask Barney. Design changes are made in the design system first (in his Claude app project), then the copy here is refreshed.
@@ -113,6 +113,21 @@ About 9 ms of headroom on the phone in its worst place. Claude's suggestions for
 ## Soundtrack
 
 Barney's two MP3s for Gloam Hallow are in his Downloads folder: `C:\Users\barne\Downloads\Lantern_in_the_Moor.mp3` (2.4 minutes, 3.5 MB) and `The_Long_Vigil.mp3` (3 minutes, 4.3 MB). They go into the game's `music.js` in phase 4; together they add about 10 MB to the built file. Which place gets which track is decided with the gameplay.
+
+## Layer lift and contrast (Barney, 2 November 2026; not yet in the design system)
+
+On the Pixel the World looked crowded, most in Blood-red rain and Night. The picture is the same 540 lines as on the computer, but only a few centimetres tall, and the feet of the three nearer back layers and the path sit within 27 lines of each other. Barney tuned two things per place on a throwaway copy of the test page (https://claude.ai/artifact/XWjgYNRSMRphhLAweesT9i, private; not in the repo):
+
+| Place | Lift (lines) | Layer gaps | Tints, far to near (were) |
+|---|---|---|---|
+| Night | 60 | ×2.2 | 0.856 0.702 0.394 0.24 (0.52 0.45 0.31 0.24) |
+| Blood-red rain | 70 | ×2.0 | 0.9 0.76 0.48 0.14 (0.52 0.45 0.31 0.14) |
+| Dawn | 30 | ×1.5 | 0.82 0.64 0.4 0.22 (0.62 0.5 0.34 0.22) |
+| Mist | 35 | ×1.0 | unchanged, 0.9 0.77 0.57 0.42 |
+
+- **Layer gaps** widen the steps between the back layers about the nearest one: each tint becomes nearest + (tint − nearest) × gaps.
+- **Lift** draws the picture as if the camera had risen by the lift, then slides it up by the same amount, so the path stays where it was. Each part sits higher by (1 − its parallax) × lift: the sky and moon by the whole lift, the clouds, back layers, mist bands and flyers by their own rates, the path not at all; the fore layer's ground drops by 0.35 × lift. The rain, the vignette and the overhanging branches stay put. The camera's own rise adds on top. The lift uses the full parallax rates, also with Reduce motion.
+- **Next:** Barney puts the change into the design system (his Claude app project): the three tints tokens, a new lift token per place, the README's wording and `bundle.js`. Then refresh the copy in `design-system/`, port it to `kit/lantern-box.js` (the sky, `kitBegin` and `kitEnd`), rebuild, and check the test page in every place.
 
 ## Still open (not phase 3)
 
