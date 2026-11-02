@@ -1441,10 +1441,27 @@ function drawStoneCircle(x,X,k,r,yfn,lx){
   const n=8+Math.floor(r()*5),rx=58*k,ry=11*k,st=[];
   for(let i=0;i<n;i++){const a=i/n*Math.PI*2+r()*0.2,fall=r()<0.18,gone=r()<0.12;if(gone)continue;st.push({a,fall,v:Math.floor(r()*3),s:(0.42+r()*0.18)*k,sz:0.8+r()*0.3});}
   st.sort((p,q)=>Math.sin(p.a)-Math.sin(q.a));
+  // a low rise under the ring, as high as its far stones are lifted, so every stone and fallen stone stands on ground
+  const R=rx+10*k;x.fillStyle=INK;x.beginPath();for(let d=-R;d<=R;d+=4){const u=d/R;x.lineTo(X+d,yfn(X+d+lx)+2-ry*0.6*Math.sqrt(Math.max(0,1-u*u)));}
+  for(let d=R;d>=-R;d-=4)x.lineTo(X+d,yfn(X+d+lx)+6);x.closePath();x.fill();
   for(const q of st){const sx=X+Math.cos(q.a)*rx,depth=Math.sin(q.a),sk=q.s*(0.82+0.18*(depth+1)/2)*q.sz,sy=groundAt(yfn,sx+lx-8*sk,sx+lx+8*sk)+2+depth*ry*0.6;
     if(q.fall){x.fillStyle=INK;x.beginPath();x.ellipse(sx,sy-3*sk,16*sk,4.5*sk,(r()-0.5)*0.3,0,Math.PI*2);x.fill();}
     else drawMenhir(x,sx,sy,sk,q.v);}
-  if(r()<0.35){x.fillStyle=INK;const lx2=X+(r()-0.5)*rx*0.6,h=48*k,Y=groundAt(yfn,lx2+lx-12*k,lx2+lx+12*k)+2;x.fillRect(lx2-11*k,Y-h,6*k,h+4);x.fillRect(lx2+5*k,Y-h,6*k,h+4);x.save();x.translate(lx2,Y-h);x.rotate((r()-0.5)*0.12);x.fillRect(-15*k,-6*k,30*k,7*k);x.restore();}
+  if(r()<0.35){const lx2=X+(r()-0.5)*rx*0.6,tilt=(r()-0.5)*0.12;drawTrilithon(x,lx2,groundAt(yfn,lx2+lx-12*k,lx2+lx+12*k)+2,k,tilt,rng32(hsh(53,Math.round(lx2+lx))));}
+}
+function drawTrilithon(x,X,Y,k,tilt,q){ // the circle's arch: two rough uprights under a rough lintel, cut like the menhirs, no straight sides
+  const j=a=>(q()-0.5)*a;x.fillStyle=INK;
+  const up=(cx,h,lean)=>{ // an upright: sides that wander in and out, a worn, uneven top; returns its top in the picture
+    const wb=8.5+j(2),wt=wb*(0.8+q()*0.12),pts=[[-wb/2,4],[-wb/2-0.6+j(1.4),-h*0.25],[-wb/2+0.5+j(1.4),-h*0.55],[-wt/2-0.3+j(1.2),-h*0.82],
+      [-wt/2+0.9+j(0.6),-h+0.7],[-wt*0.1+j(1.2),-h-0.7+j(0.8)],[wt/2-1+j(0.6),-h+j(0.6)],[wt/2+0.3+j(1.2),-h*0.8],[wb/2+0.6+j(1.4),-h*0.5],[wb/2-0.3+j(1.4),-h*0.22],[wb/2,4]];
+    x.save();x.translate(X+cx*k,Y);x.scale(k,k);x.rotate(lean);x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();x.restore();
+    return[X+(cx+Math.sin(lean)*h)*k,Y-Math.cos(lean)*h*k];};
+  const a=up(-8.5,48+j(2.4),-0.03+j(0.03)),b=up(8.5,48+j(2.4),0.03+j(0.03));
+  // the lintel rests on both tops: a rough slab with an uneven back, its ends worn round
+  const ang=Math.atan2(b[1]-a[1],b[0]-a[0])+tilt*0.5,L=17+j(2),R=17+j(2),T=7.5+j(1.5);
+  const sl=[[-L,1.5],[-L-0.8+j(1.2),-T*0.4],[-L+1.5+j(1),-T+0.5+j(0.8)],[-L*0.55+j(2),-T-0.4+j(1)],[j(3),-T+0.2+j(0.8)],[R*0.5+j(2),-T-0.6+j(1)],
+    [R-1.5+j(1),-T+0.8+j(0.8)],[R+0.8+j(1.2),-T*0.45],[R,1.5],[R*0.5,2.2+j(0.6)],[0,1.6],[-L*0.5,2.2+j(0.6)]];
+  x.save();x.translate((a[0]+b[0])/2,(a[1]+b[1])/2);x.rotate(ang);x.scale(k,k);x.beginPath();sl.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();x.restore();
 }
 /* the wind-bent forest */
 function drawBigStump(x,X,Y,v,p){ // a big broken trunk on the path: splintered top, flared roots, a stub, bracket fungi
@@ -2165,7 +2182,7 @@ function splash(ctx, place, X, Y, t, rm, seed) { // the place's splash of colour
   drawSplash(ctx, PLACE_SET[place] || "village5", "on", X, Y, t || 0, !!rm, seed || 0, "green", "intense");
 }
 return {
-  version: "3.0.0",
+  version: "4.0.0",
   world: {
     LH: LH, GROUND: gY, PLACES: ["night", "storm", "dawn", "mist"], places: LV, bossNames: BOSS_NAME,
     pal: { INK: INK, SKY: SKY, AIR: AIR, HAZE: HAZE, MOON: MOON, MOONPAL: MOONPAL, CLOUD_PAL: CLOUD_PAL, EMBER: EMBER, WITCH: WITCH,

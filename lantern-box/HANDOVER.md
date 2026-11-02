@@ -19,7 +19,7 @@ It is **neither Retro Kit nor City Nights**. Do not use the `retro-kit` skill or
 
 ## Where things are
 
-- The approved design system (the spec): https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. The copy in `lantern-box/design-system/` is version 3 of it (version 1 plus the layer lift and contrast and the moor's houses below).
+- The approved design system (the spec): https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. The copy in `lantern-box/design-system/` is version 4 of it (version 1 plus the layer lift and contrast, the moor's houses and its stone circles below).
 - The PRD (approved): https://claude.ai/artifact/HrT3en8qzkZG6v6kZxkPcJ
 - The screens rounds, the mock-ups behind the design system: https://claude.ai/artifact/J2qPyKBtp9xn2v6qDXLVdA
 - The approved look (round 12 directions page): https://claude.ai/artifact/NUbeSksdSun3oMFkVkEcbo. Its source is `lantern-box/speed-test/src/directions-round12.html`.
@@ -104,7 +104,7 @@ About 9 ms of headroom on the phone in its worst place. Claude's suggestions for
 ## Working with Barney
 
 - He is a GP partner learning to build software, on Windows. Explain what you did and why in a few plain sentences, and always say what you could not test.
-- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off, CM61 the layer lift and contrast, CM62 design system 2 and kit 0.5.0, CM63 design system 3 and kit 0.5.1; use CM64 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
+- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off, CM61 the layer lift and contrast, CM62 design system 2 and kit 0.5.0, CM63 design system 3 and kit 0.5.1, CM64 design system 4 and kit 0.5.2; use CM65 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
 - Python on his PC: `C:\Users\barne\AppData\Local\Programs\Python\Python312\python.exe`. The repo: `C:\Users\barne\Documents\Calude Code\Retro Games` (the folder really is spelt "Calude").
 - **Speed can only be measured on his devices** (Chrome on his computer and on his Pixel). Close any other copy of a page before measuring.
 - **The design system is the spec.** If the code needs something it does not cover, or a rule seems wrong, stop and ask Barney. Design changes are made in the design system first (in his Claude app project), then the copy here is refreshed.
@@ -135,6 +135,7 @@ On the Pixel the World looked crowded, most in Blood-red rain and Night. The pic
 - On the Pixel a cottage on the moor looked sunk into its hill, its door and window showing through the ground. The cause: each house on backdrop layers 2 and 3 stood at the lowest ground under it, so on the moor's steep slopes its uphill side was buried in its own hill, and the door and window, cut after every solid part, still showed there.
 - Now each moor house stands on the flattest, highest ground near its place (`level` in the moor's `content`): within its stretch of the layer, up to 0.35 of a stretch either way on layer 2 and 0.2 on layer 3 (which keeps it clear of the layer's tree). Nothing else moves. Over 1,500 sample houses a layer, the worst sinking fell from about 41 lines to about 20, and the typical one to about 3 lines more than the deliberate 4 or 5.
 - Dawn's mist in the hollows of layers 3 and 4 (the nearer hollows, in front of the houses) is at 95% of version 2's: `a` 0 0 0.62 0.475 0.323. Barney chose it on a throwaway slider page (https://claude.ai/artifact/1tZneHSLi3ncMUE1kXdph1, private; not in the repo).
+- **Stone circles (design system version 4, kit 0.5.2):** a circle's far stones are lifted up to 0.6 × its depth (about 4 to 9 lines) to look further back, with nothing under them, so on the Pixel they and the fallen stones floated above the hill, and a lifted stone behind a near one looked like a block on a block. Now each circle stands on a low rise of ground, exactly as high as its far stones are lifted (`drawStoneCircle`), so every stone and fallen stone sits on ground. The faint lit edge along that hill doesn't run over the rise. The circles' arch was three rectangles; it is now two rough uprights under a rough lintel, cut like the standing stones (`drawTrilithon`). Its shapes come from a random sequence of its own, so nothing else on the moor moved.
 
 ## Still open (not phase 3)
 

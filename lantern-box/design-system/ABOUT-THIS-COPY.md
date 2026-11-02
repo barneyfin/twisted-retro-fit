@@ -1,6 +1,6 @@
 # About this copy
 
-This folder is a copy of the approved Lantern Box design system, version 3: https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. Version 1 was approved by Barney on 1 November 2026; version 2 (2 November 2026) adds a camera lift for each place and wider steps between the backdrop layers, which he chose on his Pixel; version 3 (the same day) stands the moor's houses on level ground and sets Dawn's nearer hollow mist to 95%. The artifact is the spec; this copy is here so Claude Code can read it while building the kit.
+This folder is a copy of the approved Lantern Box design system, version 4: https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. Version 1 was approved by Barney on 1 November 2026; version 2 (2 November 2026) adds a camera lift for each place and wider steps between the backdrop layers, which he chose on his Pixel; version 3 (the same day) stands the moor's houses on level ground and sets Dawn's nearer hollow mist to 95%; version 4 (the same day) stands each moor stone circle on a low rise and cuts its arch from rough stones. The artifact is the spec; this copy is here so Claude Code can read it while building the kit.
 
 - **Don't edit these files.** Change the design system first (in Barney's Claude app project), then refresh this copy from it.
 - `README.md` is the rulebook. `tokens.json` holds every token; `tokens.css` is the same tokens as CSS custom properties, generated from it (the design system page makes it and does not publish it, so a refresh updates the changed lines here by hand).
