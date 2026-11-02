@@ -75,7 +75,7 @@ Each step ends with a check-in: tell Barney what you built, what you checked, wh
 
 **Phase 3 ends when** the test page matches the design system, the speed still passes on Barney's computer and Pixel (at least 30 fps with frames drawn in 25 ms or less on the phone, 60 fps on the computer, in Chrome, in the slowest place with a crowd on screen: eight monsters, a boss, flyers and rain), and the build gives no warnings and the console is clean.
 
-**Where that stands (2 November 2026):** the speed passes on both devices (`README.md`, The speed check). The test page's copy is at https://claude.ai/artifact/4U9Mbj734kYaNjFyFeY1ay. Still to hear from Barney: on the Pixel, how the initials, turning the phone and full screen behave, whether a place's first appearance stutters, and how the lightning and the sound effects feel.
+**Phase 3 is finished: Barney signed it off on 2 November 2026.** The speed passes on both devices (`README.md`, The speed check). The test page's copy is at https://claude.ai/artifact/4U9Mbj734kYaNjFyFeY1ay. He also checked these on the Pixel and all are fine: tapping the initials, turning the phone, full screen, any stutter when a place first appears, and how the lightning and the sound effects feel.
 
 ## Folder layout (from the PRD)
 
@@ -104,7 +104,7 @@ About 9 ms of headroom on the phone in its worst place. Claude's suggestions for
 ## Working with Barney
 
 - He is a GP partner learning to build software, on Windows. Explain what you did and why in a few plain sentences, and always say what you could not test.
-- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results; use CM60 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
+- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off; use CM61 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
 - Python on his PC: `C:\Users\barne\AppData\Local\Programs\Python\Python312\python.exe`. The repo: `C:\Users\barne\Documents\Calude Code\Retro Games` (the folder really is spelt "Calude").
 - **Speed can only be measured on his devices** (Chrome on his computer and on his Pixel). Close any other copy of a page before measuring.
 - **The design system is the spec.** If the code needs something it does not cover, or a rule seems wrong, stop and ask Barney. Design changes are made in the design system first (in his Claude app project), then the copy here is refreshed.
