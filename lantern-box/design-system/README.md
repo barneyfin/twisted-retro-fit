@@ -26,7 +26,7 @@ During play only the HUD sits over the picture: health and mana top left, the ti
 
 ### Colour
 
-- **Black silhouettes against coloured skies.** Every cut-out is `ink`. Depth comes from the air, not from grey: each backdrop layer is `ink` mixed towards the place's air (`night-air`, `storm-air`, `dawn-air`, `mist-air`) by its tint (`night-tints` and so on in Picture), so far layers fade into the sky and near ones stay black. The edges of layers 2 to 4 carry a little of the place's haze (`night-haze` …).
+- **Black silhouettes against coloured skies.** Every cut-out is `ink`. Depth comes from the air, not from grey: each backdrop layer is `ink` mixed towards the place's air (`night-air`, `storm-air`, `dawn-air`, `mist-air`) by its tint (`night-tints` and so on in Picture), so far layers fade into the sky and near ones stay black. The steps between the layers are kept wide, so the four layers stay apart on a phone's small picture. The edges of layers 2 to 4 carry a little of the place's haze (`night-haze` …).
 - **Light has fixed roles.** Never swap them.
   - `gold-light` and `lamp-glass`: glow points only. Lit windows (`window-dark` when unlit), candles, lamps and lanterns, string lights (`string-light`, `string-light-storm` in the rain, with `string-glow`), the crack of light under a door, the wanderer's lantern (`lantern-glow`). Never on a monster.
   - `potion`: the potion is the one glow point in its own red.
@@ -75,6 +75,7 @@ During play only the HUD sits over the picture: health and mana top left, the ti
 - The picture is 540 lines tall whatever the window (`picture-height`); its width follows the window. Everything is laid out in picture pixels and scaled to fill.
 - From back to front: the sky blend (four stops, `night-sky-1` to `night-sky-4` and so on), its light (a detailed moon; at Dawn a setting moon, stars and daybreak; in Mist a pale sun with rays), ragged cut-card clouds sliding slowly, backdrop layers 1 to 4 (far hills with a lit crest, then trees and buildings, larger and blacker as they come nearer), flyers between them, the play strip on the path (`ground-line`), and the fore layer: plants along the bottom edge and branches overhanging from the top edge.
 - Layers slide with the camera at their own rates (`parallax`). The camera also rises with the wanderer onto ledges and rooftops; each layer rises by its own rate, and the overhanging branches stay pinned to the top edge.
+- **The lift**: each place is seen from a little above the path (`night-lift` 60, `storm-lift` 70, `dawn-lift` 30, `mist-lift` 35 picture lines). The picture is drawn as if the camera had risen that far, with the path kept at its height, so the far layers stand higher and their feet spread apart; on a phone's small picture this keeps the layers from running together. The path, the rain, the fore layer and the vignette do not move with it, and the camera's own rise adds on top.
 - Monsters and bosses move like card puppets: their poses change in steps, `puppet-steps` times a second, with long angular limbs like the trees.
 - **The four places**, one per level:
   - **Night**, the graveyard at the edge of the village: an amber-to-violet sky, a detailed moon, gnarled pollard trees, crooked houses, graves, a ruined wall, string lights, bats.

@@ -18,6 +18,7 @@ Lower down: `W.scene(scale)` returns the shared `Scene` (version 5, the approved
 
 ## Rules
 - Back to front: the sky blend (`night-sky-1` … at 0, 45%, 80% and 470 lines); the light (Night and Blood-red rain a detailed moon with a halo; Dawn stars, daybreak on the left and a pale moon setting on the right; Mist a pale sun with rays); ragged cut-card clouds in two depths (none in Mist, which has long mist bands instead); backdrop layers 1 to 4, each `ink` mixed towards the place's air by its tint; flyers between layers 2 and 3 and between 3 and 4; the play strip; the fore layer (plants at the bottom, overhanging branches at the top); a vignette.
+- Each place has a lift (`night-lift` …): it is drawn as if the camera stood that much higher, with the path kept at its height, so each layer sits higher by the lift times (1 - its parallax). The path, the rain, the fore layer and the vignette do not move.
 - Layers slide at their `parallax` rates. Blood-red rain adds rain in two depths (behind layer 2 and in front of the strip) and distant lightning: a bolt and a slow swell on the sky only.
 - In Night and Mist the nearest backdrop layer is a step lighter, with a haze rising behind the path, so the black monsters stand out.
 - The canvas HUD the directions page drew was a sketch; the HUD is HTML (PlayScreen).

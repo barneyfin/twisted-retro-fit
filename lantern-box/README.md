@@ -38,6 +38,8 @@ lb.world.wanderer(g.x, { walking: g.walking, facing: g.facing });
 lb.world.end();
 ```
 
+Each place is already seen from a little above the path (its lift, set in the design system), so the back layers stay apart on a phone; `rise` lifts the camera further, for example to follow a jump.
+
 The path's scenery is the directions page's sample strip until levels are laid out (step 4a). Monsters have their existing poses and face one way until Gloam Hallow's play parts are designed (step 4b).
 
 ## The test page

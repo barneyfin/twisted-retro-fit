@@ -1,9 +1,9 @@
 # About this copy
 
-This folder is a copy of the approved Lantern Box design system, version 1 (approved by Barney on 1 November 2026): https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. The artifact is the spec; this copy is here so Claude Code can read it while building the kit.
+This folder is a copy of the approved Lantern Box design system, version 2: https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. Version 1 was approved by Barney on 1 November 2026; version 2 (2 November 2026) adds a camera lift for each place and wider steps between the backdrop layers, which he chose on his Pixel. The artifact is the spec; this copy is here so Claude Code can read it while building the kit.
 
 - **Don't edit these files.** Change the design system first (in Barney's Claude app project), then refresh this copy from it.
-- `README.md` is the rulebook. `tokens.json` holds every token; `tokens.css` is the same tokens as CSS custom properties, generated from it.
+- `README.md` is the rulebook. `tokens.json` holds every token; `tokens.css` is the same tokens as CSS custom properties, generated from it (the design system page makes it and does not publish it, so a refresh updates the changed lines here by hand).
 - `components/<Name>/README.md` describes each part; `preview.html` shows it. The previews expect the design system page to load `tokens.css`, the fonts, `components/bundle.css` and `components/bundle.js` for them, and the Interface previews' backdrops (stills of the places) are stored in the artifact, so opened from this folder they show unstyled and without backdrops. Open the artifact to see them.
 - `components/bundle.css` is the Interface written as CSS classes (`.lb-…`): the brass plaque, menus, buttons, toggles, segments, the slider, keycaps, numbers, initials, the high-score table, the HUD, the lancet arch and the rotate notice. Most of the kit's stylesheet starts here.
 - `components/bundle.js` is the World's drawing code: the Gloam Hallow directions page at round 12 (the signed-off look), copied unchanged, with a small door at the end, `LanternBox.world`, that picks the approved settings and names the parts. It draws the mock-up way (every layer redrawn every frame). The kit draws the same shapes the speed test's way (`../speed-test/src/kit.js`); port the drawing code unchanged.
