@@ -15,20 +15,22 @@
    The kit's rules: ARCADE.md and lantern-box/design-system/README.md.
    Build:  python lantern-box/kit/build.py <name>   (the game is finished only when it builds with no warnings)
    The kit owns every screen outside play and the HUD; the game supplies its rules and its picture. Everything lb offers
-   is listed in lantern-box/kit/lantern-box.js under "Public API". This template only spends health to earn wisps,
-   so every screen can be reached: Space or a tap earns 10 wisps for a tenth of the health, and X or a second finger
-   ends the run at once. */
+   is listed in lantern-box/kit/lantern-box.js under "Public API". This template walks the wanderer through the first
+   place with the arrow keys, and spends health to earn wisps, so every screen can be reached: Space or a tap earns 10
+   wisps for a tenth of the health, and X or a second finger ends the run at once. */
 LanternBox.game({
   id: 'lb-empty',                 // the folder name: lowercase-with-hyphens; high scores are saved under it
   title: ['Empty', 'Game'],       // an invented name, in sentence case, on two short lines (about 9 letters each at most)
 
   // New game: build and return this game's state.
   start(lb) {
-    return { health: 1 };
+    return { health: 1, x: 400, facing: 1, walking: false };
   },
 
   // Rules: called 60 times a second during play.
   update(g, lb) {
+    g.walking = lb.input.left !== lb.input.right;
+    if (g.walking) { g.facing = lb.input.right ? 1 : -1; g.x += g.facing * 1.6; }
     if (lb.ending) return;
     if (lb.input.pressed.fire || lb.input.tap) {
       lb.addWisps(10);
@@ -39,8 +41,11 @@ LanternBox.game({
     if (lb.input.pressed.alt || lb.input.pointer2.pressed) lb.gameOver(0);
   },
 
-  // Picture: called every frame, in a picture 540 lines tall (lb.H) and lb.W wide. The kit has cleared it to ink.
+  // Picture: called every frame, in a picture 540 lines tall (lb.H) and lb.W wide.
   draw(ctx, g, lb) {
+    lb.world.begin(ctx, { place: 'night', camX: g.x - lb.W * 0.3 });
+    lb.world.wanderer(g.x, { walking: g.walking, facing: g.facing });
+    lb.world.end();
   },
 });
 </script>

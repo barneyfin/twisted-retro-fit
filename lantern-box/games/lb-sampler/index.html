@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lantern Box test page</title><!-- the kit replaces this with the game's title -->
+<!-- The kit. build.py copies both files, the fonts and their licences into dist/<game>.html. Keep data-lb-inline. -->
+<link rel="stylesheet" href="../../kit/lantern-box.css" data-lb-inline>
+<script src="../../kit/lantern-box.js" data-lb-inline></script>
+</head>
+<body>
+<script>
+/* LB SAMPLER — Lantern Box's test page: the World's drawing parts, in play. Step 3c's start on it; step 3d adds every screen
+   and the frame-rate readout.
+   Keys: 1 2 3 4 a place · arrows walk and rise · C the crowd · M defeat the monsters · B defeat the boss. Or the buttons. */
+const PLACE_NAMES = ['night', 'storm', 'dawn', 'mist'];
+const CROWD_GAP = 150;                 // a crowd is about eight monsters across the picture, and a boss
+const WALK = 2.4, RISE_STEP = 3, RISE_MAX = 270;
+const DEFEAT_MONSTER = 1.6, DEFEAT_BOSS = 2.2, REST = 1;   // seconds
+
+let bar = null;
+function buttons(g, lb) {
+  bar = document.createElement('div');
+  bar.className = 'lb-ui lb-btns';
+  bar.style.cssText = 'position:fixed;left:12px;bottom:10px;display:flex;flex-wrap:wrap;gap:8px;touch-action:manipulation';
+  const add = (label, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'lb-btn';
+    b.style.background = 'var(--plaque-face)';
+    b.textContent = label;
+    b.addEventListener('click', () => { fn(); b.blur(); });
+    bar.append(b);
+  };
+  add('Place', () => { g.place = (g.place + 1) % PLACE_NAMES.length; });
+  add('Walk', () => { g.autoWalk = !g.autoWalk; });
+  add('Rise', () => { g.rising = !g.rising; });
+  add('Crowd', () => { g.crowd = !g.crowd; });
+  add('Monsters', () => { g.monsterAt = 0; });
+  add('Boss', () => { g.bossAt = 0; });
+  document.body.append(bar);
+}
+
+LanternBox.game({
+  id: 'lb-sampler',
+  title: ['Test', 'Page'],
+
+  start(lb) {
+    const g = { place: 0, x: 600, facing: 1, walking: false, autoWalk: false, rise: 0, rising: false, crowd: true, monsterAt: null, bossAt: null };
+    if (bar) bar.remove();
+    buttons(g, lb);
+    return g;
+  },
+
+  update(g, lb) {
+    const i = lb.input;
+    PLACE_NAMES.forEach((p, n) => { if (i.keyPressed('Digit' + (n + 1))) g.place = n; });
+    if (i.keyPressed('KeyC')) g.crowd = !g.crowd;
+    if (i.keyPressed('KeyM')) g.monsterAt = 0;
+    if (i.keyPressed('KeyB')) g.bossAt = 0;
+    const dir = g.autoWalk ? 1 : (i.right ? 1 : 0) - (i.left ? 1 : 0);
+    g.walking = dir !== 0;
+    if (dir) { g.facing = dir; g.x += dir * WALK; }
+    if (i.up) g.rise = Math.min(RISE_MAX, g.rise + RISE_STEP);
+    if (i.down) g.rise = Math.max(0, g.rise - RISE_STEP);
+    if (g.rising) g.rise = RISE_MAX * (0.5 - 0.5 * Math.cos(lb.time * Math.PI / 4));
+    if (g.monsterAt != null && (g.monsterAt += 1 / 60) > DEFEAT_MONSTER + REST) g.monsterAt = null;
+    if (g.bossAt != null && (g.bossAt += 1 / 60) > DEFEAT_BOSS + REST) g.bossAt = null;
+  },
+
+  draw(ctx, g, lb) {
+    if (bar) bar.hidden = lb.screen !== 'play';
+    const w = lb.world, camX = g.x - lb.W * 0.28;
+    w.begin(ctx, { place: PLACE_NAMES[g.place], camX, rise: g.rise });
+    const bossX = camX + lb.W * 0.74;
+    if (g.crowd) {
+      const a = Math.ceil((camX - 160) / CROWD_GAP), b = Math.floor((camX + lb.W + 160) / CROWD_GAP);
+      for (let j = a; j <= b; j++) {
+        const x = j * CROWD_GAP, kind = w.MONSTERS[((j % 5) + 5) % 5], ph = j * 0.77 + 0.3;
+        if (Math.abs(x - g.x) < 60 || Math.abs(x - bossX) < 130) continue;   // clear of the wanderer and the boss
+        const fly = kind === 'bat2', y = fly ? 232 + Math.sin(lb.time * 1.1 + j) * 22 : undefined;
+        const beaten = g.monsterAt != null && g.monsterAt <= DEFEAT_MONSTER;
+        if (g.monsterAt != null && !beaten) continue;   // gone, for a moment
+        w.monster({ kind, x, y, ph, id: 'c' + j, defeat: beaten ? g.monsterAt / DEFEAT_MONSTER : undefined, seed: j });
+      }
+      if (g.bossAt == null) w.boss({ x: bossX });
+      else if (g.bossAt <= DEFEAT_BOSS) w.boss({ x: bossX, defeat: g.bossAt / DEFEAT_BOSS });
+    }
+    w.wanderer(g.x, { walking: g.walking, facing: g.facing });
+    w.end();
+  },
+});
+</script>
+</body>
+</html>
