@@ -20,3 +20,4 @@ p.fillHoles(ctx, sprite, X, groundY, k, rng, { litP, win: W.pal.GOLD_LIGHT, a: 0
 ## Rules
 - Nine building kinds plus the moor's dolmen and the forest's stump. All `ink`, tinted towards the place's air with their layer; windows cut after every solid part, lit `gold-light` or dark `window-dark`.
 - Quirky, not cute: sagging roofs, jutting storeys, bent spires, missing tiles, broken sails.
+- On the moor's slopes a building stands on the flattest, highest ground near its place, so no wall, door or window is buried in the hill.

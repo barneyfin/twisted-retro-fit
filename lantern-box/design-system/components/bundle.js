@@ -36,7 +36,7 @@ const LV={
   storm:{name:"Blood-red rain",place:"the old town",set:"town",tints:[0.9,0.76,0.48,0.14],lift:70,light:"moon",fly:"bats",litP:0.26,edge:"rgba(255,206,184,0.85)",vig:0.5,crest:0.32,mist:null,
     desc:"walks the old town's street in blood-red rain, past street lamps, barrels, a well, a gate arch and a tavern or a tall townhouse, with crowded rooftops behind"},
   dawn:{name:"Dawn",place:"the open moor",set:"moor",tints:[0.82,0.64,0.4,0.22],lift:30,light:"setmoon",fly:"crows",litP:0.06,edge:"rgba(214,228,255,0.9)",vig:0.42,crest:0.42,
-    mist:null,hollows:{col:"#dfe8f6",a:[0,0,0.62,0.5,0.34],F:[0,0,378,412,448]},
+    mist:null,hollows:{col:"#dfe8f6",a:[0,0,0.62,0.475,0.323],F:[0,0,378,412,448]},
     desc:"crosses the open moor in cold blue dawn light, past standing stones, cairns, dry-stone walls and a dolmen, with a pale moon setting on the right and daybreak glowing on the left"},
   mist:{name:"Mist",place:"the wind-bent forest",set:"forest",tints:[0.9,0.77,0.57,0.42],lift:35,cw4:520,back:0.26,light:"sun",fly:"fewcrows",litP:0.1,edge:"rgba(236,242,214,0.85)",vig:0.3,crest:0,
     mist:{col:"#eef2dc",bands:[[0,104,1,4],[1,378,1,5],[2,424,0.9,8],[3,456,0.55,11]]},
@@ -909,15 +909,19 @@ class Scene{
         for(const q of [[ax,ay],[bx2,by]])x.fillRect(q[0]-2,q[1],4,l4Y(q[0]+lx)-q[1]+8);}
     }else if(set==="moor"){
       const Y2=MOORY[1],Y3=MOORY[2],Y4=MOORY[3],foot=(sp,px,kk,fn)=>groundAt(fn,px-sp.ox*kk*0.35,px+(sp.w-sp.ox)*kk*0.75);
+      // a house's spot between lo and hi: the flattest, highest ground under its whole width, near px, so no wall is buried in the slope
+      const level=(sp,px,kk,fn,lo,hi)=>{let best=px,bs=1e9,top=1e9;for(let c=lo;c<=hi;c+=8)top=Math.min(top,fn(c));
+        for(let c=lo;c<=hi;c+=8){let mn=1e9,mx=-1e9;for(let q=c-sp.ox*kk;q<=c+(sp.w-sp.ox)*kk;q+=6){const y=fn(q);if(y<mn)mn=y;if(y>mx)mx=y;}const sc=(mx-mn)+0.25*(mx-top)+0.01*Math.abs(c-px);if(sc<bs){bs=sc;best=c;}}
+        return best;};
       if(L===1){const n=1+Math.floor(r()*2);
         for(let i=0;i<n;i++){const px=bx+r()*cw,X=px-lx,q=r();
           if(q<0.5)drawTor(x,X,groundAt(yfn,px-8,px+30)+2,r);else if(q<0.75){const sp=pick(Wd.w1),kk=0.45+r()*0.25;drawSprite(x,sp,X,groundAt(yfn,px-10,px+10)+3,kk,false);}else drawMenhir(x,X,yfn(px)+1,0.3,Math.floor(r()*3));}}
       else if(L===2){const q=r(),px=bx+cw*(0.15+r()*0.7),X=px-lx;
-        if(q<0.35){const sp=S.h2[posmod(k,S.h2.length)],k2=0.9+r()*0.3,Y=foot(sp,px,k2,Y2)+4;drawSprite(x,sp,X,Y,k2,false);houses.push({sp,X,Y,k:k2,seed:hsh(19,L,k,9),a:0.55});}
+        if(q<0.35){const sp=S.h2[posmod(k,S.h2.length)],k2=0.9+r()*0.3,hx=level(sp,px,k2,Y2,Math.max(bx+cw*0.08,px-cw*0.35),Math.min(bx+cw*0.92,px+cw*0.35)),Y=foot(sp,hx,k2,Y2)+4;drawSprite(x,sp,hx-lx,Y,k2,false);houses.push({sp,X:hx-lx,Y,k:k2,seed:hsh(19,L,k,9),a:0.55});}
         else if(q<0.8)drawStoneCircle(x,X,0.7+r()*0.25,r,Y2,lx);
         else{const sp=pick(Wd.w2),kk=0.5+r()*0.2;drawSprite(x,sp,X,groundAt(Y2,px-14,px+14)+4,kk,false);}}
       else if(L===3){const px=bx+r()*cw*0.8,X=px-lx;
-        if(r()<0.35){const sp=S.h3[posmod(k,S.h3.length)],k2=0.85+r()*0.2,hx2=bx+((px-bx+cw*0.45)%cw),Y=foot(sp,hx2,k2,Y3)+5;drawSprite(x,sp,hx2-lx,Y,k2,false);houses.push({sp,X:hx2-lx,Y,k:k2,seed:hsh(19,L,k,9),a:0.75});}
+        if(r()<0.35){const sp=S.h3[posmod(k,S.h3.length)],k2=0.85+r()*0.2,h0=bx+((px-bx+cw*0.45)%cw),hx2=level(sp,h0,k2,Y3,Math.max(bx+cw*0.05,h0-cw*0.2),Math.min(bx+cw*0.95,h0+cw*0.2)),Y=foot(sp,hx2,k2,Y3)+5;drawSprite(x,sp,hx2-lx,Y,k2,false);houses.push({sp,X:hx2-lx,Y,k:k2,seed:hsh(19,L,k,9),a:0.75});}
         else if(r()<0.65){const cx2=bx+cw*(0.2+r()*0.6);drawStoneCircle(x,cx2-lx,1.05+r()*0.35,r,Y3,lx);}
         if(r()<0.6){const sp=pick(Wd.w3),kk=0.5+r()*0.25;drawSprite(x,sp,X,groundAt(Y3,px-18,px+18)+6,kk,false);}
         if(r()<0.5){const wx0=bx+r()*cw*0.5;drawFieldWall(x,wx0-lx,120+r()*160,Y3,lx,r);}
@@ -2161,7 +2165,7 @@ function splash(ctx, place, X, Y, t, rm, seed) { // the place's splash of colour
   drawSplash(ctx, PLACE_SET[place] || "village5", "on", X, Y, t || 0, !!rm, seed || 0, "green", "intense");
 }
 return {
-  version: "2.0.0",
+  version: "3.0.0",
   world: {
     LH: LH, GROUND: gY, PLACES: ["night", "storm", "dawn", "mist"], places: LV, bossNames: BOSS_NAME,
     pal: { INK: INK, SKY: SKY, AIR: AIR, HAZE: HAZE, MOON: MOON, MOONPAL: MOONPAL, CLOUD_PAL: CLOUD_PAL, EMBER: EMBER, WITCH: WITCH,

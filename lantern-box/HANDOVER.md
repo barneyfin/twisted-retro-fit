@@ -19,7 +19,7 @@ It is **neither Retro Kit nor City Nights**. Do not use the `retro-kit` skill or
 
 ## Where things are
 
-- The approved design system (the spec): https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. The copy in `lantern-box/design-system/` is version 2 of it (version 1 plus the layer lift and contrast below).
+- The approved design system (the spec): https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. The copy in `lantern-box/design-system/` is version 3 of it (version 1 plus the layer lift and contrast and the moor's houses below).
 - The PRD (approved): https://claude.ai/artifact/HrT3en8qzkZG6v6kZxkPcJ
 - The screens rounds, the mock-ups behind the design system: https://claude.ai/artifact/J2qPyKBtp9xn2v6qDXLVdA
 - The approved look (round 12 directions page): https://claude.ai/artifact/NUbeSksdSun3oMFkVkEcbo. Its source is `lantern-box/speed-test/src/directions-round12.html`.
@@ -104,7 +104,7 @@ About 9 ms of headroom on the phone in its worst place. Claude's suggestions for
 ## Working with Barney
 
 - He is a GP partner learning to build software, on Windows. Explain what you did and why in a few plain sentences, and always say what you could not test.
-- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off, CM61 the layer lift and contrast, CM62 design system 2 and kit 0.5.0; use CM63 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
+- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off, CM61 the layer lift and contrast, CM62 design system 2 and kit 0.5.0, CM63 design system 3 and kit 0.5.1; use CM64 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
 - Python on his PC: `C:\Users\barne\AppData\Local\Programs\Python\Python312\python.exe`. The repo: `C:\Users\barne\Documents\Calude Code\Retro Games` (the folder really is spelt "Calude").
 - **Speed can only be measured on his devices** (Chrome on his computer and on his Pixel). Close any other copy of a page before measuring.
 - **The design system is the spec.** If the code needs something it does not cover, or a rule seems wrong, stop and ask Barney. Design changes are made in the design system first (in his Claude app project), then the copy here is refreshed.
@@ -129,6 +129,12 @@ On the Pixel the World looked crowded, most in Blood-red rain and Night. The pic
 - **Lift** draws the picture as if the camera had risen by the lift, then slides it up by the same amount, so the path stays where it was. Each part sits higher by (1 − its parallax) × lift: the sky and moon by the whole lift, the clouds, back layers, mist bands and flyers by their own rates. The path, the rain, the fore layer (plants and overhanging branches) and the vignette do not move. The camera's own rise adds on top. The lift uses the full parallax rates, also with Reduce motion.
 - **Done, 2 November 2026:** design system version 2 (tokens `night-tints` … with the new values, new tokens `night-lift` … , the README's World and Places wording, `bundle.js`: `lift` in `LV` and `at(k)` in `Scene.render`), the copy here refreshed, and kit 0.5.0 (the World block as `bundle.js`; `kitBegin` draws the lift). The kit's frame of each place matches the design system's own drawing to within 1 colour level in 255 over the top half of the picture, with Reduce motion on and off.
 - One change from the tuning page: there the plants along the bottom edge dropped by 0.35 × lift, partly out of the picture. In version 2 the fore layer stays put, like the overhanging branches.
+
+## The moor's houses (Barney, 2 November 2026; design system version 3, kit 0.5.1)
+
+- On the Pixel a cottage on the moor looked sunk into its hill, its door and window showing through the ground. The cause: each house on backdrop layers 2 and 3 stood at the lowest ground under it, so on the moor's steep slopes its uphill side was buried in its own hill, and the door and window, cut after every solid part, still showed there.
+- Now each moor house stands on the flattest, highest ground near its place (`level` in the moor's `content`): within its stretch of the layer, up to 0.35 of a stretch either way on layer 2 and 0.2 on layer 3 (which keeps it clear of the layer's tree). Nothing else moves. Over 1,500 sample houses a layer, the worst sinking fell from about 41 lines to about 20, and the typical one to about 3 lines more than the deliberate 4 or 5.
+- Dawn's mist in the hollows of layers 3 and 4 (the nearer hollows, in front of the houses) is at 95% of version 2's: `a` 0 0 0.62 0.475 0.323. Barney chose it on a throwaway slider page (https://claude.ai/artifact/1tZneHSLi3ncMUE1kXdph1, private; not in the repo).
 
 ## Still open (not phase 3)
 
