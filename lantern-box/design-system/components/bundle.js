@@ -1,10 +1,15 @@
-/* Lantern Box: the World's drawing code.
+/* Lantern Box: the World's drawing code, design system version 6 (2 November 2026).
    Everything from "helpers" to "the sample strip" below is the drawing code of the signed-off look, the Gloam Hallow
-   directions page at round 12 (1 November 2026), copied unchanged; only the page's own controls are left out.
-   It draws the mock-up way: every layer redrawn every frame. Games draw the same shapes the kit's way (layers painted
-   once in tiles and slid, poses painted once per puppet step), as the phase 1 speed test proved.
-   The door at the bottom (LanternBox.world) is the only new code: it chooses the approved settings (Scene version 5,
-   splashes on at the intense glow, card-and-wisp defeats, no canvas HUD) and names the parts. */
+   directions page at round 12 (1 November 2026), with the places' changes of versions 2 to 5 (made in Claude Code and
+   chosen by Barney: among them each place's lift, the layer tints, the moor's stone circles and backdrop doors ending at
+   the ground line), and two changes made in version 6, marked where they are:
+     - the bosses: round 12's four (washed-out level colours) replaced by the four agreed in the bosses rework: the veiled
+       ghost, the tentacled skull, the gaping tree (windswept) and the moor mother (in place of the cauldron witch);
+     - the monsters: every card piece of the five monsters in play graded charcoal to ink inside an ink edge (CARD, cardFill,
+       cardTaper), as the bosses are.
+   Only the page's own controls are left out. It draws the mock-up way: every layer redrawn every frame. Games draw the same
+   shapes the kit's way (layers painted once in tiles and slid, poses painted once per puppet step), as the speed test proved.
+   The door at the bottom (LanternBox.world) chooses the approved settings and names the parts. */
 window.LanternBox = (function () {
 "use strict";
 /* ============================== helpers ============================== */
@@ -998,7 +1003,8 @@ class Scene{
     const T=H.tmp,tc=T.getContext("2d");
     tc.setTransform(1,0,0,1,0,0);tc.globalCompositeOperation="source-over";tc.clearRect(0,0,T.width,T.height);tc.setTransform(s,0,0,s,130*s,230*s);
     tc.fillStyle=INK;tc.strokeStyle=INK;tc.lineCap="round";tc.lineJoin="round";
-    const det=MONSTER[m.kind](tc,t,m,o.rm);
+    {const b=MON_BOX[m.kind]||[-128,-228,128,18],w=b[2]-b[0],h=b[3]-b[1];CARD={box:[b[0]+w*0.44,b[1]+h*0.3,Math.max(w,h)*0.62],edge:m.kind==="bat2"||m.kind==="crawler"?1.2:1.7};}
+    let det;try{det=MONSTER[m.kind](tc,t,m,o.rm);}finally{CARD=null;} // graded card pieces while the monster draws (version 6)
     c.save();c.setTransform(1,0,0,1,0,0);
     const bb=MON_BOX[m.kind]||[-128,-228,128,18],sx=Math.max(0,Math.floor((130+bb[0])*s)),sy=Math.max(0,Math.floor((230+bb[1])*s)),sw=Math.min(T.width-sx,Math.ceil((bb[2]-bb[0])*s)),sh=Math.min(T.height-sy,Math.ceil((bb[3]-bb[1])*s));
     const put=()=>c.drawImage(T,sx,sy,sw,sh,dx+sx,dy+sy,sw,sh);
@@ -1700,9 +1706,9 @@ const MONSTER={
   hatmaw(x,t,m,rm){
     const hop=Math.max(0,Math.sin(t*(rm?1.4:2.6)+m.ph)),dy=-hop*(rm?3:9),sq=1-hop*0.06;
     x.save();x.translate(0,dy);x.scale(1/sq,sq);
-    x.beginPath();x.ellipse(0,-7,34,6.5,0,0,Math.PI*2);x.fill();
+    x.beginPath();x.ellipse(0,-7,34,6.5,0,0,Math.PI*2);cardFill(x);
     x.beginPath();x.moveTo(-21,-9);x.bezierCurveTo(-25,-34,-11,-52,4,-66);x.bezierCurveTo(12,-75,27,-73,24,-61);x.bezierCurveTo(21,-55,13,-58,15,-63);
-    x.bezierCurveTo(10,-52,23,-31,21,-9);x.closePath();x.fill();
+    x.bezierCurveTo(10,-52,23,-31,21,-9);x.closePath();cardFill(x);
     x.restore();
     return (c,o)=>{c.save();c.translate(0,dy);c.scale(1/sq,sq);
       if(o.emberMouth)emberMouth(c,[[-22,-30],[-16,-34],[-10,-34.2],[-4,-32],[1,-29],[-2,-23],[-8,-17],[-14,-15.8],[-21,-17]],-11,-23,14);
@@ -1750,7 +1756,21 @@ const MONSTER={
    card-puppet joints that move in steps, long angular limbs like the trees ============================== */
 const BONE="#d8ccb6";
 const pz=(t,rm)=>rm?t*0.5:Math.floor(t*8)/8; // puppet time: poses change in steps, like card puppets
-function limb(x,ax,ay,segs){let px=ax,py=ay;for(const g of segs){const nx=px+Math.sin(g[1])*g[0],ny=py+Math.cos(g[1])*g[0];taper(x,[px,py,nx,ny,g[2],g[3]]);px=nx;py=ny;}return[px,py];}
+function limb(x,ax,ay,segs){let px=ax,py=ay;for(const g of segs){const nx=px+Math.sin(g[1])*g[0],ny=py+Math.cos(g[1])*g[0];cardTaper(x,[px,py,nx,ny,g[2],g[3]]);px=nx;py=ny;}return[px,py];}
+/* Graded card pieces for the monsters (design system version 6, Barney 2 November: "grade them all"). While monsterInto draws a
+   monster, CARD holds where its light sits; every limb segment 3 or more wide is graded across its width (charcoal on its upper
+   side, falling to ink), and every body piece is filled charcoal to ink from a point high on the monster, inside an ink edge.
+   Hairline claws and the thinnest twigs stay ink. Outside monsterInto, CARD is null and both draw plain ink as before. */
+let CARD=null;
+function cardTaper(x,s){
+  taper(x,s);if(!CARD||s[4]<3)return;
+  const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=dy/L,ny=-dx/L,f=ny<0||(ny===0&&nx<0)?1:-1,w=(s[4]+s[5])/2,mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2,hi=w>=6?CH[4]:CH[3];
+  const g=x.createLinearGradient(mx+nx*f*w*0.42,my+ny*f*w*0.42,mx-nx*f*w*0.42,my-ny*f*w*0.42);g.addColorStop(0,CH[2]);g.addColorStop(0.3,hi);g.addColorStop(0.68,CH[2]);g.addColorStop(1,CH[0]);
+  x.fillStyle=g;taper(x,[s[0],s[1],s[2],s[3],s[4]*0.7,s[5]*0.7]);x.fillStyle=INK;}
+function cardFill(x){
+  if(!CARD||x.globalCompositeOperation!=="source-over"){x.fill();return;}
+  const b=CARD.box;x.fillStyle=rg(x,b[0],b[1],1,b[2],[[0,CH[4]],[0.5,CH[2]],[1,CH[0]]]);x.fill();
+  x.save();x.strokeStyle=INK;x.lineWidth=CARD.edge;x.lineJoin="round";x.stroke();x.restore();x.fillStyle=INK;}
 function emberMouth(c,pts,cx,cy,r){ // a glowing throat: hot at the back, dark red at the lips
   c.save();const g=c.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,"#ffc27a");g.addColorStop(0.45,EMBER.danger);g.addColorStop(1,"#5a0c08");
   c.fillStyle=g;c.shadowColor=EMBER.glow;c.shadowBlur=6;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fill();c.restore();}
@@ -1761,8 +1781,8 @@ Object.assign(MONSTER,{
     const tq=pz(t*1.3+m.ph,rm),w=Math.sin(tq*6);
     for(let i=0;i<3;i++){const bx=-8+i*9,ph=i%2?w:-w,fw=i<1||(i===1&&ph>0);
       limb(x,bx,-12,[[10,(fw?-2.35:2.35)+ph*0.22,2.6,1.7],[20,(fw?-0.22:0.22)+ph*0.16,1.7,0.6]]);}
-    x.beginPath();x.moveTo(-14,-11);x.quadraticCurveTo(-6,-24,6,-22);x.lineTo(9,-27);x.lineTo(11,-21.5);x.lineTo(15,-25);x.lineTo(16,-18.5);x.quadraticCurveTo(21,-12,14,-8);x.quadraticCurveTo(0,-5,-14,-11);x.closePath();x.fill();
-    x.beginPath();x.moveTo(-12,-15);x.quadraticCurveTo(-20,-19,-27,-15);x.lineTo(-25,-10);x.quadraticCurveTo(-19,-7,-12,-9);x.closePath();x.fill();
+    x.beginPath();x.moveTo(-14,-11);x.quadraticCurveTo(-6,-24,6,-22);x.lineTo(9,-27);x.lineTo(11,-21.5);x.lineTo(15,-25);x.lineTo(16,-18.5);x.quadraticCurveTo(21,-12,14,-8);x.quadraticCurveTo(0,-5,-14,-11);x.closePath();cardFill(x);
+    x.beginPath();x.moveTo(-12,-15);x.quadraticCurveTo(-20,-19,-27,-15);x.lineTo(-25,-10);x.quadraticCurveTo(-19,-7,-12,-9);x.closePath();cardFill(x);
     for(let i=0;i<3;i++){const bx=-6+i*9,ph=i%2?-w:w,fw=i<1||(i===1&&ph>0);
       limb(x,bx,-10,[[9,(fw?-2.2:2.2)+ph*0.22,2.8,1.8],[19,(fw?-0.3:0.3)+ph*0.16,1.8,0.6]]);}
     return (c,o)=>{emberMouth(c,[[-26.5,-13.2],[-19,-12.6],[-14,-12],[-19,-10.4],[-25.4,-11]],-17,-12,8);
@@ -1776,10 +1796,10 @@ Object.assign(MONSTER,{
       const tips=[0,1,2].map(k=>{const a=a2+sd*(0.35+k*0.45),L=[14,12,9][k];return[wr[0]+Math.sin(a)*L,wr[1]+Math.cos(a)*L];});
       const mem=[[sd*2,-3],e,wr,tips[0]];for(let k=1;k<3;k++){const p0=tips[k-1],p1=tips[k];mem.push([(p0[0]+p1[0])/2*0.82+wr[0]*0.18,(p0[1]+p1[1])/2*0.82+wr[1]*0.18],p1);}
       mem.push([sd*5,4],[sd*2,3]);
-      x.beginPath();mem.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();
+      x.beginPath();mem.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();cardFill(x);
       x.lineWidth=1.4;x.beginPath();x.moveTo(sd*3,-2);x.lineTo(e[0],e[1]);x.lineTo(wr[0],wr[1]);for(const tp of tips){x.moveTo(wr[0],wr[1]);x.lineTo(tp[0],tp[1]);}x.stroke();}
-    x.beginPath();x.ellipse(0,0,3.6,6.5,0,0,Math.PI*2);x.fill();x.beginPath();x.ellipse(0,-6.5,3.2,3,0,0,Math.PI*2);x.fill();
-    x.beginPath();x.moveTo(-3,-8);x.lineTo(-3.6,-13);x.lineTo(-0.8,-9);x.moveTo(3,-8);x.lineTo(3.6,-13);x.lineTo(0.8,-9);x.fill();
+    x.beginPath();x.ellipse(0,0,3.6,6.5,0,0,Math.PI*2);cardFill(x);x.beginPath();x.ellipse(0,-6.5,3.2,3,0,0,Math.PI*2);cardFill(x);
+    x.beginPath();x.moveTo(-3,-8);x.lineTo(-3.6,-13);x.lineTo(-0.8,-9);x.moveTo(3,-8);x.lineTo(3.6,-13);x.lineTo(0.8,-9);cardFill(x);
     return (c,o)=>{emberMouth(c,[[-1.8,-4.6],[1.8,-4.6],[1.2,-2.6],[0,-2],[-1.2,-2.6]],0,-4,3);teeth(c,[[-1.6,-4.6],[-1.1,-3],[-0.6,-4.6],[0.6,-4.6],[1.1,-3],[1.6,-4.6]]);
       eyes(c,o,[[-1.6,-7.2,0.3],[1.6,-7.2,-0.3]],1.1,0.8);};
   },
@@ -1787,10 +1807,10 @@ Object.assign(MONSTER,{
     const tq=pz(t+m.ph,rm),s1=Math.sin(tq*3),bob=Math.abs(s1)*2,op=3+Math.max(0,Math.sin(tq*1.7))*3;
     x.save();x.translate(0,-bob);
     for(const q of [[s1,5],[-s1,11]])limb(x,q[1],-48,[[21,-0.45+q[0]*0.25,6.5,4.2],[19,0.65-q[0]*0.2,4.2,3],[11,-0.25,3,1.4]]);
-    x.beginPath();x.moveTo(15,-50);x.quadraticCurveTo(18,-72,-2,-86);x.quadraticCurveTo(-12,-91,-20,-84);x.quadraticCurveTo(-6,-76,2,-47);x.closePath();x.fill();
-    for(let i=0;i<5;i++){const u=i/4,bx=lerp(15,-6,u),by=lerp(-58,-86,u)-Math.sin(u*Math.PI)*5;x.beginPath();x.moveTo(bx-2.4,by+1.6);x.lineTo(bx+3+u*2,by-6);x.lineTo(bx+2.4,by+1.4);x.closePath();x.fill();}
-    x.beginPath();x.moveTo(-15,-87);x.lineTo(-30,-89);x.lineTo(-40,-84);x.lineTo(-39,-80);x.lineTo(-18,-79);x.closePath();x.fill();
-    x.beginPath();x.moveTo(-18,-78);x.lineTo(-37,-79+op);x.lineTo(-35,-75+op);x.lineTo(-17,-73);x.closePath();x.fill();
+    x.beginPath();x.moveTo(15,-50);x.quadraticCurveTo(18,-72,-2,-86);x.quadraticCurveTo(-12,-91,-20,-84);x.quadraticCurveTo(-6,-76,2,-47);x.closePath();cardFill(x);
+    for(let i=0;i<5;i++){const u=i/4,bx=lerp(15,-6,u),by=lerp(-58,-86,u)-Math.sin(u*Math.PI)*5;x.beginPath();x.moveTo(bx-2.4,by+1.6);x.lineTo(bx+3+u*2,by-6);x.lineTo(bx+2.4,by+1.4);x.closePath();cardFill(x);}
+    x.beginPath();x.moveTo(-15,-87);x.lineTo(-30,-89);x.lineTo(-40,-84);x.lineTo(-39,-80);x.lineTo(-18,-79);x.closePath();cardFill(x);
+    x.beginPath();x.moveTo(-18,-78);x.lineTo(-37,-79+op);x.lineTo(-35,-75+op);x.lineTo(-17,-73);x.closePath();cardFill(x);
     for(const q of [[-s1,-8],[s1,-14]]){const h=limb(x,q[1],-82,[[25,-0.4+q[0]*0.22,4.6,3.4],[27,-0.08-q[0]*0.25,3.4,2.2]]);
       x.lineWidth=1.4;for(let k=0;k<3;k++){x.beginPath();x.moveTo(h[0],h[1]);x.lineTo(h[0]-5+k*2.6,h[1]+5.5);x.lineTo(h[0]-7+k*2.6,h[1]+6.5);x.stroke();}}
     x.restore();
@@ -1805,9 +1825,9 @@ Object.assign(MONSTER,{
     const tq=pz(t*0.6+m.ph,rm),s1=Math.sin(tq*2.4);
     x.save();x.scale(1.15,1); // 15% wider
     for(const q of [[s1,-3],[-s1,5]])limb(x,q[1],-112,[[44,-0.2+q[0]*0.18,8,6],[46,0.32-q[0]*0.16,6,4],[20,-0.12,4,2]]);
-    x.beginPath();x.moveTo(-8,-108);x.quadraticCurveTo(-12,-140,-6,-168);x.lineTo(8,-168);x.quadraticCurveTo(14,-140,10,-108);x.closePath();x.fill();
-    x.save();x.globalCompositeOperation="destination-out";x.beginPath();x.ellipse(1,-140,5.5,13,0.05,0,Math.PI*2);x.fill();x.restore();
-    x.beginPath();x.moveTo(-5,-168);x.quadraticCurveTo(-4,-178,1,-182);x.quadraticCurveTo(7,-178,7,-168);x.closePath();x.fill();
+    x.beginPath();x.moveTo(-8,-108);x.quadraticCurveTo(-12,-140,-6,-168);x.lineTo(8,-168);x.quadraticCurveTo(14,-140,10,-108);x.closePath();cardFill(x);
+    x.save();x.globalCompositeOperation="destination-out";x.beginPath();x.ellipse(1,-140,5.5,13,0.05,0,Math.PI*2);cardFill(x);x.restore();
+    x.beginPath();x.moveTo(-5,-168);x.quadraticCurveTo(-4,-178,1,-182);x.quadraticCurveTo(7,-178,7,-168);x.closePath();cardFill(x);
     for(const q of [[-1,-180,-2.6],[3,-181,-0.4],[5,-179,0.9]]){limb(x,q[0],q[1],[[10,q[2]+Math.PI,2.2,1.2],[7,q[2]+Math.PI+(q[2]<0?-0.7:0.7),1.2,0.5]]);}
     for(const q of [[-s1,-6,-1],[s1,8,1]]){const sh=[q[1],-164],h=limb(x,sh[0],sh[1],[[30,q[2]*0.5+q[0]*0.2,4.4,3.2],[34,q[2]*0.12-q[0]*0.2,3.2,2],[14,q[2]*-0.3,2,1]]);
       limb(x,h[0],h[1],[[8,q[2]*0.8,1.2,0.5]]);limb(x,h[0],h[1],[[9,-q[2]*0.4,1.2,0.5]]);limb(x,(sh[0]+h[0])/2,(sh[1]+h[1])/2+8,[[10,q[2]*1.3,1.6,0.6]]);}
@@ -1850,14 +1870,12 @@ function drawHUD(x,W){
   x.restore();
 }
 
-/* ============================== the bosses: one per place, painted in washed-out colours taken from the level,
-   with ember eyes, mouths and seams and a thin ember outline. Same puppet steps and angular shapes as the others. ============================== */
-const BOSS_PAL={ // stronger colours, still taken from each level
-  night:{veilTop:"#dcbfe4",veilBot:"#f6cfae",coreTop:"#f4e2f2",coreBot:"#ffe2c6",shade:"#a882ad",deep:"#6c4a78",claw:"#f1dcea",clawShade:"#b991b6",aura:"#f0c9e0"},
-  storm:{bone:"#e8bcb9",boneShade:"#b0717a",boneDeep:"#5e2232",socket:"#22070e",tent:"#b4566f",tentLight:"#ef9fb1",tentShade:"#6a2640",sucker:"#f6c6cf"},
-  dawn:{robe:"#6b84bb",robeShade:"#3e5288",robeLight:"#a9bbe0",skin:"#b4d0d6",skinShade:"#7c9ea8",hat:"#3d4d80",hatShade:"#283460",band:"#eaa58b",hair:"#1b2034",iron:"#232b40",ironLight:"#56638a",straw:"#e8c69f",strawShade:"#b48c68",handle:"#4a3a2c"},
-  mist:{bark:"#707b60",barkShade:"#434b38",barkDeep:"#232a1d",barkLight:"#a9b48f",moss:"#9fbb52"}};
-const BOSS_NAME={night:"the veiled ghost",storm:"the tentacled skull",dawn:"the cauldron witch",mist:"the gaping tree"};
+/* ============================== the bosses: design system version 6 (2 November 2026) ==============================
+   Round 12's bosses, painted in washed-out colours taken from each level, were replaced in the bosses rework (Barney, 2 November):
+   black card cut-outs like the monsters, blacks graded charcoal to ink inside ink edges, ember eyes, mouths, rim and glow, a few
+   lines lit faintly in the level's colour, and the level-coloured glow behind. The helpers just below are round 12's, kept because
+   the new bosses use some of them; the bosses themselves follow BOSS_AURA further down. ============================== */
+const BOSS_NAME={night:"the veiled ghost",storm:"the tentacled skull",dawn:"the moor mother",mist:"the gaping tree"}; // the witch replaced by the moor mother (version 6)
 function fillP(x,col,pts){x.fillStyle=col;x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();}
 function strokeP(x,col,w,pts){x.strokeStyle=col;x.lineWidth=w;x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.stroke();}
 function cLimb(x,col,ax,ay,segs){x.fillStyle=col;return limb(x,ax,ay,segs);}
@@ -1868,234 +1886,389 @@ function claws(x,col,hx,hy,base,spread,len,sd){ // long curling claws: three joi
   for(let k=0;k<4;k++){const a0=base+(k-1.5)*spread;let px=hx,py=hy,a=a0,w=2.8;
     for(let j=0;j<3;j++){const L=len*(j===0?0.45:j===1?0.35:0.3),nx=px+Math.sin(a)*L,ny=py+Math.cos(a)*L,w2=j===2?0.4:w*0.75;x.fillStyle=col;taper(x,[px,py,nx,ny,w,w2]);px=nx;py=ny;w=w2;a+=sd*0.55;}}
 }
+const BOSS_AURA={night:["#f0c9e0",-110,125,0.48],storm:["#ff8fa6",-80,130,0.45],dawn:["#bcd2ff",-100,130,0.48],mist:["#f8ffc8",-110,150,0.62]}; // 50% stronger; the tree's is brighter so it shows against the pale mist // a glow round each boss, in its level's colour
+const BOSS_CYCLE=7.5,BOSS_H=320,BOSS_GROUND=292;
+/* ============================== bosses, the rework: black card first, like the monsters ==============================
+   Each boss is drawn in ink as one cut-out (with holes cut through it), then put down the monster way: an ember rim and an ember
+   glow round the whole shape, then its ember details (eyes, mouth, seams, the hollows that glow). The place's colour is only a nod,
+   in one of three ways (NOD): "edge" a thin rim of the place's light, "aura" the level-coloured glow behind it, "detail" a few inner
+   lines lit faintly in the level's colour. Same size, same stepping, same golden-wisp defeat as before. */
+const nd=n=>typeof n==="string"?{edge:n==="edge",aura:n==="aura",detail:n==="detail"}:(n||{}); // the nod: one of edge, aura, detail, or a mix of them
+const NOD_COL={night:"#f0c9e0",storm:"#ff8fa6",dawn:"#bcd2ff",mist:"#f8ffc8"}; // the level colour each boss nods to (its old glow)
+function cutPath(x,pts){x.save();x.globalCompositeOperation="destination-out";x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();x.restore();}
+function lens(a,b,w){const dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy)||1,nx=-dy/L*w,ny=dx/L*w,mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+  return [a,[lerp(a[0],mx,0.5)+nx*0.8,lerp(a[1],my,0.5)+ny*0.8],[mx+nx,my+ny],[lerp(mx,b[0],0.5)+nx*0.8,lerp(my,b[1],0.5)+ny*0.8],b,[lerp(mx,b[0],0.5)-nx*0.5,lerp(my,b[1],0.5)-ny*0.5],[mx-nx*0.6,my-ny*0.6],[lerp(a[0],mx,0.5)-nx*0.5,lerp(a[1],my,0.5)-ny*0.5]];}
+function hollow(c,pts,cx,cy,r,a){ // a hole through the card, smouldering inside: dark red, hottest at the eyes
+  c.save();const g=c.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,rgba(EMBER.danger,a*0.7));g.addColorStop(0.5,rgba("#7a160c",a));g.addColorStop(1,rgba("#240504",a));
+  c.fillStyle=g;c.shadowColor=EMBER.glow;c.shadowBlur=7;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fill();c.restore();}
+function litLines(c,col,a,w,lines){c.save();c.globalAlpha=a;c.strokeStyle=col;c.lineWidth=w;c.lineCap="round";c.lineJoin="round";
+  for(const pts of lines){c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();}c.restore();}
+
+const CH=["#060508","#100e13","#19161d","#231f27","#2d2832"]; // ink, then paler blacks to charcoal: graded inside, ink at the edge
+function card(x,look,path,grad,edge){ // one card piece: flat ink (round 1), or graded charcoal inside an ink edge (round 2)
+  x.beginPath();path();x.closePath();
+  if(look&&look.tone){x.fillStyle=grad();x.fill();x.lineWidth=edge||3;x.strokeStyle=INK;x.lineJoin="miter";x.miterLimit=4;x.stroke();x.lineJoin="round";}
+  else{x.fillStyle=INK;x.fill();}
+  x.fillStyle=INK;}
+function lg(x,x0,y0,x1,y1,stops){const g=x.createLinearGradient(x0,y0,x1,y1);stops.forEach(q=>g.addColorStop(q[0],q[1]));return g;}
+function rg(x,cx,cy,r0,r1,stops){const g=x.createRadialGradient(cx,cy,r0,cx,cy,r1);stops.forEach(q=>g.addColorStop(q[0],q[1]));return g;}
+function poly(x,pts){pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));}
+function horn(base,dirs,lens,w0){ // an angular horn: straight joints, narrowing to a sharp point; returns its outline and its outer edge
+  const J=[base],W=[w0];let p=base,w=w0;
+  dirs.forEach((d,i)=>{const L=Math.hypot(d[0],d[1]);p=[p[0]+d[0]/L*lens[i],p[1]+d[1]/L*lens[i]];J.push(p);w=i===dirs.length-1?0:w*0.62;W.push(w);});
+  const nrm=j=>{const a=J[Math.max(0,j-1)],b=J[Math.min(J.length-1,j+1)],dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy)||1;return[-dy/L,dx/L];};
+  const A=[],B=[];J.forEach((q,j)=>{const n=nrm(j);A.push([q[0]+n[0]*W[j]/2,q[1]+n[1]*W[j]/2]);B.push([q[0]-n[0]*W[j]/2,q[1]-n[1]*W[j]/2]);});
+  return{pts:A.concat(B.slice(0,-1).reverse()),edgeA:A,edgeB:B};}
 const BOSS={
-  night(x,t,rm){ // the veiled ghost: thin, its body bending one way then another, arms set low and angled down, coloured like the night sky
-    const P=BOSS_PAL.night,tq=pz(t*0.7,rm),hv=8+Math.sin(tq*2)*4,k1=Math.sin(tq*1.3)*5,k2=Math.sin(tq*1.3+2)*5,a1=Math.sin(tq*1.7)*0.14,a2=Math.sin(tq*1.7+1.4)*0.14;
-    x.save();x.translate(0,-hv);
-    const sp=[[0,-2],[-9+k1*0.4,-56],[8+k2*0.5,-108],[-4+k1*0.4,-152],[-1,-180]],wd=[22,18,15,12,10];
-    const side=(sd,extra)=>sp.map((p,i)=>{const q=sp[Math.min(i+1,sp.length-1)],o=sp[Math.max(i-1,0)],dx=q[0]-o[0],dy=q[1]-o[1],L=Math.hypot(dx,dy)||1;return[p[0]-dy/L*(wd[i]+extra)*sd,p[1]+dx/L*(wd[i]+extra)*sd];});
-    const grad=(top,bot)=>{const g=x.createLinearGradient(0,-200,0,0);g.addColorStop(0,top);g.addColorStop(1,bot);return g;};
-    const L0=side(-1,0),R0=side(1,0);
-    x.fillStyle=grad(P.coreTop,P.coreBot);x.beginPath();L0.concat(R0.slice().reverse()).forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();
-    x.fillStyle=rgba(P.shade,0.7);x.beginPath();R0.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));for(let i=sp.length-1;i>=0;i--)x.lineTo(lerp(sp[i][0],R0[i][0],0.35),lerp(sp[i][1],R0[i][1],0.35));x.closePath();x.fill();
-    for(let i=1;i<sp.length-1;i++)strokeP(x,rgba(P.deep,0.5),1.2,[L0[i],[sp[i][0],sp[i][1]-2],R0[i]]); // seams at every bend
-    // the veils follow the bends, wider than the body, ragged at the hem
-    const veil=(alpha,extra,seed,sway)=>{const rr=rng32(seed),Lv=side(-1,extra),Rv=side(1,extra),w0=Lv[0][0],w1=Rv[0][0],hem=raggedEdge(w1+6,8,w0-6,8,12,8,rr).map((q,i)=>[q[0],q[1]+Math.sin(tq*3+i)*sway]);
-      x.save();x.globalAlpha=alpha;x.fillStyle=grad(P.veilTop,P.veilBot);x.beginPath();x.moveTo(sp[4][0],sp[4][1]-26);
-      for(let i=sp.length-1;i>=1;i--)x.lineTo(Rv[i][0],Rv[i][1]);hem.forEach(q=>x.lineTo(q[0],q[1]));for(let i=1;i<sp.length;i++)x.lineTo(Lv[i][0],Lv[i][1]);x.closePath();x.fill();x.restore();};
-    veil(0.5,16,71,2.2);veil(0.42,9,72,1.4);
-    x.save();x.globalAlpha=0.5;for(let i=1;i<sp.length-1;i++){strokeP(x,P.shade,1.2,[[sp[i+1][0]-6,sp[i+1][1]],[sp[i][0]-10,sp[i][1]],[sp[i-1][0]-12,sp[i-1][1]]]);strokeP(x,"#fff4ec",1.3,[[sp[i+1][0]+5,sp[i+1][1]],[sp[i][0]+7,sp[i][1]],[sp[i-1][0]+9,sp[i-1][1]]]);}x.restore();
-    // low-set arms, angled down, hands low and mean
-    const shL=[lerp(sp[2][0],L0[2][0],0.9),sp[2][1]+8],shR=[lerp(sp[2][0],R0[2][0],0.6),sp[2][1]+12],sw2=a1*1.6; // both arms reach the same way, swinging together
-    const HR=cLimb(x,P.claw,shR[0],shR[1],[[26,-0.55+a1,6,5],[24,-1.05+sw2,5,3.6],[8,-0.6+a1,3.6,3]]);
-    const HL=cLimb(x,P.claw,shL[0],shL[1],[[26,-0.7+a1,6,5],[24,-1.2+sw2,5,3.6],[8,-0.75+a1,3.6,3]]);
-    x.fillStyle=P.claw;x.beginPath();x.ellipse(HL[0],HL[1],4.6,3.6,0,0,Math.PI*2);x.ellipse(HR[0],HR[1],4.6,3.6,0,0,Math.PI*2);x.fill();
-    claws(x,P.claw,HL[0],HL[1],-0.55,0.28,24,1);claws(x,P.claw,HR[0],HR[1],-0.45,0.28,22,1);
-    claws(x,P.clawShade,HL[0]+1,HL[1]+1,-0.3,0.26,11,1);claws(x,P.clawShade,HR[0]+1,HR[1]+1,-0.25,0.26,10,1);
-    // the hood, tilted along the top of the body, a shadow round the eyes
-    const hx=sp[4][0],hy=sp[4][1]-6; // a bigger hood and face
-    fillP(x,grad(P.veilTop,P.veilBot),[[hx-21,hy+20],[hx-16,hy-8],[hx+2,hy-26],[hx+17,hy-6],[hx+21,hy+22],[hx,hy+32]]);
-    x.save();x.beginPath();[[hx-21,hy+20],[hx-16,hy-8],[hx+2,hy-26],[hx+17,hy-6],[hx+21,hy+22],[hx,hy+32]].forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.clip();
-    const fg=x.createRadialGradient(hx,hy+8,1,hx,hy+10,20);fg.addColorStop(0,rgba(P.deep,0.95));fg.addColorStop(0.55,rgba(P.deep,0.6));fg.addColorStop(1,rgba(P.shade,0));x.fillStyle=fg;x.fillRect(hx-24,hy-26,48,60);x.restore(); // darkness deepening behind the eyes
+  night(x,t,rm,nod,look){ // the veiled ghost: a tall torn shroud bending one way then another, a pointed hood, long low arms with hooked claws
+    const tq=pz(t*0.7,rm),hv=6+Math.sin(tq*2)*3,k1=Math.sin(tq*1.3)*5,k2=Math.sin(tq*1.3+2)*5,a1=Math.sin(tq*1.7)*0.14,sw=a1*1.6,N=nd(nod),GK=1.2; // GK: 20% bigger (Barney, 2 Nov)
+    x.save();x.scale(GK,GK);x.translate(0,-hv);
+    const sp=[[0,0],[-9+k1*0.4,-48],[8+k2*0.5,-94],[-4+k1*0.4,-132],[-1,-154]],wd=[34,30,24,18,12];
+    const side=(sd,e)=>sp.map((p,i)=>{const q=sp[Math.min(i+1,sp.length-1)],o=sp[Math.max(i-1,0)],dx=q[0]-o[0],dy=q[1]-o[1],L=Math.hypot(dx,dy)||1;return[p[0]-dy/L*(wd[i]+e)*sd,p[1]+dx/L*(wd[i]+e)*sd];});
+    const L0=side(-1,0),R0=side(1,0),r=rng32(71);
+    // the shroud, its hem torn into long tatters that sway in steps
+    const n=13,hem=[];for(let i=0;i<=n;i++){const u=i/n,hx0=lerp(R0[0][0]+8,L0[0][0]-8,u),long=i%2===1;hem.push([hx0+(long?Math.sin(tq*3+i)*2.5:0),(long?10+r()*16:-3-r()*5)+Math.sin(tq*2.4+i*0.7)*2]);}
+    card(x,look,()=>{x.moveTo(sp[4][0],sp[4][1]-22);for(let i=sp.length-1;i>=1;i--)x.lineTo(R0[i][0],R0[i][1]);hem.forEach(q=>x.lineTo(q[0],q[1]));for(let i=1;i<sp.length;i++)x.lineTo(L0[i][0],L0[i][1]);},
+      ()=>lg(x,0,-176,0,24,[[0,CH[1]],[0.4,CH[3]],[1,CH[0]]]),3);
+    if(look&&look.tone){ // the shroud's front layer: narrower, paler, its own torn edge
+      const Li=side(-1,-15),Ri=side(1,-15),hem2=[];for(let i=0;i<=6;i++){const u=i/6;hem2.push([lerp(Ri[1][0],Li[1][0],u),Ri[1][1]+(i%2?8+r()*6:-2)+Math.sin(tq*2.4+i)*1.5]);}
+      card(x,look,()=>{x.moveTo(sp[4][0],sp[4][1]-14);for(let i=sp.length-1;i>=1;i--)x.lineTo(Ri[i][0],Ri[i][1]);hem2.forEach(q=>x.lineTo(q[0],q[1]));for(let i=1;i<sp.length;i++)x.lineTo(Li[i][0],Li[i][1]);},
+        ()=>lg(x,0,-160,0,-40,[[0,CH[4]],[1,CH[2]]]),2.4);}
+    // long torn slits through the shroud, following its folds
+    const at=(i,f,sd)=>{const S=sd>0?R0:L0;return[lerp(sp[i][0],S[i][0],f),lerp(sp[i][1],S[i][1],f)];};
+    if(N.detail)litLines(x,NOD_COL.night,0.5,1.3,[[at(4,0.1,1),at(3,0.55,1),at(2,0.75,1),at(1,0.8,1)],[at(3,0.5,-1),at(2,0.7,-1),at(1,0.85,-1),at(0,0.7,-1)],[at(2,0.15,1),at(1,0.3,1),at(0,0.55,1)]]);
+    const slits=[[at(1,0.55,1),at(2,0.45,1),2.4],[at(0,0.42,-1),at(1,0.5,-1),2.2],[at(2,0.35,-1),at(3,0.3,-1),1.8],[at(0,0.25,1),at(1,0.12,1),1.6]];
+    for(const q of slits)cutPath(x,lens([q[0][0],q[0][1]+2],[q[1][0],q[1][1]-2],q[2]));
+    // low-set arms, angled down, both swinging the same way; long hooked claws
+    const shL=[lerp(sp[2][0],L0[2][0],0.85),sp[2][1]+10],shR=[lerp(sp[2][0],R0[2][0],0.7),sp[2][1]+14];
+    const HR=limb(x,shR[0],shR[1],[[28,0.75+a1,7,5],[26,0.25+sw,5,3.4],[8,0.55+a1,3.4,2.6]]);
+    const HL=limb(x,shL[0],shL[1],[[28,-0.7+a1,7,5],[26,-1.2+sw,5,3.4],[8,-0.75+a1,3.4,2.6]]);
+    x.beginPath();x.ellipse(HL[0],HL[1],4.4,3.4,0,0,Math.PI*2);x.ellipse(HR[0],HR[1],4.4,3.4,0,0,Math.PI*2);x.fill();
+    claws(x,INK,HL[0],HL[1],-0.55,0.3,26,1);claws(x,INK,HR[0],HR[1],0.45,0.3,24,-1);
+    // the hood: tall and pointed, tipped forward; the face is a hole through it
+    const hx=sp[4][0],hy=sp[4][1]-4;
+    const hood=[[hx-22,hy+22],[hx-18,hy-6],[hx-6,hy-24],[hx+6,hy-36],[hx+9,hy-26],[hx+18,hy-6],[hx+22,hy+24],[hx,hy+34]];
+    card(x,look,()=>poly(x,hood),()=>rg(x,hx-3,hy-14,4,36,[[0,CH[4]],[0.55,CH[2]],[1,CH[1]]]),3);
+    if(N.detail)litLines(x,NOD_COL.night,0.5,1.3,[[hood[1],hood[2],hood[3]]]);
+    const face=[[hx-10,hy+19],[hx-12,hy+5],[hx-6,hy-7],[hx+2,hy-11],[hx+9,hy-4],[hx+12,hy+8],[hx+8,hy+20],[hx-1,hy+25]];
+    cutPath(x,face);
     x.restore();
-    return (c,o)=>{c.save();c.translate(0,-hv);emberGlow(c,hx,hy+8,24,0.55);emberEye(c,hx-6,hy+8,4.2,2.8,0.3);emberEye(c,hx+6,hy+8,4,2.7,-0.3);c.restore();};
+    return (c,o)=>{c.save();c.scale(GK,GK);c.translate(0,-hv);
+      hollow(c,face,hx,hy+7,16,0.95);emberEye(c,hx-5,hy+6,3.8,2.5,0.35);emberEye(c,hx+5,hy+6,3.6,2.4,-0.3);
+      seam(c,[at(2,0.2,-1),[sp[2][0]-3,sp[2][1]+6]],1.1);seam(c,[at(1,0.2,1),[sp[1][0]+3,sp[1][1]+7]],1);
+      c.restore();};
   },
-  storm(x,t,rm){ // the tentacled skull: an angry skull with a working jaw, on a mass of banded, suckered tentacles
-    const P=BOSS_PAL.storm,tq=pz(t*0.8,rm),op=4+Math.max(0,Math.sin(tq*1.4))*6;
-    const tent=(ax,ay,a0,curl,n,w0,ph)=>{let x0=ax,y0=ay,a=a0,w=w0;const pts=[];
-      for(let i=0;i<n;i++){const kink=(i%3===1)?(i%2?1:-1)*(0.55+0.2*Math.sin(ph+i)):0; // sharp elbows every few segments
+  storm(x,t,rm,nod,look){ // the tentacled skull: an angry skull with a working jaw, on a mass of jointed tentacles, suckers cut through them
+    const tq=pz(t*0.8,rm),op=4+Math.max(0,Math.sin(tq*1.4))*6,segs=[],N=nd(nod),BA=look&&look.tone?0.36:0.45,SK=1.2; // SK: 20% bigger (Barney, 2 Nov)
+    x.save();x.scale(SK,SK);
+    const tent=(ax,ay,a0,curl,n,w0,ph)=>{let x0=ax,y0=ay,a=a0,w=w0;
+      for(let i=0;i<n;i++){const kink=(i%3===1)?(i%2?1:-1)*(0.55+0.2*Math.sin(ph+i)):0;
         a+=curl*(1+i*0.06)*1.6+kink+Math.sin(tq*2+ph+i*0.5)*0.12;const L=(n-i)*0.8+6,nx=x0+Math.sin(a)*L,ny=y0+Math.cos(a)*L,w2=Math.max(1.4,w*0.9);
-        x.fillStyle=mixc(P.tentShade,P.tentLight,0.25+0.6*(0.5+0.5*Math.sin(i*0.95+ph*1.7)));taper(x,[x0,y0,nx,ny,w,w2]);pts.push([x0,y0,nx,ny,a,w,w2]);x0=nx;y0=ny;w=w2;}
-      pts.forEach((q,i)=>{if(i%3!==2||q[5]<5)return;const al=0.5+0.5*Math.sin(t*(rm?0.3:0.7)+ph*2.1+i*1.3);if(al<0.05)return; // a patch that slowly glows and fades
-        x.save();x.globalAlpha=al*0.85;x.fillStyle="#ff9cbf";x.beginPath();x.ellipse((q[0]+q[2])/2,(q[1]+q[3])/2,q[5]*0.55,q[5]*0.32,q[4],0,Math.PI*2);x.fill();x.restore();});
-      for(const q of pts){const nx=Math.cos(q[4]),ny=-Math.sin(q[4]),mx=(q[0]+q[2])/2,my=(q[1]+q[3])/2;
-        fillP(x,P.tentShade,[[q[0]-nx*q[5]*0.5,q[1]-ny*q[5]*0.5],[q[2]-nx*q[6]*0.5,q[3]-ny*q[6]*0.5],[mx-nx*q[5]*0.15,my-ny*q[5]*0.15]]); // a shaded underside
-        fillP(x,P.tentLight,[[q[0]+nx*q[5]*0.42,q[1]+ny*q[5]*0.42],[mx+nx*q[5]*0.05,my+ny*q[5]*0.05],[q[2]+nx*q[6]*0.42,q[3]+ny*q[6]*0.42]]); // the zigzag band
-        if(q[5]>4){x.fillStyle=P.sucker;x.beginPath();x.arc(mx-nx*q[5]*0.3,my-ny*q[5]*0.3,q[5]*0.16,0,Math.PI*2);x.fill();x.fillStyle=P.tentShade;x.beginPath();x.arc(mx-nx*q[5]*0.3,my-ny*q[5]*0.3,q[5]*0.07,0,Math.PI*2);x.fill();}}};
+        if(look&&look.tone)x.fillStyle=w<5?INK:(i%2?CH[2]:CH[1]);taper(x,[x0,y0,nx,ny,w,w2]);x.fillStyle=INK;
+        if(N.detail&&w>=4){const vx=Math.cos(a),vy=-Math.sin(a),mx=(x0+nx)/2,my=(y0+ny)/2;x.save();x.globalAlpha=BA; // the lit band, drawn with its segment
+          fillP(x,NOD_COL.storm,[[x0+vx*w*0.42,y0+vy*w*0.42],[mx+vx*w*0.12,my+vy*w*0.12],[nx+vx*w2*0.42,ny+vy*w2*0.42]]);x.restore();x.fillStyle=INK;}
+        segs.push([x0,y0,nx,ny,a,w,w2]);x0=nx;y0=ny;w=w2;}};
+    const holes=()=>{x.save();x.globalCompositeOperation="destination-out";for(let j=0;j<segs.length;j++){const q=segs[j];if(q[5]<8||j%2)continue;const nx=Math.cos(q[4]),ny=-Math.sin(q[4]),mx=(q[0]+q[2])/2,my=(q[1]+q[3])/2;
+      x.beginPath();x.arc(mx-nx*q[5]*0.22,my-ny*q[5]*0.22,q[5]*0.13,0,Math.PI*2);x.fill();}x.restore();};
     tent(18,-70,-3.0,0.12,13,22,0.4);tent(-26,-40,-1.6,-0.07,12,21,1.2);tent(30,-30,1.9,0.06,13,21,2.1);
-    { // the body: a webbed skirt between the tentacle roots, mottled, the colour fading in and out across it
-      const web=[[-44,-62],[-58,-30],[-40,-10],[-18,-22],[-6,-4],[12,-18],[30,-6],[48,-24],[58,-48],[42,-66]];
-      x.beginPath();x.moveTo(web[0][0],web[0][1]);for(let i=1;i<=web.length;i++){const p0=web[i-1],p1=web[i%web.length],mx=(p0[0]+p1[0])/2,my=(p0[1]+p1[1])/2;x.quadraticCurveTo(mx*0.82,my*0.82-8,p1[0],p1[1]);}x.closePath();
-      const g=x.createRadialGradient(-4,-46,4,0,-36,64);g.addColorStop(0,P.tentLight);g.addColorStop(0.45,P.tent);g.addColorStop(1,P.tentShade);x.fillStyle=g;x.fill();
-      x.save();x.clip();
-      for(let i=0;i<14;i++){const rr=rng32(hsh(88,i)),cx=-50+rr()*100,cy=-64+rr()*58,r0=4+rr()*9,al=0.18+0.22*(0.5+0.5*Math.sin(t*(rm?0.25:0.6)+i*1.7));
-        x.fillStyle=rgba(i%3?P.tentShade:P.tentLight,al);x.beginPath();x.ellipse(cx,cy,r0,r0*0.7,rr()*3,0,Math.PI*2);x.fill();}
-      for(const q of [[-30,-56,-40,-20],[-10,-58,-12,-14],[12,-58,22,-14],[30,-58,44,-22]])strokeP(x,rgba(P.tentShade,0.65),2,[[q[0],q[1]],[(q[0]+q[2])/2+(q[2]>q[0]?-4:4),(q[1]+q[3])/2],[q[2],q[3]]]);
-      x.restore();}
-    // the skull
-    fillP(x,P.bone,[[-46,-102],[-44,-118],[-34,-132],[-16,-142],[14,-142],[34,-132],[44,-118],[48,-102],[44,-86],[40,-74],[32,-64],[22,-58],[-22,-58],[-32,-64],[-40,-74],[-44,-86]]);
-    fillP(x,P.boneShade,[[22,-140],[34,-132],[44,-118],[48,-102],[44,-86],[40,-74],[32,-64],[22,-58],[26,-80],[32,-104],[28,-126]]);
-    fillP(x,"#f6d4d0",[[-38,-124],[-18,-138],[-4,-139],[-22,-130],[-40,-110]]);
-    { // the same mottling as the body and tentacles, fading in and out across the skull
-      x.save();x.beginPath();[[-46,-102],[-44,-118],[-34,-132],[-16,-142],[14,-142],[34,-132],[44,-118],[48,-102],[44,-86],[40,-74],[32,-64],[22,-58],[-22,-58],[-32,-64],[-40,-74],[-44,-86]].forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.clip();
-      const sg=x.createLinearGradient(0,-142,0,-58);sg.addColorStop(0,rgba(P.tentLight,0));sg.addColorStop(1,rgba(P.tent,0.55));x.fillStyle=sg;x.fillRect(-50,-145,100,90);
-      for(let i=0;i<12;i++){const rr=rng32(hsh(89,i)),cx=-44+rr()*88,cy=-140+rr()*80,r0=4+rr()*8,al=0.16+0.2*(0.5+0.5*Math.sin(t*(rm?0.25:0.6)+i*1.9));
-        x.fillStyle=rgba(i%3?P.tent:P.tentLight,al);x.beginPath();x.ellipse(cx,cy,r0,r0*0.7,rr()*3,0,Math.PI*2);x.fill();}
-      x.restore();}
-    fillP(x,P.boneShade,[[-46,-92],[-40,-90],[-38,-74],[-44,-80]]);fillP(x,P.boneShade,[[46,-92],[40,-90],[38,-74],[44,-80]]); // temples
-    fillP(x,P.boneDeep,[[-38,-104],[-6,-96],[-4,-92],[-36,-98]]);fillP(x,P.boneDeep,[[38,-104],[6,-96],[4,-92],[36,-98]]); // angry brow ridges
-    fillP(x,P.socket,[[-34,-96],[-8,-91],[-8,-80],[-16,-72],[-30,-76],[-36,-86]]);fillP(x,P.socket,[[34,-96],[8,-91],[8,-80],[16,-72],[30,-76],[36,-86]]);
-    fillP(x,P.socket,[[0,-76],[5,-68],[3,-62],[0,-64],[-3,-62],[-5,-68]]);
-    fillP(x,P.boneShade,[[-30,-70],[-14,-66],[-24,-62]]);fillP(x,P.boneShade,[[30,-70],[14,-66],[24,-62]]); // cheekbones
-    fillP(x,P.bone,[[-26,-58],[26,-58],[24,-50+op],[10,-44+op],[-10,-44+op],[-24,-50+op]]);
-    fillP(x,P.boneShade,[[12,-58],[26,-58],[24,-50+op],[10,-44+op]]);
-    fillP(x,P.socket,[[-20,-58],[20,-58],[18,-52+op*0.6],[-18,-52+op*0.6]]);
-    x.fillStyle="#fbf0e6";for(let i=0;i<6;i++){fillP(x,"#f5e2dc",[[-19+i*6.4,-59],[-14.6+i*6.4,-59],[-15.4+i*6.4,-53],[-18.2+i*6.4,-53]]);fillP(x,"#ecd2cc",[[-16+i*5.6,-53+op*0.6],[-12+i*5.6,-53+op*0.6],[-12.6+i*5.6,-48+op*0.6],[-15.4+i*5.6,-48+op*0.6]]);}
-    strokeP(x,P.boneDeep,1.4,[[-8,-141],[-12,-128],[-6,-120],[-11,-108]]);strokeP(x,P.boneDeep,1.2,[[24,-136],[28,-124],[24,-116]]);strokeP(x,P.boneDeep,1,[[-12,-128],[-20,-124]]);
-    tent(-36,-40,-2.2,0.03,12,22,3.0);tent(8,-34,-0.5,-0.1,11,20,4.2);
-    return (c,o)=>{emberGlow(c,-20,-84,18,0.55);emberGlow(c,20,-84,18,0.55);emberEye(c,-20,-84,4.4,3.2,0.3);emberEye(c,20,-84,4.4,3.2,-0.3);
-      emberMouth(c,[[-18,-52],[18,-52],[16,-50+op*0.5],[-16,-50+op*0.5]],0,-51,18);
-      seam(c,[[-11,-108],[-14,-100]],1.2);seam(c,[[24,-116],[22,-108]],1.1);};
-  },
-  dawn(x,t,rm){ // the cauldron witch: tattered robe, crumpled hat, hooked profile, stirring a cauldron painted with flames
-    const P=BOSS_PAL.dawn,tq=pz(t*0.8,rm),st=tq*2.2,hx=Math.cos(st)*6,hy=Math.sin(st)*3,lift=Math.sin(tq*1.3)*0.15,r=rng32(3131);
-    // the broom, leaning on the cauldron
-    strokeP(x,P.handle,3.2,[[-4,-4],[-22,-92]]);
-    fillP(x,P.straw,[[-10,2],[6,2],[2,-26],[-4,-30],[-10,-26]]);fillP(x,P.strawShade,[[-2,2],[6,2],[2,-26],[-1,-28]]);
-    for(let i=0;i<5;i++)strokeP(x,P.strawShade,0.8,[[-8+i*3,1],[-5+i*1.5,-24]]);fillP(x,P.handle,[[-6,-27],[3,-27],[3,-31],[-6,-31]]);
-    // the robe: long and tattered
-    const hem=raggedEdge(70,4,-14,4,14,8,r);
-    fillP(x,P.robe,[[18,-122],[34,-118],[52,-80],[64,-30]].concat(hem,[[-12,-36],[-6,-90],[2,-118]]));
-    fillP(x,P.robeShade,[[34,-118],[52,-80],[66,-24],[60,4],[46,4],[40,-60],[28,-108]]);
-    for(const q of [[10,-110,4,2],[22,-100,24,0],[-2,-80,-6,0]])strokeP(x,P.robeShade,1.6,[[q[0],q[1]],[(q[0]+q[2])/2+3,(q[1]+q[3])/2],[q[2],q[3]]]);
-    strokeP(x,P.robeLight,1.4,[[4,-112],[-4,-60],[-8,-20]]);
-    // hair, straggling over the shoulders
-    fillP(x,P.hair,[[-6,-152],[10,-150],[16,-130],[20,-110],[12,-114],[10,-100],[4,-112],[0,-104],[-2,-120],[-8,-130]]);
-    // the face, in profile: hooked nose, jutting chin, a wart
-    fillP(x,P.skin,[[2,-152],[-6,-152],[-10,-148],[-14,-146],[-24,-139],[-26,-136],[-16,-134],[-13,-130],[-19,-124],[-17,-120],[-10,-121],[-4,-116],[4,-120],[8,-134]]);
-    fillP(x,P.skinShade,[[4,-152],[8,-134],[4,-120],[-1,-126],[2,-142]]);
-    strokeP(x,P.skinShade,0.9,[[-10,-140],[-6,-138]]);strokeP(x,P.skinShade,0.9,[[-12,-134],[-8,-131]]);
-    x.fillStyle=P.skinShade;x.beginPath();x.arc(-20,-137,1.4,0,Math.PI*2);x.fill();
-    // the hat: tall, crumpled, bent over at the tip, with a buckled band
-    x.save();x.translate(-2,-153);x.rotate(-0.12);
-    fillP(x,P.hat,[[-32,2],[-27,-4],[0,-6],[27,-5],[34,1],[22,5],[-22,6]]);fillP(x,P.hatShade,[[8,-5],[27,-5],[34,1],[22,5],[10,4]]);
-    fillP(x,P.hat,[[-14,-3],[-10,-20],[-4,-30],[-6,-38],[2,-46],[10,-54],[22,-54],[26,-48],[16,-48],[12,-42],[10,-34],[13,-18],[15,-3]]);
-    fillP(x,P.hatShade,[[4,-36],[10,-34],[13,-18],[15,-3],[6,-3],[8,-20]]);
-    strokeP(x,P.hatShade,1.2,[[-8,-26],[0,-28]]);
-    fillP(x,P.band,[[-13.6,-3],[14.8,-3],[13.6,-9],[-12.4,-9]]);x.strokeStyle=P.hatShade;x.lineWidth=1.4;x.strokeRect(-3,-9.2,6,6);
+    // the webbed skirt between the tentacle roots
+    const web=[[-44,-62],[-58,-30],[-40,-10],[-18,-22],[-6,-4],[12,-18],[30,-6],[48,-24],[58,-48],[42,-66]];
+    card(x,look,()=>{x.moveTo(web[0][0],web[0][1]);for(let i=1;i<=web.length;i++){const p0=web[i-1],p1=web[i%web.length],mx=(p0[0]+p1[0])/2,my=(p0[1]+p1[1])/2;x.quadraticCurveTo(mx*0.82,my*0.82-8,p1[0],p1[1]);}},
+      ()=>rg(x,0,-42,2,62,[[0,CH[3]],[1,CH[0]]]),3);
+    holes();
+    // the skull, with an angry brow cut into its outline, and its jaw a separate card piece
+    const skull=[[-46,-102],[-44,-118],[-34,-132],[-16,-142],[14,-142],[34,-132],[44,-118],[48,-102],[44,-86],[40,-74],[32,-64],[22,-58],[-22,-58],[-32,-64],[-40,-74],[-44,-86]];
+    const hR=horn([26,-133],[[0.82,-0.57],[0.26,-0.97],[0.66,-0.75]],[19,18,13],13),hL=horn([-26,-133],[[-0.86,-0.5],[-0.3,-0.95],[-0.72,-0.69]],[18,19,12],13);
+    if(look&&look.horns){for(const h of [hR,hL])card(x,look,()=>poly(x,h.pts),()=>lg(x,h.edgeA[0][0],h.edgeA[0][1],h.edgeA[3][0],h.edgeA[3][1],[[0,CH[3]],[1,CH[0]]]),2.2);
+      if(N.detail)litLines(x,NOD_COL.storm,0.5,1.1,[hR.edgeB.slice(0,3),hL.edgeA.slice(0,3)]);}
+    card(x,look,()=>poly(x,skull),()=>rg(x,-12,-122,4,64,[[0,CH[4]],[0.5,CH[2]],[1,CH[0]]]),3);
+    card(x,look,()=>poly(x,[[-26,-60],[26,-60],[24,-50+op],[10,-44+op],[-10,-44+op],[-24,-50+op]]),()=>lg(x,0,-60,0,-44+op,[[0,CH[2]],[1,CH[0]]]),2.5);
+    if(N.detail)litLines(x,NOD_COL.storm,0.5,1.2,[[[-38,-104],[-6,-96]],[[38,-104],[6,-96]],[[-30,-128],[-14,-138],[2,-139]]]);
+    const sockL=[[-34,-98],[-8,-92],[-8,-80],[-16,-72],[-30,-76],[-36,-88]],sockR=sockL.map(p=>[-p[0],p[1]]),nose=[[0,-76],[5,-68],[3,-62],[0,-64],[-3,-62],[-5,-68]];
+    cutPath(x,sockL);cutPath(x,sockR);cutPath(x,nose);
+    const segs0=segs.length;tent(-36,-40,-2.2,0.03,12,22,3.0);tent(8,-34,-0.5,-0.1,11,20,4.2);
+    {const keep=segs.splice(0,segs0);holes();segs.unshift(...keep);}
     x.restore();
-    // arms: one stirring, one clawed hand raised
-    const sq=pz(t*1.1,rm),sx2=Math.cos(sq*2.6)*0.22,sy2=Math.sin(sq*2.6)*0.18;
-    const H1=cLimb(x,P.robe,-2,-112,[[20,-1.55+sx2,9,7],[16,-0.25+sy2,7,6],[12,-1.1+sx2*0.6,6,5]]);
-    fillP(x,P.robeShade,[[H1[0]-6,H1[1]-6],[H1[0]+5,H1[1]-8],[H1[0]+4,H1[1]+2],[H1[0]-2,H1[1]+6],[H1[0]-8,H1[1]+1]]);
-    x.fillStyle=P.skin;taper(x,[H1[0],H1[1],H1[0]-3,H1[1]+4,5,4]);
-    strokeP(x,P.handle,2.6,[[H1[0]-2+hx*0.3,H1[1]-6],[-42+hx,-62+hy]]);
-    const H2=cLimb(x,P.robe,10,-114,[[24,-1.3-lift*0.5,8,6.5],[18,-2.4-lift*1.6,6.5,5],[10,-1.7-lift,5,4]]);
-    fillP(x,P.robeShade,[[H2[0]-6,H2[1]+8],[H2[0]+6,H2[1]+8],[H2[0]+4,H2[1]-2],[H2[0]-4,H2[1]-4]]);
-    claws(x,P.skin,H2[0],H2[1],-0.9-lift,0.32,15,1);
-    // the cauldron: three legs, a heavy rim, flames painted round it, an eyeball on the lip
-    for(const q of [[-62,2,-58,-12],[-26,2,-30,-12],[-44,4,-44,-12]])fillP(x,P.iron,[[q[0]-3,q[1]],[q[0]+3,q[1]],[q[2]+3,q[3]],[q[2]-3,q[3]]]);
-    x.fillStyle=P.iron;x.beginPath();x.ellipse(-44,-34,35,27,0,0,Math.PI*2);x.fill();
-    x.fillStyle=P.ironLight;x.beginPath();x.ellipse(-56,-40,8,14,0.3,0,Math.PI*2);x.fill();
-    x.fillStyle=P.iron;x.beginPath();x.ellipse(-44,-58,34,8,0,0,Math.PI*2);x.fill();
-    x.strokeStyle=P.ironLight;x.lineWidth=1.6;x.beginPath();x.ellipse(-44,-58,33,7,0,Math.PI*1.05,Math.PI*1.95);x.stroke();
-    return (c,o)=>{emberEye(c,-8,-142,2.3,1.6,0.2);emberMouth(c,[[-17,-128],[-8,-129],[-6,-126],[-13,-124]],-10,-127,5);teeth(c,[[-15,-128.4],[-14,-126],[-13,-128.6],[-11,-128.8],[-10.2,-126.4],[-9.4,-128.8]]);
-      c.save();const g=c.createRadialGradient(-44,-58,0,-44,-58,30);g.addColorStop(0,"#ffc27a");g.addColorStop(0.6,EMBER.danger);g.addColorStop(1,"#5a0c08");c.fillStyle=g;c.shadowColor=EMBER.glow;c.shadowBlur=10;c.beginPath();c.ellipse(-44,-58,29,5.2,0,0,Math.PI*2);c.fill();c.restore();
-      c.save();c.fillStyle=rgba(EMBER.danger,0.85);c.shadowColor=EMBER.glow;c.shadowBlur=5;c.beginPath(); // flames painted on the pot
-      c.moveTo(-74,-20);for(let i=0;i<=9;i++){const u=i/9,fx=lerp(-74,-14,u),fy=-20-(i%2?14+Math.sin(i*1.7)*4:2);c.lineTo(fx,fy);}c.lineTo(-14,-14);c.quadraticCurveTo(-44,-4,-74,-14);c.closePath();c.fill();c.restore();
-      c.save();c.fillStyle=BONE;c.beginPath();c.arc(-22,-63,4,0,Math.PI*2);c.fill();c.fillStyle=EMBER.danger;c.shadowColor=EMBER.glow;c.shadowBlur=4;c.beginPath();c.arc(-23.4,-63.4,1.9,0,Math.PI*2);c.fill();c.fillStyle=INK;c.beginPath();c.arc(-23.8,-63.6,0.8,0,Math.PI*2);c.fill();c.restore();
-      for(let i=0;i<3;i++){ // curling ribbons of steam, rising in steps
-        const ph=((pz(t*0.35,rm)+i/3)%1),bx=-52+i*8,al=Math.sin(ph*Math.PI)*0.55;if(al<0.03)continue;
-        const pts=[];for(let k=0;k<=5;k++){const u=k/5;pts.push([bx+(k%2?1:-1)*(3+u*7)*(i%2?1:-1)+Math.sin(ph*3+i)*3,-62-ph*12-u*(20+ph*10)]);}
-        c.save();c.strokeStyle=rgba("#e2e9f7",al);c.lineCap="round";c.lineJoin="round";
-        for(let k=0;k<5;k++){c.lineWidth=(1-k/5)*9+2;c.beginPath();c.moveTo(pts[k][0],pts[k][1]);c.lineTo(pts[k+1][0],pts[k+1][1]);c.stroke();}c.restore();}
-      const fs=rm?0.3:1;c.save();c.shadowColor=EMBER.glow;c.shadowBlur=8; // the fire flickers: each tongue rises and falls on its own
-      for(const layer of [[EMBER.danger,1],["#ffc27a",0.55]]){c.fillStyle=layer[0];c.beginPath();c.moveTo(-66,-6);
-        for(let i=0;i<=8;i++){const u=i/8,h=i%2?(7+8*(0.5+0.5*Math.sin(t*6.1*fs+i*1.9))+3*Math.sin(t*9.7*fs+i))*layer[1]:2;c.lineTo(lerp(-66,-22,u)+(i%2?Math.sin(t*4.3*fs+i)*1.5:0),-6-h);}
-        c.lineTo(-22,-6);c.closePath();c.fill();}
-      c.restore();
-      emberGlow(c,-44,-12,32,0.34+0.06*Math.sin(t*2.1*fs));};
-  },
-  mist(x,t,rm){ // the gaping tree: windswept like the forest, leaning and streaming downwind, standing on root legs, with gnarled hands
-    const P=BOSS_PAL.mist,tq=pz(t*0.6,rm),a1=Math.sin(tq*1.5)*0.14,a2=Math.sin(tq*1.5+1.7)*0.12,stp=Math.sin(tq*1.1),op=Math.sin(tq*1.2)*4,sw=Math.sin(tq*0.9)*0.04;
-    const seg=(x0,y0,x1,y1,w0,w1)=>{x.fillStyle=P.bark;taper(x,[x0,y0,x1,y1,w0,w1]);const dx=x1-x0,dy=y1-y0,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L;
-      x.fillStyle=P.barkShade;taper(x,[x0-nx*w0*0.28,y0-ny*w0*0.28,x1-nx*w1*0.28,y1-ny*w1*0.28,w0*0.42,w1*0.4]);
-      strokeP(x,rgba(P.barkDeep,0.7),1,[[x0+nx*w0*0.1,y0+ny*w0*0.1],[(x0+x1)/2+nx*2,(y0+y1)/2+ny*2],[x1+nx*w1*0.1,y1+ny*w1*0.1]]);
-      strokeP(x,rgba(P.barkLight,0.6),1,[[x0+nx*w0*0.36,y0+ny*w0*0.36],[x1+nx*w1*0.36,y1+ny*w1*0.36]]);};
-    const hand=(hx,hy,a,sd)=>{x.fillStyle=P.bark;x.beginPath();x.ellipse(hx,hy,6,4.6,a,0,Math.PI*2);x.fill(); // a knot of a palm and four long, jointed twig fingers
-      for(let k=0;k<4;k++){let px=hx,py=hy,fa=a+(k-1.5)*0.42,w=2.8;for(let j=0;j<3;j++){fa+=sd*(j?0.5:0.15);const L=[10,8,6][j],nx=px+Math.sin(fa)*L,ny=py-Math.cos(fa)*L;x.fillStyle=P.bark;taper(x,[px,py,nx,ny,w,w*0.7]);px=nx;py=ny;w*=0.7;}}};
-    // rooted: a flared foot with roots gripping the ground
-    const hip=[0,-4];
-    fillP(x,P.barkShade,[[-40,2],[-24,-14],[-16,-34],[18,-34],[26,-14],[44,2]]);
-    for(const q of [[-1,1.35,34],[-1,1.0,24],[1,1.25,36],[1,0.85,22]]){const sd=q[0];let rx=sd*10,ry=-14,ra=sd*q[1],w=12;for(let k=0;k<3;k++){ra+=sd*(k===1?0.35:-0.15);const L=q[2]*[0.45,0.35,0.25][k],nx=rx+Math.sin(ra)*L,ny=Math.min(3,ry+Math.cos(ra)*L*0.55+3);seg(rx,ry,nx,ny,w,w*0.6);rx=nx;ry=ny;w*=0.6;}}
-    // the trunk leans further downwind as it climbs, kinking on the way
-    const segs=[[0.18+sw,46,50,46],[0.55+sw,40,46,40],[0.34+sw,34,40,34],[0.85+sw,28,34,28],[1.15+sw,22,28,20]];
-    let px=hip[0],py=hip[1]+4;const J=[[px,py]];
-    for(const g of segs){const nx=px+Math.sin(g[0])*g[1],ny=py-Math.cos(g[0])*g[1];seg(px,py,nx,ny,g[2],g[3]);px=nx;py=ny;J.push([px,py]);}
-    for(let i=1;i<J.length-1;i++){x.fillStyle=P.bark;x.beginPath();x.ellipse(J[i][0],J[i][1],segs[i][2]*0.4,segs[i][2]*0.3,0.6,0,Math.PI*2);x.fill();}
-    for(const q of [[3,-1.2,8],[4,-1.4,7]]){const j=J[q[0]];seg(j[0]-12,j[1],j[0]-12+Math.sin(q[1])*q[2],j[1]-Math.cos(q[1])*q[2],5,2);} // broken stubs on the windward side
-    // the crown streams downwind
-    const top=J[J.length-1];
-    for(const q of [[1.1,72,12,31],[1.4,84,11,32],[0.8,60,10,33],[1.7,58,9,34],[1.25,50,8,35]]){let cx=top[0],cy=top[1],ca=q[0]+sw,cw=q[2];
-      for(let k=0;k<3;k++){ca+=(1.55-ca)*0.45+(k===1?-0.3:0.2);const L=q[1]*[0.42,0.34,0.24][k],nx=cx+Math.sin(ca)*L,ny=cy-Math.cos(ca)*L,w2=cw*0.7;seg(cx,cy,nx,ny,cw,w2);if(k===1)cLimb(x,P.bark,nx,ny,[[9,ca-0.5,w2*0.5,1]]);cx=nx;cy=ny;cw=w2;}
-      for(let c2=0;c2<2;c2++)cLimb(x,P.bark,cx,cy,[[7,ca+(c2?0.6:-0.4),1.8,0.5]]);}
-    // two sturdy arms: one reaching for you, bent back at the elbow by the wind; one swept downwind
-    const branchArm=(ax,ay,a,turns,lens,w,sd)=>{for(let k=0;k<turns.length;k++){a+=turns[k];const L=lens[k],nx=ax+Math.sin(a)*L,ny=ay-Math.cos(a)*L,w2=w*0.66;seg(ax,ay,nx,ny,w,w2);
-        if(k>=1){const sa=a+sd*(0.7+k*0.1);let bx2=nx,by2=ny,bw=w2*0.55;for(let j=0;j<2;j++){const bl=[12,8][j],ex=bx2+Math.sin(sa+j*sd*0.5)*bl,ey=by2-Math.cos(sa+j*sd*0.5)*bl;x.fillStyle=P.bark;taper(x,[bx2,by2,ex,ey,bw,bw*0.55]);bx2=ex;by2=ey;bw*=0.55;}}
-        ax=nx;ay=ny;w=w2;}
-      for(let c2=0;c2<3;c2++){let tx=ax,ty=ay,ta=a+(c2-1)*0.5,tw=w*0.8;for(let j=0;j<2;j++){ta+=sd*0.45;const L=[9,6][j],nx=tx+Math.sin(ta)*L,ny=ty-Math.cos(ta)*L;x.fillStyle=P.bark;taper(x,[tx,ty,nx,ny,tw,tw*0.5]);tx=nx;ty=ny;tw*=0.5;}}};
-    const armL=()=>branchArm(J[3][0]-12,J[3][1]+2,-1.2+a1,[0,1.0,-0.45,0.55],[26,22,16,12],15,1); // reaching for you, but bent back by the wind
-    const armR=()=>branchArm(J[4][0]+10,J[4][1]+4,1.5-a2,[0,-0.7,0.55,-0.3],[26,22,16,12],14,1);
-    armR();armL();
-    // the face, low on the trunk: heavy brows, ember eyes, a gaping mouth with splinter teeth
-    const fx=lerp(J[1][0],J[2][0],0.85),fy=lerp(J[1][1],J[2][1],0.85)-6; // the face, higher up the trunk
-    fillP(x,P.barkDeep,[[fx-19,fy+2],[fx-6,fy+8],[fx-6,fy+15],[fx-17,fy+15]]);fillP(x,P.barkDeep,[[fx+4,fy+6],[fx+16,fy],[fx+16,fy+11],[fx+6,fy+15]]);
-    fillP(x,P.barkShade,[[fx-22,fy-2],[fx-4,fy+6],[fx-3,fy+10],[fx-20,fy+4]]);fillP(x,P.barkShade,[[fx+2,fy+4],[fx+19,fy-4],[fx+18,fy+2],[fx+3,fy+9]]);
-    const mx=fx-2,my=fy+24;
-    fillP(x,P.barkDeep,[[mx-17,my],[mx-4,my-4],[mx+11,my-6],[mx+17,my+5],[mx+13,my+26+op],[mx,my+34+op],[mx-11,my+31+op],[mx-19,my+17]]);
-    for(const q of [[-14,1,-11,10,-8,-1],[-6,-3,-3,8,0,-4],[3,-5,6,6,9,-5],[10,-4,12,5,15,2],[-16,19,-12,11,-9,24],[-4,31,-1,21,3,32],[7,29,10,19,13,26]])fillP(x,P.barkLight,[[mx+q[0],my+q[1]+(q[1]>15?op:0)],[mx+q[2],my+q[3]+(q[1]>15?op*0.5:0)],[mx+q[4],my+q[5]+(q[1]>15?op:0)]]);
-    return (c,o)=>{emberEye(c,fx-11,fy+10,3.3,2.2,-0.3);emberEye(c,fx+10,fy+7,3.1,2.1,0.4);
-      c.save();const g=c.createRadialGradient(mx,my+15,0,mx,my+14,24);g.addColorStop(0,rgba("#ffc27a",0.95));g.addColorStop(0.45,rgba(EMBER.danger,0.75));g.addColorStop(1,rgba("#5a0c08",0));c.fillStyle=g;
-      c.beginPath();c.moveTo(mx-14,my+2);c.lineTo(mx+13,my-2);c.lineTo(mx+11,my+26+op);c.lineTo(mx-11,my+27+op);c.closePath();c.fill();c.restore();
-      seam(c,[[J[0][0]+12,J[0][1]-6],[J[0][0]+16,J[0][1]-18]],1.2);seam(c,[[J[4][0]+2,J[4][1]+10],[J[4][0]+6,J[4][1]]],1.1);};
+    return (c,o)=>{c.save();c.scale(SK,SK);
+      hollow(c,sockL,-20,-84,14,0.95);hollow(c,sockR,20,-84,14,0.95);
+      emberEye(c,-20,-84,4.2,3,0.3);emberEye(c,20,-84,4.2,3,-0.3);
+      emberMouth(c,[[-20,-58],[20,-58],[18,-52+op*0.6],[-18,-52+op*0.6]],0,-55,20);
+      {const up=[],lo=[];for(let i=0;i<6;i++){const x0=-18.5+i*6.4;up.push([x0,-58.5,x0+2.1,-53.4,x0+4.2,-58.5]);}
+        for(let i=0;i<5;i++){const x0=-15.5+i*6.6,yb=-52+op*0.6;lo.push([x0,yb+0.5,x0+2.1,yb-4,x0+4.2,yb+0.5]);}teeth(c,up.concat(lo));}
+      seam(c,[[-8,-141],[-12,-128],[-6,-120],[-11,-108]],1.3);seam(c,[[24,-136],[28,-124],[24,-116]],1.1);c.restore();};
   }
 };
-const BH={};
-const BOSS_AURA={night:["#f0c9e0",-110,125,0.48],storm:["#ff8fa6",-80,130,0.45],dawn:["#bcd2ff",-100,130,0.48],mist:["#f8ffc8",-110,150,0.62]}; // 50% stronger; the tree's is brighter so it shows against the pale mist // a glow round each boss, in its level's colour
-const BOSS_RIM={night:true,storm:true,dawn:false,mist:false};
-function bossInto(c,s,lv,t,o,dx,dy,noAura){ // a boss painted into its own canvas, wrapped in its glow
-  if(!BH.tmp||BH.tmpS!==s){BH.tmp=mk(460*s,330*s);BH.tmpS=s;}
-  const T=BH.tmp,tc=T.getContext("2d");tc.setTransform(1,0,0,1,0,0);tc.clearRect(0,0,T.width,T.height);tc.setTransform(s,0,0,s,230*s,300*s);tc.lineCap="round";tc.lineJoin="round";
-  const det=BOSS[lv](tc,t,o.rm),A=BOSS_AURA[lv];
-  c.save();c.setTransform(s,0,0,s,dx+230*s,dy+300*s);
-  if(!noAura){const ag=c.createRadialGradient(0,A[1],10,0,A[1],A[2]);ag.addColorStop(0,rgba(A[0],A[3]));ag.addColorStop(1,rgba(A[0],0));c.fillStyle=ag;c.fillRect(-A[2],A[1]-A[2],A[2]*2,A[2]*2);}
-  c.setTransform(1,0,0,1,0,0);
-  if(BOSS_RIM[lv]){c.shadowColor=rgba(EMBER.danger,0.85);c.shadowBlur=2.2*s;c.drawImage(T,dx,dy);c.shadowColor=rgba(EMBER.glow,0.35);c.shadowBlur=9*s;c.drawImage(T,dx,dy);c.shadowColor="transparent";c.shadowBlur=0;}
-  c.drawImage(T,dx,dy);
-  c.setTransform(s,0,0,s,dx+230*s,dy+300*s);det(c,o);c.restore();
-}
-const BOSS_BOX=[-110,-235,170,12],BOSS_CYCLE=7.5;
-function bossDefeat(c,M,s,X,Y,u,seed){ // the boss falls apart into card pieces, and a large golden wisp rises
-  const ox=X-230,oy=Y-300,x0=X+BOSS_BOX[0],y0=Y+BOSS_BOX[1],w=BOSS_BOX[2]-BOSS_BOX[0],h=BOSS_BOX[3]-BOSS_BOX[1];
-  if(!BH.pieces){const r=rng32(seed),cols=4,rows=3,pts=[];for(let j=0;j<=rows;j++){pts.push([]);for(let i=0;i<=cols;i++){const jx=(i>0&&i<cols)?(r()-0.5)*0.14:0,jy=(j>0&&j<rows)?(r()-0.5)*0.18:0;pts[j].push([i/cols+jx,j/rows+jy]);}}
-    BH.pieces=[];for(let j=0;j<rows;j++)for(let i=0;i<cols;i++)BH.pieces.push({poly:[pts[j][i],pts[j][i+1],pts[j+1][i+1],pts[j+1][i]],vx:(i-1.5)*0.7+(r()-0.5)*0.6,vy:-0.5-r()*0.9,spin:(r()-0.5)*4});}
-  for(const pc of BH.pieces){const cx=x0+w*(pc.poly[0][0]+pc.poly[2][0])/2,cy=y0+h*(pc.poly[0][1]+pc.poly[2][1])/2,tx=pc.vx*u*90,ty=pc.vy*u*70+u*u*320,al=u<0.5?1:Math.max(0,1-(u-0.5)/0.5);
+const BOSS_CACHE={};
+const BOSS_SIZE={night:1.2,storm:1.2}; // the ghost and the skull are drawn 20% bigger (Barney, 2 Nov)
+const BOSS_BOXES={night:[-104,-252,98,28],storm:[-208,-212,138,32]}; // what each boss's card pieces cover when it is defeated (measured over a whole stepping cycle)
+function bossAura(lv){const A=BOSS_AURA[lv],k=BOSS_SIZE[lv]||1;if(lv==="mist")return[A[0],-150,190,0.55];return[A[0],A[1]*k,A[2]*k,A[3]];} // the glow behind, grown with the boss
+function bossDefeat(c,M,s,X,Y,u,seed,lv,K){ // as bossDefeat, over this boss's own box: card pieces tumble, a large golden wisp rises
+  const box=BOSS_BOXES[lv],ox=X-230,oy=Y-300,x0=X+box[0],y0=Y+box[1],w=box[2]-box[0],h=box[3]-box[1],k=BOSS_SIZE[lv]||1;
+  if(!K.pieces){const r=rng32(seed),cols=4,rows=3,pts=[];for(let j=0;j<=rows;j++){pts.push([]);for(let i=0;i<=cols;i++){const jx=(i>0&&i<cols)?(r()-0.5)*0.14:0,jy=(j>0&&j<rows)?(r()-0.5)*0.18:0;pts[j].push([i/cols+jx,j/rows+jy]);}}
+    K.pieces=[];for(let j=0;j<rows;j++)for(let i=0;i<cols;i++)K.pieces.push({poly:[pts[j][i],pts[j][i+1],pts[j+1][i+1],pts[j+1][i]],vx:(i-1.5)*0.7+(r()-0.5)*0.6,vy:-0.5-r()*0.9,spin:(r()-0.5)*4});}
+  for(const pc of K.pieces){const cx=x0+w*(pc.poly[0][0]+pc.poly[2][0])/2,cy=y0+h*(pc.poly[0][1]+pc.poly[2][1])/2,tx=pc.vx*u*90,ty=pc.vy*u*70+u*u*320,al=u<0.5?1:Math.max(0,1-(u-0.5)/0.5);
     c.save();c.globalAlpha=al;c.translate(cx+tx,cy+ty);c.rotate(pc.spin*u);c.translate(-cx,-cy);c.beginPath();pc.poly.forEach((q,i)=>{const px=x0+q[0]*w,py=y0+q[1]*h;i?c.lineTo(px,py):c.moveTo(px,py);});c.closePath();c.clip();c.drawImage(M,ox,oy,M.width/s,M.height/s);c.restore();}
-  const wu=(u-0.2)/0.8;if(wu>0){const cx=X+Math.sin(wu*3)*10,cy=Y-110-wu*160,a=Math.sin(Math.min(1,wu*1.2)*Math.PI)*0.95;
+  const wu=(u-0.2)/0.8;if(wu>0){const cx=X+Math.sin(wu*3)*10,cy=Y-110*k-wu*160,a=Math.sin(Math.min(1,wu*1.2)*Math.PI)*0.95;
     c.save();let g=c.createRadialGradient(cx,cy,0,cx,cy,60);g.addColorStop(0,rgba("#ffe7a8",a*0.9));g.addColorStop(0.4,rgba("#ffcf6a",a*0.45));g.addColorStop(1,rgba("#ffb84a",0));c.fillStyle=g;c.fillRect(cx-60,cy-60,120,120);
     c.fillStyle=rgba("#fff3d0",a);c.shadowColor="#ffcf6a";c.shadowBlur=14;c.beginPath();c.moveTo(cx-9,cy);c.quadraticCurveTo(cx,cy-18,cx+9,cy);c.quadraticCurveTo(cx+7,cy+22,cx-10,cy+46);c.quadraticCurveTo(cx-2,cy+20,cx-9,cy);c.fill();c.restore();}
 }
-const BOSS_H=320,BOSS_GROUND=292;
-function renderBossStrip(cv,t,o){
+function bossInto(c,s,lv,t,o,dx,dy,nod,noAura,cache,look){ // a reworked boss: ink cut-out, ember rim and glow, ember details, and its nod to the level's colour
+  const K=cache||BOSS_CACHE;if(!K.tmp||K.tmpS!==s){K.tmp=mk(460*s,330*s);K.edge=mk(460*s,330*s);K.tmpS=s;}
+  const T=K.tmp,tc=T.getContext("2d");tc.setTransform(1,0,0,1,0,0);tc.globalCompositeOperation="source-over";tc.clearRect(0,0,T.width,T.height);
+  tc.setTransform(s,0,0,s,230*s,300*s);tc.fillStyle=INK;tc.strokeStyle=INK;tc.lineCap="round";tc.lineJoin="round";
+  const det=BOSS[lv](tc,t,o.rm,nod,look),N=nd(nod);
+  c.save();
+  if(N.aura&&!noAura){const A=bossAura(lv);c.setTransform(s,0,0,s,dx+230*s,dy+300*s);const ag=c.createRadialGradient(0,A[1],10,0,A[1],A[2]);ag.addColorStop(0,rgba(A[0],A[3]));ag.addColorStop(1,rgba(A[0],0));c.fillStyle=ag;c.fillRect(-A[2],A[1]-A[2],A[2]*2,A[2]*2);}
+  c.setTransform(1,0,0,1,0,0);
+  c.shadowColor=rgba(o.dcol,0.95);c.shadowBlur=2.5*s;c.drawImage(T,dx,dy);   // the rim, as a monster's
+  c.shadowColor=rgba(o.dglow,0.6);c.shadowBlur=11*s;c.drawImage(T,dx,dy);    // the glow, as a monster's
+  c.shadowColor="transparent";c.shadowBlur=0;
+  if(N.edge){const E=K.edge,ec=E.getContext("2d");ec.setTransform(1,0,0,1,0,0);ec.globalCompositeOperation="source-over";ec.clearRect(0,0,E.width,E.height);ec.drawImage(T,0,0);
+    ec.globalCompositeOperation="source-in";ec.fillStyle=LV[lv].edge;ec.fillRect(0,0,E.width,E.height);c.drawImage(E,dx+2*s,dy-2*s);}
+  c.drawImage(T,dx,dy);
+  c.setTransform(s,0,0,s,dx+230*s,dy+300*s);det(c,o);c.restore();
+}
+
+/* ============================== the gaping tree, rework: an ancient gnarled tree, a skull's face in its bark ==============================
+   After Barney's pictures (inspiration only): a huge twisted trunk flaring into buttress roots, thick limbs that twist up and split into
+   a dense crown of fine angular twigs, a skull's face formed in the bark (hollow sockets with ember eyes, a gaping maw with splinter
+   teeth), strong roots spreading from a contoured base, and two angular side branches set lower than the crown, at different heights
+   (round 5, Barney 2 Nov: no nose, no arms, hands or legs).
+   Black card with graded blacks, ember rim and glow, a few lit lines in Mist's colour, moss hanging from the limbs.
+   look.wind leans the whole tree to the right, as every tree in the wind-bent forest. */
+BOSS.mist=function(x,t,rm,nod,look){
+  const N=nd(nod),tq=pz(t*0.6,rm),r=rng32(4242),W=look&&look.wind?1:0,TONE=look&&look.tone,LIT=NOD_COL.mist;
+  const op=3+Math.max(0,Math.sin(tq*1.3))*7,breathe=Math.sin(tq*1.1)*1.2,TK=0.86; // TK: drawn at 0.86 so the crown stays inside the boss's space
+  x.save();x.scale(TK,TK);
+  const lean=y=>W*Math.pow(Math.max(0,-y)/150,1.3)*46;
+  let segs=[];const moss=[];
+  const drawSegs=list=>{for(const s of list){x.fillStyle=INK;taper(x,[s[0],s[1],s[2],s[3],s[4],s[5]]);}
+    // round 7 (Barney, 2 Nov: the grading as obvious as the ghost's and skull's): each limb and root graded across its width,
+    // charcoal on its upper side falling to ink on the other, inside an ink edge; the thinnest twigs stay ink
+    if(TONE)for(const s of list){if(s[4]<4)continue;const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=dy/L,ny=-dx/L,f=ny<0||(ny===0&&nx<0)?1:-1,w=(s[4]+s[5])/2,mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2,hi=w>=9?CH[4]:CH[3];
+      const g=x.createLinearGradient(mx+nx*f*w*0.42,my+ny*f*w*0.42,mx-nx*f*w*0.42,my-ny*f*w*0.42);g.addColorStop(0,CH[2]);g.addColorStop(0.3,hi);g.addColorStop(0.68,CH[2]);g.addColorStop(1,CH[0]);
+      x.fillStyle=g;taper(x,[s[0],s[1],s[2],s[3],s[4]*0.78,s[5]*0.78]);}
+    if(N.detail){x.save();x.globalAlpha=0.42;x.strokeStyle=LIT;x.lineWidth=1.1;x.lineCap="round";for(const s of list){if(s[4]<(s[6]>=3?8:11)||s[7])continue;const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=dy/L,ny=-dx/L,f=ny<0?1:-1;
+      x.beginPath();x.moveTo(s[0]+nx*f*s[4]*0.36,s[1]+ny*f*s[4]*0.36);x.lineTo(s[2]+nx*f*s[5]*0.36,s[3]+ny*f*s[5]*0.36);x.stroke();}x.restore();}
+    x.fillStyle=INK;};
+  // a crown branch: angular segments, splitting into finer twigs; the wind pushes every segment to the right
+  const br=(P,th,len,w,d,ph)=>{let p=P,a=th;const n=d>=2?3:2;
+    for(let i=0;i<n;i++){a+=(i%2?1:-1)*(0.18+r()*0.22)+Math.sin(tq*1.7+ph+i)*0.035*(4-d);
+      let dx=Math.cos(a)*len/n,dy=Math.sin(a)*len/n;if(W){dx+=len/n*(0.8-0.1*d);dy*=0.9;}
+      const L=Math.hypot(dx,dy),q=[p[0]+dx/L*len/n,p[1]+dy/L*len/n],w2=d===0&&i===n-1?0.6:w*(1-0.18*(i+1)/n);
+      segs.push([p[0],p[1],q[0],q[1],w*(1-0.18*i/n),w2,d]);
+      if(d>=2&&i===1&&r()<0.6)br(q,a+(r()<0.5?-1:1)*(0.8+r()*0.3),len*0.45,w*0.5,d-2,ph+3);
+      if(d>=2&&r()<0.25)moss.push([q[0],q[1],16+r()*16,ph+i]);
+      p=q;}
+    if(d>0){const m=2+(r()<0.55?1:0);for(let k=0;k<m;k++)br(p,a+(k-(m-1)/2)*(0.62+r()*0.2)+(r()-0.5)*0.25,len*(0.62+r()*0.12),w*0.6,d-1,ph+k*1.7);}};
+  // the trunk: a twisted centreline, flaring hard into the roots, narrowing to the fork; its outline knotted
+  const cl=[[0,0],[5,-22],[-4,-48],[-8,-74],[3,-100],[6,-124],[0,-146]].map((p,i)=>[p[0]+lean(p[1]),p[1]-(i>3?breathe:0)]);
+  const wd=[62,46,38,34,31,32,24];
+  const side=sd=>{const pts=[];cl.forEach((p,i)=>{const q=cl[Math.min(i+1,cl.length-1)],o=cl[Math.max(i-1,0)],dx=q[0]-o[0],dy=q[1]-o[1],L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L;
+      pts.push([p[0]+nx*wd[i]*sd,Math.min(1,p[1]+ny*wd[i]*sd)]);
+      if(i<cl.length-1){const m=[(p[0]+q[0])/2,(p[1]+q[1])/2],wm=(wd[i]+wd[i+1])/2+(r()-0.3)*7;pts.push([m[0]+nx*wm*sd,Math.min(1,m[1]+ny*wm*sd)]);}});return pts;};
+  const Lt=side(-1),Rt=side(1);
+  // round 7 (Barney, 2 Nov): the trunk graded across its width like the limbs, charcoal on its upper-left side falling to ink on the
+  // other, and darkening to ink towards the base where the roots spread
+  const tp=()=>{poly(x,Lt);for(let i=Rt.length-1;i>=0;i--)x.lineTo(Rt[i][0],Rt[i][1]);};
+  card(x,look,tp,()=>{const ax=cl[6][0]-cl[0][0],ay=cl[6][1]-cl[0][1],aL=Math.hypot(ax,ay),nx=-ay/aL,ny=ax/aL,M=cl[3],k=44;
+      return lg(x,M[0]-nx*k,M[1]-ny*k,M[0]+nx*k,M[1]+ny*k,[[0,CH[2]],[0.3,CH[4]],[0.62,CH[2]],[1,CH[0]]]);},3);
+  if(TONE){x.save();x.beginPath();tp();x.closePath();x.clip();x.fillStyle=lg(x,0,-62,0,0,[[0,rgba(CH[0],0)],[1,rgba(CH[0],0.8)]]);x.fillRect(-140,-62,300,64);x.restore();}
+  // the bark's twist: dark grooves spiralling up the trunk, the ridges beside them faintly lit
+  const at=(f,y)=>{let i=0;while(i<cl.length-2&&cl[i+1][1]>y)i++;const v=(cl[i][1]-y)/((cl[i][1]-cl[i+1][1])||1),c0=[lerp(cl[i][0],cl[i+1][0],v),y],w=lerp(wd[i],wd[i+1],v)*0.9;return[c0[0]+(f*2-1)*w,y];};
+  const groove=(f0,f1,y0,y1)=>{const pts=[];for(let k=0;k<=7;k++){const u=k/7;pts.push(at(lerp(f0,f1,u),lerp(y0,y1,u)));}return pts;};
+  const gr=[groove(0.22,0.64,-14,-138),groove(0.6,0.95,-18,-120),groove(0.05,0.3,-34,-132)];
+  if(TONE){x.save();x.strokeStyle=INK;x.lineWidth=3;x.lineCap="round";x.lineJoin="round";for(const g of gr){x.beginPath();poly(x,g);x.stroke();}x.restore();}
+  if(N.detail)litLines(x,LIT,0.38,1.1,gr.map(g=>g.map(p=>[p[0]+3,p[1]])));
+  // strong roots spreading from the base: each leaves the trunk high as a buttress, drops steeply, rides over a knuckle and runs out
+  // along the ground to a point, with a smaller root splitting off at the knuckle; two shorter roots come forward over the base
+  const root=(f,y0,dir,reach,w,hump)=>{const s0=at(f,y0),P=[s0,[s0[0]+dir*reach*0.26,-20-hump],[s0[0]+dir*reach*0.58,-12-hump*0.6],[s0[0]+dir*reach,3]],ws=[w,w*0.74,w*0.46,1.5],rs=[];
+    for(let i=0;i<3;i++)rs.push([P[i][0],P[i][1],P[i+1][0],P[i+1][1],ws[i],ws[i+1],3,i>0?1:0]);
+    rs.push([P[2][0],P[2][1],P[2][0]+dir*reach*0.2,3.5,w*0.3,0.8,2,1]);
+    rs.push([P[1][0],P[1][1],P[1][0]+dir*reach*0.1,4,w*0.36,1,2,1]);
+    return rs;};
+  drawSegs([...root(0.03,-54,-1,86,30,4),...root(0.97,-50,1,90,30,2),...root(0.1,-30,-1,56,22,0),...root(0.9,-28,1,52,20,1)]);
+  const fr=(f,y0,tx,w)=>{const s0=at(f,y0),m=[lerp(s0[0],tx,0.55),-7];return[[s0[0],s0[1],m[0],m[1],w,w*0.55,3],[m[0],m[1],tx,3.5,w*0.55,1,3]];};
+  drawSegs([...fr(0.3,-24,at(0.06,-2)[0]-6,17),...fr(0.72,-22,at(0.96,-2)[0]+10,16)]);
+  // two angular side branches, lower than the crown and at different heights: sharp elbows, a spur, forked twigs at the end
+  const sideBr=(f,y0,dir,e0,len,w,ph)=>{let p=at(f,y0);const off=[0,0.44,-0.3,0.34],Ls=[0.32,0.27,0.23,0.18],ww=[w,w*0.72,w*0.5,w*0.3,1];
+    for(let i=0;i<4;i++){const e=e0+off[i]+Math.sin(tq*1.5+ph)*0.04,a=dir<0?Math.PI+e:-e;let dx=Math.cos(a)*len*Ls[i],dy=Math.sin(a)*len*Ls[i];if(W)dx+=len*Ls[i]*(dir<0?0.1:0.35); // the windward branch is not folded back, so it stays a branch
+      const q=[p[0]+dx,p[1]+dy];segs.push([p[0],p[1],q[0],q[1],ww[i],ww[i+1],3]);
+      if(i<3){const eu=e+(i%2?-0.75:0.95),au=dir<0?Math.PI+eu:-eu;br(q,au,len*(i===1?0.24:0.17),ww[i+1]*0.45,i===1?1:0,ph+5+i);}
+      if(i===1)moss.push([q[0],q[1],15,ph]);
+      p=q;}};
+  sideBr(0.02,-66,-1,0.4+W*0.25,84,15,0.6);
+  sideBr(0.98,-94,1,0.52,74,14,2.1);
+  drawSegs(segs);segs=[];
+  // the crown: three great limbs twisting up from the fork
+  const F=cl[6];
+  const wa=W*0.2;
+  br([F[0]-10,F[1]+12],-Math.PI/2-0.72+wa*0.8,58,22,3,0.3);
+  br([F[0]+2,F[1]+6],-Math.PI/2-0.06+wa,64,24,3,1.4);
+  br([F[0]+10,F[1]+12],-Math.PI/2+0.66+wa*0.6,56,21,3,2.6);
+  drawSegs(segs);segs=[];
+  // moss hanging from the limbs, swaying in steps
+  for(const m of moss){let px=m[0],py=m[1],a=Math.PI/2+Math.sin(tq*1.4+m[3])*0.12-W*0.7;for(let j=0;j<3;j++){const L=m[2]/3,q=[px+Math.cos(a)*L,py+Math.sin(a)*L];
+      x.fillStyle=TONE?mixc(CH[2],"#9fbb52",0.18):INK;taper(x,[px,py,q[0],q[1],2.8-j*0.7,2.1-j*0.6]);px=q[0];py=q[1];a+=0.12;}}
+  x.fillStyle=INK;
+  // the face, formed in the bark: hollow sockets and a gaping maw
+  const fx=lean(-96)+(cl[4][0]-lean(cl[4][1]))*0.5,sockL=[[fx-26,-110],[fx-6,-106],[fx-5,-96],[fx-12,-88],[fx-24,-92],[fx-29,-101]],sockR=sockL.map(p=>[2*fx-p[0],p[1]+2]);
+  const maw=[[fx-20,-68],[fx-8,-72],[fx+6,-71],[fx+19,-66],[fx+15,-56+op*0.5],[fx+6,-48+op],[fx-5,-48+op],[fx-16,-55+op*0.5]];
+  // round 6 (Barney, 2 Nov): eyes and mouth at half size, each shrunk about its own centre, the eyes drawn a little closer together
+  const FS=0.5,EL=[fx-16,-99,fx-12,-98],ER=[fx+16,-97,fx+12,-96],MW=[fx,-60,fx,-63];
+  const FC=(cc,k,fn)=>{cc.save();cc.translate(k[2],k[3]);cc.scale(FS,FS);cc.translate(-k[0],-k[1]);fn();cc.restore();};
+  FC(x,EL,()=>cutPath(x,sockL));FC(x,ER,()=>cutPath(x,sockR));FC(x,MW,()=>cutPath(x,maw));
+  x.restore();
+  return (c,o)=>{c.save();c.scale(TK,TK);
+    FC(c,EL,()=>{hollow(c,sockL,fx-16,-99,15,0.95);emberEye(c,fx-16,-99,4.2,3,0.35);});FC(c,ER,()=>{hollow(c,sockR,fx+16,-97,15,0.95);emberEye(c,fx+16,-97,4.2,3,-0.35);});
+    FC(c,MW,()=>{hollow(c,maw,fx,-60+op*0.4,20,0.95);emberMouth(c,maw.map(p=>[fx+(p[0]-fx)*0.82,-60+op*0.4+(p[1]+60-op*0.4)*0.78]),fx,-60+op*0.4,14);
+    const tt=[];for(let i=0;i<5;i++){const x0=fx-16+i*7;tt.push([x0,-69.5+Math.abs(i-2)*0.8,x0+2.6,-62+(i%2)*1.5,x0+5,-69+Math.abs(i-2)*0.8]);}
+    for(let i=0;i<4;i++){const x0=fx-12+i*7,yb=-50+op*0.95;tt.push([x0,yb,x0+2.6,yb-6-(i%2)*1.5,x0+5,yb]);}
+    teeth(c,tt);});
+    c.restore();}; // round 7 (Barney, 2 Nov): the three ember seams on the trunk removed
+};
+BOSS_SIZE.mist=1;
+BOSS_BOXES.mist=[-132,-262,160,12]; // measured over a stepping cycle, upright and windswept
+
+/* ============================== the moor mother: Dawn's boss, in place of the cauldron witch ==============================
+   After Barney's own Gemini picture (2 Nov): a gaunt figure in a ragged robe, a crown of smooth curved antlers, a split face (a pale
+   dead eye on one half; an ember eye, fangs and a tusk on the beast half), a cluster of small ember eyes on the beast shoulder like a
+   spider's, a bony hand on one side and a great serrated scythe claw on the other, and four long spider legs that step out from under
+   the robe. No tentacles (the skull keeps those), no purple or green magic: ember and a nod to Dawn's pale blue, like the others.
+   Same look as the ghost, skull and tree: graded blacks inside ink edges, ember rim and glow, a few lit lines, the glow behind. */
+BOSS.dawn=function(x,t,rm,nod,look){
+  const N=nd(nod),TONE=look&&look.tone,LIT=NOD_COL.dawn,tq=pz(t*0.7,rm);
+  const hv=Math.sin(tq*2)*3,sw=Math.sin(tq*1.2)*0.16,ht=Math.sin(tq*0.9)*0.06,op=2+Math.max(0,Math.sin(tq*1.4))*4;
+  // a limb, antler or leg segment: ink, then graded across its width (charcoal on its upper side falling to ink), then a lit line
+  const drawSegs=(list,dark)=>{for(const s of list){x.fillStyle=INK;taper(x,[s[0],s[1],s[2],s[3],s[4],s[5]]);}
+    if(TONE)for(const s of list){if(s[4]<3.5)continue;const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=dy/L,ny=-dx/L,f=ny<0||(ny===0&&nx<0)?1:-1,w=(s[4]+s[5])/2,mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2;
+      const hi=dark?CH[2]:(w>=7?CH[4]:CH[3]),g=x.createLinearGradient(mx+nx*f*w*0.42,my+ny*f*w*0.42,mx-nx*f*w*0.42,my-ny*f*w*0.42);
+      g.addColorStop(0,dark?CH[1]:CH[2]);g.addColorStop(0.3,hi);g.addColorStop(0.68,dark?CH[1]:CH[2]);g.addColorStop(1,CH[0]);x.fillStyle=g;taper(x,[s[0],s[1],s[2],s[3],s[4]*0.74,s[5]*0.74]);}
+    if(N.detail&&!dark){x.save();x.globalAlpha=0.45;x.strokeStyle=LIT;x.lineWidth=1.1;x.lineCap="round";for(const s of list){if(s[4]<6||s[6]===0)continue;const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=dy/L,ny=-dx/L,f=ny<0?1:-1;
+      x.beginPath();x.moveTo(s[0]+nx*f*s[4]*0.34,s[1]+ny*f*s[4]*0.34);x.lineTo(s[2]+nx*f*s[5]*0.34,s[3]+ny*f*s[5]*0.34);x.stroke();}x.restore();}
+    x.fillStyle=INK;};
+  const rot=(p,o,a)=>{const c=Math.cos(a),s=Math.sin(a),dx=p[0]-o[0],dy=p[1]-o[1];return[o[0]+dx*c-dy*s,o[1]+dx*s+dy*c];};
+  // the four spider legs: up to a high knee, down through an angular ankle to a long point; they step in pairs, card-puppet fashion
+  const leg=(hip,knee,ankle,foot,ph,dark)=>{const lift=Math.max(0,Math.sin(tq*1.6+ph))*11,H=[hip[0],hip[1]-hv],K=[knee[0],knee[1]-hv*0.6-lift*0.35],A=[ankle[0]-Math.sign(ankle[0])*lift*0.2,ankle[1]-lift*0.7],F=[foot[0]-Math.sign(foot[0])*lift*0.3,foot[1]-lift];
+    const sg=[[H[0],H[1],K[0],K[1],11,8.5,1],[K[0],K[1],A[0],A[1],8.5,6,1],[A[0],A[1],F[0],F[1],6,0.8,0]];
+    const o=Math.sign(knee[0]);sg.push([K[0],K[1],K[0]+o*4,K[1]-11,4.5,0.6,0]); // a thorn at the knee
+    for(const u of [0.35,0.65]){const p=[lerp(K[0],A[0],u),lerp(K[1],A[1],u)];sg.push([p[0],p[1],p[0]+o*6,p[1]-4,3,0.5,0]);} // spines down the shin
+    drawSegs(sg,dark);};
+  leg([-8,-80],[-94,-120],[-122,-48],[-134,1],Math.PI,true);
+  leg([8,-80],[96,-116],[126,-44],[136,1],0,true);
+  leg([-14,-72],[-62,-112],[-82,-44],[-94,1],0,false);
+  leg([14,-72],[66,-108],[88,-40],[100,1],Math.PI,false);
+  // the ragged robe, from the shoulders to a tattered hem that stops above the legs
+  const Y=-hv,HY=[-52,-34,-50,-28,-47,-39,-56,-26,-45,-37,-54,-31,-50],hem=[];for(let i=0;i<=12;i++)hem.push([46-i*7.6,HY[i]+Math.sin(tq*1.3+i)*2+Y]);
+  const robe=[[-14,-158+Y],[16,-157+Y],[28,-148+Y],[26,-126+Y],[19,-104+Y],[27,-84+Y],[40,-62+Y],...hem,[-40,-62+Y],[-27,-84+Y],[-18,-104+Y],[-22,-126+Y],[-28,-148+Y]];
+  card(x,look,()=>poly(x,robe),()=>rg(x,-6,-126+Y,6,96,[[0,CH[4]],[0.45,CH[3]],[0.75,CH[2]],[1,CH[0]]]),3);
+  const folds=[[[-8,-140+Y],[-10,-104+Y],[-22,-56+Y]],[[9,-138+Y],[10,-104+Y],[22,-50+Y]],[[0,-112+Y],[1,-84+Y],[-1,-42+Y]]];
+  if(TONE){x.save();x.strokeStyle=INK;x.lineWidth=2.4;x.lineCap="round";x.lineJoin="round";for(const f of folds){x.beginPath();poly(x,f);x.stroke();}x.restore();}
+  if(N.detail)litLines(x,LIT,0.4,1.1,folds.map(f=>f.map(p=>[p[0]-2.5,p[1]])));
+  x.fillStyle=INK;
+  // long hair hanging from the human half of the head over the shoulder
+  const HC=[2,-170+Y],hr=[];for(let i=0;i<6;i++){const x0=-10+i*2.2,len=34+((i*7)%5)*6,sway=Math.sin(tq*1.1+i)*1.5;hr.push([x0,-182+Y,x0-6+sway,-182+Y+len*0.55,3.2,2.2,0],[x0-6+sway,-182+Y+len*0.55,x0-9+sway*1.6,-182+Y+len,2.2,0.6,0]);}
+  drawSegs(hr.map(s=>{const a=rot([s[0],s[1]],HC,ht),b=rot([s[2],s[3]],HC,ht);return[a[0],a[1],b[0],b[1],s[4],s[5],0];}),false);
+  // the bony arm, a ragged sleeve over it, and a hand of long claws
+  const S0=[-22,-146+Y],E0=[-46,-110+Y],W0=[-50,-82+Y];
+  const arm=[[S0[0],S0[1],E0[0],E0[1],6.5,5,1],[E0[0],E0[1],W0[0],W0[1],5,3.8,1]];
+  for(let k=0;k<4;k++){let p=W0,a=Math.PI/2+0.55-k*0.3;for(let j=0;j<3;j++){const L=[9,8,7][j],q=[p[0]+Math.cos(a)*L,p[1]+Math.sin(a)*L];arm.push([p[0],p[1],q[0],q[1],[3,2.3,1.6][j],[2.3,1.6,0.4][j],0]);p=q;a-=0.32;}}
+  drawSegs(arm,false);
+  const sleeve=[[-20,-154+Y],[-32,-142+Y],[-46,-120+Y],[-56,-100+Y+Math.sin(tq*1.3)*2],[-50,-104+Y],[-48,-93+Y],[-43,-104+Y],[-39,-97+Y],[-37,-114+Y],[-28,-132+Y]];
+  card(x,look,()=>poly(x,sleeve),()=>lg(x,-24,-148+Y,-50,-100+Y,[[0,CH[3]],[1,CH[0]]]),2.4);
+  // the beast shoulder, spiked, with its cluster of eyes
+  const sh=[[12,-156],[18,-169],[24,-158],[32,-172],[37,-157],[47,-162],[45,-148],[51,-138],[41,-131],[30,-128],[18,-134],[12,-143]].map(p=>[p[0],p[1]+Y]);
+  // the claw arm (round 9, Barney 2 Nov: angular, not a semicircle): armoured plates with a spiked elbow, a knuckled wrist, and a
+  // blade of straight facets that juts out, breaks sharply down and hooks back to a point, sawteeth along its inner edge; it swings in steps
+  const SO=[28,-142+Y],sr=p=>rot([p[0],p[1]+Y],SO,-sw);
+  const E1=sr([60,-124]),W1=sr([74,-92]);
+  const nrm=(a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1;return[-dy/l,dx/l];};
+  const plate=(a,b,w0,w1)=>{const n=nrm(a,b);return[[a[0]+n[0]*w0/2,a[1]+n[1]*w0/2],[b[0]+n[0]*w1/2,b[1]+n[1]*w1/2],[b[0]-n[0]*w1/2,b[1]-n[1]*w1/2],[a[0]-n[0]*w0/2,a[1]-n[1]*w0/2]];};
+  const spike=(p,dir,len,w)=>{const n=[-dir[1],dir[0]];return[[p[0]+n[0]*w/2,p[1]+n[1]*w/2],[p[0]+dir[0]*len,p[1]+dir[1]*len],[p[0]-n[0]*w/2,p[1]-n[1]*w/2]];};
+  const ua=plate(SO,E1,12,9),fa=plate(E1,W1,9,11);
+  const sp=[spike(E1,(()=>{const d=sr([70,-140]);const v=[d[0]-E1[0],d[1]-E1[1]],l=Math.hypot(v[0],v[1]);return[v[0]/l,v[1]/l];})(),13,7)];
+  {const n=nrm(E1,W1);for(const u of [0.35,0.72]){const p=[lerp(E1[0],W1[0],u)-n[0]*4.5,lerp(E1[1],W1[1],u)-n[1]*4.5],d=[-n[0]*0.8+(W1[0]-E1[0])/40*-0.25,-n[1]*0.8];const l=Math.hypot(d[0],d[1]);sp.push(spike(p,[d[0]/l,d[1]/l],8,5));}}
+  const armG=(a,b)=>()=>lg(x,a[0],a[1],b[0],b[1],[[0,CH[4]],[0.5,CH[2]],[1,CH[0]]]);
+  for(const q of sp)card(x,look,()=>poly(x,q),()=>CH[1],1.6);
+  card(x,look,()=>poly(x,ua),armG(sr([30,-152]),sr([50,-120])),2.4);
+  card(x,look,()=>poly(x,fa),armG(sr([78,-120]),sr([62,-96])),2.4);
+  // the blade: a spine of straight facets, outer edge plain, inner edge toothed
+  const SP=[[72,-96],[100,-86],[108,-60],[96,-32],[72,-18]].map(sr),BW=[15,14,12,7,0];
+  const vn=k=>{const a=SP[Math.max(0,k-1)],b=SP[Math.min(SP.length-1,k+1)];return nrm(a,b);};
+  const OUT=SP.map((p,k)=>{const n=vn(k);return[p[0]-n[0]*BW[k]/2,p[1]-n[1]*BW[k]/2];}),IN=SP.map((p,k)=>{const n=vn(k);return[p[0]+n[0]*BW[k]/2,p[1]+n[1]*BW[k]/2];});
+  const inner=[];for(let k=IN.length-1;k>0;k--){const a=IN[k],b=IN[k-1],n=nrm(SP[k-1],SP[k]);inner.push(a);if(k>1)for(const u of [0.3,0.65]){const m=[lerp(a[0],b[0],u),lerp(a[1],b[1],u)],tb=[lerp(a[0],b[0],u+0.14),lerp(a[1],b[1],u+0.14)];inner.push([m[0]+n[0]*5.5,m[1]+n[1]*5.5],tb);}}
+  inner.push(IN[0]);
+  const blade=[...OUT,...inner];
+  card(x,look,()=>poly(x,blade),()=>{const a=sr([104,-78]),b=sr([88,-60]);return lg(x,a[0],a[1],b[0],b[1],[[0,CH[4]],[0.45,CH[3]],[0.8,CH[1]],[1,CH[0]]]);},2.4);
+  const tal=[[70,-86],[62,-72],[58,-56],[63,-66],[68,-76]].map(sr); // a second, smaller talon of straight facets
+  card(x,look,()=>poly(x,tal),()=>{const a=sr([70,-84]),b=sr([60,-60]);return lg(x,a[0],a[1],b[0],b[1],[[0,CH[3]],[1,CH[0]]]);},2);
+  const wk=[0,1,2,3,4,5].map(k=>[W1[0]+Math.cos(k*Math.PI/3+0.2)*6.5,W1[1]+Math.sin(k*Math.PI/3+0.2)*6.5]); // the knuckled wrist
+  card(x,look,()=>poly(x,wk),()=>rg(x,W1[0]-2,W1[1]-2,1,8,[[0,CH[4]],[1,CH[1]]]),2);
+  if(N.detail)litLines(x,LIT,0.45,1.2,[OUT.slice(0,4).map((p,k)=>{const n=vn(k);return[p[0]+n[0]*2.2,p[1]+n[1]*2.2];}),[ua[0],ua[1]].map(p=>[p[0],p[1]+1.5])]);
+  card(x,look,()=>poly(x,sh),()=>rg(x,26,-152+Y,3,30,[[0,CH[4]],[0.55,CH[2]],[1,CH[0]]]),2.4);
+  // the antlers: smooth curved beams with upturned tines, set on the head and tilting with it
+  const ant=[];const beam=(b0,dir,a0,curve,tines)=>{let p=b0,a=a0,w=10;for(let i=0;i<7;i++){a+=curve[i]*dir;const q=[p[0]+Math.cos(a)*12.5,p[1]+Math.sin(a)*12.5],w2=Math.max(1.6,w-1.2);ant.push([p[0],p[1],q[0],q[1],w,w2,1]);
+      const tn=tines[i];if(tn){let tp=q,ta=-Math.PI/2+dir*tn[1];const tw=w2*0.88;for(let j=0;j<3;j++){ta+=dir*0.16;const tq2=[tp[0]+Math.cos(ta)*tn[0]/3,tp[1]+Math.sin(ta)*tn[0]/3];ant.push([tp[0],tp[1],tq2[0],tq2[1],tw*(1-j/3),j===2?0.4:tw*(1-(j+1)/3),j===0?1:0]);tp=tq2;}}
+      p=q;w=w2;}};
+  const L0=-Math.PI/2-1.12,R0=-Math.PI/2+1.12,CV=[0,-0.17,-0.17,-0.15,-0.12,-0.08,-0.04];
+  beam([-6,-185+Y],-1,L0,CV,[[16,-0.55],[30,-0.2],0,[34,-0.05],0,[28,0.1],0]);
+  beam([10,-185+Y],1,R0,CV,[[16,-0.55],[30,-0.2],0,[34,-0.05],0,[28,0.1],0]);
+  drawSegs(ant.map(s=>{const a=rot([s[0],s[1]],HC,ht),b=rot([s[2],s[3]],HC,ht);return[a[0],a[1],b[0],b[1],s[4],s[5],s[6]];}),false);
+  // the head: a gaunt human half and a spiked beast half with a long jaw and a tusk
+  const hd=[[-6,-188],[-11,-180],[-12,-170],[-10,-161],[-6,-155],[1,-152],[8,-149],[13,-154],[15,-162],[19,-168],[14,-173],[17,-182],[9,-186],[2,-189]].map(p=>rot([p[0],p[1]+Y],HC,ht));
+  x.fillStyle=INK;taper(x,[2,-150+Y,2,-162+Y,9,8]);
+  card(x,look,()=>poly(x,hd),()=>{const c=rot([-3,-176+Y],HC,ht);return rg(x,c[0],c[1],2,22,[[0,CH[4]],[0.55,CH[2]],[1,CH[0]]]);},2.4);
+  const tusk=[[11,-156],[16,-150],[17,-142],[14,-135],[13.5,-143],[10,-151]].map(p=>rot([p[0],p[1]+Y],HC,ht));
+  card(x,look,()=>poly(x,tusk),()=>{const a=rot([14,-152+Y],HC,ht),b=rot([14,-136+Y],HC,ht);return lg(x,a[0],a[1],b[0],b[1],[[0,CH[3]],[1,CH[0]]]);},1.8);
+  // holes through the card: the dead eye, the ember eye, the mouth, and the eye cluster on the shoulder
+  const R=p=>rot([p[0],p[1]+Y],HC,ht);
+  const deadE=[[-7.5,-173.5],[-4.5,-175],[-2,-173.5],[-2.5,-170.5],[-5.5,-170],[-8,-171.5]].map(R);
+  const beastE=[[3,-175],[9,-178],[14,-176],[12,-171],[6,-170]].map(R);
+  const mouth=[[0,-161],[6,-163],[13,-162],[12,-158+op*0.5],[6,-156+op],[1,-158+op*0.4]].map(R);
+  const cl=[[26,-148,3.4],[35,-145,3],[29,-139,2.8],[39,-137,2.4]].map(e=>[e[0],e[1]+Y,e[2]]);
+  const hex=(cx,cy,r)=>[0,1,2,3,4,5].map(i=>[cx+Math.cos(i*Math.PI/3+0.3)*r,cy+Math.sin(i*Math.PI/3+0.3)*r]);
+  cutPath(x,deadE);cutPath(x,beastE);cutPath(x,mouth);for(const e of cl)cutPath(x,hex(e[0],e[1],e[2]));
+  return (c,o)=>{
+    // the dead eye: pale and clouded, no ember
+    c.save();const dc=R([-5,-172]);const g=c.createRadialGradient(dc[0],dc[1],0,dc[0],dc[1],4);g.addColorStop(0,"#e9e2d4");g.addColorStop(0.6,"#b9b0a2");g.addColorStop(1,"#3a3438");c.fillStyle=g;c.beginPath();poly(c,deadE);c.closePath();c.fill();c.restore();
+    const be=R([8.5,-174]);hollow(c,beastE,be[0],be[1],7,0.95);emberEye(c,be[0],be[1],3,1.9,-0.25+ht);
+    const mc=R([6.5,-159+op*0.3]);hollow(c,mouth,mc[0],mc[1],8,0.95);emberMouth(c,mouth.map(p=>[mc[0]+(p[0]-mc[0])*0.8,mc[1]+(p[1]-mc[1])*0.7]),mc[0],mc[1],6);
+    const tt=[];for(let i=0;i<4;i++){const a=R([1.5+i*2.8,-161.6]),b=R([2.9+i*2.8,-158.4]),d=R([4.3+i*2.8,-161.8]);tt.push([a[0],a[1],b[0],b[1],d[0],d[1]]);}
+    for(let i=0;i<3;i++){const a=R([3+i*3,-156.5+op*0.9]),b=R([4.4+i*3,-159.5+op*0.9]),d=R([5.8+i*3,-156.5+op*0.9]);tt.push([a[0],a[1],b[0],b[1],d[0],d[1]]);}
+    teeth(c,tt);
+    for(const e of cl){hollow(c,hex(e[0],e[1],e[2]),e[0],e[1],e[2]*1.6,0.95);emberEye(c,e[0],e[1],e[2]*0.62,e[2]*0.62,0);}
+  };
+};
+BOSS_SIZE.dawn=1.2; // the glow behind and the wisp sized as the other reworked bosses
+BOSS_BOXES.dawn=[-140,-278,140,12]; // measured over a stepping cycle
+
+/* The approved settings (rounds 1-9). The boss functions still take a look and a nod, from the rounds when options were
+   compared; only these are approved: graded blacks (tone), the skull's horns, the tree leaning with the wind, and the nod to the
+   level's colour as lit details plus the glow behind. */
+const BOSS_LOOK={tone:true,horns:true,wind:true},BOSS_NOD={detail:true,aura:true};
+const _bossCache=new WeakMap();
+function renderBossStrip(cv,t,o){ // the wanderer and the place's boss; on a 7.5 s loop the boss breaks into card pieces and its golden wisp rises
   const c=cv.getContext("2d"),s=cv.height/BOSS_H,SW=cv.width/s,lv=o.level,sk=SKY[lv];
+  let K=_bossCache.get(cv);if(!K){K={};_bossCache.set(cv,K);}
   c.setTransform(s,0,0,s,0,0);
   const g=c.createLinearGradient(0,0,0,BOSS_GROUND);g.addColorStop(0,sk[0]);g.addColorStop(0.45,sk[1]);g.addColorStop(0.8,sk[2]);g.addColorStop(1,sk[3]);c.fillStyle=g;c.fillRect(0,0,SW,BOSS_H);
   c.fillStyle=mixc(INK,AIR[lv],0.55);c.beginPath();c.moveTo(0,BOSS_H);for(let x=0;x<=SW;x+=8)c.lineTo(x,236+12*Math.sin(x*0.009)+6*Math.sin(x*0.023+1));c.lineTo(SW,BOSS_H);c.closePath();c.fill();
   c.fillStyle=mixc(INK,AIR[lv],0.3);c.beginPath();c.moveTo(0,BOSS_H);for(let x=0;x<=SW;x+=8)c.lineTo(x,268+6*Math.sin(x*0.015+2));c.lineTo(SW,BOSS_H);c.closePath();c.fill();
   c.fillStyle=INK;c.fillRect(0,BOSS_GROUND,SW,BOSS_H-BOSS_GROUND);
-  const wx=SW*0.16;drawWanderer(c,wx,BOSS_GROUND+1,t,false,1,o.rm,LV[lv].edge);
-  const bx=SW*0.62,by=BOSS_GROUND+2,ph=t%BOSS_CYCLE;
-  if(ph<4.8)bossInto(c,s,lv,t,o,Math.round((bx-230)*s),Math.round((by-300)*s));
-  else{ // defeated on a loop: card pieces and a large golden wisp, then back again
-    if(!BH.M||BH.Ms!==s){BH.M=mk(460*s,330*s);BH.Ms=s;}
-    const mc=BH.M.getContext("2d");mc.setTransform(1,0,0,1,0,0);mc.clearRect(0,0,BH.M.width,BH.M.height);bossInto(mc,s,lv,t,o,0,0,true);
-    const A=BOSS_AURA[lv],fade=ph<7?Math.max(0,1-(ph-4.8)/0.8):(ph-7)/0.5; // the glow fades as it falls apart, and returns with it
+  const wx=SW*0.14;drawWanderer(c,wx,BOSS_GROUND+1,t,false,1,o.rm,LV[lv].edge);
+  const bx=SW*0.6,by=BOSS_GROUND+2,ph=t%BOSS_CYCLE;
+  if(ph<4.8)bossInto(c,s,lv,t,o,Math.round((bx-230)*s),Math.round((by-300)*s),BOSS_NOD,false,K,BOSS_LOOK);
+  else{ // defeated on a loop: card pieces and a large golden wisp, then back again; the glow behind fades and returns with it
+    if(!K.M||K.Ms!==s){K.M=mk(460*s,330*s);K.Ms=s;}
+    const mc=K.M.getContext("2d");mc.setTransform(1,0,0,1,0,0);mc.clearRect(0,0,K.M.width,K.M.height);bossInto(mc,s,lv,t,o,0,0,BOSS_NOD,true,K,BOSS_LOOK);
+    const A=bossAura(lv),fade=ph<7?Math.max(0,1-(ph-4.8)/0.8):(ph-7)/0.5;
     if(fade>0){c.save();const ag=c.createRadialGradient(bx,by+A[1],10,bx,by+A[1],A[2]);ag.addColorStop(0,rgba(A[0],A[3]*fade));ag.addColorStop(1,rgba(A[0],0));c.fillStyle=ag;c.fillRect(bx-A[2],by+A[1]-A[2],A[2]*2,A[2]*2);c.restore();}
-    if(ph<7)bossDefeat(c,BH.M,s,bx,by,(ph-4.8)/2.2,77);
-    else{c.save();c.globalAlpha=(ph-7)/0.5;c.drawImage(BH.M,bx-230,by-300,BH.M.width/s,BH.M.height/s);c.restore();}}
+    if(ph<7)bossDefeat(c,K.M,s,bx,by,(ph-4.8)/2.2,77,lv,K);
+    else{c.save();c.globalAlpha=(ph-7)/0.5;c.drawImage(K.M,bx-230,by-300,K.M.width/s,K.M.height/s);c.restore();}}
   c.textAlign="center";c.textBaseline="top";c.font='12px "Alegreya Sans",sans-serif';c.fillStyle="#c9a25a";
   c.fillText("the wanderer",wx,BOSS_GROUND+10);c.fillText("boss: "+BOSS_NAME[lv],bx,BOSS_GROUND+10);
 }
+
 /* ============================== the sample strip: the monsters side by side, defeated one at a time ============================== */
 const SHEET_H=300,SHEET_GROUND=262,DEFEAT_CYCLE=3.6;
 const SHEET_CAST=[{kind:"crawler",u:0.17,label:"small: crawler"},{kind:"bat2",u:0.33,label:"small: flyer",fly:150},{kind:"hatmaw",u:0.5,label:"medium: mouth-hat"},{kind:"ghoul2",u:0.67,label:"medium: ghoul"},{kind:"walker",u:0.86,label:"large: walker"}];
@@ -2152,6 +2325,7 @@ function renderSheet(cv,t,o,scene){
   });
 }
 
+
 /* ============================== the door: LanternBox.world ============================== */
 const PLACE_SET = { night: "village5", storm: "town", dawn: "moor", mist: "forest" };
 const _scenes = {};
@@ -2177,7 +2351,7 @@ function drawMonsters(cv, t, o) { // the five sample monsters side by side, one 
   o = o || {};
   renderSheet(cv, t || 0, options(o.level, Object.assign({ walking: false }, o)), sceneAt(cv.height / SHEET_H));
 }
-function drawBosses(cv, t, o) { // the wanderer and the place's boss; on a 7.5 s loop the boss breaks up and its golden wisp rises
+function drawBosses(cv, t, o) { // the wanderer and the place's boss (version 6); on a 7.5 s loop it breaks into card pieces and its golden wisp rises
   o = o || {};
   renderBossStrip(cv, t || 0, options(o.level, Object.assign({ walking: false }, o)));
 }
@@ -2185,11 +2359,11 @@ function splash(ctx, place, X, Y, t, rm, seed) { // the place's splash of colour
   drawSplash(ctx, PLACE_SET[place] || "village5", "on", X, Y, t || 0, !!rm, seed || 0, "green", "intense");
 }
 return {
-  version: "5.0.0",
+  version: "6.0.0",
   world: {
     LH: LH, GROUND: gY, PLACES: ["night", "storm", "dawn", "mist"], places: LV, bossNames: BOSS_NAME,
     pal: { INK: INK, SKY: SKY, AIR: AIR, HAZE: HAZE, MOON: MOON, MOONPAL: MOONPAL, CLOUD_PAL: CLOUD_PAL, EMBER: EMBER, WITCH: WITCH,
-      GOLD_LIGHT: GOLD_LIGHT, POTION: POTION, BONE: BONE, BOSS_PAL: BOSS_PAL, BOSS_AURA: BOSS_AURA },
+      GOLD_LIGHT: GOLD_LIGHT, POTION: POTION, BONE: BONE, BOSS_AURA: BOSS_AURA, CARD_BLACKS: CH, NOD_COL: NOD_COL },
     options: options, scene: sceneAt, drawPlace: drawPlace, drawMonsters: drawMonsters, drawBosses: drawBosses,
     drawWanderer: drawWanderer, splash: splash,
     parts: {
@@ -2205,7 +2379,9 @@ return {
       drawMoon: drawMoon, moonSprite4: moonSprite4, drawStars: drawStars, drawDaybreak: drawDaybreak, drawSetMoon: drawSetMoon,
       drawSun: drawSun, drawRays: drawRays, drawRain: drawRain, drawBolt: drawBolt, lightning: lightning,
       renderCutClouds: renderCutClouds, renderMist: renderMist,
-      MONSTER: MONSTER, MON_BOX: MON_BOX, drawDefeat: drawDefeat, BOSS: BOSS, bossInto: bossInto, bossDefeat: bossDefeat,
+      MONSTER: MONSTER, MON_BOX: MON_BOX, drawDefeat: drawDefeat, cardFill: cardFill, cardTaper: cardTaper,
+      BOSS: BOSS, bossInto: bossInto, bossDefeat: bossDefeat, bossAura: bossAura, BOSS_SIZE: BOSS_SIZE, BOSS_BOXES: BOSS_BOXES,
+      BOSS_LOOK: BOSS_LOOK, BOSS_NOD: BOSS_NOD, card: card, hollow: hollow, cutPath: cutPath, litLines: litLines,
       drawSplash: drawSplash, SPLASH: SPLASH, SETS: SETS,
       rng32: rng32, hsh: hsh, mixc: mixc, rgba: rgba, mk: mk
     }

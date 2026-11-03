@@ -78,6 +78,14 @@ Published copy (private to Barney): https://claude.ai/artifact/4U9Mbj734kYaNjFyF
 
 Each cell is frames a second / time to draw one frame. Both pass their targets, in every place. "Under" means eight frames fitted inside one screen refresh, so the time is an upper limit. The Pixel reports its system as Android 10 to web pages, whatever it really runs. The iPhone, the HP laptop, the Fire HD 8 and the computer's AMD graphics are still to be measured (report only). The results from phase 1's speed test are in `speed-test/README.md`.
 
+### Results, 3 November 2026 (kit 0.6.0: the new bosses and graded monsters, Picture Automatic, which stayed at Best)
+
+| Device | Picture | Night | Blood-red rain | Dawn | Mist | Slowest 5% / longest | Layers |
+|---|---|---|---|---|---|---|---|
+| Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 74 fps / 10.5 ms | 54 / 13.1 ms | 72 / 10.4 ms | 64 / 11.6 ms | 25 / 33 ms | 107 MB |
+
+The phone still passes in every place. Against kit 0.4.0, each place lost 4 to 11 frames a second (Dawn and Mist the most, where the new bosses are heavier), the time to draw a frame is no worse, the slowest 5% is unchanged and the single longest frame rose from 26 to 33 ms. The computer was not measured again.
+
 ## Picture: Automatic, Best, Faster, Fastest
 
 | Level | What it does |
@@ -98,6 +106,7 @@ Off leaves out the glow round lights, ember eyes, splashes and wisps. A monster'
 | Path | What it is |
 |---|---|
 | `HANDOVER.md` | The note that hands the kit from phase to phase |
+| `HANDOVER-bosses.md` | The note that handed over design system version 6: the new bosses and graded monsters |
 | `design-system/` | The copy of the approved design system, the spec. Don't edit it here |
 | `speed-test/` | Phase 1's speed test, kept as it is |
 | `kit/lantern-box.css` | The design system's tokens and Interface, unchanged, and the shell's layout |
