@@ -1,4 +1,4 @@
-/* Lantern Box 0.6 — runtime
+/* Lantern Box 0.7 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.6.0';
+  const VERSION = '0.7.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -1390,7 +1390,6 @@ let FX=true;                               // the Effects setting: glow round li
 // a boss's picture moves only with its pose time, pz(t*rate): rate*8 steps a second (night 5.6, storm 6.4, dawn 5.6, mist 4.8),
 // so it is repainted exactly when its pose steps. The rates are the boss functions' own (BOSS.night ... BOSS.mist): keep them in step
 const BOSS_STEP={night:0.7,storm:0.8,dawn:0.7,mist:0.6};
-const BOSS_PAD=48;                         // room above a boss's own canvas, for the tree's glow (it reaches 340 above the feet)
 const FLY_BOX={bat:[-22,-16,22,12],crow:[-20,-14,14,11]},FLY_REF=1.2;
 function drawFlyerKit(x,kind,X,Y,k,ph,col){ // bats and crows: each wing position painted once, 17 positions from up to down
   const s=KIT.fly,q=Math.round((Math.sin(ph)+1)*8),key=kind+col+q,bb=FLY_BOX[kind];
@@ -1467,12 +1466,13 @@ Object.assign(Scene.prototype,{
       if(tl.eyes.length)drawTreeEyes(ctx,tl.eyes.map(e=>Object.assign({},e,{X:e.X-lx})),t,L,o.rm);
     }
   },
-  bossAt(ctx,s,lv,t,o,bx,by){ // the boss, repainted into its own canvas when its pose steps; E is also bossInto's cache
+  bossAt(ctx,s,lv,t,o,bx,by){ // the boss, repainted into its own canvas when its pose steps (E is also bossInto's cache); its glow onto the scene each frame
     if(!this.kit){bossInto(ctx,s,lv,t,o,Math.round((bx-230)*s),Math.round((by-300)*s)+(this.dyS||0),BOSS_NOD,false,this.bossK||(this.bossK={}),BOSS_LOOK);return;}
     const step=o.rm?-KIT.frame:Math.floor(t*(BOSS_STEP[lv]||1)*8);let E=this.bossC;
-    if(!E||E.lv!==lv||E.s!==s)E=this.bossC={cv:mk(460*s,(330+BOSS_PAD)*s),lv,s,step:null};
-    if(E.step!==step){const c=E.cv.getContext("2d");c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,E.cv.width,E.cv.height);bossInto(c,s,lv,t,o,0,Math.round(BOSS_PAD*s),BOSS_NOD,false,E,BOSS_LOOK);E.step=step;}
-    ctx.drawImage(E.cv,Math.round((bx-230)*s)/s,Math.round((by-300-BOSS_PAD)*s)/s,E.cv.width/s,E.cv.height/s);
+    if(!E||E.lv!==lv||E.s!==s)E=this.bossC={cv:mk(460*s,330*s),lv,s,step:null};
+    if(E.step!==step){const c=E.cv.getContext("2d");c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,E.cv.width,E.cv.height);bossInto(c,s,lv,t,o,0,0,BOSS_NOD,true,E,BOSS_LOOK);E.step=step;}
+    if(FX)bossGlow(ctx,bx,by,lv,1); // the glow lightens the scene behind the boss ("screen"), so it is drawn here, never into E.cv
+    ctx.drawImage(E.cv,Math.round((bx-230)*s)/s,Math.round((by-300)*s)/s,E.cv.width/s,E.cv.height/s);
   },
   kitBegin(ctx,s,W,t,camX,camY,o){ // everything behind the wanderer and the monsters
     const lv=o.level,rm=o.rm,L=LV[lv],tn=L.tints,W2=W*2,key=lv+"@"+s.toFixed(4)+"@"+Math.round(W*s)+"@"+FX;
@@ -2413,7 +2413,7 @@ function hollow(c,pts,cx,cy,r,a){ // a hole through the card, smouldering inside
 function litLines(c,col,a,w,lines){c.save();c.globalAlpha=a;c.strokeStyle=col;c.lineWidth=w;c.lineCap="round";c.lineJoin="round";
   for(const pts of lines){c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();}c.restore();}
 
-const CH=["#060508","#100e13","#19161d","#231f27","#2d2832"]; // ink, then paler blacks to charcoal: graded inside, ink at the edge
+const CH=["#060508","#17141b","#27232d","#3a3544","#504a5c"]; // ink, then paler blacks to charcoal: graded inside, ink at the edge (version 7: the lighter steps raised so the grading shows on a phone; was 100e13, 19161d, 231f27, 2d2832)
 function card(x,look,path,grad,edge){ // one card piece: flat ink (round 1), or graded charcoal inside an ink edge (round 2)
   x.beginPath();path();x.closePath();
   if(look&&look.tone){x.fillStyle=grad();x.fill();x.lineWidth=edge||3;x.strokeStyle=INK;x.lineJoin="miter";x.miterLimit=4;x.stroke();x.lineJoin="round";}
@@ -2510,7 +2510,13 @@ const BOSS={
 const BOSS_CACHE={};
 const BOSS_SIZE={night:1.2,storm:1.2}; // the ghost and the skull are drawn 20% bigger (Barney, 2 Nov)
 const BOSS_BOXES={night:[-104,-252,98,28],storm:[-208,-212,138,32]}; // what each boss's card pieces cover when it is defeated (measured over a whole stepping cycle)
-function bossAura(lv){const A=BOSS_AURA[lv],k=BOSS_SIZE[lv]||1;if(lv==="mist")return[A[0],-150,190,0.55];return[A[0],A[1]*k,A[2]*k,A[3]];} // the glow behind, grown with the boss
+function bossAura(lv){const A=BOSS_AURA[lv],k=BOSS_SIZE[lv]||1,b=lv==="mist"?[A[0],-150,190,0.55]:[A[0],A[1]*k,A[2]*k,A[3]];return[b[0],b[1]*1.05,b[2]*1.2,Math.min(1,b[3]*1.6)];} // the glow behind, grown with the boss; version 7: 1.2 times larger and 1.6 times stronger, so it shows on a phone
+function bossGlow(c,X,Y,lv,fade){ // version 7: the glow behind a boss, in picture units with its feet at (X, Y). Drawn straight onto the scene, before the boss: it lightens
+  // what is behind it ("screen"), holding its strength out to about a third of its radius, so it shows against a bright horizon, black scenery and the Mist's pale sky
+  const A=bossAura(lv),a=A[3]*(fade==null?1:fade);if(a<=0)return;const cy=Y+A[1],R=A[2];
+  c.save();c.globalCompositeOperation="screen";const g=c.createRadialGradient(X,cy,8,X,cy,R);
+  g.addColorStop(0,rgba(A[0],a));g.addColorStop(0.35,rgba(A[0],a*0.8));g.addColorStop(0.7,rgba(A[0],a*0.32));g.addColorStop(1,rgba(A[0],0));
+  c.fillStyle=g;c.fillRect(X-R,cy-R,R*2,R*2);c.restore();}
 function bossDefeat(c,M,s,X,Y,u,seed,lv,K){ // as bossDefeat, over this boss's own box: card pieces tumble, a large golden wisp rises
   const box=BOSS_BOXES[lv],ox=X-230,oy=Y-300,x0=X+box[0],y0=Y+box[1],w=box[2]-box[0],h=box[3]-box[1],k=BOSS_SIZE[lv]||1;
   if(!K.pieces){const r=rng32(seed),cols=4,rows=3,pts=[];for(let j=0;j<=rows;j++){pts.push([]);for(let i=0;i<=cols;i++){const jx=(i>0&&i<cols)?(r()-0.5)*0.14:0,jy=(j>0&&j<rows)?(r()-0.5)*0.18:0;pts[j].push([i/cols+jx,j/rows+jy]);}}
@@ -2527,7 +2533,7 @@ function bossInto(c,s,lv,t,o,dx,dy,nod,noAura,cache,look){ // a reworked boss: i
   tc.setTransform(s,0,0,s,230*s,300*s);tc.fillStyle=INK;tc.strokeStyle=INK;tc.lineCap="round";tc.lineJoin="round";
   const det=BOSS[lv](tc,t,o.rm,nod,look),N=nd(nod);
   c.save();
-  if(N.aura&&!noAura&&FX){const A=bossAura(lv);c.setTransform(s,0,0,s,dx+230*s,dy+300*s);const ag=c.createRadialGradient(0,A[1],10,0,A[1],A[2]);ag.addColorStop(0,rgba(A[0],A[3]));ag.addColorStop(1,rgba(A[0],0));c.fillStyle=ag;c.fillRect(-A[2],A[1]-A[2],A[2]*2,A[2]*2);}
+  if(N.aura&&!noAura&&FX){c.setTransform(s,0,0,s,dx+230*s,dy+300*s);bossGlow(c,0,0,lv,1);} // the glow behind (version 7: bossGlow)
   c.setTransform(1,0,0,1,0,0);
   if(FX){c.shadowColor=rgba(o.dcol,0.95);c.shadowBlur=2.5*s;c.drawImage(T,dx,dy);   // the rim, as a monster's
   c.shadowColor=rgba(o.dglow,0.6);c.shadowBlur=11*s;c.drawImage(T,dx,dy);}    // the glow, as a monster's
@@ -2771,8 +2777,8 @@ function renderBossStrip(cv,t,o){ // the wanderer and the place's boss; on a 7.5
   else{ // defeated on a loop: card pieces and a large golden wisp, then back again; the glow behind fades and returns with it
     if(!K.M||K.Ms!==s){K.M=mk(460*s,330*s);K.Ms=s;}
     const mc=K.M.getContext("2d");mc.setTransform(1,0,0,1,0,0);mc.clearRect(0,0,K.M.width,K.M.height);bossInto(mc,s,lv,t,o,0,0,BOSS_NOD,true,K,BOSS_LOOK);
-    const A=bossAura(lv),fade=ph<7?Math.max(0,1-(ph-4.8)/0.8):(ph-7)/0.5;
-    if(fade>0){c.save();const ag=c.createRadialGradient(bx,by+A[1],10,bx,by+A[1],A[2]);ag.addColorStop(0,rgba(A[0],A[3]*fade));ag.addColorStop(1,rgba(A[0],0));c.fillStyle=ag;c.fillRect(bx-A[2],by+A[1]-A[2],A[2]*2,A[2]*2);c.restore();}
+    const fade=ph<7?Math.max(0,1-(ph-4.8)/0.8):(ph-7)/0.5;
+    if(fade>0)bossGlow(c,bx,by,lv,fade);
     if(ph<7)bossDefeat(c,K.M,s,bx,by,(ph-4.8)/2.2,77,lv,K);
     else{c.save();c.globalAlpha=(ph-7)/0.5;c.drawImage(K.M,bx-230,by-300,K.M.width/s,K.M.height/s);c.restore();}}
   c.textAlign="center";c.textBaseline="top";c.font='12px "Alegreya Sans",sans-serif';c.fillStyle="#c9a25a";
@@ -2903,8 +2909,8 @@ function makeTools(env){
       if(o.defeat==null){scene.bossAt(f.ctx,s,lv,f.t,f.opt,X,Y);return;}
       const u=clamp(o.defeat,0,1),d=defeatCanvas("B",460,330,s),K=scene.defK||(scene.defK={});
       bossInto(d.c,s,lv,f.t,f.opt,0,0,BOSS_NOD,true,K,BOSS_LOOK);
-      const A=bossAura(lv),fade=Math.max(0,1-u*2.2/0.8); // the glow fades as it falls apart
-      if(fade>0&&FX){const c=f.ctx;c.save();const ag=c.createRadialGradient(X,Y+A[1],10,X,Y+A[1],A[2]);ag.addColorStop(0,rgba(A[0],A[3]*fade));ag.addColorStop(1,rgba(A[0],0));c.fillStyle=ag;c.fillRect(X-A[2],Y+A[1]-A[2],A[2]*2,A[2]*2);c.restore();}
+      const fade=Math.max(0,1-u*2.2/0.8); // the glow fades as it falls apart
+      if(fade>0&&FX)bossGlow(f.ctx,X,Y,lv,fade);
       bossDefeat(f.ctx,d.M,s,X,Y,u,77,lv,K);
     },
     splash(x,o){ // o: y, seed. The place's own splash of colour.

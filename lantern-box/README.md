@@ -86,6 +86,14 @@ Each cell is frames a second / time to draw one frame. Both pass their targets, 
 
 The phone still passes in every place. Against kit 0.4.0, each place lost 4 to 11 frames a second (Dawn and Mist the most, where the new bosses are heavier), the time to draw a frame is no worse, the slowest 5% is unchanged and the single longest frame rose from 26 to 33 ms. The computer was not measured again.
 
+### Results, 3 November 2026 (kit 0.7.0: lighter blacks and the bosses' glow drawn onto the scene each frame)
+
+| Device | Picture | Night | Blood-red rain | Dawn | Mist | Slowest 5% / longest | Layers |
+|---|---|---|---|---|---|---|---|
+| Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 72 fps / 9.8 ms | 58 / 13.9 ms | 77 / 10.1 ms | 63 / 11.2 ms | 25 / 41 ms | 111 MB |
+
+Within a few frames a second of kit 0.6.0 in every place (Dawn 5 better, Mist 1 worse), so the glow drawn every frame costs little. The slowest 5% is unchanged; the single longest frame was 41 ms. The computer was not measured again.
+
 ## Picture: Automatic, Best, Faster, Fastest
 
 | Level | What it does |
@@ -107,6 +115,7 @@ Off leaves out the glow round lights, ember eyes, splashes and wisps. A monster'
 |---|---|
 | `HANDOVER.md` | The note that hands the kit from phase to phase |
 | `HANDOVER-bosses.md` | The note that handed over design system version 6: the new bosses and graded monsters |
+| `HANDOVER-bosses-7.md` | The note that handed over design system version 7: lighter blacks and a stronger glow, to show on a phone |
 | `design-system/` | The copy of the approved design system, the spec. Don't edit it here |
 | `speed-test/` | Phase 1's speed test, kept as it is |
 | `kit/lantern-box.css` | The design system's tokens and Interface, unchanged, and the shell's layout |

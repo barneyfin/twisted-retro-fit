@@ -1,6 +1,6 @@
 # Monsters
 
-The monster style, in five samples: black card puppets, graded charcoal to ink (version 6), with ember eyes, an ember rim and inner detail, in three sizes. Each in turn is defeated: it breaks into card pieces and a pale wisp rises towards the score.
+The monster style, in five samples: black card puppets, graded charcoal to ink (version 6; lighter in version 7, matching the bosses), with ember eyes, an ember rim and inner detail, in three sizes. Each in turn is defeated: it breaks into card pieces and a pale wisp rises towards the score.
 
 ## When to use
 - Every enemy in a Lantern Box game is drawn in this style. The five here (crawler and flyer; mouth-hat and ghoul; the walker) are the samples the look was signed off on; a game's own cast is designed in its step 4b.

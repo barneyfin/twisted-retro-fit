@@ -100,10 +100,10 @@
   --moon-halo: #ffae63;
   --dawn-hollows: #dfe8f6;
   --mist-band: #eef2dc;
-  --card-black-1: #100e13;
-  --card-black-2: #19161d;
-  --card-black-3: #231f27;
-  --card-charcoal: #2d2832;
+  --card-black-1: #17141b;
+  --card-black-2: #27232d;
+  --card-black-3: #3a3544;
+  --card-charcoal: #504a5c;
   --boss-night-aura: #f0c9e0;
   --boss-storm-aura: #ff8fa6;
   --boss-dawn-aura: #bcd2ff;
@@ -135,6 +135,7 @@
   --picture-height: 540px;
   --ground-line: 468px;
   --boss-scale: 1.2;
+  --boss-glow: screen 1.2 1.6;
   --puppet-steps: 8;
   --strip-repeat: 1900px;
   --night-tints: 0.52 0.45 0.31 0.24;

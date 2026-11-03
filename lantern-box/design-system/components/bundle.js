@@ -1,4 +1,4 @@
-/* Lantern Box: the World's drawing code, design system version 6 (2 November 2026).
+/* Lantern Box: the World's drawing code, design system version 7 (3 November 2026).
    Everything from "helpers" to "the sample strip" below is the drawing code of the signed-off look, the Gloam Hallow
    directions page at round 12 (1 November 2026), with the places' changes of versions 2 to 5 (made in Claude Code and
    chosen by Barney: among them each place's lift, the layer tints, the moor's stone circles and backdrop doors ending at
@@ -7,6 +7,8 @@
        ghost, the tentacled skull, the gaping tree (windswept) and the moor mother (in place of the cauldron witch);
      - the monsters: every card piece of the five monsters in play graded charcoal to ink inside an ink edge (CARD, cardFill,
        cardTaper), as the bosses are.
+   Version 7 (3 November 2026) makes both show on a phone: the card blacks' lighter steps raised (CH), and the bosses' glow
+   1.2 times larger, 1.6 times stronger and drawn to lighten what is behind it (bossAura, bossGlow).
    Only the page's own controls are left out. It draws the mock-up way: every layer redrawn every frame. Games draw the same
    shapes the kit's way (layers painted once in tiles and slid, poses painted once per puppet step), as the speed test proved.
    The door at the bottom (LanternBox.world) chooses the approved settings and names the parts. */
@@ -1904,7 +1906,7 @@ function hollow(c,pts,cx,cy,r,a){ // a hole through the card, smouldering inside
 function litLines(c,col,a,w,lines){c.save();c.globalAlpha=a;c.strokeStyle=col;c.lineWidth=w;c.lineCap="round";c.lineJoin="round";
   for(const pts of lines){c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();}c.restore();}
 
-const CH=["#060508","#100e13","#19161d","#231f27","#2d2832"]; // ink, then paler blacks to charcoal: graded inside, ink at the edge
+const CH=["#060508","#17141b","#27232d","#3a3544","#504a5c"]; // ink, then paler blacks to charcoal: graded inside, ink at the edge (version 7: the lighter steps raised so the grading shows on a phone; was 100e13, 19161d, 231f27, 2d2832)
 function card(x,look,path,grad,edge){ // one card piece: flat ink (round 1), or graded charcoal inside an ink edge (round 2)
   x.beginPath();path();x.closePath();
   if(look&&look.tone){x.fillStyle=grad();x.fill();x.lineWidth=edge||3;x.strokeStyle=INK;x.lineJoin="miter";x.miterLimit=4;x.stroke();x.lineJoin="round";}
@@ -2001,7 +2003,13 @@ const BOSS={
 const BOSS_CACHE={};
 const BOSS_SIZE={night:1.2,storm:1.2}; // the ghost and the skull are drawn 20% bigger (Barney, 2 Nov)
 const BOSS_BOXES={night:[-104,-252,98,28],storm:[-208,-212,138,32]}; // what each boss's card pieces cover when it is defeated (measured over a whole stepping cycle)
-function bossAura(lv){const A=BOSS_AURA[lv],k=BOSS_SIZE[lv]||1;if(lv==="mist")return[A[0],-150,190,0.55];return[A[0],A[1]*k,A[2]*k,A[3]];} // the glow behind, grown with the boss
+function bossAura(lv){const A=BOSS_AURA[lv],k=BOSS_SIZE[lv]||1,b=lv==="mist"?[A[0],-150,190,0.55]:[A[0],A[1]*k,A[2]*k,A[3]];return[b[0],b[1]*1.05,b[2]*1.2,Math.min(1,b[3]*1.6)];} // the glow behind, grown with the boss; version 7: 1.2 times larger and 1.6 times stronger, so it shows on a phone
+function bossGlow(c,X,Y,lv,fade){ // version 7: the glow behind a boss, in picture units with its feet at (X, Y). Drawn straight onto the scene, before the boss: it lightens
+  // what is behind it ("screen"), holding its strength out to about a third of its radius, so it shows against a bright horizon, black scenery and the Mist's pale sky
+  const A=bossAura(lv),a=A[3]*(fade==null?1:fade);if(a<=0)return;const cy=Y+A[1],R=A[2];
+  c.save();c.globalCompositeOperation="screen";const g=c.createRadialGradient(X,cy,8,X,cy,R);
+  g.addColorStop(0,rgba(A[0],a));g.addColorStop(0.35,rgba(A[0],a*0.8));g.addColorStop(0.7,rgba(A[0],a*0.32));g.addColorStop(1,rgba(A[0],0));
+  c.fillStyle=g;c.fillRect(X-R,cy-R,R*2,R*2);c.restore();}
 function bossDefeat(c,M,s,X,Y,u,seed,lv,K){ // as bossDefeat, over this boss's own box: card pieces tumble, a large golden wisp rises
   const box=BOSS_BOXES[lv],ox=X-230,oy=Y-300,x0=X+box[0],y0=Y+box[1],w=box[2]-box[0],h=box[3]-box[1],k=BOSS_SIZE[lv]||1;
   if(!K.pieces){const r=rng32(seed),cols=4,rows=3,pts=[];for(let j=0;j<=rows;j++){pts.push([]);for(let i=0;i<=cols;i++){const jx=(i>0&&i<cols)?(r()-0.5)*0.14:0,jy=(j>0&&j<rows)?(r()-0.5)*0.18:0;pts[j].push([i/cols+jx,j/rows+jy]);}}
@@ -2018,7 +2026,7 @@ function bossInto(c,s,lv,t,o,dx,dy,nod,noAura,cache,look){ // a reworked boss: i
   tc.setTransform(s,0,0,s,230*s,300*s);tc.fillStyle=INK;tc.strokeStyle=INK;tc.lineCap="round";tc.lineJoin="round";
   const det=BOSS[lv](tc,t,o.rm,nod,look),N=nd(nod);
   c.save();
-  if(N.aura&&!noAura){const A=bossAura(lv);c.setTransform(s,0,0,s,dx+230*s,dy+300*s);const ag=c.createRadialGradient(0,A[1],10,0,A[1],A[2]);ag.addColorStop(0,rgba(A[0],A[3]));ag.addColorStop(1,rgba(A[0],0));c.fillStyle=ag;c.fillRect(-A[2],A[1]-A[2],A[2]*2,A[2]*2);}
+  if(N.aura&&!noAura){c.setTransform(s,0,0,s,dx+230*s,dy+300*s);bossGlow(c,0,0,lv,1);} // the glow behind (version 7: bossGlow)
   c.setTransform(1,0,0,1,0,0);
   c.shadowColor=rgba(o.dcol,0.95);c.shadowBlur=2.5*s;c.drawImage(T,dx,dy);   // the rim, as a monster's
   c.shadowColor=rgba(o.dglow,0.6);c.shadowBlur=11*s;c.drawImage(T,dx,dy);    // the glow, as a monster's
@@ -2261,8 +2269,8 @@ function renderBossStrip(cv,t,o){ // the wanderer and the place's boss; on a 7.5
   else{ // defeated on a loop: card pieces and a large golden wisp, then back again; the glow behind fades and returns with it
     if(!K.M||K.Ms!==s){K.M=mk(460*s,330*s);K.Ms=s;}
     const mc=K.M.getContext("2d");mc.setTransform(1,0,0,1,0,0);mc.clearRect(0,0,K.M.width,K.M.height);bossInto(mc,s,lv,t,o,0,0,BOSS_NOD,true,K,BOSS_LOOK);
-    const A=bossAura(lv),fade=ph<7?Math.max(0,1-(ph-4.8)/0.8):(ph-7)/0.5;
-    if(fade>0){c.save();const ag=c.createRadialGradient(bx,by+A[1],10,bx,by+A[1],A[2]);ag.addColorStop(0,rgba(A[0],A[3]*fade));ag.addColorStop(1,rgba(A[0],0));c.fillStyle=ag;c.fillRect(bx-A[2],by+A[1]-A[2],A[2]*2,A[2]*2);c.restore();}
+    const fade=ph<7?Math.max(0,1-(ph-4.8)/0.8):(ph-7)/0.5;
+    if(fade>0)bossGlow(c,bx,by,lv,fade);
     if(ph<7)bossDefeat(c,K.M,s,bx,by,(ph-4.8)/2.2,77,lv,K);
     else{c.save();c.globalAlpha=(ph-7)/0.5;c.drawImage(K.M,bx-230,by-300,K.M.width/s,K.M.height/s);c.restore();}}
   c.textAlign="center";c.textBaseline="top";c.font='12px "Alegreya Sans",sans-serif';c.fillStyle="#c9a25a";
@@ -2359,7 +2367,7 @@ function splash(ctx, place, X, Y, t, rm, seed) { // the place's splash of colour
   drawSplash(ctx, PLACE_SET[place] || "village5", "on", X, Y, t || 0, !!rm, seed || 0, "green", "intense");
 }
 return {
-  version: "6.0.0",
+  version: "7.0.0",
   world: {
     LH: LH, GROUND: gY, PLACES: ["night", "storm", "dawn", "mist"], places: LV, bossNames: BOSS_NAME,
     pal: { INK: INK, SKY: SKY, AIR: AIR, HAZE: HAZE, MOON: MOON, MOONPAL: MOONPAL, CLOUD_PAL: CLOUD_PAL, EMBER: EMBER, WITCH: WITCH,
@@ -2380,7 +2388,7 @@ return {
       drawSun: drawSun, drawRays: drawRays, drawRain: drawRain, drawBolt: drawBolt, lightning: lightning,
       renderCutClouds: renderCutClouds, renderMist: renderMist,
       MONSTER: MONSTER, MON_BOX: MON_BOX, drawDefeat: drawDefeat, cardFill: cardFill, cardTaper: cardTaper,
-      BOSS: BOSS, bossInto: bossInto, bossDefeat: bossDefeat, bossAura: bossAura, BOSS_SIZE: BOSS_SIZE, BOSS_BOXES: BOSS_BOXES,
+      BOSS: BOSS, bossInto: bossInto, bossDefeat: bossDefeat, bossAura: bossAura, bossGlow: bossGlow, BOSS_SIZE: BOSS_SIZE, BOSS_BOXES: BOSS_BOXES,
       BOSS_LOOK: BOSS_LOOK, BOSS_NOD: BOSS_NOD, card: card, hollow: hollow, cutPath: cutPath, litLines: litLines,
       drawSplash: drawSplash, SPLASH: SPLASH, SETS: SETS,
       rng32: rng32, hsh: hsh, mixc: mixc, rgba: rgba, mk: mk

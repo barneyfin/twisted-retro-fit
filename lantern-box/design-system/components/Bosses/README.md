@@ -1,6 +1,6 @@
 # Bosses
 
-One boss per place (version 6): black card like the monsters, graded charcoal to ink, with ember eyes, mouths, rim and glow, and a small nod to the level's colour: a few lit lines and the glow behind. Defeated, a boss breaks into card pieces and a large golden wisp rises.
+One boss per place (version 6, made to show on a phone in version 7): black card like the monsters, graded charcoal to ink, with ember eyes, mouths, rim and glow, and a small nod to the level's colour: a few lit lines and the glow behind. Defeated, a boss breaks into card pieces and a large golden wisp rises.
 
 ## When to use
 - At the end of each place's level: Night, the veiled ghost; Blood-red rain, the tentacled skull; Dawn, the moor mother; Mist, the gaping tree. What each does is decided with Gloam Hallow's gameplay.
@@ -12,6 +12,7 @@ const P = W.parts, cache = {};                      // keep one cache object per
 P.bossInto(c, s, level, t, W.options(level), dx, dy, P.BOSS_NOD, false, cache, P.BOSS_LOOK); // one boss, origin at (dx + 230s, dy + 300s)
 P.bossDefeat(c, M, s, X, Y, u /* 0..1 */, seed, level, cache); // its card pieces over P.BOSS_BOXES[level], and the golden wisp
 P.bossAura(level);                                  // the glow behind: [colour, height above the feet, radius, strength]
+P.bossGlow(c, X, Y, level, fade);                   // draws that glow straight onto the scene, feet at (X, Y) in picture units, fade 0..1
 ```
 
 ## The game provides
@@ -20,6 +21,7 @@ P.bossAura(level);                                  // the glow behind: [colour,
 ## Rules
 - Black card cut-outs drawn like the monsters: each piece graded from `card-charcoal` inside to `ink` at its edge, inside a 2 to 3px ink edge; limbs, roots and antlers graded across their width; holes cut through for eyes and mouths, smouldering dark red inside. Put down the monster way: a 2.5px `ember` rim and an 11px `ember-glow` glow round the whole cut-out, then ember eyes, ember mouths with `bone` teeth, and seams.
 - The nod to the level's colour, and only this: a few inner lines lit faintly in it (`boss-night-aura` …, at about 40 to 45%) and the glow behind (`boss-night-aura` …), which fades as the boss breaks and returns with it.
+- The glow (version 7, `boss-glow`): it lightens what is behind the boss (canvas `screen`), so it must be drawn straight onto the scene, before the boss, with `bossGlow`. Never paint it into a cached boss picture: on a transparent canvas there is nothing behind it to lighten, and it comes out as the faint wash version 6 had. A game that caches the boss's picture draws the glow each frame with `bossGlow` and the cached boss without its glow (`noAura` true).
 - Size: 1.2 times their first size (`boss-scale`), larger than the monsters. The ghost 247 picture pixels tall, the skull 206 tall and about 330 wide, the tree 255, the moor mother 270 to her antler tips; the walker is 194.
 - Only the approved settings, `P.BOSS_LOOK` (graded, the skull's horns, the tree leaning with the wind) and `P.BOSS_NOD` (lit details and the glow behind). The boss functions still accept other values from the rounds when options were compared; never use them.
 - The veiled ghost: a tall torn shroud bending one way then another, a paler front layer, a charcoal pointed hood, long low arms with hooked claws.
