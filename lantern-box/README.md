@@ -28,6 +28,7 @@ It prints a line for each game, then `Done, no warnings.` Add a game's folder na
 3. Write `start`, `update` and `draw`. Everything the kit offers is listed in `kit/lantern-box.js` under "Public API".
 4. Name colours with `lb.color('ember')`, never as colour codes. The names are in `design-system/tokens.json`.
 5. A soundtrack goes in a `music.js` beside `index.html`, one or two tracks. The game switches with `lb.music(1)`.
+6. Sounds come from the kit: `lb.sfx('swing')` plays one of the design system's sounds (`lb.sounds` lists them), and `lb.ambient('night')` sets the place's background sound, heard only in play. The kit plays the menus' sounds, the plaque lines' chime, the place card's toll and the win's bells itself. A game carries no sound files of its own.
 
 A frame of the World looks like this. The game decides what happens, and the tools only draw:
 
@@ -57,6 +58,7 @@ The path's scenery is the directions page's sample strip until levels are laid o
 | Defeat | D | Breaks the crowd and the boss into card pieces and wisps |
 | Hurt | | Lowers the health and mana bars |
 | (the wanderer) | Space, J, K, Shift, L | Since 4c-6b the kit's named controls play his moves: Space jumps, J swings the sword, K casts the chosen spell (heal, fireball, or a fizzle with none), Shift rolls, L switches spell. On a touch device the stick walks (a quick flick sideways rolls, up climbs) and the three buttons jump, swing and cast; Hide clears the test buttons away from the thumbs. The readout names the last control pressed |
+| Sounds | | Plays any of the kit's sounds (since 4c-7), and turns the place's background sound on or off. The wanderer's moves make their sounds, the plaque lines chime, the place card tolls and the win rings its bells; the background follows the place shown, in play only, and is off during the speed check |
 | HUD | | Plays the HUD's moments (since 4c-6a, the full HUD of design system version 8): an armour pip filling or cracking, a life's lantern guttering out, learning and switching spells, mana short of the spell's cost, plaque lines (two take turns), a boss fight (its name, the bar filling, hits with their traces, the bar going) and the place card. A tap on the spell's socket switches spells too |
 | Parts | V | Each drawing part in turn: the place alone, the monsters, defeats, the boss, the wanderer walking and standing, his moves (jump, sword, roll, fireball, hurt, the life lost), the boss (arriving, its three attacks with their signals and ground warnings, a hit), the monsters' attacks (each signals, attacks, recovers and takes a hit), casting, the sword's six looks, the spells (heal at three strengths, not enough mana, fireballs and their bursts), the loot (resting, dropping, picked up), the checkpoint (lighting, and the return after a life lost), climbing the place's first bank and walking off the crag (on a level), the splash, the lights |
 | Screens | | Opens any screen: pause, settings, three kinds of game over, initials, high scores, How to play (from play and from the title), the win (three lives, one life), the rotate notice, the title |
@@ -141,7 +143,7 @@ Off leaves out the glow round lights, ember eyes, splashes and wisps. A monster'
 | `kit/lantern-box.js` | The game shell, and the World's drawing code with its tools |
 | `kit/build.py` | Makes `dist/<name>.html` and checks the rules |
 | `kit/template.html` | The starting point for a new game |
-| `kit/fonts/`, `kit/licences/` | IM Fell English and Alegreya Sans, and their licences |
+| `kit/fonts/`, `kit/licences/` | IM Fell English and Alegreya Sans, and their licences; the source and licence of the kit's two recorded sounds |
 | `games/lb-sampler/` | The test page |
 | `games/lb-empty/` | A copy of the template, kept to prove a new game builds with no warnings |
 

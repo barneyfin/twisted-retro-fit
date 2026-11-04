@@ -24,6 +24,8 @@ It warns about anything the arcade's rules (ARCADE.md) or Lantern Box's rules fo
 - things that would flash or repeat faster than 3 times a second, where the code shows it: fast endless
   animations, fast blink formulas and fast timers
 - kit fonts that differ from the design system's copy
+- the kit's recorded sounds (SND_CLIPS) coming to 100 KB or more, or without their source and licence noted in
+  lantern-box/kit/licences/README.md (ARCADE.md)
 
 Standard library only; Python 3.8 or newer.
 """
@@ -186,6 +188,28 @@ def inline_js(js_path):
     return js.replace("</script", "<\\/script")
 
 
+CLIPS_RE = re.compile(r"const SND_CLIPS\s*=\s*\{(.*?)\};", re.DOTALL)
+CLIP_RE = re.compile(r'"([\w-]+)"\s*:\s*"([A-Za-z0-9+/]*={0,2})"')
+CLIPS_LIMIT = 100 * 1024   # bytes: ARCADE.md allows short sound effects under 100 KB in all
+
+
+def check_clips():
+    """Warn about the kit's recorded sounds: 100 KB or more in all, or no note of their source and licence. Returns the number of warnings."""
+    notes = []
+    m = CLIPS_RE.search(read_text(KIT / "lantern-box.js"))
+    if m:
+        size = sum(len(base64.b64decode(data)) for _, data in CLIP_RE.findall(m.group(1)))
+        if size >= CLIPS_LIMIT:
+            notes.append("the kit's recorded sounds (SND_CLIPS in lantern-box.js) come to " + str(round(size / 1024)) +
+                         " KB: ARCADE.md allows short sound effects under 100 KB in all")
+        readme = LICENCES / "README.md"
+        if not readme.exists() or "Pixabay" not in readme.read_text(encoding="utf-8"):
+            notes.append("the kit's recorded sounds have no note of their source and licence in lantern-box/kit/licences/README.md (ARCADE.md)")
+    for note in notes:
+        print("  Warning: " + note + ".")
+    return len(notes)
+
+
 def check_kit():
     """Warn about the kit's own fonts: a copy that differs from the design system's. Returns the number of warnings."""
     notes = []
@@ -332,7 +356,7 @@ def main():
         dirs = sorted(p for p in GAMES.iterdir() if p.is_dir() and (p / "index.html").exists()) if GAMES.exists() else []
         if not dirs:
             fail("no games found in lantern-box/games/")
-    warnings = check_kit()
+    warnings = check_kit() + check_clips()
     for f in KIT_FILES:
         if f.exists():
             warnings += check_lines(rel(f), read_text(f), game=False)
