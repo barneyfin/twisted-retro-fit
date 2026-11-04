@@ -22,6 +22,12 @@
   --health-low: #b52b22;
   --mana-top: #5fdcca;
   --mana-low: #2a9f8f;
+  --boss-top: #ff9a5a;
+  --boss-low: #a8331a;
+  --boss-trace: rgba(255,200,150,0.55);
+  --touch-face: rgba(12,7,9,0.55);
+  --touch-face-light: rgba(12,7,9,0.3);
+  --touch-face-pressed: rgba(201,162,90,0.3);
   --brass-wash: rgba(201,162,90,0.14);
   --brass-tint: rgba(201,162,90,0.1);
   --brass-glow: rgba(255,190,100,0.35);

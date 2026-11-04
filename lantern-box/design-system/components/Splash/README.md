@@ -3,7 +3,7 @@
 The splashes of colour: one small, menacing thing at ground level per stretch of path, lit from within by witch-green.
 
 ## When to use
-- Placed along the path by the game, a few per screen at most. One design per place: Night, a pierced tin grave lantern; Blood-red rain, a grotesque on a post; Dawn, an iron fire basket; Mist, a horned mask nailed to a stump.
+- Placed along the path by the game, a few per screen at most. One design per place: Night, a pierced tin grave lantern; Blood Red Rain, a grotesque on a post; Dawn, an iron fire basket; Mist, a horned mask nailed to a stump.
 - They are scenery with menace, not monsters: they do not attack unless a game's gameplay says they do.
 
 ## Code

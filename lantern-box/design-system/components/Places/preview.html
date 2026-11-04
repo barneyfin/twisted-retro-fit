@@ -21,7 +21,7 @@ canvas{display:block;width:100%;background:var(--ink)}
 </head>
 <body>
 <div class="lb-ui wrap">
-<div class="bar"><span class="cap">Drawn by LanternBox.world.drawPlace, the approved round 12 code</span><span class="sp"></span><button class="lb-btn" type="button" id="play" aria-pressed="false">Play</button></div><div class="grid"><figure><canvas id="c-night" style="height:258px" aria-label="Night"></canvas><figcaption class="cap"><b style="color:var(--text)">Night</b> · the graveyard at the edge of the village</figcaption></figure><figure><canvas id="c-storm" style="height:258px" aria-label="Blood-red rain"></canvas><figcaption class="cap"><b style="color:var(--text)">Blood-red rain</b> · the old town</figcaption></figure><figure><canvas id="c-dawn" style="height:258px" aria-label="Dawn"></canvas><figcaption class="cap"><b style="color:var(--text)">Dawn</b> · the open moor</figcaption></figure><figure><canvas id="c-mist" style="height:258px" aria-label="Mist"></canvas><figcaption class="cap"><b style="color:var(--text)">Mist</b> · the wind-bent forest</figcaption></figure></div>
+<div class="bar"><span class="cap">Drawn by LanternBox.world.drawPlace, the approved round 12 code</span><span class="sp"></span><button class="lb-btn" type="button" id="play" aria-pressed="false">Play</button></div><div class="grid"><figure><canvas id="c-night" style="height:258px" aria-label="Night"></canvas><figcaption class="cap"><b style="color:var(--text)">Night</b> · the graveyard at the edge of the village</figcaption></figure><figure><canvas id="c-storm" style="height:258px" aria-label="Blood Red Rain"></canvas><figcaption class="cap"><b style="color:var(--text)">Blood Red Rain</b> · the old town</figcaption></figure><figure><canvas id="c-dawn" style="height:258px" aria-label="Dawn"></canvas><figcaption class="cap"><b style="color:var(--text)">Dawn</b> · the open moor</figcaption></figure><figure><canvas id="c-mist" style="height:258px" aria-label="Mist"></canvas><figcaption class="cap"><b style="color:var(--text)">Mist</b> · the wind-bent forest</figcaption></figure></div>
 </div>
 <script>
 
@@ -35,7 +35,7 @@ function ground(c,W,wx0,y1){c.fillStyle=L.pal.INK;c.beginPath();c.moveTo(0,y1+10
 function label(c,txt,X,Y){c.save();c.font=(12*(window._d||1)/(window._s||1)).toFixed(2)+'px "Alegreya Sans",sans-serif';c.textAlign='center';c.textBaseline='top';c.fillStyle='#c9a25a';c.fillText(txt,X,Y);c.restore();}
 function player(btn,draw){let on=false,t0=0,id=0;const loop=n=>{draw((n-t0)/1000);id=requestAnimationFrame(loop);};
   btn.addEventListener('click',()=>{on=!on;btn.setAttribute('aria-pressed',String(on));btn.textContent=on?'Pause':'Play';if(on){t0=performance.now()-btn._t*1000;id=requestAnimationFrame(loop);}else{cancelAnimationFrame(id);}});btn._t=0;return t=>{btn._t=t;};}
-function places(bar,cb){const names={night:'Night',storm:'Blood-red rain',dawn:'Dawn',mist:'Mist'};bar.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{bar.querySelectorAll('[data-lv]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));cb(b.dataset.lv);}));}
+function places(bar,cb){const names={night:'Night',storm:'Blood Red Rain',dawn:'Dawn',mist:'Mist'};bar.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{bar.querySelectorAll('[data-lv]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));cb(b.dataset.lv);}));}
 
 const cvs=L.PLACES.map(k=>document.getElementById('c-'+k));
 function draw(t){L.PLACES.forEach((k,i)=>L.drawPlace(cvs[i],{level:k,t:t,camX:600+t*60,walking:t>0,rm:RM}));}

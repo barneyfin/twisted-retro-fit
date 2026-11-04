@@ -3,7 +3,7 @@
 One boss per place (version 6, made to show on a phone in version 7): black card like the monsters, graded charcoal to ink, with ember eyes, mouths, rim and glow, and a small nod to the level's colour: a few lit lines and the glow behind. Defeated, a boss breaks into card pieces and a large golden wisp rises.
 
 ## When to use
-- At the end of each place's level: Night, the veiled ghost; Blood-red rain, the tentacled skull; Dawn, the moor mother; Mist, the gaping tree. What each does is decided with Gloam Hallow's gameplay.
+- At the end of each place's level: Night, the veiled ghost; Blood Red Rain, the tentacled skull; Dawn, the moor mother; Mist, the gaping tree. What each does is decided with Gloam Hallow's gameplay.
 
 ## Code
 ```js
@@ -30,3 +30,6 @@ P.bossGlow(c, X, Y, level, fade);                   // draws that glow straight 
 - The gaping tree: leaning with the wind; a twisted trunk graded across its width and darkening to the base; a small skull's face in the bark (sockets with ember eyes, a gaping maw with splinter teeth), no nose and no ember seams; strong roots leaving the trunk like buttresses and spreading along the ground; two angular side branches below the crown at different heights; a crown of fine angular twigs; moss strands (`boss-mist-moss`). No arms, hands or legs.
 - Poses change in steps (`puppet-steps`). Nothing flickers more than 3 times a second.
 - Defeat: card pieces (4 by 3) over the boss's own box (`P.BOSS_BOXES`) tumble and fade as the glow fades; a large golden wisp (`wisp-gold`, glow `wisp-gold-glow` through `gold-light`) rises.
+
+## Version 8
+- The names are capitalised, as names: The Veiled Ghost, The Tentacled Skull, The Moor Mother, The Gaping Tree (`BOSS_NAME`). Their attacks, signals, ground warnings and arrival are in BossAttacks (play.js); the bar in BossBar; the name plaque in PlaqueLine.

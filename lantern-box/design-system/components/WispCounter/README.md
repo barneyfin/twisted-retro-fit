@@ -20,3 +20,6 @@ Add `is-phone` for 96px wide.
 - 104px wide (96 on a phone), `hud-face`, `chamfer-hud`. WISPS in `counter-label`, `wisp-label`; the number in `counter`, padded to four places with zeros, tabular, `heading`.
 - Past 9999 it shows all the digits; the plaque does not grow, so a game expecting more than five digits widens it.
 - It does not flash or bounce. Screen readers hear the score only when asked, not at every wisp.
+
+## Version 8
+- On a phone the WISPS label is 12px (no text in play under 12px on a phone). In Hysteria (later) the same plaque shows the clock: TIME over minutes and seconds.

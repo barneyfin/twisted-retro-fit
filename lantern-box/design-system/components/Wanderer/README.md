@@ -18,3 +18,6 @@ W.drawWanderer(ctx, X, Y, t, walking, facing /* 1 or -1 */, rm, W.places[level].
 - `ink` silhouette, edged 1.3px up and to the right in the place's light (`night-edge` …); the lantern's glass `lamp-glass` with a `lantern-glow` pool round it and a faint light at the feet; the scarf `wanderer-scarf`.
 - The scarf is a stand-in: a hooded figure with a long red scarf is the traveller in *Journey* (2012). PRD question 8 is open; Barney's pencilled answer is no scarf and a long trailing red tie belt at the waist, settled in 4b.
 - The hero is never ember: ember means danger.
+
+## Version 8
+- The long red tie belt (knotted at the back, two tails trailing) replaces the scarf: PRD question 8, settled in step 4b round 1b. His moves, poses and effects are in Moves (play.js).

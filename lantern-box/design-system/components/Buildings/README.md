@@ -3,7 +3,7 @@
 The building kinds: crooked cut-outs, every storey leaning, with lit and dark windows cut through them. Neighbours never match.
 
 ## When to use
-- In the backdrop layers of Night (village houses, a chapel, a manor) and Blood-red rain (crowded townhouses, taverns, a watchtower); ruins, mills, crypts and towers on the moor; a woodcutter's hut and a great stump in the forest. The one on the path is the mouth-hat's perch.
+- In the backdrop layers of Night (village houses, a chapel, a manor) and Blood Red Rain (crowded townhouses, taverns, a watchtower); ruins, mills, crypts and towers on the moor; a woodcutter's hut and a great stump in the forest. The one on the path is the mouth-hat's perch.
 
 ## Code
 ```js
@@ -20,5 +20,3 @@ p.fillHoles(ctx, sprite, X, groundY, k, rng, { litP, win: W.pal.GOLD_LIGHT, a: 0
 ## Rules
 - Nine building kinds plus the moor's dolmen and the forest's stump. All `ink`, tinted towards the place's air with their layer; windows cut after every solid part, lit `gold-light` or dark `window-dark`.
 - Quirky, not cute: sagging roofs, jutting storeys, bent spires, missing tiles, broken sails.
-- On the moor's slopes a building stands on the flattest, highest ground near its place, so no wall, door or window is buried in the hill.
-- Every backdrop building stands a few lines into its ground so it never floats; its doors and windows end at the layer's ground line, so none shows on the hill.

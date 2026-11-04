@@ -23,3 +23,6 @@ Add `is-phone` for 206px wide.
 - 232px wide (206 on a phone), `hud-face`, `chamfer-hud`, padded 9px 12px, rows 6px apart.
 - Health 10px tall, `health-top` to `health-low`; mana 7px, `mana-top` to `mana-low`; both in a `track` with a `track-line` edge, so the empty part shows. Icons `brass`.
 - Bars change in steps as the game sets them; no flashing when low. Hits are shown on the wanderer in the World.
+
+## Version 8
+- Grown into three rows (`lb-vitals is-full`): health with three armour slots continuing its line, mana, a lantern per life, and the spell's socket at the right. See HUD for the whole plaque, its moments and its rules.

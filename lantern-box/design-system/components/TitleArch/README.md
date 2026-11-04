@@ -32,3 +32,6 @@ The lancet arch: a gothic arch cut from black card, lit from behind, holding the
 - The selected item is lit, not banded: `title-selected`, 700, `glow-title-item`, a `gold-light` candle flame before it. Others `title-item`. Hover lights an item to `title-selected` without the flame.
 - Best is `best` type, padded to four places, in `title-letter`; its label in `title-item`. Before any score: Best 0000 wisps.
 - Hint `hint` at 13px in `title-hint`, keycaps in `title-key` and `title-key-line`. Computers only.
+
+## Version 8
+- Four items: Start game, How to play, High scores, Settings. Inside the same arch everything moves up and closes in to fit (`lb-arch has-four`: padding 70px, gaps 12px, items 42px tall; on a phone padding 48px, gaps 6px, items 44px, the name 42px).

@@ -24,3 +24,6 @@ W.parts.drawDefeat(c, M, s, X, Y, box, u /* 0..1 */, "cardwisp", seed);
 - Three sizes: small (crawler, flyer), medium (mouth-hat, ghoul), large (the walker, 15% wider than first drawn). The mouth-hat has no black-and-white stripes.
 - Defeat: the cut-out splits into jagged card pieces that tumble away and fade; a pale wisp (`wisp-pale`, glow `wisp-pale-glow`) rises up and to the right towards the score. No blood, ever.
 - The labels under the samples belong to this preview, not to games.
+
+## Version 8
+- Made posable for their attacks (`crawlerP`, `bat2P`, `hatmawP`, `ghoulP`, `walkerP` in play.js): see MonsterAttacks.

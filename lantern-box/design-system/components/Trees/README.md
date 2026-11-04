@@ -3,7 +3,7 @@
 The trees and plants: gnarled pollards with thick spreading limbs, wind-bent trees, dead snags, overhanging limbs, and the fore layer's grass, ferns and heather.
 
 ## When to use
-- Pollards in Night and Blood-red rain; wind-bent trees and snags in Mist (all bent the same way); the moor's heather and wind-combed grass at Dawn. Overhanging limbs reach in from the top corners in the fore layer, pinned to the top edge when the camera rises.
+- Pollards in Night and Blood Red Rain; wind-bent trees and snags in Mist (all bent the same way); the moor's heather and wind-combed grass at Dawn. Overhanging limbs reach in from the top corners in the fore layer, pinned to the top edge when the camera rises.
 
 ## Code
 ```js

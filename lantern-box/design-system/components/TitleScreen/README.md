@@ -22,3 +22,6 @@ On a phone held sideways: the arch `is-phone` at 44px left and 8px top; the tile
 - The arch stands on the left, so the middle and right of the place stay open; nothing else covers the picture.
 - The first key or tap also starts the audio.
 - Keyboard hints are hidden on touch devices.
+
+## Version 8
+- How to play is the arch's second item (TitleArch, `has-four`).

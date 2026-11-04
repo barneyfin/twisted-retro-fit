@@ -19,3 +19,6 @@ Add `is-phone` for 44px.
 - 40px on a computer, `target` (44px) on a phone: a 1.5px `brass` edge round a `tile-face`, corners cut by `chamfer-control`. Icons are 20px strokes in `heading`.
 - Tiles sit `space-3` apart (`space-2` on a phone), top-aligned with the counter.
 - Focus: a 2px `focus` ring inside the face.
+
+## Version 8
+- A third tile, "?" (How to play), sits between full screen and pause; it opens the how-to-play page with the game paused (HowToPlay).

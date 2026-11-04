@@ -35,7 +35,7 @@ function ground(c,W,wx0,y1){c.fillStyle=L.pal.INK;c.beginPath();c.moveTo(0,y1+10
 function label(c,txt,X,Y){c.save();c.font=(12*(window._d||1)/(window._s||1)).toFixed(2)+'px "Alegreya Sans",sans-serif';c.textAlign='center';c.textBaseline='top';c.fillStyle='#c9a25a';c.fillText(txt,X,Y);c.restore();}
 function player(btn,draw){let on=false,t0=0,id=0;const loop=n=>{draw((n-t0)/1000);id=requestAnimationFrame(loop);};
   btn.addEventListener('click',()=>{on=!on;btn.setAttribute('aria-pressed',String(on));btn.textContent=on?'Pause':'Play';if(on){t0=performance.now()-btn._t*1000;id=requestAnimationFrame(loop);}else{cancelAnimationFrame(id);}});btn._t=0;return t=>{btn._t=t;};}
-function places(bar,cb){const names={night:'Night',storm:'Blood-red rain',dawn:'Dawn',mist:'Mist'};bar.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{bar.querySelectorAll('[data-lv]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));cb(b.dataset.lv);}));}
+function places(bar,cb){const names={night:'Night',storm:'Blood Red Rain',dawn:'Dawn',mist:'Mist'};bar.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{bar.querySelectorAll('[data-lv]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));cb(b.dataset.lv);}));}
 
 const cv=document.getElementById('cv'),NM={night:'grave lantern',storm:'grotesque on a post',dawn:'iron fire basket',mist:'mask on a stump'};
 function draw(t){const c=cv.getContext('2d'),W=pic(cv,370,500),cw=W/4;

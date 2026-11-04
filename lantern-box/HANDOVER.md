@@ -19,7 +19,7 @@ It is **neither Retro Kit nor City Nights**. Do not use the `retro-kit` skill or
 
 ## Where things are
 
-- The approved design system (the spec): https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. The copy in `lantern-box/design-system/` is version 7 of it (version 1 plus the layer lift and contrast, the moor's houses, its stone circles and the buildings' doors below, the new bosses and graded monsters in `HANDOVER-bosses.md`, and version 7's lighter blacks and stronger glow in `HANDOVER-bosses-7.md`).
+- The approved design system (the spec): https://claude.ai/artifact/WHorELA7gRgEncv7E7vvEY. The copy in `lantern-box/design-system/` is version 8 of it (version 1 plus the layer lift and contrast, the moor's houses, its stone circles and the buildings' doors below, the new bosses and graded monsters in `HANDOVER-bosses.md`, version 7's lighter blacks and stronger glow in `HANDOVER-bosses-7.md`, and the play parts of version 8 in `HANDOVER-play-8.md`).
 - The PRD (approved): https://claude.ai/artifact/HrT3en8qzkZG6v6kZxkPcJ
 - The screens rounds, the mock-ups behind the design system: https://claude.ai/artifact/J2qPyKBtp9xn2v6qDXLVdA
 - The approved look (round 12 directions page): https://claude.ai/artifact/NUbeSksdSun3oMFkVkEcbo. Its source is `lantern-box/speed-test/src/directions-round12.html`.
@@ -104,7 +104,7 @@ About 9 ms of headroom on the phone in its worst place. Claude's suggestions for
 ## Working with Barney
 
 - He is a GP partner learning to build software, on Windows. Explain what you did and why in a few plain sentences, and always say what you could not test.
-- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off, CM61 the layer lift and contrast, CM62 design system 2 and kit 0.5.0, CM63 design system 3 and kit 0.5.1, CM64 design system 4 and kit 0.5.2, CM65 design system 5 and kit 0.5.3, CM66 design system 6 and kit 0.6.0, CM67 design system 7 and kit 0.7.0; use CM68 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
+- **Commit after checking in with him.** At the end of each step, write the commit message to `CM<n>.txt` in the repo root (CM54 was step 3a, CM55 this commit rule, CM56 step 3b, CM57 step 3c, CM58 step 3d, CM59 the speed results, CM60 the sign-off, CM61 the layer lift and contrast, CM62 design system 2 and kit 0.5.0, CM63 design system 3 and kit 0.5.1, CM64 design system 4 and kit 0.5.2, CM65 design system 5 and kit 0.5.3, CM66 design system 6 and kit 0.6.0, CM67 design system 7 and kit 0.7.0, CM68 the ARCADE.md sound-effects rule, CM69 the design system 8 copy; use CM70 next) and ask. When he says yes, move the file into `.git`, stage only the paths that belong to the step, and run `git commit -F .git/CM<n>.txt`. Never push or create branches unless he asks (a push to `main` publishes the website).
 - Python on his PC: `C:\Users\barne\AppData\Local\Programs\Python\Python312\python.exe`. The repo: `C:\Users\barne\Documents\Calude Code\Retro Games` (the folder really is spelt "Calude").
 - **Speed can only be measured on his devices** (Chrome on his computer and on his Pixel). Close any other copy of a page before measuring.
 - **The design system is the spec.** If the code needs something it does not cover, or a rule seems wrong, stop and ask Barney. Design changes are made in the design system first (in his Claude app project), then the copy here is refreshed.
@@ -158,6 +158,10 @@ Version 7 was made in Barney's Claude app project on 3 November, after his Pixel
 - The glow lightens what is behind it (canvas `screen`), so `Scene.bossAt` paints the cached boss without it (`noAura` true) and draws it straight onto the scene each frame with `bossGlow`, just before the boss; `world.boss()`'s defeat draws its fading glow the same way. Effects off: no glow. `BOSS_PAD` is gone.
 - Checked: each boss with its glow matches the design system's own drawing to within 1 colour level in 255 over the glow's whole area, in all four places; the glow clearly lightens the scene beside each boss (Night 32 to 111 on a 0 to 255 scale, Rain 55 to 106, Dawn 84 to 141, Mist 97 to 171) and is gone with Effects off; defeats draw with Effects on and off; both games build with no warnings and a clean console. One glow takes about 0.1 ms at Dawn and 1.5 ms in Mist on the computer.
 - Speed on Barney's Pixel (3 November, kit 0.7.0): Night 72 fps / 9.8 ms, Rain 58 / 13.9, Dawn 77 / 10.1, Mist 63 / 11.2, slowest 5% 25 ms, longest 41 ms, layers 111 MB. It passes in every place, within a few frames a second of kit 0.6.0 (`README.md`, The speed check).
+
+## The play parts (design system version 8, step 4c)
+
+Version 8 was made in Barney's Claude app project on 4 November and gathers in Gloam Hallow's play parts from step 4b's twelve review rounds: `components/play.js`, 18 new components and `bundle.js` 8.0.0. `HANDOVER-play-8.md` describes it, the copy (CM69) and step 4c, the kit change that brings the play parts into the kit; plan 4c with Barney before building. Until then the kit is still 0.7.0 and uses none of version 8.
 
 ## Still open (not phase 3)
 
