@@ -1,4 +1,4 @@
-/* Lantern Box 0.2 — stylesheet
+/* Lantern Box 0.8 — stylesheet
    Three parts: the design system's tokens and fonts (design-system/tokens.css, copied unchanged; each font's licence is
    in kit/licences), the Interface (design-system/components/bundle.css, copied unchanged), and the shell's layout, which
    places them on the screen. Games never edit this file. Change the design system first, then this file. */

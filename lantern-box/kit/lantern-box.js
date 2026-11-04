@@ -1,4 +1,4 @@
-/* Lantern Box 0.7 — runtime
+/* Lantern Box 0.8 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.7.0';
+  const VERSION = '0.8.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -1154,11 +1154,11 @@ class Scene{
     if(L.light==="sun"){at(0);drawRays(ctx,W,t,rm);}
     at(0.34);
     if(L.fly==="bats")drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));
-    else drawCrows(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),L.fly==="crows"?7:3,false);
+    else if(L.fly==="crows")drawCrowFlocks(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));else drawCrowsAlone(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),3,false);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),0); /* version 8 */
     at(0.5);this.layer(ctx,off,s,W,t,camX*f(0.5),3,tn[2],o);mb(3);
     at(0.62);
     if(L.fly==="bats")drawBigBats(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7));
-    else if(L.fly==="crows")drawCrows(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7),0,true);
+    else if(L.fly==="crows")drawCrowsAlone(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7),3,true);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.78),1); /* version 8 */
     at(0.76);this.layer(ctx,off,s,W,t,camX*f(0.76),4,tn[3],o);
     at(1);this.play(ctx,s,W,t,camX,o);
     if(lv==="storm")drawRain(ctx,W,t,1,rm);
@@ -1390,13 +1390,16 @@ let FX=true;                               // the Effects setting: glow round li
 // a boss's picture moves only with its pose time, pz(t*rate): rate*8 steps a second (night 5.6, storm 6.4, dawn 5.6, mist 4.8),
 // so it is repainted exactly when its pose steps. The rates are the boss functions' own (BOSS.night ... BOSS.mist): keep them in step
 const BOSS_STEP={night:0.7,storm:0.8,dawn:0.7,mist:0.6};
-const FLY_BOX={bat:[-22,-16,22,12],crow:[-20,-14,14,11]},FLY_REF=1.2;
+// version 8: the side-on crow (crowSide) beats with cos(ph), not sin(ph), and the moor's near crows are drawn up to 1.43 times
+// their size, so it is painted at 1.5 (the box holds every wing position, worked out from its points)
+const FLY_BOX={bat:[-22,-16,22,12],crow:[-20,-14,14,11],crowSide:[-16,-20,15,16]},FLY_REF={bat:1.2,crow:1.2,crowSide:1.5};
+const FLY_DRAW={bat:(c,q,col)=>drawBat(c,0,0,1,Math.asin(q/8-1),col),crow:(c,q,col)=>drawCrow(c,0,0,1,Math.asin(q/8-1),col),crowSide:(c,q,col)=>crowSide(c,0,0,1,Math.acos(q/8-1),col)};
 function drawFlyerKit(x,kind,X,Y,k,ph,col){ // bats and crows: each wing position painted once, 17 positions from up to down
-  const s=KIT.fly,q=Math.round((Math.sin(ph)+1)*8),key=kind+col+q,bb=FLY_BOX[kind];
+  const s=KIT.fly,q=Math.round(((kind==="crowSide"?Math.cos(ph):Math.sin(ph))+1)*8),key=kind+col+q,bb=FLY_BOX[kind];
   if(!KIT.fc||KIT.fcS!==s){KIT.fc=new Map();KIT.fcS=s;}
   let cv=KIT.fc.get(key);
-  if(!cv){const R=FLY_REF*s;cv=mk((bb[2]-bb[0])*R,(bb[3]-bb[1])*R);const c=cv.getContext("2d");c.setTransform(R,0,0,R,-bb[0]*R,-bb[1]*R);
-    KIT.fly=null;(kind==="bat"?drawBat:drawCrow)(c,0,0,1,Math.asin(q/8-1),col);KIT.fly=s;KIT.fc.set(key,cv);}
+  if(!cv){const R=FLY_REF[kind]*s;cv=mk((bb[2]-bb[0])*R,(bb[3]-bb[1])*R);const c=cv.getContext("2d");c.setTransform(R,0,0,R,-bb[0]*R,-bb[1]*R);
+    KIT.fly=null;FLY_DRAW[kind](c,q,col);KIT.fly=s;KIT.fc.set(key,cv);}
   x.drawImage(cv,X+bb[0]*k,Y+bb[1]*k,(bb[2]-bb[0])*k,(bb[3]-bb[1])*k);
 }
 function fairySprite(lv,s){ // one light on a string, with its glow, painted once (the glow is in screen pixels, as in the mock-up)
@@ -1511,11 +1514,11 @@ Object.assign(Scene.prototype,{
     if(L.light==="sun"){at(0);drawRays(ctx,W,t,rm);}
     at(f(0.34),0.34);KIT.fly=s;
     if(L.fly==="bats")drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));
-    else drawCrows(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),L.fly==="crows"?7:3,false);
+    else if(L.fly==="crows")drawCrowFlocks(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));else drawCrowsAlone(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),3,false);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),0); // version 8
     KIT.fly=null;this.kitLayer(ctx,s,W,t,camX*f(0.5),3,tn[2],o,off(f(0.5),0.5));mb(3);KIT.fly=s;
     at(f(0.62),0.62);
     if(L.fly==="bats")drawBigBats(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7));
-    else if(L.fly==="crows")drawCrows(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7),0,true);
+    else if(L.fly==="crows")drawCrowsAlone(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7),3,true);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.78),1); // version 8
     KIT.fly=null;
     this.kitLayer(ctx,s,W,t,camX*f(0.76),4,tn[3],o,off(f(0.76),0.76));
     // the path: its still parts from tiles, then everything that moves on it
@@ -1683,6 +1686,46 @@ function drawCrow(x,X,Y,k,ph,col){if(KIT.fly)return drawFlyerKit(x,'crow',X,Y,k,
   x.beginPath();x.moveTo(-5,0.8);x.lineTo(-11.5,-0.8);x.lineTo(-11,4.2);x.closePath();x.fill();
   x.restore();
 }
+/* version 8 (step 4b round 12, Barney, 4 November 2026): the crow redrawn side on, beating its wings as the bats do; the moor's
+   flocks; the crows flying alone; the Mist's leaves. The old drawCrow and drawCrows are kept for reference but no longer drawn. */
+/* Round 12, the places: the moor's crow flocks (like the night's bat swarm, crossing left to right) beside its solitary crows,
+   and the Mist's leaves blowing across from left to right. The design system's scene calls these where it draws its flyers
+   (the page's build adds the calls to bundle.js; version 8 makes them part of it). Scenery: tinted as their layer, no glow. */
+// a crow side on, flying right, beating its wings as the bats do: a long body, a head with a heavy beak and a fanned tail,
+// and long wings with five fingers splayed at the tip. ph: the beat; cos(ph) is the near wing's lift, +1 up, -1 down.
+function crowSide(x,X,Y,k,ph,col){if(KIT.fly)return drawFlyerKit(x,'crowSide',X,Y,k,ph,col); /* the kit way: each wing position painted once */
+  x.save();x.translate(X,Y);x.scale(k,k);x.fillStyle=col;const c=Math.cos(ph);
+  const wing=(sx,sy,lift)=>{x.save();x.translate(sx,sy);x.rotate(-0.38);x.scale(1,lift);x.beginPath();x.moveTo(4.2,0.6);x.quadraticCurveTo(5,-7,3.4,-9.6);x.lineTo(2.6,-16);x.lineTo(1.7,-12.6);
+    x.lineTo(0.8,-16.4);x.lineTo(-0.1,-12.4);x.lineTo(-1.1,-15.6);x.lineTo(-1.8,-11.8);x.lineTo(-3,-14.2);x.lineTo(-3.3,-10.6);x.quadraticCurveTo(-4.6,-5,-3.8,0.6);x.closePath();x.fill();x.restore();};
+  const lift=v=>Math.sign(v||1)*Math.max(0.16,Math.abs(v));
+  wing(2.2,-1.6,lift(c*0.85+0.22));                                                   // the far wing, behind
+  x.beginPath();x.ellipse(0,0,7,2.6,-0.04,0,Math.PI*2);x.fill();                      // body
+  x.beginPath();x.arc(7.2,-1.1,2.4,0,Math.PI*2);x.fill();                             // head
+  x.beginPath();x.moveTo(9,-2.1);x.lineTo(13.4,-0.7);x.lineTo(9,0.3);x.closePath();x.fill();   // beak
+  x.beginPath();x.moveTo(-5.6,-1.3);x.lineTo(-13,-2.6);x.quadraticCurveTo(-14.2,0.6,-12.6,3.8);x.lineTo(-5.6,1.5);x.closePath();x.fill();   // tail
+  wing(1,-1,lift(c));x.restore();}                                                    // the near wing
+// flocks of crows, as the night's bat swarms are made: two flocks, close and wheeling, every crow beating its wings, crossing left to right
+function drawCrowFlocks(x,W,t,lx,rm,col){const span=W+800,v=rm?22:50,N=rm?11:22;
+  for(let f=0;f<2;f++){const cx=-400+((t*v+f*span*0.55-lx)%span+span)%span,cy=165+f*50+Math.sin(t*0.4+f*2)*16;
+    if(cx<-260||cx>W+260)continue;
+    for(let i=0;i<N;i++){const h=(m,q)=>{const r=Math.sin((f*97+i*13.7)*m)*q;return r-Math.floor(r);},a=h(12.9898,43758.5453),b=h(78.233,24658.37),c=h(39.42,9658.1);
+      const wob=Math.sin(t*(rm?0.6:1.2)+i)*(rm?2:5),ox=(a-0.5)*230+wob*0.5,oy=(b-0.5)*80+wob,k=0.52+c*0.24;
+      crowSide(x,cx+ox,cy+oy,k,t*(rm?4.5:9)+i*0.7,col);}}};
+// a leaf: a pointed oval with a short stem, turned and squashed as it tumbles
+function leafShape(x,X,Y,k,ang,turn,col){x.save();x.translate(X,Y);x.rotate(ang);x.scale(k,k*Math.max(0.15,Math.abs(Math.cos(turn))));x.fillStyle=col;
+  x.beginPath();x.moveTo(-6,0);x.quadraticCurveTo(-1,-3.6,6,0);x.quadraticCurveTo(-1,3.6,-6,0);x.closePath();x.fill();x.fillRect(-8.5,-0.45,3,0.9);x.restore();}
+// leaves on the wind: depth 0 far (small, slow, tinted), 1 nearer; gusts come and go
+function drawLeaves(x,W,t,lx,rm,col,depth){const N=depth?(rm?4:9):(rm?7:16),sp=depth?(rm?70:190):(rm?40:110),span=W+300,H=420;
+  for(let i=0;i<N;i++){const r1=Math.sin((depth*53+i*17.1)*12.9898)*43758.5453,a=r1-Math.floor(r1),r2=Math.sin((depth*29+i*5.7)*78.233)*24658.37,b=r2-Math.floor(r2);
+    const gust=1+0.45*Math.sin(t*0.37+i*0.21)+0.25*Math.sin(t*1.1+depth),v=sp*(0.75+a*0.5)*gust;
+    const X=-150+(((t*v+a*span*3-lx)%span)+span)%span,Y=(depth?120:90)+b*H*(depth?0.7:0.75)+Math.sin(t*(1.3+a)+i)*(depth?18:10)+X*0.05*(b-0.4);
+    const k=depth?(1.3+a*0.7):(0.7+a*0.4),ang=Math.sin(t*(2+a*2)+i)*0.9+t*(depth?2.2:1.2)*(b>0.5?1:-1),turn=t*(3+b*4)+i;
+    leafShape(x,X,Y,k,ang,turn,col);}};
+// crows flying alone or in a few: the same crow, nearer and bigger (the moor's three near ones; the Mist's three far ones)
+function drawCrowsAlone(x,W,t,lx,rm,col,n,big){const span=W+760;
+  for(let i=0;i<n;i++){const v=big?(rm?20:52)+i*12:(rm?12:30)+i*6,X=-220+(((t*v+i*span*0.41-lx)%span)+span)%span,Y=(big?118+i*54:170+i*26)+Math.sin(t*0.5+i*1.9)*(big?10:6);
+    crowSide(x,X,Y,big?1.15+i*0.14:0.62+i*0.07,t*(rm?3:6)+i*1.3,col);}};
+
 function drawCrows(x,W,t,lx,rm,col,n,big){
   const span=W+760;
   if(big){for(let i=0;i<3;i++){const v=(rm?20:52)+i*12,X=-220+posmod(t*v+i*span*0.41-lx,span),Y=118+i*54+Math.sin(t*0.6+i*1.9)*12;drawCrow(x,X,Y,0.95+i*0.12,t*(rm?2.6:5.5)+i,col);}return;}
@@ -2384,7 +2427,7 @@ function drawHUD(x,W){
    black card cut-outs like the monsters, blacks graded charcoal to ink inside ink edges, ember eyes, mouths, rim and glow, a few
    lines lit faintly in the level's colour, and the level-coloured glow behind. The helpers just below are round 12's, kept because
    the new bosses use some of them; the bosses themselves follow BOSS_AURA further down. ============================== */
-const BOSS_NAME={night:"the veiled ghost",storm:"the tentacled skull",dawn:"the moor mother",mist:"the gaping tree"}; // the witch replaced by the moor mother (version 6)
+const BOSS_NAME={night:"The Veiled Ghost",storm:"The Tentacled Skull",dawn:"The Moor Mother",mist:"The Gaping Tree"} /* version 8: names, so capitalised (Barney, 4 November 2026) */; // the witch replaced by the moor mother (version 6)
 function fillP(x,col,pts){x.fillStyle=col;x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();}
 function strokeP(x,col,w,pts){x.strokeStyle=col;x.lineWidth=w;x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.stroke();}
 function cLimb(x,col,ax,ay,segs){x.fillStyle=col;return limb(x,ax,ay,segs);}

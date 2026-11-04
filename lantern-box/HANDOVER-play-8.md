@@ -134,10 +134,7 @@ The split below is a suggestion from the Claude app project. Judge it against th
 - **The clips are 45 KB**, base64 MP3s.
   - ARCADE.md's new rule wants their source and licence noted beside the kit: add a note in `lantern-box/kit/licences/`, taking the text from `design-system/assets/Licences/README.md` ("Sounds").
   - A build check that the clips stay under 100 KB in all would enforce the rule.
-- **One question for Barney: which soundtrack file is track 1?**
-  - Track 1 plays for Night and Blood Red Rain, track 2 for Dawn and the Mist (gameplay note, Sound).
-  - The files are `Lantern_in_the_Moor.mp3` and `The_Long_Vigil.mp3`.
-  - Neither note says which is which. Ask; don't guess.
+- **The soundtracks (Barney, 4 November 2026, after this note was first written):** track 1 is `The_Long_Vigil.mp3`, for Night and Blood Red Rain; track 2 is `Lantern_in_the_Moor.mp3`, for Dawn and the Mist. The gameplay note's Sound section now says so. Both files are in his Downloads folder (HANDOVER.md, Soundtrack).
 
 ### Version, checks and commits
 

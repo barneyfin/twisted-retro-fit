@@ -31,7 +31,7 @@
    Keys: 1 2 3 4 a place · arrows walk and rise · C the crowd · D defeats · V the next part · T the speed check. Or the buttons.
    It uses the kit's test hook (lb._debug) to open any screen; games do not. */
 const PLACE_NAMES = ['night', 'storm', 'dawn', 'mist'];
-const PLACE_LABEL = { night: 'Night', storm: 'Blood-red rain', dawn: 'Dawn', mist: 'Mist' };
+const PLACE_LABEL = { night: 'Night', storm: 'Blood Red Rain', dawn: 'Dawn', mist: 'Mist' };
 const CROWD = 8;                       // the speed target's crowd: eight monsters, a boss, the flyers and the rain
 const WALK = 2.4, RISE_STEP = 3, RISE_MAX = 270, RISE_EVERY = 8;
 const DEFEAT_MONSTER = 1.6, DEFEAT_BOSS = 2.2, REST = 1;   // seconds
@@ -137,7 +137,7 @@ function finishCheck(g, lb) {
   const phone = R.every((r) => r.fps >= 29.5 && r.drawn <= 25), computer = R.every((r) => r.fps >= 58);
   const line = 'Lantern Box speed check, kit ' + lb.version + ' · ' + device() + ' · ' + p.width + ' × ' + p.height + ' at ' + p.sharpness.toFixed(2) + '× · Picture ' + lb.settings.picture + ' (' + p.level + ')' +
     (lb.settings.reduceMotion ? ' · reduce motion' : '') + (lb.settings.effects ? '' : ' · effects off') + ' · ' +
-    R.map((r) => PLACE_LABEL[r.place].replace('Blood-red rain', 'Rain') + ' ' + Math.round(r.fps) + ' fps / ' + ms(r)).join(' · ') +
+    R.map((r) => PLACE_LABEL[r.place].replace('Blood Red Rain', 'Rain') + ' ' + Math.round(r.fps) + ' fps / ' + ms(r)).join(' · ') +
     ' · slowest 5% ' + Math.round(Math.max(...R.map((r) => r.slow))) + ' ms · longest ' + Math.round(Math.max(...R.map((r) => r.max))) + ' ms · layers ' + Math.round(lb.world.stats.tileBytes / 1048576) + ' MB';
   openPanel((face, close) => {
     const h = document.createElement('h2');
