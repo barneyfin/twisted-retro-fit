@@ -4119,6 +4119,102 @@ function makeTools(env){
   })();
 
   /* ---------- The game shell ---------- */
+  /* ----- 4c-6a. hud10.js: the HUD of design system version 8 (HUD, PlaqueLine, PlaceCard, BossBar), word for word: build writes its markup,
+     set shows a state. The review page's stages, close-ups and clock are left out; the shell below builds it, wires its tiles and runs
+     its moments on the kit's own clock. ----- */
+  const HUD8 = (() => {
+const SH="M0.8 1.7 Q5 0.1 9.2 1.7 L9.2 5.6 Q9.2 9.5 5 11.5 Q0.8 9.5 0.8 5.6 Z";
+const ICON={
+  heart:(w,h)=>`<svg width="${w}" height="${h}" viewBox="0 0 14 13" aria-hidden="true"><path d="M7 12.5 C2 9 0 6.5 0 4 A3.6 3.6 0 0 1 7 2.4 A3.6 3.6 0 0 1 14 4 C14 6.5 12 9 7 12.5 Z"/></svg>`,
+  flame:(w,h)=>`<svg width="${w}" height="${h}" viewBox="0 0 12 18" aria-hidden="true"><path d="M6 1 C9 6 11 8 11 12 A5 5 0 0 1 1 12 C1 8 3 6 6 1 Z"/></svg>`,
+  pip:()=>`<svg class="lb-pip" viewBox="0 0 10 12" aria-hidden="true"><path class="slot" d="${SH}"/><g class="hl"><path class="half" clip-path="url(#lbPipL)" d="${SH}"/></g><g class="hr"><path class="half" clip-path="url(#lbPipR)" d="${SH}"/></g><path class="crack" d="M5 0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4"/><path class="glint" d="M5 2.2 L6.4 6 L5 9.8 L3.6 6 Z"/></svg>`,
+  life:()=>`<svg class="lb-life" viewBox="0 0 10 15" aria-hidden="true"><circle class="ring" cx="5" cy="1.5" r="1.1"/><path class="frame" d="M2 4.7 L3.5 2.7 H6.5 L8 4.7 Z"/><rect class="glass" x="2.4" y="4.7" width="5.2" height="7.3"/><path class="flame" d="M5 6.3 Q6.5 8.4 5.9 9.7 Q5 10.9 4.1 9.7 Q3.5 8.4 5 6.3 Z"/><path class="frame" d="M1.6 12 H8.4 L7.5 13.8 H2.5 Z"/><circle class="puff" cx="5" cy="2" r="1.2"/><circle class="puff" cx="5" cy="2" r="1.2"/><circle class="puff" cx="5" cy="2" r="1.2"/></svg>`,
+  heal:`<ellipse cx="12" cy="16.3" rx="7.6" ry="2.7"/><path d="M12 15.4 V4.6 M7.6 8.8 L12 4.2 L16.4 8.8"/>`,
+  fire:`<circle class="solid" cx="16" cy="12" r="4.8"/><path class="solid" d="M13.8 8.2 L3.6 4.4 L11.2 10.6 Z M12.4 10.8 L0.8 12.4 L12.4 13.8 Z M13.8 15.8 L4.2 18.8 L11.2 13.6 Z"/>`,
+  reach:`<path d="M19.2 4.8 L9.4 14.6 M6.8 12 L12 17.2 M9.4 14.6 L5.4 18.6"/><circle class="solid" cx="4.6" cy="19.4" r="1.5"/>`,
+  rune:`<path d="M7.2 20 L5.6 11.2 L9.2 4.2 L16 3.6 L18.6 11.8 L16.4 20 Z"/><path class="solid" d="M12 7.4 L14.5 11.6 L12 15.8 L9.5 11.6 Z"/>`,
+  full:`<path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15"/>`,
+  pause:`<path d="M9 5 V19 M15 5 V19"/>`,
+  help:`<path d="M9.2 9.3 A2.85 2.85 0 1 1 13.4 11.8 C12.4 12.4 12 13 12 14.3"/><circle cx="12" cy="18" r="1.3" style="fill:var(--heading);stroke:none"/>`,
+  jump:`<path d="M12 16.5 V4.5 M7 9.5 L12 4.5 L17 9.5 M6 20.5 H18"/>`,
+  attack:`<path d="M19.2 4.8 L9.4 14.6 M6.8 12 L12 17.2 M9.4 14.6 L5.4 18.6"/><circle class="solid" cx="4.6" cy="19.4" r="1.5"/>`,
+  stick:`<path class="l" d="M23 45 L14 56 L23 67"/><path class="r" d="M89 45 L98 56 L89 67"/><path class="u" d="M45 23 L56 14 L67 23"/>`
+};
+const NAME={heal:"heal",fire:"fireball"};
+const defs=`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><clipPath id="lbPipL" clipPathUnits="userSpaceOnUse"><path d="M-1 -1 H5 V0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4 V13 H-1 Z"/></clipPath><clipPath id="lbPipR" clipPathUnits="userSpaceOnUse"><path d="M11 -1 H5 V0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4 V13 H11 Z"/></clipPath></defs></svg>`;
+let defsDone=false;
+function oct(w,cls){const c=w*0.293,a=0.75,b=w-0.75,p=[[c,a],[w-c,a],[b,c],[b,w-c],[w-c,b],[c,b],[a,w-c],[a,c]].map(q=>q.map(v=>v.toFixed(2)).join(",")).join(" ");
+  return `<svg class="oct ${cls||""}" viewBox="0 0 ${w} ${w}" aria-hidden="true"><polygon points="${p}"/></svg>`;}
+function tile(icon,label,phone){return `<button class="lb-tile${phone?" is-phone":""}" type="button" aria-label="${label}"><span><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[icon]}</svg></span></button>`;}
+function vitals(phone,extra){const iw=phone?13:14;
+  return `<div class="lb-plaque is-hud lb-vitals is-full${phone?" is-phone":""}${extra||""}" role="group" aria-label=""><div class="lb-face">
+    <div class="lb-vitals-rows">
+      <div class="lb-bar-row">${ICON.heart(iw,phone?12:13)}<div class="lb-bar hp"><i></i></div><span class="lb-pips">${ICON.pip()}${ICON.pip()}${ICON.pip()}</span></div>
+      <div class="lb-bar-row">${ICON.flame(iw,iw)}<div class="lb-bar is-mana mp"><i></i></div></div>
+      <div class="lb-lives" aria-hidden="true">${ICON.life()}${ICON.life()}${ICON.life()}</div>
+    </div>
+    <button class="lb-spell" type="button" aria-label=""><span><svg class="pic" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="lb-spell-marks" aria-hidden="true"></span></span></button>
+  </div></div>`;}
+function counter(phone,label,num){return `<div class="lb-plaque is-hud lb-counter${phone?" is-phone":""}" role="status" aria-label="${num} ${label.toLowerCase()}"><div class="lb-face"><span class="lb-counter-label" aria-hidden="true">${label}</span><span class="lb-counter-num" aria-hidden="true">${num}</span></div></div>`;}
+function build(el,phone,o){o=o||{};if(!defsDone){document.body.insertAdjacentHTML("afterbegin",defs);defsDone=true;}
+  el.insertAdjacentHTML("beforeend",`<div class="lb-ui lb-hud${phone?" is-phone":""}">
+    <div class="lb-hud-left">${vitals(phone)}</div>
+    <div class="lb-hud-right">${o.full?tile("full","Full screen"):""}${tile("help","How to play",phone)}${tile("pause","Pause",phone)}${counter(phone,"Wisps","0000")}</div>
+    <div class="lb-bossbar" role="meter" aria-valuemin="0" aria-valuemax="100" hidden><p class="lb-bossbar-name"></p><div class="lb-bossbar-edge"><div class="lb-bossbar-track"><i class="trace"></i><i class="fill"></i></div></div></div>
+    <div class="lb-plaque is-hud lb-line" hidden><div class="lb-face"><svg class="pic" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="lb-line-text"></span></div></div>
+    <div class="lb-plaque is-hud lb-line is-name" hidden><div class="lb-face"><span class="lb-line-text"></span><div class="lb-rule" aria-hidden="true"><i></i></div></div></div>
+    <div class="lb-card" hidden><div class="lb-plaque${phone?" is-phone":""}"><div class="lb-face is-centred"><h2 class="lb-heading"></h2><div class="lb-rule" aria-hidden="true"><i></i></div><p class="lb-card-sub"></p></div></div></div>
+    ${o.touch?`<div class="lb-touch" aria-hidden="true">
+      <div class="lb-stick">${oct(112,"base")}<svg class="chev" viewBox="0 0 112 112">${ICON.stick}</svg><div class="lb-knob">${oct(50,"knob")}<i></i></div></div>
+      <div class="lb-thumb"></div>
+      <button class="lb-touch-btn b-jump" type="button" tabindex="-1" style="right:104px;bottom:22px">${oct(64)}<svg class="ic" viewBox="0 0 24 24">${ICON.jump}</svg></button>
+      <button class="lb-touch-btn b-attack" type="button" tabindex="-1" style="right:26px;bottom:22px">${oct(64)}<svg class="ic" viewBox="0 0 24 24">${ICON.attack}</svg></button>
+      <button class="lb-touch-btn is-small b-cast" type="button" tabindex="-1" style="right:70px;bottom:98px">${oct(54)}<svg class="ic" viewBox="0 0 24 24"></svg></button>
+    </div>`:""}
+  </div>`);
+  return el.lastElementChild;}
+// ---- showing a state ----
+const hexRGB=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const mixHex=(a,b,u)=>{const A=hexRGB(a),B=hexRGB(b);return "rgb("+A.map((v,i)=>Math.round(v+(B[i]-v)*u)).join(",")+")";};
+const ease=u=>u<=0?0:u>=1?1:u*u*(3-2*u);
+function setOnce(o,k,v,f){if(o["_"+k]!==v){o["_"+k]=v;f(v);}}
+function picFor(svg,kind){setOnce(svg,"pic",kind||"",k=>{svg.innerHTML=k?ICON[k]:"";});}
+function setLine(ln,line){const on=!!line;if(ln.hidden===on)ln.hidden=!on;if(!on)return;
+  setOnce(ln,"t",line.text,v=>{ln.querySelector(".lb-line-text").textContent=v;ln.setAttribute("aria-label",v);});ln.classList.toggle("no-pic",!line.kind);if(line.kind)picFor(ln.querySelector(".pic"),line.kind);
+  const u=line.u,long=ln.classList.contains("is-name"),T=long?2.6:2,a=u<0.22?u/0.22:u>T-0.4?Math.max(0,(T-u)/0.4):1,dy=-8*(1-ease(Math.min(1,u/0.25)));ln.style.opacity=String(a);ln.style.transform=`translate(-50%,${dy.toFixed(2)}px)`;}
+function setCard(cd,card){const on=!!(card&&card.a>0);if(cd.hidden===on)cd.hidden=!on;if(!on)return;
+  setOnce(cd,"lv",card.lv,v=>{cd.querySelector(".lb-heading").textContent=CARDS[v][0];cd.querySelector(".lb-card-sub").textContent=CARDS[v][1];cd.setAttribute("aria-label",CARDS[v][0]+", "+CARDS[v][1]);});cd.style.opacity=String(card.a);}
+function set(hud,st){const q=s=>hud.querySelector(s);
+  const hp=Math.round(st.hp*100),mp=Math.round(st.mp*100);
+  setOnce(hud,"hp",hp,v=>q(".hp").style.setProperty("--v",v+"%"));setOnce(hud,"mp",mp,v=>q(".mp").style.setProperty("--v",v+"%"));
+  const pips=hud.querySelectorAll(".lb-pip");pips.forEach((p,i)=>{const fx=st.pipFx&&st.pipFx.i===i?st.pipFx:null;p.classList.toggle("is-on",i<st.pips||!!fx);
+    const hl=p.querySelector(".hl"),hr=p.querySelector(".hr"),ck=p.querySelector(".crack"),gl=p.querySelector(".glint");
+    if(fx&&fx.kind==="crack"){const u=fx.u,a=ease(Math.max(0,(u-0.25)/0.75));ck.style.opacity=u<0.25?u/0.25:Math.max(0,1-a*1.6);
+      hl.setAttribute("transform",`translate(${-1.6*a} ${3.2*a*a}) rotate(${-16*a} 5 11)`);hr.setAttribute("transform",`translate(${1.6*a} ${3.6*a*a}) rotate(${18*a} 5 11)`);hl.style.opacity=hr.style.opacity=String(1-a);gl.style.opacity=0;}
+    else if(fx&&fx.kind==="gain"){const u=fx.u,s=0.35+0.65*ease(Math.min(1,u/0.6));hl.setAttribute("transform",`translate(5 6) scale(${s}) translate(-5 -6)`);hr.setAttribute("transform",`translate(5 6) scale(${s}) translate(-5 -6)`);
+      hl.style.opacity=hr.style.opacity=String(Math.min(1,u/0.35));gl.style.opacity=u>0.45?Math.max(0,1-Math.abs(u-0.7)/0.25):0;ck.style.opacity=0;}
+    else{if(hl.getAttribute("transform")){hl.removeAttribute("transform");hr.removeAttribute("transform");}hl.style.opacity=hr.style.opacity="";ck.style.opacity=0;gl.style.opacity=0;}});
+  const lives=hud.querySelectorAll(".lb-life");lives.forEach((l,i)=>{const fx=st.lifeFx&&st.lifeFx.i===i?st.lifeFx:null,g=l.querySelector(".glass"),f=l.querySelector(".flame"),pf=l.querySelectorAll(".puff");
+    if(fx){l.classList.remove("is-out");const u=fx.u,a=Math.min(1,u/0.5);g.style.fill=mixHex("#ffcf6a","#1a1218",ease(a));f.style.opacity=String(Math.max(0,1-a*1.4));f.setAttribute("transform",`translate(5 9.8) scale(${Math.max(0.01,1-a)}) translate(-5 -9.8)`);
+      pf.forEach((p,j)=>{const v=(u-0.3-j*0.12)/0.55;if(v<=0||v>=1){p.style.opacity=0;return;}p.setAttribute("cy",String(3-9*v));p.setAttribute("cx",String(5+Math.sin(v*5+j*2)*1.6));p.setAttribute("r",String(1+1.4*v));p.style.opacity=String(0.75*(1-v));});}
+    else{l.classList.toggle("is-out",i>=st.lives);g.style.fill="";f.style.opacity="";f.removeAttribute("transform");pf.forEach(p=>p.style.opacity=0);}});
+  const sp=q(".lb-spell"),pic=sp.querySelector(".pic"),marks=sp.querySelector(".lb-spell-marks"),n=st.spells.length,kind=n?st.spells[st.sel%n]:null,short=n&&st.mp<st.cost;
+  sp.classList.toggle("is-empty",!n);sp.classList.toggle("has-two",n>1);sp.classList.toggle("is-short",!!short);
+  picFor(pic,st.flipKind||kind);pic.style.transform=st.flip!=null?`translateY(${n>1?-3:0}px) scaleX(${Math.max(0.04,Math.abs(1-2*st.flip))})`:"";
+  setOnce(marks,"m",n>1?n+":"+(st.sel%n):"",v=>{marks.innerHTML=n>1?st.spells.map((s,i)=>`<i${i===st.sel%n?' class="is-on"':""}></i>`).join(""):"";});
+  setOnce(sp,"lab",kind?`Spell: ${NAME[kind]}${n>1?". Tap to switch":""}${short?". Not enough mana":""}`:"No spell yet",v=>sp.setAttribute("aria-label",v));
+  const cast=q(".b-cast");if(cast){cast.classList.toggle("is-empty",!n);cast.classList.toggle("is-short",!!short);picFor(cast.querySelector(".ic"),kind);}
+  setOnce(q(".lb-vitals"),"lab",`Health ${hp} per cent, armour ${st.pips} of 3, mana ${mp} per cent, ${st.lives} ${st.lives===1?"life":"lives"} left`,v=>q(".lb-vitals").setAttribute("aria-label",v));
+  const ctr=q(".lb-counter");if(ctr&&st.wisps!=null)setOnce(ctr,"w",st.wisps,v=>{const s=String(v).padStart(4,"0");ctr.querySelector(".lb-counter-num").textContent=s;ctr.setAttribute("aria-label",v+" wisps");});
+  const ha=st.hudA==null?1:st.hudA;[".lb-hud-left",".lb-hud-right",".lb-touch"].forEach(sl=>{const e=q(sl);if(e)setOnce(e,"ha",ha.toFixed(2),v=>e.style.opacity=v);});
+  const ln=q(".lb-line:not(.is-name)");if(ln)setLine(ln,st.line);const nm=q(".lb-line.is-name");if(nm)setLine(nm,st.name&&st.name.u<2.6?{kind:null,text:st.name.name,u:st.name.u}:null);const cd=q(".lb-card");if(cd)setCard(cd,st.card);
+  const bb=q(".lb-bossbar");if(bb){const on=!!(st.boss&&st.boss.a>0&&ha>0);if(bb.hidden===on)bb.hidden=!on;
+    if(on){setOnce(bb,"n",st.boss.name,v=>{bb.querySelector(".lb-bossbar-name").textContent=v;bb.setAttribute("aria-label",v);});bb.style.opacity=String(st.boss.a*ha);
+      const tr=bb.querySelector(".lb-bossbar-track");tr.style.setProperty("--v",st.boss.hp.toFixed(3));tr.style.setProperty("--trace",Math.max(st.boss.hp,st.boss.trace).toFixed(3));setOnce(bb,"vn",Math.round(st.boss.hp*100),v=>bb.setAttribute("aria-valuenow",String(v)));}}}
+const CARDS={night:["Night","The Graveyard"],storm:["Blood Red Rain","The Old Town"],dawn:["Dawn","The Open Moor"],mist:["Mist","The Wind Bent Forest"]}; // from mv10.js: the places' names (Barney, 4 November 2026)
+return{build,set,ICON,oct};
+  })();
+
   function createGame(cfg) {
     if (!cfg || typeof cfg.start !== 'function' || typeof cfg.update !== 'function' || typeof cfg.draw !== 'function') {
       throw new Error('Lantern Box: LanternBox.game() needs start(), update() and draw() functions.');
@@ -4127,6 +4223,10 @@ function makeTools(env){
     const titleText = lines.join(' ');
     const gameId = slug(cfg.id || titleText);
     const hasMana = cfg.mana !== false;
+    // version 8 (4c-6a): hud: 'full' is the HUD of design system version 8 (armour, lives, the spell, the '?' tile, the boss bar, the plaque
+    // lines, the place card); howTo: { goal: [two lines], keys, touchKeys } adds How to play to the title and the '?' tile; win: { heading, line,
+    // lifeBonus } words the win screen (lb.win())
+    const fullHud = cfg.hud === 'full', howTo = cfg.howTo || null, winWords = cfg.win || { heading: 'The end', line: '', lifeBonus: 10 };
     const touch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     const mqPortrait = window.matchMedia('(orientation: portrait)');
     const upright = () => touch && mqPortrait.matches;
@@ -4173,7 +4273,7 @@ function makeTools(env){
     /* ----- DOM ----- */
     document.documentElement.lang = document.documentElement.lang || 'en';
     document.title = titleText;
-    const root = el('div', 'lb-root lb-ui lb-loading' + (touch ? ' lb-touch' : ''));
+    const root = el('div', 'lb-root lb-ui lb-loading' + (touch ? ' lb-is-touch' : ''));   // version 8: not lb-touch, the touch controls' own class
     const canvas = el('canvas', 'lb-canvas');
     canvas.setAttribute('role', 'img');
     canvas.setAttribute('aria-label', titleText);
@@ -4187,7 +4287,8 @@ function makeTools(env){
     rotateEl.hidden = true;
     const errorEl = el('div', 'lb-error');
     errorEl.hidden = true;
-    root.append(canvas, titleScreen, hudLayer, dialogLayer, rotateEl, errorEl);
+    const fadeEl = el('div', 'lb-fadeout');   // version 8: black over the picture, under the HUD (lb.fade, the place card)
+    root.append(canvas, fadeEl, titleScreen, hudLayer, dialogLayer, rotateEl, errorEl);
     document.body.append(root);
     const ctx = canvas.getContext('2d');
 
@@ -4205,7 +4306,8 @@ function makeTools(env){
       timers: [],
       shakeAmt: 0,
       shakeT: 0,
-      errored: false
+      errored: false,
+      h8: { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0 }
     };
     function after(seconds, fn) { state.timers.push({ at: state.time + seconds, fn: fn }); }
     function shake(amount, seconds) {   // the picture only, in its lines; the HUD never moves
@@ -4464,6 +4566,20 @@ function makeTools(env){
       hudLayer.innerHTML = '';
       hudNodes = null;
       if (!state.inGame) return;
+      if (fullHud) {   // version 8: design system version 8's HUD, its tiles wired to the shell
+        const node = HUD8.build(hudLayer, V.phone, { full: !touch && !V.phone, touch: false });
+        const full = node.querySelector('.lb-tile[aria-label="Full screen"]');
+        if (full) full.replaceWith(fullscreenTile('lb-tile', '<span>' + ICON.fullscreen + '</span>'));
+        const help = node.querySelector('.lb-tile[aria-label="How to play"]');
+        if (help && !howTo) help.remove(); else if (help) help.addEventListener('click', () => { help.blur(); openHowTo('play'); });
+        const ps = node.querySelector('.lb-tile[aria-label="Pause"]');
+        ps.addEventListener('click', () => { ps.blur(); pause(); });
+        const sp = node.querySelector('.lb-spell');
+        sp.addEventListener('click', () => { sp.blur(); if (api.hud.onSwitch && state.screen === 'play') api.hud.onSwitch(state.game, api); });   // api.hud: this function has a hud of its own
+        hudNodes = { full: node };
+        syncHud();
+        return;
+      }
       const ph = V.phone ? ' is-phone' : '';
       const hud = el('div', 'lb-hud' + ph);
       const left = el('div', 'lb-hud-left');
@@ -4489,6 +4605,7 @@ function makeTools(env){
     }
     function syncHud() {
       if (!hudNodes) return;
+      if (hudNodes.full) { HUD8.set(hudNodes.full, h8State()); return; }
       const pc = (f) => Math.round(clamp(f, 0, 1) * 100);
       hudNodes.health.style.setProperty('--v', pc(state.health) + '%');
       if (hudNodes.mana) hudNodes.mana.style.setProperty('--v', pc(state.mana) + '%');
@@ -4496,10 +4613,79 @@ function makeTools(env){
       hudNodes.num.textContent = pad4(state.score);
       hudNodes.counter.setAttribute('aria-label', state.score + ' wisps');
     }
+    // version 8: the full HUD's moments, timed on the kit's clock as the design system times them: a pip cracks (0.4 s) or fills (0.5 s), a
+    // life's lantern gutters out (0.8 s), the spell turns over (0.24 s), each plaque line shows for 2 s in turn, the boss's name 2.6 s; the boss
+    // bar fills as the boss arrives (1 s) and a lighter trace of what a hit took drains after 0.35 s (0.6 s); the place card (3 s)
+    const h8 = state.h8;
+    function h8State() {
+      const T = state.time, fx = (f) => (f && T - f.t0 < f.len ? f : null), st = { hp: state.health, mp: state.mana, pips: h8.pips, lives: h8.lives, spells: h8.spells, sel: h8.sel, cost: h8.cost, wisps: state.score, hudA: h8.hudA };
+      const pf = fx(h8.pipFx); if (pf) st.pipFx = { i: pf.i, kind: pf.kind, u: (T - pf.t0) / pf.len };
+      const lf = fx(h8.lifeFx); if (lf) st.lifeFx = { i: lf.i, u: T - lf.t0 };
+      const ff = fx(h8.flipFx); if (ff) { st.flip = (T - ff.t0) / ff.len; if (st.flip < 0.5) st.flipKind = ff.from; }
+      // the name and the lines share the top middle: a line waits while the boss's name shows
+      const naming = !!(h8.name && T - h8.name.t0 < 2.6);
+      if (h8.line && T - h8.line.t0 >= 2) h8.line = null;
+      if (!h8.line && !naming && h8.lines.length) h8.line = Object.assign(h8.lines.shift(), { t0: T });
+      if (h8.line) st.line = { kind: h8.line.kind, text: h8.line.text, u: T - h8.line.t0 };
+      if (naming) st.name = { name: h8.name.name, u: T - h8.name.t0 };
+      const b = h8.boss;
+      if (b) {
+        const a = b.out != null ? 1 - (T - b.out) / 0.4 : Math.min(1, (T - b.t0) / 0.4);
+        if (b.out != null && a <= 0) h8.boss = null;
+        else {
+          const fill = Math.min(1, (T - b.t0) / 1), hp = Math.min(b.hp, fill), drain = b.hitT == null ? 1 : 1 - clamp((T - b.hitT - 0.35) / 0.6, 0, 1);
+          st.boss = { name: b.name, hp: hp, trace: Math.max(hp, hp + (b.trace - b.hp) * drain), a: a };
+        }
+      }
+      const c = h8.card;
+      if (c) {
+        const t = T - c.t0;
+        if (t >= 0.9 && !c.called) { c.called = true; if (c.onBlack) c.onBlack(); }
+        if (t >= 3) { h8.card = null; if (c.onDone) c.onDone(); }
+        else {
+          const black = t < 0.5 ? t / 0.5 : t < 1.9 ? 1 : 1 - (t - 1.9) / 1.1;
+          st.card = { lv: c.place, a: t < 0.5 ? 0 : t < 0.9 ? (t - 0.5) / 0.4 : t < 2.4 ? 1 : 1 - (t - 2.4) / 0.6 };
+          st.hudA = Math.min(st.hudA, t < 0.5 ? 1 - t / 0.5 : t < 1.9 ? 0 : (t - 1.9) / 1.1);
+          fadeEl.style.opacity = String(Math.max(black, h8.fade));
+        }
+        if (!h8.card) fadeEl.style.opacity = String(h8.fade);
+      }
+      return st;
+    }
     const hud = {
       health(f) { state.health = clamp(+f || 0, 0, 1); syncHud(); },
-      mana(f) { state.mana = clamp(+f || 0, 0, 1); syncHud(); }
+      mana(f) { state.mana = clamp(+f || 0, 0, 1); syncHud(); },
+      // version 8 (hud: 'full')
+      armour(n) { n = clamp(n | 0, 0, 3); if (n < h8.pips) h8.pipFx = { i: n, kind: 'crack', t0: state.time, len: 0.4 }; else if (n > h8.pips) h8.pipFx = { i: n - 1, kind: 'gain', t0: state.time, len: 0.5 }; h8.pips = n; syncHud(); },
+      lives(n) { n = clamp(n | 0, 0, 9); if (n < h8.lives) h8.lifeFx = { i: n, t0: state.time, len: 0.8 }; h8.lives = n; syncHud(); },
+      spells(list, sel, cost) { // the spells known (in world.LOOT's names: 'heal', 'fire'), the chosen one, and what it costs (so its picture dims when mana is short)
+        list = (list || []).slice(); sel = sel | 0;
+        if (list.length > 1 && h8.spells.length === list.length && sel % list.length !== h8.sel % list.length) h8.flipFx = { from: h8.spells[h8.sel % h8.spells.length], t0: state.time, len: 0.24 };
+        h8.spells = list; h8.sel = sel; if (cost != null) h8.cost = +cost || 0; syncHud();
+      },
+      line(kind, text) { h8.lines.push({ kind: kind || null, text: String(text) }); },   // a plaque line at the top middle (kind: a loot picture, or none)
+      bossName(name) {   // the boss's name on the larger plaque as it arrives (2.6 s); a line showing then starts again after it
+        if (h8.line) { h8.lines.unshift({ kind: h8.line.kind, text: h8.line.text }); h8.line = null; }
+        h8.name = { name: String(name), t0: state.time };
+      },
+      boss(o) { // the boss bar: { name, hp 0 to 1 }, or null when the fight ends (it fades)
+        if (!o) { if (h8.boss && h8.boss.out == null) h8.boss.out = state.time; return; }
+        const hp = clamp(+o.hp, 0, 1), b = h8.boss;
+        if (!b || b.name !== o.name || b.out != null) h8.boss = { name: String(o.name), hp: hp, trace: hp, t0: state.time, hitT: null };
+        else if (hp < b.hp) { const shown = b.hitT == null ? b.hp : b.hp + (b.trace - b.hp) * (1 - clamp((state.time - b.hitT - 0.35) / 0.6, 0, 1)); b.trace = Math.max(shown, b.hp); b.hitT = state.time; b.hp = hp; }
+        else b.hp = hp;
+      },
+      fade(a) { h8.hudA = clamp(+a, 0, 1); syncHud(); },                                // the HUD's own fade
+      onSwitch: null                                                                    // set by the game: a tap on the spell's socket switches spells
     };
+    function fade(a) { h8.fade = clamp(+a || 0, 0, 1); if (!h8.card) fadeEl.style.opacity = String(h8.fade); }   // black over the picture
+    // the place card (3 s, play stopped: the game holds its play until onDone): onBlack once it is dark (0.9 s), to move the world to the next place
+    function placeCard(place, onBlack, onDone) { h8.card = { place: place, t0: state.time, onBlack: onBlack || null, onDone: onDone || null, called: false }; syncHud(); }
+    const placing = () => !!h8.card;
+    function resetH8() {   // a new run (or the title): three lives, no armour, no spells, nothing showing
+      Object.assign(h8, { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0 });
+      fadeEl.style.opacity = '0';
+    }
 
     /* ----- Settings ----- */
     function applySettings() {
@@ -4799,6 +4985,111 @@ function makeTools(env){
       }
       return { panel: panel, items: items, opts: opts };
     }
+    /* version 8 (4c-6a): How to play (HowToPlay): the game's goal in two lines, then the controls; from the '?' tile in play (the game paused
+       behind it, its button Resume) or the title (Back). Esc does the same. */
+    const HOWTO_KEYS = [[['A', 'D', ' or ', 'left', 'right'], 'walk'], [['J'], 'attack'], [['W', ' or ', 'up'], 'climb a bank'], [['K'], 'cast'],
+      [['Space'], 'jump'], [['L'], 'switch spell'], [['Shift'], 'roll'], [['Esc', ' or ', 'P'], 'pause']];
+    const OCT34 = '<polygon class="oct" points="10.0,0.7 24.0,0.7 33.3,10.0 33.3,24.0 24.0,33.3 10.0,33.3 0.7,24.0 0.7,10.0"/>';
+    const HOWTO_TOUCH = [
+      ['<polygon class="oct dim" points="10.0,0.7 24.0,0.7 33.3,10.0 33.3,24.0 24.0,33.3 10.0,33.3 0.7,24.0 0.7,10.0"/><path class="chev" d="M7 13.5 L4 17 L7 20.5 M27 13.5 L30 17 L27 20.5 M13.5 7 L17 4 L20.5 7"/><path class="dia" d="M17 12.5 L21.5 17 L17 21.5 L12.5 17 Z"/>', '<b>Left thumb</b>, anywhere on the left: walk, climb up a bank, flick to roll'],
+      [OCT34 + '<g class="ic" transform="translate(5,5)"><path d="M12 16.5 V4.5 M7 9.5 L12 4.5 L17 9.5 M6 20.5 H18"/></g>', '<b>Jump</b>'],
+      [OCT34 + '<g class="ic" transform="translate(5,5)"><path d="M19.2 4.8 L9.4 14.6 M6.8 12 L12 17.2 M9.4 14.6 L5.4 18.6"/><circle class="solid" cx="4.6" cy="19.4" r="1.5"/></g>', '<b>Attack</b>'],
+      [OCT34 + '<g class="ic" transform="translate(5,5)"><circle class="solid" cx="16" cy="12" r="4.8"/><path class="solid" d="M13.8 8.2 L3.6 4.4 L11.2 10.6 Z M12.4 10.8 L0.8 12.4 L12.4 13.8 Z M13.8 15.8 L4.2 18.8 L11.2 13.6 Z"/></g>', '<b>Cast</b> the chosen spell'],
+      ['<path d="M5 1 H29 L33 5 V29 L29 33 H5 L1 29 V5 Z" style="fill:var(--tile-face);stroke:var(--brass);stroke-width:1.3"/><g class="ic" transform="translate(5,5)"><circle class="solid" cx="16" cy="12" r="4.8"/><path class="solid" d="M13.8 8.2 L3.6 4.4 L11.2 10.6 Z M12.4 10.8 L0.8 12.4 L12.4 13.8 Z M13.8 15.8 L4.2 18.8 L11.2 13.6 Z"/></g>', '<b>Tap the spell</b>, top left, to switch']];
+    function howToDialog(from) {
+      const phone = V.phone, label = from === 'play' ? 'Resume' : 'Back';
+      const close = () => { if (from === 'play') resume(); else { sfx('back'); state.screen = 'title'; closeDialog(); } };
+      const { panel, face } = plaque('lb-ht-t', 560, 700, phone ? 'display:grid;grid-template-columns:minmax(0,0.92fr) minmax(0,1fr);column-gap:24px;align-items:center;padding:18px 20px' : 'gap:12px;padding:22px 24px 20px');
+      const goals = (howTo.goal || []).map((line, i) => { const g = txt('p', 'lb-howto-goal', line); if (phone) g.style.fontSize = '15px'; else if (i) g.style.marginTop = '-6px'; return g; });
+      const btn = button(label, true);
+      btn.style.width = '100%';
+      const items = [{ el: btn, activate: close }];
+      if (phone) {
+        const left = el('div');
+        left.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+        btn.style.marginTop = '4px';
+        left.append(heading('lb-ht-t', 'How to play'), el('div', '', RULE).firstChild, ...goals, btn);
+        const keys = el('div', 'lb-touchkeys');
+        (howTo.touchKeys || HOWTO_TOUCH).forEach((q) => keys.append(el('div', 'lb-touchkey', '<svg viewBox="0 0 34 34" aria-hidden="true">' + q[0] + '</svg><span>' + q[1] + '</span>')));
+        face.append(left, keys);
+      } else {
+        const keys = el('div', 'lb-keys');
+        (howTo.keys || HOWTO_KEYS).forEach((q) => keys.append(el('div', 'lb-key', '<span class="caps">' + q[0].map((c) => (c.charAt(0) === ' ' ? c : kbd(c))).join('') + '</span>' + q[1])));
+        face.append(heading('lb-ht-t', 'How to play'), el('div', '', RULE).firstChild, ...goals, keys, btn);
+        if (!touch) { const hint = el('p', 'lb-hint', kbd('Esc') + ' ' + label.toLowerCase()); hint.style.textAlign = 'center'; face.append(hint); }
+      }
+      return { panel: panel, items: items, opts: { back: close } };
+    }
+    function openHowTo(from) {
+      if (!howTo) return;
+      if (from === 'play') {
+        if (state.screen !== 'play') return;
+        state.screen = 'paused';
+        resetInput();
+        sfx('pause');
+        if (cfg.onPause) cfg.onPause(state.game, api);
+      } else { state.screen = 'howto'; sfx('confirm'); }
+      showDialog(() => howToDialog(from));
+    }
+    /* version 8 (4c-6a): the win (WinCard): the game's two lines, the rule, the score as on game over (NEW BEST when it beats the best), then the
+       lives still lit counted into it, each adding its bonus in turn half a second apart, the counted lantern brightening once; then as game over. */
+    let winCount = null;
+    function winDialog(base, lives, total, newBest, qualifies) {
+      const phone = V.phone, bonus = winWords.lifeBonus == null ? 10 : winWords.lifeBonus;
+      const { panel, face } = plaque('lb-wn-t', 460, 640, phone ? 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;align-items:center;padding:20px' : 'gap:12px;padding:22px 20px 18px');
+      const h = heading('lb-wn-t', winWords.heading);
+      const line = txt('p', 'lb-win-line', winWords.line || '');
+      const result = el('div', 'lb-result');
+      if (newBest) result.append(txt('p', 'lb-flag', 'New best'));
+      const num = txt('p', 'lb-num lb-score-xl', String(base));
+      result.append(num, txt('p', 'lb-unit', 'wisps'));
+      const lanterns = el('span', 'lanterns');
+      for (let i = 0; i < Math.max(3, lives); i++) { const l = el('span', '', HUD8.ICON.life()).firstChild; if (i >= lives) l.classList.add('is-out'); lanterns.append(l); }
+      const plus = txt('span', 'plus', '+0');
+      const bon = el('p', 'lb-bonus', 'Lives left ');
+      bon.append(lanterns, plus);
+      let items, opts = {};
+      const actions = el('div');
+      if (qualifies) {
+        const cont = button('Continue', true);
+        cont.style.width = '100%';
+        actions.append(cont);
+        items = [{ el: cont, activate: () => { winCount = null; state.score = total; sfx('confirm'); openInitials(); } }];   // the whole score, counted or not
+      } else {
+        items = [menuItem('Play again', startOver), menuItem('High scores', () => { sfx('confirm'); openScores(-1, true); }), menuItem('Menu', toMenu)];
+        actions.append(menuNav('The win', items));
+        opts = { back: toMenu };
+      }
+      if (phone) {
+        const a = el('div'); a.style.cssText = 'display:flex;flex-direction:column;gap:8px'; a.append(h, line, el('div', '', RULE).firstChild);
+        const b = el('div'); b.style.cssText = 'display:flex;flex-direction:column;gap:10px'; b.append(result, bon, actions);
+        face.append(a, b);
+      } else face.append(h, line, el('div', '', RULE).firstChild, result, bon, actions);
+      // the count: it carries on from wherever it had got to if the plaque is built again for another layout
+      const c = winCount || (winCount = { n: 0 });
+      const show = () => { num.textContent = String(base + c.n * bonus); plus.textContent = '+' + c.n * bonus; state.score = base + c.n * bonus; syncHud(); };   // the HUD's counter steps with it
+      show();
+      const lit = [...lanterns.children].slice(0, lives);
+      const step = () => {
+        if (!num.isConnected || winCount !== c || c.n >= lives) return;
+        const l = lit[c.n]; c.n++; show(); sfx('blip');
+        l.style.transition = 'filter 0.25s'; l.style.filter = 'brightness(1.8)'; setTimeout(() => { l.style.filter = ''; }, 250);
+        if (c.n < lives) setTimeout(step, 500);
+      };
+      if (c.n < lives) setTimeout(step, c.n ? 500 : 700);
+      return { panel: panel, items: items, opts: opts };
+    }
+    function showWin() {
+      if (!state.inGame) return;
+      state.screen = 'over';
+      state.ending = false;
+      const lives = h8.lives, base = state.score, total = base + lives * (winWords.lifeBonus == null ? 10 : winWords.lifeBonus);
+      const table = readScores(), prevBest = table.length ? table[0].s : 0;
+      winCount = null;
+      const newBest = total > 0 && total > prevBest;
+      if (newBest) setTimeout(() => sfx('newBest'), 650);
+      showDialog(() => winDialog(base, lives, total, newBest, total > 0 && (table.length < 10 || total > table[table.length - 1].s)));
+    }
     function showGameOver() {
       state.screen = 'over';
       state.ending = false;
@@ -4941,7 +5232,7 @@ function makeTools(env){
       const scrim = el('div', 'lb-scrim is-title');
       scrim.style.position = 'fixed';
       const wrap = el('div', 'lb-title-arch' + ph);
-      const arch = el('div', 'lb-arch' + ph, '<div class="lb-arch-card"></div>');
+      const arch = el('div', 'lb-arch' + ph + (howTo ? ' has-four' : ''), '<div class="lb-arch-card"></div>');
       const inner = el('div', 'lb-arch-inner');
       const h1 = el('h1', 'lb-title');
       lines.forEach((line, i) => { if (i) h1.append(el('br')); h1.append(line); });
@@ -4957,9 +5248,10 @@ function makeTools(env){
       };
       const items = [
         item('Start game', () => { sfx('confirm'); startGame(); }),
+        howTo ? item('How to play', () => openHowTo('title')) : null,
         item('High scores', () => { sfx('confirm'); openScores(-1, false); }),
         item('Settings', () => openSettings('title'))
-      ];
+      ].filter(Boolean);
       const best = el('p', 'lb-best', 'Best <span class="lb-num">' + pad4(bestScore()) + '</span> wisps');
       inner.append(h1, rule, menu, best);
       if (!touch && !phone) inner.append(el('p', 'lb-hint', kbd('up') + ' ' + kbd('down') + ' choose · ' + kbd('Enter') + ' select'));
@@ -4998,6 +5290,7 @@ function makeTools(env){
       state.ending = false;
       state.shakeAmt = 0;
       state.shakeT = 0;
+      resetH8();
       buildHud();
       layout();
       resetInput();
@@ -5027,6 +5320,7 @@ function makeTools(env){
       state.inGame = false;
       state.screen = 'title';
       state.game = null;
+      resetH8();
       buildHud();
       titleNav = null;
       buildTitle();
@@ -5142,6 +5436,7 @@ function makeTools(env){
         while (acc >= STEP) { tick(); acc -= STEP; }
       } else acc = 0;
       if (music) music.sync(state.inGame, state.screen, state.ending);
+      if (hudNodes && hudNodes.full) syncHud();   // version 8: the full HUD's moments
       render();
     }
     // The kit's named colours (design-system/tokens.json): games name them instead of writing colour codes
@@ -5169,6 +5464,16 @@ function makeTools(env){
        lb.addWisps(n), lb.wisps, lb.best: the score, in whole wisps. lb.gameOver(delay): ends the run (game over, then the
          initials if it makes the top ten). lb.hud.health(0..1), lb.hud.mana(0..1): the bars; mana: false in the config leaves
          the mana bar out. lb.sfx('name'), sfx.tone(o), sfx.noise(o). lb.music(0 or 1): the soundtrack to play.
+       The full HUD (version 8; hud: 'full' in the config): lb.hud.armour(0..3) (a pip cracks or fills), lb.hud.lives(n) (a lantern
+         gutters out), lb.hud.spells(list, sel, cost) (the spells known, e.g. ['heal', 'fire'], the chosen one, and its mana cost: its
+         picture dims while mana is short; a new choice turns it over), lb.hud.onSwitch = (g, lb) => ... (a tap on the spell's socket),
+         lb.hud.line(kind, text) (a plaque line, 2 s; lines take turns; kind a loot picture or none), lb.hud.bossName(name) (2.6 s),
+         lb.hud.boss({ name, hp 0..1 }) (the boss bar: it fills as the boss arrives, a hit leaves a trace that drains) and
+         lb.hud.boss(null) (it goes), lb.hud.fade(0..1) (the HUD's own fade). lb.placeCard(place, onBlack, onDone): the place card
+         (3 s; onBlack at 0.9 s, once the picture is black, onDone at the end; lb.placing() while it shows). lb.fade(0..1): black over
+         the picture, under the HUD. lb.win(): the win (the lives still lit counted into the score). lb.howTo(): How to play.
+         howTo: { goal: [two lines], keys, touchKeys } in the config adds How to play to the title and the '?' tile; win: { heading,
+         line, lifeBonus } words the win.
        lb.shake(lines, seconds): the picture only, never under Reduce motion. lb.after(seconds, fn): a timer in game time.
        lb.settings: effects, reduceMotion, picture and the rest (read only). lb.screen, lb.time, lb.t.
        lb.picture: the Picture level in use ('best', 'faster' or 'fastest') and the picture's width, height and sharpness.
@@ -5195,7 +5500,8 @@ function makeTools(env){
          world.stringLights(ax, ay, qx, qy, bx, by, seed). begin({ sample: true }) adds the directions page's monsters and
          wanderer to the path. Without a level, the path's scenery is the directions page's sample strip.
        In the game's config: id, title (a string, or its two lines), start, update, draw(ctx, g, lb), place (the place behind
-       the title, 'night' if left out), drawTitle(ctx, lb) (to draw the title's picture itself), mana, music, init(lb), onPause(g, lb). */
+       the title, 'night' if left out), drawTitle(ctx, lb) (to draw the title's picture itself), mana, music, init(lb), onPause(g, lb),
+       and (version 8) hud: 'full', howTo, win. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
@@ -5208,6 +5514,7 @@ function makeTools(env){
       get ending() { return state.ending; },
       get best() { return Math.max(bestScore(), state.score); },
       addWisps: addWisps, gameOver: gameOver, shake: shake, after: after,
+      fade: fade, placeCard: placeCard, placing: placing, win: showWin, howTo: () => openHowTo('play'),   // version 8 (4c-6a)
       music: (i) => { if (music && music.tracks[i]) music.want = i; },
       rand: rand, randInt: randInt, pick: pick, clamp: clamp, lerp: lerp
     };
@@ -5247,7 +5554,8 @@ function makeTools(env){
       set speed(v) { speed = clamp(+v || 1, 0.1, 20); },
       start: startGame, pause: pause, resume: resume, quit: quitToTitle,
       setWisps: (n) => { state.score = n | 0; syncHud(); },
-      showGameOver: showGameOver, openSettings: openSettings, openScores: openScores, openInitials: openInitials
+      showGameOver: showGameOver, openSettings: openSettings, openScores: openScores, openInitials: openInitials,
+      openHowTo: openHowTo, showWin: showWin, h8: state.h8
     };
     return api;
   }
