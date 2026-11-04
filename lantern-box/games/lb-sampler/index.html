@@ -106,6 +106,13 @@ function climbScene(g, lb) { // on the place's level: its first bank that rises 
   return CLIMBS[L.place] = { L, foot: B.foot, h: B.h, scale: B.h / (96 * 1.32), top: B.foot + lb.world.move('climb', n).dx, stride, walkFrom,
     tWalk, tClimb: tWalk + n / 12, total: tWalk + n / 12 + 8 / 12 + 1.2, crag };
 }
+function pitScene(g, lb) { // on the place's level: its first pit, timed as play.js's loopLost (its pit mode) times the fall
+  const L = levelOf(g, lb), pit = L.pits[0];
+  if (!pit) return null;
+  const pl = pit[0], pw = pit[1] - pit[0], ST = 5.5 * 1.32, wx0 = pl - 120;
+  const steps = Math.round((pl + pw * 0.42 - wx0) / ST), tFall = 0.5 + steps / 12, shat = tFall + 0.34;
+  return { L, pl, pw, ST, wx0, steps, tFall, shat, total: shat + 1.1 + 0.9 };
+}
 const PARTS = [
   { name: 'The whole scene', crowd: true },
   { name: 'The place alone: its sky, flyers, weather and scenery' },
@@ -219,6 +226,21 @@ const PARTS = [
     const s = ds - 6, v = Math.min(1, s / 3), y0 = L.ground(x0 - 2), y1 = L.ground(x0 + 44);
     if (s < 5) w.wanderer(x0 - 2 + 46 * v, { move: 'drop', step: s, y: y0 + (y1 - y0) * v * v + 1 });
     else w.wanderer(x0 + 44, { move: 'idle', step: lb.time * 12 });
+  } },
+  { name: 'The wanderer falling into a pit (on a level)', focus(g, lb) { const P = pitScene(g, lb); return P ? P.pl - 40 : g.x; }, draw(w, lb, g, cam) {
+    // play.js's fall: he walks on a step too far, drops into the gap drifting on, drawn only above the ground and in the gap,
+    // and breaks into his card pieces in the dark 0.34 s into the fall (since 4c-8, after Barney asked)
+    if (!g.ground) return;
+    const P = pitScene(g, lb);
+    if (!P) return;
+    const L = P.L, tt = lb.time % P.total, st = Math.min(P.steps, Math.max(0, (tt - 0.5) * 12)), pit = [P.pl, P.pl + P.pw];
+    let X = P.wx0 + st * P.ST, Y = L.ground(X) + 1;
+    if (tt < 0.5) { w.wanderer(X, { move: 'idle', step: tt * 12, y: Y }); return; }
+    if (tt < P.tFall) { w.wanderer(X, { move: 'walk', step: st, y: Y }); return; }
+    const d = tt - P.tFall;
+    X += 26 * d;
+    if (tt < P.shat) w.wanderer(X, { move: 'jump', step: 5, y: Y + 0.5 * 980 * d * d, pit });   // the jump's falling pose
+    else w.wanderer(X, { pit, shatter: tt - P.shat, y: L.ground(P.pl) + 1 + 0.5 * 980 * 0.34 * 0.34 });
   } },
   { name: "The place's splash of colour", draw(w, lb, g, cam) { w.splash(cam + lb.W * 0.5, { seed: 1 }); } },
   { name: 'The lights', draw(w, lb, g, cam) {
@@ -493,7 +515,7 @@ function buildPieces(g, lb) {
     ['Sounds', () => soundsPanel(g, lb)],
     ['Screens', () => screensPanel(g, lb)],
     ['Speed check', () => startCheck(g, lb)],
-  ].concat(lb.touch ? [['Hide', () => { g.barHidden = true; }]] : [])   // on a touch device: the whole screen for the thumbs
+  ].concat([['Hide', () => { g.barHidden = true; }]])   // the whole picture: for the thumbs on a touch device, and to see the ground (since 4c-8, on computers too)
     .forEach(([label, fn]) => bar.append(button(label, false, fn)));
   showBar = button('Test buttons', false, () => { g.barHidden = false; });
   showBar.classList.add('lb-ui', 'ls-show');
