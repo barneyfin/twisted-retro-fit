@@ -46,7 +46,7 @@ const CROWD = 8;                       // the speed target's crowd: eight monste
 const WALK = 2.4, RISE_STEP = 3, RISE_MAX = 270, RISE_EVERY = 8;
 const DEFEAT_MONSTER = 1.6, DEFEAT_BOSS = 2.2, REST = 1;   // seconds
 const WARM = 1.5, RUN = 4, LOAD = 2.5, TEST_PACE = 1;      // the speed check: seconds in each place, and lines a frame
-const TEST_PAGE = '4c-8, design 10e';               // the step of 4c this test page was built for, in the speed check's line (the kit is 0.8.0 throughout)
+const TEST_PAGE = '4d-0';               // the step of 4c this test page was built for, in the speed check's line (the kit is 0.8.0 throughout)
 const HOLD = 0.32;                     // where the camera holds the wanderer on a level, as play.js does
 const SAMPLE_SCORES = [['MOR', 2480], ['VEX', 1960], ['BAR', 1120], ['OWL', 1040], ['RUE', 880], ['HEX', 760], ['ASH', 610], ['FEN', 450], ['IVY', 320], ['NOX', 180]];
 
@@ -183,6 +183,19 @@ const PARTS = [
       const hit = attack ? undefined : u - a - 0.35;       // after the attack, a blow: the jolt and the rim's flare
       const y = fly ? groundAt(g, lb, x) - fly : undefined;
       w.monster({ kind, x, y, ph: i * 0.7, id: 'a' + i, attack: attack || undefined, hit: hit != null && hit >= 0 ? hit : undefined });
+    });
+  } },
+  { name: "The monsters mirrored (kit 0.8.1): each facing right, attacking, then taking a hit", draw(w, lb, g, cam) {
+    // the same attacks as the part above, each monster facing right (facing: 1): its lunge, dive or sweep goes right, a hit jolts it left
+    const t = lb.time, at = (i) => spread(lb, cam, 5, i) + 40;
+    const plan = [['walker', ['high', 'low'], 0], ['ghoul2', ['swipe'], 1], ['hatmaw', ['hop', 'bite'], 2], ['bat2', ['dive'], 3, 118], ['crawler', ['lunge'], 4]];
+    const LEN = { lunge: 0.88, dive: 1.4, hop: 1.2, bite: 1.0, swipe: 1.35, high: 1.3, low: 1.25 };
+    plan.forEach(([kind, names, slot, fly], i) => {
+      const total = names.reduce((a, n) => a + LEN[n], 0) + 1.1, u = (t + i * 0.45) % total, x = at(slot);
+      let a = 0, attack = null; for (const n of names) { if (u < a + LEN[n]) { attack = { name: n, t: u - a }; break; } a += LEN[n]; }
+      const hit = attack ? undefined : u - a - 0.35;
+      const y = fly ? groundAt(g, lb, x) - fly : undefined;
+      w.monster({ kind, x, y, ph: i * 0.7, id: 'm' + i, facing: 1, attack: attack || undefined, hit: hit != null && hit >= 0 ? hit : undefined });
     });
   } },
   { name: 'The spells: heal at three strengths, not enough mana, fireballs at three strengths and their bursts', draw(w, lb, g, cam) {
@@ -398,6 +411,7 @@ function screensPanel(g, lb) {
     ['Initials', () => { seedScores(); D.setWisps(1120); D.openInitials(); }],
     ['High scores', () => { seedScores(); D.setWisps(1120); D.openScores(2, true); }],
     ['How to play', () => lb.howTo()],
+    ['Testing', () => { D.pause(); D.openSettings('paused'); D.openTesting('paused'); }],
     ['How to play: title', () => { D.quit(); D.openHowTo('title'); }],
     ['The win: 3 lives', () => { seedScores(); D.setWisps(2580); lb.hud.lives(g.lives = 3); lb.win(); }],
     ['The win: 1 life', () => { seedScores(); D.setWisps(400); lb.hud.lives(g.lives = 1); lb.win(); }],
@@ -543,6 +557,13 @@ LanternBox.game({
   howTo: { goal: ['Cut your path through four blighted lands, felling the terror bound to each. Sever the roots of The Gaping Tree to break the night.',
     'Three chances to break the dark. Fall, and return to the glow of your last lit lantern.'] },
   win: { heading: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.', lifeBonus: 10 },
+  // kit 0.8.1: the Testing panel (Settings), with the options Gloam Hallow will use; the test page shows them but only uses the frame-rate line
+  test: { options: [
+    { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
+    { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
+    { id: 'safe', name: "Can't be hurt", toggle: true, note: 'Nothing takes health, armour or lives.' },
+    { id: 'all', name: 'Every spell and sword upgrade', toggle: true, note: 'All of them from the start.' },
+  ] },
 
   start(lb) {
     LB = lb;

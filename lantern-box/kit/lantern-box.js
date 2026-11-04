@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.8.0';
+  const VERSION = '0.8.1';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -369,7 +369,7 @@ return {level:v=>{lvl=v;if(out)out.gain.setTargetAtTime(0.5*v,ctx.currentTime,0.
       if (!tracks.length) return;
       const level = settings.muted ? 0 : (settings.volume / 100) * share;
       const playing = inGame && screen === 'play' && !ending;
-      const keepPlace = playing || (inGame && (screen === 'paused' || screen === 'settings'));
+      const keepPlace = playing || (inGame && (screen === 'paused' || screen === 'settings' || screen === 'testing'));
       if (!m.out && audio.ctx) {
         // Its own volume control, beside the sound effects' one, so `level` is measured against the file itself
         m.out = audio.ctx.createGain();
@@ -4270,23 +4270,29 @@ function makeTools(env){
     spark(from,to,u){ // a gold spark between two points ({ x, y }), u 0 to 1: the return at a checkpoint sends one from its glass to his lantern (0.3 s)
       const f=frame("spark");cpSpark(f.ctx,[from.x-f.camX,from.y],[to.x-f.camX,to.y],Math.max(0,Math.min(1,u)));
     },
-    monster(o){ // o: kind, x, y, ph (its pace, so neighbours differ), id (a monster's own name), defeat (0 to 1, over 1.6 s), seed
+    monster(o){ // o: kind, x, y, ph (its pace, so neighbours differ), id (a monster's own name), defeat (0 to 1, over 1.6 s), seed, facing (kit 0.8.1)
       // version 8 (4c-5a): the posable monsters, always. attack { name, t (seconds since its signal began), dir, dx, dy (the flyer's dive) }: names in
       // world.ATTACKS; it moves the monster from x (returned as dx, dy) and says its phase. hit: seconds since a blow landed (0.13 s: it jolts back a
       // puppet step and its ember rim flares once; a one-hit monster then breaks up, which is the game's defeat).
       const f=frame("monster"),s=f.s;
       if(!MON_BOX[o.kind]||!MON_P[o.kind])throw new Error('Lantern Box: no monster called "'+o.kind+'".');
+      // kit 0.8.1 (4d, Barney's choice): facing 1 mirrors a monster to face right, its attack's movement and a hit's jolt with it (the design
+      // system draws them facing left, -1, the default; its lit edge flips too)
+      const fc=o.facing===1?1:-1,flip=fc===1?-1:1;
       const at=o.attack?moAttack(o.kind,o.attack):null,hit=o.hit!=null&&o.hit>=0&&o.hit<0.13;
-      let dx=at?at.dx:0,dy=at?at.dy:0;if(hit){dx+=8;if(o.kind==="bat2")dy-=6;}
+      let dx=(at?at.dx:0)*flip,dy=at?at.dy:0;if(hit){dx+=8*flip;if(o.kind==="bat2")dy-=6;}
       const x=o.x+dx,X=x-f.camX,Y=(o.y==null?f.gy(x)+(STAND[o.kind]||0):o.y)+dy,m={kind:MON_P[o.kind],X,Y,ph:o.ph||0,id:o.id,P:at?at.P:{}};
       const out=at?{phase:at.phase,dx,dy}:{phase:null,dx,dy};
+      const c=f.ctx,Xs=Math.round(X*s)/s;   // mirrored about a whole device pixel, so its painted picture stays sharp
+      if(fc===1){c.save();c.translate(Xs,0);c.scale(-1,1);c.translate(-Xs,0);}
       if(o.rise!=null&&o.rise<0.35){ // version 8 (4c-5b): rising out of the ground (the skull's crawlers): 0.35 s, its legs still, dust bursting
-        const rv=clamp(o.rise/0.35,0,1),c=f.ctx,gy=f.gy(x);m.Y+=(1-rv)*26;m.P=Object.assign({t:1.0},m.P);
-        c.save();c.beginPath();c.rect(X-80,-2000,160,2000+gy+4);c.clip();scene.monster(c,s,m,f.t,f.opt,hit);c.restore();fxBurst(c,X,gy-2,1,rv,"#3a2a22");return out;}
-      if(o.defeat==null){scene.monster(f.ctx,s,m,f.t,f.opt,hit);return out;}
-      const d=defeatCanvas("M",260,250,s);
-      scene.monsterInto(d.c,s,m,f.t,f.opt,0,0);
-      drawDefeat(f.ctx,d.M,s,X,Y,MON_BOX[o.kind],clamp(o.defeat,0,1),"cardwisp",o.seed||0);
+        const rv=clamp(o.rise/0.35,0,1),gy=f.gy(x);m.Y+=(1-rv)*26;m.P=Object.assign({t:1.0},m.P);
+        c.save();c.beginPath();c.rect(X-80,-2000,160,2000+gy+4);c.clip();scene.monster(c,s,m,f.t,f.opt,hit);c.restore();fxBurst(c,X,gy-2,1,rv,"#3a2a22");}
+      else if(o.defeat==null)scene.monster(c,s,m,f.t,f.opt,hit);
+      else{const d=defeatCanvas("M",260,250,s);
+        scene.monsterInto(d.c,s,m,f.t,f.opt,0,0);
+        drawDefeat(c,d.M,s,X,Y,MON_BOX[o.kind],clamp(o.defeat,0,1),"cardwisp",o.seed||0);}
+      if(fc===1)c.restore();
       return out;
     },
     ATTACKS:MO_ATTACKS,
@@ -4478,6 +4484,15 @@ return{build,set,stickShow,ICON,oct};
       store.set(SHARED_KEY, shared);
       store.set(OWN_KEY, own);
     }
+    // kit 0.8.1: Testing (see testingDialog): the game's options and the kit's frame-rate line, kept per game on this device
+    const testCfg = cfg.test && Array.isArray(cfg.test.options) ? cfg.test : null;
+    const testOptions = () => testCfg.options.concat([{ id: 'fps', name: 'Frame-rate line', toggle: true, note: 'Frames a second and a frame\'s drawing time, in play.' }]);
+    const testValues = {};
+    if (testCfg) {
+      const saved = asObject(store.get('lanternbox.test.' + gameId, {}));
+      testOptions().forEach((op) => { const v = saved[op.id]; testValues[op.id] = op.choices ? (op.choices.some((ch) => ch[0] === v) ? v : op.choices[0][0]) : !!v; });
+    }
+    const saveTest = () => store.set('lanternbox.test.' + gameId, testValues);
     const audio = makeAudio(settings);
     // version 8 (4c-7): every named sound is design system version 8's (lb.sounds lists them); the shell's moments as Barney chose: the menus'
     // muted tick, soft chime and falling tick (select, confirm, back), pause the soft chime, game over the life lost's falling tones, new best
@@ -4531,7 +4546,9 @@ return{build,set,stickShow,ICON,oct};
     const errorEl = el('div', 'lb-error');
     errorEl.hidden = true;
     const fadeEl = el('div', 'lb-fadeout');   // version 8: black over the picture, under the HUD (lb.fade, the place card)
-    root.append(canvas, fadeEl, titleScreen, hudLayer, dialogLayer, rotateEl, errorEl);
+    const fpsEl = el('div', 'lb-plaque is-hud lb-fps', '<div class="lb-face"></div>');   // kit 0.8.1: Testing's frame-rate line
+    fpsEl.hidden = true;
+    root.append(canvas, fadeEl, titleScreen, hudLayer, fpsEl, dialogLayer, rotateEl, errorEl);
     document.body.append(root);
     const ctx = canvas.getContext('2d');
 
@@ -5110,7 +5127,7 @@ return{build,set,stickShow,ICON,oct};
       return { panel: panel, items: items, opts: { back: resume } };
     }
 
-    function settingsDialog(close) {
+    function settingsDialog(close, from) {
       const phone = V.phone;
       const { panel, face } = plaque('lb-se-t', 500, 680, phone ? 'gap:12px;padding:14px 20px 18px' : 'padding:20px 22px 18px');
       const items = [];
@@ -5175,6 +5192,9 @@ return{build,set,stickShow,ICON,oct};
       const picNote = txt('p', 'lb-note', 'Automatic picks the most detail your device can run smoothly.');
       const picName = txt('span', 'lb-setting-name', 'Picture');
       picName.id = 'lb-set-pic';
+      // kit 0.8.1: Testing, while the game asks for it (cfg.test)
+      const testBtn = testCfg ? button('Testing') : null;
+      if (testBtn) items.push({ el: testBtn, activate: () => openTesting(from) });
       // Done
       const done = button('Done', true);
       items.push({ el: done, activate: close });
@@ -5183,7 +5203,9 @@ return{build,set,stickShow,ICON,oct};
       if (phone) {
         done.style.padding = '0 24px';
         const head = el('div', 'lb-header');
-        head.append(heading('lb-se-t', 'Settings'), done);
+        head.append(heading('lb-se-t', 'Settings'));
+        if (testBtn) { testBtn.style.padding = '0 16px'; head.append(testBtn); }
+        head.append(done);
         const cols = el('div');
         cols.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:26px';
         const a = el('div');
@@ -5206,21 +5228,92 @@ return{build,set,stickShow,ICON,oct};
         pic.append(line, picNote);
         const foot = el('div', '', '<span class="lb-hint">' + kbd('Esc') + ' done</span>');
         foot.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:12px;padding-top:2px';
+        if (testBtn) foot.append(testBtn);
         foot.append(done);
         if (touch) foot.firstChild.remove();
         face.append(heading('lb-se-t', 'Settings'), el('div', '', RULE).firstChild, vol, fxRow, rmRow, pic, foot);
       }
       return { panel: panel, items: items, opts: opts };
     }
+    const settingsCloser = (from) => () => {
+      sfx('back');
+      if (from === 'paused') { state.screen = 'paused'; showDialog(pauseDialog); }
+      else { state.screen = 'title'; closeDialog(); }
+    };
     function openSettings(from) {
       state.screen = 'settings';
       sfx('confirm');
-      const close = () => {
-        sfx('back');
-        if (from === 'paused') { state.screen = 'paused'; showDialog(pauseDialog); }
-        else { state.screen = 'title'; closeDialog(); }
-      };
-      showDialog(() => settingsDialog(close));
+      showDialog(() => settingsDialog(settingsCloser(from), from));
+    }
+    /* kit 0.8.1: Testing, for trying a game out; it shows only while the game's config has test: { options: [ ... ] }, each option either
+       { id, name, choices: [[value, label], ...] } or { id, name, toggle: true, note }. The kit adds a frame-rate line (fps). The values are kept on
+       this device (lanternbox.test.<game>) and the game reads them as lb.test; deleting test from the config takes it all away. */
+    function testingDialog(close) {
+      const phone = V.phone;
+      const { panel, face } = plaque('lb-te-t', 520, 700, phone ? 'gap:12px;padding:14px 20px 18px' : 'padding:20px 22px 18px');
+      const items = [], choiceRows = [], toggleRows = [];
+      testOptions().forEach((op, oi) => {
+        if (op.choices) {
+          const nameId = 'lb-te-' + oi;
+          const seg = el('div', 'lb-segments' + (phone || op.choices.length > 3 ? ' is-grid' : ''));
+          if (!seg.classList.contains('is-grid')) seg.style.gridTemplateColumns = 'repeat(' + op.choices.length + ',minmax(0,1fr))';   // the row is drawn for four
+          seg.setAttribute('role', 'group');
+          seg.setAttribute('aria-labelledby', nameId);
+          const btns = op.choices.map((ch) => { const b = txt('button', '', ch[1]); b.type = 'button'; b.addEventListener('click', () => pick(ch[0])); seg.append(b); return b; });
+          const show = () => btns.forEach((b, i) => b.setAttribute('aria-pressed', op.choices[i][0] === testValues[op.id] ? 'true' : 'false'));
+          const pick = (v) => { testValues[op.id] = v; saveTest(); show(); sfx('blip'); if (nav && nav.items === items) nav.select(items.indexOf(item), true); };
+          const step = (d) => { const i = op.choices.findIndex((ch) => ch[0] === testValues[op.id]); pick(op.choices[(i + d + op.choices.length) % op.choices.length][0]); };
+          show();
+          const item = { el: seg, noClick: true, focus: () => btns[Math.max(0, op.choices.findIndex((ch) => ch[0] === testValues[op.id]))], left: () => step(-1), right: () => step(1) };
+          items.push(item);
+          const row = el('div', 'lb-setting');
+          row.style.cssText = 'flex-direction:column;align-items:stretch;gap:8px';
+          const name = txt('span', 'lb-setting-name', op.name);
+          name.id = nameId;
+          row.append(name, seg);
+          choiceRows.push(row);
+        } else {
+          const row = el('div', 'lb-setting', '<div class="lb-setting-text"><span class="lb-setting-name"></span><p class="lb-note"></p></div><button class="lb-toggle" type="button"></button>');
+          const nameEl = row.querySelector('.lb-setting-name');
+          nameEl.textContent = op.name;
+          nameEl.id = 'lb-te-' + oi;
+          row.querySelector('.lb-note').textContent = op.note || '';
+          const sw = row.querySelector('button');
+          sw.setAttribute('aria-labelledby', nameEl.id);
+          const show = () => { sw.setAttribute('aria-pressed', testValues[op.id] ? 'true' : 'false'); sw.textContent = testValues[op.id] ? 'On' : 'Off'; };
+          show();
+          const flip = () => { testValues[op.id] = !testValues[op.id]; saveTest(); show(); sfx('blip'); };
+          items.push({ el: sw, activate: flip, left: flip, right: flip });
+          toggleRows.push(row);
+        }
+      });
+      const done = button('Back', true);
+      items.push({ el: done, activate: close });
+      const note = txt('p', 'lb-note', 'For trying the game out. Start game uses these.');
+      if (phone) {
+        done.style.padding = '0 24px';
+        const head = el('div', 'lb-header');
+        head.append(heading('lb-te-t', 'Testing'), done);
+        const cols = el('div');
+        cols.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:26px';
+        const a = el('div'); a.style.cssText = 'display:flex;flex-direction:column;gap:10px'; a.append(...choiceRows);
+        const b = el('div'); b.style.cssText = 'display:flex;flex-direction:column;gap:10px'; b.append(...toggleRows, note);
+        cols.append(a, b);
+        face.append(head, cols);
+      } else {
+        const foot = el('div', '', '<span class="lb-hint">' + kbd('Esc') + ' back</span>');
+        foot.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:12px;padding-top:2px';
+        foot.append(done);
+        if (touch) foot.firstChild.remove();
+        face.append(heading('lb-te-t', 'Testing'), el('div', '', RULE).firstChild, note, ...choiceRows, ...toggleRows, foot);
+      }
+      return { panel: panel, items: items, opts: { back: close, start: items.length - 1 } };
+    }
+    function openTesting(from) {
+      if (!testCfg) return;
+      state.screen = 'testing';
+      sfx('confirm');
+      showDialog(() => testingDialog(() => { sfx('back'); state.screen = 'settings'; showDialog(() => settingsDialog(settingsCloser(from), from)); }));
     }
 
     function scoreRows(table, highlight, from, to) {
@@ -5777,7 +5870,20 @@ return{build,set,stickShow,ICON,oct};
       if (music) music.sync(state.inGame, state.screen, state.ending);
       syncAmbient();   // version 8 (4c-7)
       if (hudNodes && hudNodes.full) syncHud();   // version 8: the full HUD's moments
+      const r0 = performance.now();
       render();
+      if (testCfg) showFps(gap, performance.now() - r0);   // kit 0.8.1
+    }
+    // kit 0.8.1: Testing's frame-rate line, in play: frames a second and a frame's drawing time, averaged over half a second
+    const fpsAcc = { n: 0, gap: 0, draw: 0, t: 0 };
+    function showFps(gap, drawMs) {
+      const on = !!testValues.fps && state.inGame && state.screen === 'play';
+      if (fpsEl.hidden === on) fpsEl.hidden = !on;
+      if (!on) return;
+      fpsAcc.n++; fpsAcc.gap += gap; fpsAcc.draw += drawMs; fpsAcc.t += gap;
+      if (fpsAcc.t < 0.5) return;
+      fpsEl.firstChild.textContent = Math.round(fpsAcc.n / fpsAcc.gap) + ' fps · ' + (fpsAcc.draw / fpsAcc.n).toFixed(1) + ' ms a frame · ' + pictureLevel();
+      fpsAcc.n = 0; fpsAcc.gap = 0; fpsAcc.draw = 0; fpsAcc.t = 0;
     }
     // The kit's named colours (design-system/tokens.json): games name them instead of writing colour codes
     const colours = {};
@@ -5850,7 +5956,8 @@ return{build,set,stickShow,ICON,oct};
          wanderer to the path. Without a level, the path's scenery is the directions page's sample strip.
        In the game's config: id, title (a string, or its two lines), start, update, draw(ctx, g, lb), place (the place behind
        the title, 'night' if left out), drawTitle(ctx, lb) (to draw the title's picture itself), mana, music, init(lb), onPause(g, lb),
-       and (version 8) hud: 'full', howTo, win. */
+       and (version 8) hud: 'full', howTo, win, and (kit 0.8.1) test: { options } for the Testing panel (Settings), its values in lb.test.
+       world.monster takes facing (kit 0.8.1): 1 mirrors it to face right. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
@@ -5864,6 +5971,7 @@ return{build,set,stickShow,ICON,oct};
       get best() { return Math.max(bestScore(), state.score); },
       addWisps: addWisps, gameOver: gameOver, shake: shake, after: after,
       fade: fade, placeCard: placeCard, placing: placing, win: showWin, howTo: () => openHowTo('play'),   // version 8 (4c-6a)
+      get test() { return testCfg ? Object.assign({}, testValues) : null; },   // kit 0.8.1: Testing's values, or null when the game has none
       sounds: Object.keys(SND8.FX), ambient: ambient,   // version 8 (4c-7)
       music: (i) => { if (music && music.tracks[i]) music.want = i; },
       rand: rand, randInt: randInt, pick: pick, clamp: clamp, lerp: lerp
@@ -5905,7 +6013,7 @@ return{build,set,stickShow,ICON,oct};
       start: startGame, pause: pause, resume: resume, quit: quitToTitle,
       setWisps: (n) => { state.score = n | 0; syncHud(); },
       showGameOver: showGameOver, openSettings: openSettings, openScores: openScores, openInitials: openInitials,
-      openHowTo: openHowTo, showWin: showWin, h8: state.h8, snd: SND8
+      openHowTo: openHowTo, showWin: showWin, h8: state.h8, snd: SND8, openTesting: openTesting
     };
     return api;
   }
