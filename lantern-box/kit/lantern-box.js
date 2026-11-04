@@ -1281,6 +1281,13 @@ class Scene{
     }
   }
   play(ctx,s,W,t,camX,o){
+    if(o.lvl){ // version 8: a level's rolling ground, as play.js's loopLevel draws it (its still parts into the path's tiles, its candles and shrines live)
+      const T=o.lvl,P=lvBuild(T,s),e=LV[T.lv].edge,st=this.pass!=="live";
+      if(st)rlPath(ctx,T,camX,W,P.G);
+      lvDress(ctx,P,camX,W,t,this.pass||null,o.rm);
+      if(st){ctx.save();ctx.translate(-camX,0);P.pieces.forEach((pl,i)=>{if(pl.X>camX+W+40||pl.X+pl.w*pl.k<camX-40)return;c2Draw(ctx,pl);const w=P.walks[i];c2Lit(ctx,w,w.x0,w.x1,e);});ctx.restore();}
+      return;
+    }
     const Pp=this.pools,x=ctx,set=this.ver<5?"village":LV[o.level].set,SD=SETS[set==="village"&&this.ver>=5?"village5":set],PH=set==="village"?Pp.ph:Pp.get(set).ph;
     const st=this.pass!=="live",lv=this.pass!=="static";
     if(st){x.fillStyle=INK;
@@ -1416,7 +1423,7 @@ function drawFairyKit(x,fl,t,lv,s){ // as drawFairy, but each light is the paint
   x.globalAlpha=1;
 }
 Object.assign(Scene.prototype,{
-  kitReset(key){this.kitKey=key;this.tiles={};this.poses=new Map();this.sky=null;this.vig=null;this.scr=null;this.bossC=null;},
+  kitReset(key){this.kitKey=key;this.tiles={};this.playKey=null;this.poses=new Map();this.sky=null;this.vig=null;this.scr=null;this.bossC=null;},
   scratch(s){ // two working canvases, a tile plus its margins wide
     const w=TWP+2*TMP,h=Math.ceil(LH*s);
     if(!this.scr||this.scr.w!==w||this.scr.h!==h)this.scr={w,h,a:mk(w,h),b:mk(w,h)};
@@ -1521,15 +1528,18 @@ Object.assign(Scene.prototype,{
     else if(L.fly==="crows")drawCrowsAlone(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7),3,true);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.78),1); // version 8
     KIT.fly=null;
     this.kitLayer(ctx,s,W,t,camX*f(0.76),4,tn[3],o,off(f(0.76),0.76));
-    // the path: its still parts from tiles, then everything that moves on it
-    this.drawTiles(ctx,this.kitTiles("play",camX,W,s,i=>this.buildPlayTile(i,s,t,o)),camX,s,off(1));
+    // the path: its still parts from tiles, then everything that moves on it (a level's tiles are its own: version 8)
+    const pk=o.lvl?"play@"+o.lvl.key:"play";
+    if(this.playKey!==pk){for(const k in this.tiles)if(k.startsWith("play"))delete this.tiles[k];this.playKey=pk;}
+    this.drawTiles(ctx,this.kitTiles(pk,camX,W,s,i=>this.buildPlayTile(i,s,t,o)),camX,s,off(1));
     at(1);this.dyS=off(1);this.pass="live";this.play(ctx,s,W,t,camX,o);this.pass=null;this.dyS=0;
   },
   kitEnd(ctx,s,W,t,camX,camY,o){ // everything in front of them
     const lv=o.level,rm=o.rm,off=k=>Math.round(camY*k*s),at=k=>ctx.setTransform(s,0,0,s,0,off(k));
     if(lv==="storm"){at(0);drawRain(ctx,W,t,1,rm);}
     const fk=rm?1.08:1.35;
-    this.drawTiles(ctx,this.kitTiles("fore",camX*fk,W,s,i=>this.buildForeTile(i,s,t,o,"g")),camX*fk,s,off(fk));
+    // version 8 (Barney, 4 November 2026): the plants along the bottom edge stay where they are as the camera rises, as play.js draws them
+    this.drawTiles(ctx,this.kitTiles("fore",camX*fk,W,s,i=>this.buildForeTile(i,s,t,o,"g")),camX*fk,s,0);
     this.drawTiles(ctx,this.kitTiles("foreTop",camX*fk,W,s,i=>this.buildForeTile(i,s,t,o,"t")),camX*fk,s,0); // branches stay hung from the top edge
     ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(this.vig,0,0);
     // tidy: forget poses not used for a while; count the memory the tiles hold
@@ -2885,10 +2895,232 @@ function renderSheet(cv,t,o,scene){
 }
 
 
+/* ============================== the play parts: design system version 8 (play.js 1.0.0) ==============================
+   Step 4c of the PRD brings play.js's parts into the kit, one step at a time (lantern-box/HANDOVER.md, "The play parts").
+   The drawing is play.js's word for word, its names for bundle.js's parts (the LP and LB objects) replaced by the kit's own; the
+   review page's loops, the rejected ledges and rooftops (mvcourse.js, most of mvcourse2.js) and its own machinery are left
+   out. The kit's way changes when things are drawn (tiles, cached poses), never what they look like or how long they take. */
+
+/* ---------- from mvscene.js: the seeded random numbers the play parts draw with ---------- */
+function mvRng(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
+
+/* ---------- from mvcourse2.js: the helpers the pieces are drawn and stood on with (the ledges themselves are not ported) ---------- */
+const C2_INK="#060508";
+function c2Sprite(S,w,h,ox,oy,fn){const c=mk(Math.ceil(w*S),Math.ceil(h*S)),x=c.getContext("2d");x.setTransform(S,0,0,S,ox*S,oy*S);x.fillStyle=C2_INK;x.strokeStyle=C2_INK;fn(x);return{c,ox,oy,w,h};}
+// the top of a sprite's silhouette, per column: the first row of at least four solid rows, so thin twigs and rails are ignored
+function c2Top(sp){if(sp._top)return sp._top;const c=sp.c,W=c.width,H=c.height,d=c.getContext("2d").getImageData(0,0,W,H).data,sc=W/sp.w,out=new Float32Array(W).fill(1e9),run=Math.max(3,Math.round((sp.run||3)*sc));
+  for(let x=0;x<W;x++){let n=0;for(let y=0;y<H;y++){if(d[(y*W+x)*4+3]>110){n++;if(n>=run){out[x]=(y-run+1)/sc-sp.oy;break;}}else n=0;}}return sp._top={out,sc};}
+function c2At(pl,x){const sp=pl.sp,u=pl.flip?(pl.X-x)/pl.k:(x-pl.X)/pl.k,T=c2Top(sp),col=Math.round((u+sp.ox)*T.sc);if(col<0||col>=T.out.length)return 1e9;return pl.Y+T.out[col]*pl.k;}
+// a walk along a placed piece's top between x0 and x1, smoothed a little; or flat at a set height
+function c2Walk(pl,x0,x1,flatY,band){if(flatY==null&&band){let m=1e9;for(let x=x0;x<=x1;x+=1)m=Math.min(m,c2At(pl,x));while(x0<x1&&c2At(pl,x0)>m+band)x0+=1;while(x1>x0&&c2At(pl,x1)>m+band)x1-=1;}
+  if(flatY==null){const st=x=>Math.abs(c2At(pl,x+4)-c2At(pl,x))>7||c2At(pl,x)>1e8;while(x0<x1-8&&(st(x0)||c2At(pl,x0)>1e8))x0+=1;while(x1>x0+8&&(st(x1-4)||c2At(pl,x1)>1e8))x1-=1;}const ys=[];for(let x=x0;x<=x1+0.5;x+=2)ys.push(flatY!=null?flatY:c2At(pl,x));
+  const sm=ys.map((y,i)=>{const w=ys.slice(Math.max(0,i-2),i+3).filter(v=>v<1e8).sort((a,b)=>a-b);return w.length?w[Math.floor(w.length/2)]:y;});
+  return{x0,x1,pl,y:x=>{const i=Math.max(0,Math.min(sm.length-1,(x-x0)/2)),a=Math.floor(i),b=Math.min(sm.length-1,a+1);return sm[a]+(sm[b]-sm[a])*(i-a);}};}
+function c2Draw(c,pl){drawSprite(c,pl.sp,pl.X,pl.Y,pl.k,pl.flip);if(pl.sp.holes&&pl.sp.holes.length){c.save();if(pl.flip){c.translate(pl.X,pl.Y);c.scale(-1,1);c.translate(-pl.X,-pl.Y);}
+  fillHoles(c,pl.sp,pl.X,pl.Y,pl.k,mvRng(pl.seed||7),{litP:0.45,win:GOLD_LIGHT,a:0.95,bar:C2_INK,dark:"#1a1218",crack:true});c.restore();}}
+function c2Lit(c,wk,x0,x1,edge){c.save();c.strokeStyle=edge;c.lineWidth=2.2;c.lineCap="round";c.lineJoin="round";c.beginPath();for(let x=x0;x<=x1;x+=2){const y=wk.y(x);x===x0?c.moveTo(x,y):c.lineTo(x,y);}c.stroke();c.restore();}
+
+/* ---------- mvroll.js: the rolling ground ---------- */
+/* ============================== 4b round 5c: the rolling ground ==============================
+   The play strip's ground rolls up from today's floor (never below it): the moor's hills up to about half the screen, the graveyard and
+   the forest about 35 to 40%, the old town's streets about 25%. A few steep banks need a jump or a climb; pits lie in the dips. Each place
+   has small, right-sized pieces to stand on and climb (a lit top edge on each; walk off, nothing is dropped through). The camera follows
+   the wanderer along and up, so the layers rise at their own rates. Drawn into the real places by overriding the Scene's play strip. */
+const RL_MAX={night:190,storm:135,dawn:270,mist:200};
+// smooth value noise: the ground's small undulations at several scales, and the crumble of a bank's face
+function rlHash(k,s){let n=(Math.imul(k|0,374761393)+Math.imul(s|0,668265263))|0;n=Math.imul(n^(n>>>13),1274126177);n^=n>>>16;return (n>>>0)/4294967296*2-1;}
+function rlNoise(s,x){const i=Math.floor(x),f=x-i,u=f*f*(3-2*f);return rlHash(i,s)*(1-u)+rlHash(i+1,s)*u;}
+const RL_SEED={night:11,storm:23,dawn:37,mist:53},RL_ROUGH={night:1,storm:0.55,dawn:1.25,mist:1.05}; // the moor roughest, the old town's streets smoothest
+function tRough(T,x){const s=T.seed;return rlNoise(s,x/150)*6+rlNoise(s+1,x/61)*4.2+rlNoise(s+2,x/26)*2.5+rlNoise(s+3,x/10.5)*1.1;}
+// a bank's face: two or three steep pitches with short, tilted shelves between, different for every bank
+const _rlBank={};
+function tBankU(TR,i,u){let T=_rlBank[TR.key+"#"+i];
+  if(!T){const r=mvRng(TR.seed*7+i*13),n=2+Math.floor(r()*2);T=[[0,0]];let p=0,h=0;
+    for(let k=0;k<n;k++){const span=1/n,steep=span*(0.4+r()*0.2);if(k===n-1){T.push([1,1]);break;}p+=steep;h=Math.min(0.9,h+span*(0.75+r()*0.5));T.push([p,h]);p+=span-steep;h=Math.min(0.93,h+0.03+r()*0.05);T.push([p,h]);}
+    _rlBank[TR.key+"#"+i]=T;}
+  for(let k=0;k<T.length-1;k++){const a=T[k],b=T[k+1];if(u<=b[0]){let v=(u-a[0])/Math.max(1e-6,b[0]-a[0]);v=v*v*(3-2*v);return a[1]+(b[1]-a[1])*v;}}return 1;}
+function tHill(T,x){const P=T.pts,M=T.max;let lo=0,hi=P.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(P[m][0]<=x)lo=m;else hi=m;} // a binary search: levels have many points
+  for(let i=lo;i<=lo;i++){const a=P[i],b=P[i+1];if(b&&x>=a[0]&&x<b[0]){const u0=(x-a[0])/(b[0]-a[0]);let u=u0,cr=0;
+  if(a[2]==="b"){u=tBankU(T,i,u0);cr=Math.sin(Math.PI*u0)*Math.abs(b[1]-a[1])*M*0.07*rlNoise(T.seed+9,x/3.4);}
+  else if(a[2]==="s")u=(1-Math.cos(u0*Math.PI))/2;else u=0;return M*(a[1]+(b[1]-a[1])*u)+cr;}}return 0;}
+// the ground: the big shape, then the undulations (gentle on the floor itself, fuller once the ground has risen)
+function tGround(T,x){const h=tHill(T,x),w=Math.max(0,Math.min(1,h/40)),a=(0.3+0.7*w*w*(3-2*w))*T.rough;return gY(x)-h-tRough(T,x)*a;}
+const _rlAvg={};function tRise(T,x){if(!_rlAvg[T.key]){const a=[];for(let X=0;X<=T.len;X+=4){let s=0,n=0;for(let d=-110;d<=110;d+=10){s+=tHill(T,X+d);n++;}a.push(s/n);}_rlAvg[T.key]=a;}
+  const a=_rlAvg[T.key],i=Math.max(0,Math.min(a.length-1,x/4));return a[Math.floor(i)]*0.8;}
+// ---------- the new small pieces, in the same hand
+function rlBoxTomb(x){x.beginPath();x.moveTo(-4,3);x.lineTo(-3,-6);x.lineTo(78,-7);x.lineTo(80,3);x.closePath();x.fill();
+  x.beginPath();x.moveTo(2,-6);x.lineTo(3,-34);x.lineTo(72,-35);x.lineTo(73,-6);x.closePath();x.fill();
+  x.beginPath();x.moveTo(-6,-33);x.quadraticCurveTo(36,-37,82,-34);x.lineTo(81,-41);x.quadraticCurveTo(38,-44,-5,-41);x.closePath();x.fill();
+  x.save();x.globalCompositeOperation="destination-out";for(const cx of [16,37,58]){x.beginPath();x.ellipse(cx,-20,4,7,0,0,Math.PI*2);x.fill();}x.restore();}
+// drawing helpers for hand-cut pieces: a tapered band along a curve (roots, splinters, poles, spokes); a cut (a thin, wavering slit of light)
+function rlTaper(x,p0,p1,p2,w0,w1,n){n=n||14;const L=[],R=[];for(let i=0;i<=n;i++){const t=i/n,m=1-t,px=m*m*p0[0]+2*m*t*p1[0]+t*t*p2[0],py=m*m*p0[1]+2*m*t*p1[1]+t*t*p2[1],dx=2*m*(p1[0]-p0[0])+2*t*(p2[0]-p1[0]),dy=2*m*(p1[1]-p0[1])+2*t*(p2[1]-p1[1]),l=Math.hypot(dx,dy)||1,w=(w0+(w1-w0)*t)/2;L.push([px-dy/l*w,py+dx/l*w]);R.push([px+dy/l*w,py-dx/l*w]);}
+  x.beginPath();x.moveTo(L[0][0],L[0][1]);for(const p of L)x.lineTo(p[0],p[1]);for(let i=R.length-1;i>=0;i--)x.lineTo(R[i][0],R[i][1]);x.closePath();x.fill();}
+function rlBlob(x,pts){const n=pts.length,m=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2],s=m(pts[n-1],pts[0]);x.beginPath();x.moveTo(s[0],s[1]);for(let i=0;i<n;i++){const q=m(pts[i],pts[(i+1)%n]);x.quadraticCurveTo(pts[i][0],pts[i][1],q[0],q[1]);}x.closePath();x.fill();}
+function rlCut(x,a,b,w,wob,r){x.save();x.globalCompositeOperation="destination-out";x.lineWidth=w;x.lineCap="round";x.beginPath();x.moveTo(a[0],a[1]);x.quadraticCurveTo((a[0]+b[0])/2+(r()-0.5)*wob,(a[1]+b[1])/2+(r()-0.5)*wob,b[0],b[1]);x.stroke();x.restore();}
+// a big crate: a hand-cut box, its frame and diagonal brace and the boards between shown by slits of light
+function rlCrate(x,X,w,h,seed,rot){const r=mvRng(seed),j=()=>(r()-0.5)*1.6,f=4.6;x.save();x.translate(X+w/2,0);x.rotate(rot||0);x.translate(-w/2,0);
+  const P=[[j(),2],[j()*0.8,-h+j()],[w+j()*0.8,-h+j()],[w+j(),2]];x.beginPath();x.moveTo(P[0][0],P[0][1]);for(let i=1;i<=4;i++){const a=P[i-1],b=P[i%4];x.quadraticCurveTo((a[0]+b[0])/2+j()*0.6,(a[1]+b[1])/2+j()*0.6,b[0],b[1]);}x.closePath();x.fill();
+  const cw=1.25;for(let k=1;k<3;k++){const y=-f-(h-2*f)*k/3+j()*0.5;rlCut(x,[f+1,y],[w-f-1,y+j()*0.6],cw,1,r);} // the boards
+  const d=2.7,len=Math.hypot(w-2*f,h-2*f),nx=(h-2*f)/len*d,ny=(w-2*f)/len*d;x.beginPath();x.moveTo(f-nx*0.2,-f+ny*0.2);x.lineTo(f+nx*1.6,-f+ny*1.6+0.4);x.lineTo(w-f+nx*0.2,-h+f-ny*0.2);x.lineTo(w-f-nx*1.6,-h+f-ny*1.6-0.4);x.closePath();x.fill(); // the brace, over the boards
+  for(const s of [-1,1])rlCut(x,[f+1.5+s*nx,-f-1.5+s*ny],[w-f-1.5+s*nx,-h+f+1.5+s*ny],cw,1.2,r);
+  rlCut(x,[f,-f],[w-f,-f+j()*0.4],cw,0.8,r);rlCut(x,[f,-h+f],[w-f,-h+f+j()*0.4],cw,0.8,r);rlCut(x,[f,-f],[f+j()*0.4,-h+f],cw,0.8,r);rlCut(x,[w-f,-f],[w-f+j()*0.4,-h+f],cw,0.8,r); // the frame
+  x.restore();}
+// a barrel: bellied staves, hoops near each end, a stave seam or two
+function rlBarrel(x,X,w,h,seed){const r=mvRng(seed),hw=w/2,cx=X+hw,b=w*0.14;x.beginPath();x.moveTo(cx-hw+b,2);x.bezierCurveTo(cx-hw-1.2,-h*0.3,cx-hw-1.2,-h*0.7,cx-hw+b,-h);x.quadraticCurveTo(cx,-h-1.6,cx+hw-b,-h+0.4);x.bezierCurveTo(cx+hw+1.2,-h*0.7,cx+hw+1.2,-h*0.3,cx+hw-b,2);x.closePath();x.fill();
+  const half=f=>hw-b+(b+0.9)*Math.sin(Math.PI*f)*0.95;for(const f of [0.13,0.22,0.78,0.87]){const y=-h*f,hh=half(f)-1.6;rlCut(x,[cx-hh,y],[cx+hh,y+0.3],1.2,0.6,r);}
+  for(const s of [-0.38,0.3]){x.save();x.globalCompositeOperation="destination-out";x.lineWidth=1;x.lineCap="round";x.beginPath();x.moveTo(cx+s*hw*0.8,-h*0.25);x.quadraticCurveTo(cx+s*hw*1.12,-h*0.5,cx+s*hw*0.8,-h*0.75);x.stroke();x.restore();}}
+// the old town's handcart, parked: a tilted bed of three crooked boards on a beam, one big wheel, a prop at the front, the handle raised behind, a slumped sack
+function rlCart(x){const r=mvRng(31),yT=X=>-51-X*0.065;x.lineJoin="round";
+  rlTaper(x,[98,yT(98)+18],[128,yT(122)+9],[154,-62],5.2,3.6);x.beginPath();x.ellipse(154.5,-62.5,3,2.4,-0.6,0,Math.PI*2);x.fill(); // the handle and its worn grip
+  rlTaper(x,[13,yT(13)+15],[9.5,-16],[6,1],5.6,4.2,8);x.beginPath();x.ellipse(6,1.2,5.2,2.2,0,0,Math.PI*2);x.fill(); // the prop and its foot
+  rlTaper(x,[-3,yT(-3)+17.6],[56,yT(56)+19.2],[116,yT(116)+17.4],4.4,4.6,10); // the beam
+  for(let k=0;k<3;k++){const t0=k*5.7,e0=(r()-0.5)*4.4,e1=(r()-0.5)*4.4,bw=(k===1?1:-1)*(0.8+r()*1.2); // three boards, light between them
+    x.beginPath();x.moveTo(-1+e0,yT(-1)+t0);x.quadraticCurveTo(54,yT(54)+t0+bw,108+e1,yT(108)+t0);x.lineTo(108.4+e1,yT(108)+t0+4.4);x.quadraticCurveTo(54,yT(54)+t0+4.4+bw,-1.3+e0,yT(-1)+t0+4.4);x.closePath();x.fill();}
+  for(const [px,up] of [[1,4],[54,0],[104,5]]){const t=yT(px);x.beginPath();x.moveTo(px-2.3,t+17.5);x.lineTo(px-2,t-up);x.quadraticCurveTo(px,t-up-1.3,px+2.2,t-up+0.3);x.lineTo(px+2.5,t+17.5);x.closePath();x.fill();} // the stakes
+  const wx=62,wy=-22.6,R0=22.6;x.lineWidth=4.6;x.beginPath();for(let i=0;i<=30;i++){const a=i/30*Math.PI*2,rr=R0-2.3+rlNoise(5,i*0.8)*0.45,px=wx+Math.cos(a)*rr,py=wy+Math.sin(a)*rr;i?x.lineTo(px,py):x.moveTo(px,py);}x.closePath();x.stroke(); // the rim, a touch out of true
+  for(let i=0;i<9;i++){const a=i/9*Math.PI*2+0.25+(r()-0.5)*0.09,c=Math.cos(a),s=Math.sin(a),bend=(r()-0.5)*1.4;rlTaper(x,[wx+c*4,wy+s*4],[wx+c*10-s*bend,wy+s*10+c*bend],[wx+c*(R0-3),wy+s*(R0-3)],3.3,2.2,6);} // nine spokes
+  x.beginPath();x.arc(wx,wy,5.4,0,Math.PI*2);x.fill();
+  const Y=X=>yT(X);rlShape(x,[[2,Y(2)+1.5,1],[-0.5,Y(0)-5],[2.5,Y(3)-11],[7.5,Y(8)-14.5],[11,Y(11)-17],[12.6,Y(12.6)-21.5],[15.4,Y(15.4)-23.6],[18.2,Y(18)-21.4],[17.4,Y(17.4)-17.6],[22.5,Y(22.5)-15.4],[29,Y(29)-11.6],[33.5,Y(33.5)-6.4],[35.5,Y(35.5)+1.5,1]]); // the sack, slumped
+  rlShape(x,[[14.8,Y(15)-22.6,1],[18.6,Y(18.6)-27.6],[22.4,Y(22.4)-26.4],[21,Y(21)-23.4],[17.8,Y(17.8)-22.2]]); // its tied neck, flopped over
+  rlCut(x,[6,Y(6)-8.5],[16,Y(16)-12],1.1,2,r);rlCut(x,[19,Y(19)-10],[30,Y(30)-6.5],1.1,2,r);}
+// an outline through points: those marked sharp are corners (splinter tips, notches), the rest are smoothed through; the first must be sharp
+function rlShape(x,pts){const n=pts.length,mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];x.beginPath();x.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<=n;i++){const p=pts[i%n],q=pts[(i+1)%n];if(p[2])x.lineTo(p[0],p[1]);else{const e=q[2]?q:mid(p,q);x.quadraticCurveTo(p[0],p[1],e[0],e[1]);}}x.closePath();x.fill();}
+// the forest's great stump: no ruler edges. A trunk that bulges and leans a little (a burr on its right flank), flaring into buttresses and
+// gnarled roots (the right one arched clear of the ground); a broken crown, its middle standable, splintered at both ends; a stub of branch,
+// shelf fungi, a couple of bark fissures, and a torn hollow (pointed at the top, its lower lip toothed) in place of the old egg-shaped hole
+function rlGreatStump(x){const r=mvRng(23),N=rlNoise,lean=0.06,E=Math.exp;
+  const xl=h=>18+0.085*h-22*E(-h/9)+4.4*N(41,h/22)+N(43,h/5),xr=h=>92-0.03*h+22*E(-h/10)+4.4*N(42,h/22)+N(44,h/5)+5*E(-(((h-52)/8)**2));
+  const pts=[[xl(0)-3,4,1]];for(let h=2;h<=94;h+=3)pts.push([xl(h),-h]);
+  pts.push([26.4,-100],[25.6,-108],[26.6,-116,1],[28.8,-109],[30.6,-103],[31.6,-99.5,1]); // the splinter on the left
+  for(let X=36;X<=72;X+=4)pts.push([X,-97.4+(X-36)*0.06+N(45,X/5)*2.1+(X>52?1.6:0)]); // the broken surface, falling a little to the right
+  pts.push([75.6,-95,1],[77.6,-101,1],[79.8,-96.4],[82.4,-99.6,1],[84.8,-93.6],[87.4,-96.2,1],[89.4,-91.6]); // splinters on the right
+  for(let h=88;h>=2;h-=3)pts.push([xr(h),-h]);pts.push([xr(0)+3,4,1]);rlShape(x,pts);
+  rlTaper(x,[xl(6)+3,-5],[0,-6.5],[-9,-1.2],8,5,8);rlTaper(x,[-9,-1.2],[-15,1],[-20,4.5],5,1.6,8);rlTaper(x,[6,-2],[2,0],[-1,4.5],5,1.8,6); // roots, left
+  rlTaper(x,[xr(7)-3,-6],[116,-11.5],[123,-4],8,5,8);rlTaper(x,[123,-4],[127,0],[129,4.5],5,1.6,6);rlTaper(x,[106,-2],[111,0],[113,4.5],5,1.8,6); // roots, right: the long one arches just clear
+  const bx=xr(66);rlTaper(x,[bx-6,-63],[bx+10,-70],[bx+18,-84],10,4.6,10);rlShape(x,[[bx+15.6,-81,1],[bx+16.6,-90,1],[bx+18.6,-85,1],[bx+21,-89.5,1],[bx+21.2,-82,1]]); // the stub branch
+  for(const [h,s] of [[35,1],[43,0.85]]){const e=xl(h)+1;rlShape(x,[[e+1.5,-h+1.6,1],[e+1.5,-h-1.2,1],[e-5*s,-h-3.4],[e-11*s,-h-3],[e-15*s,-h-0.6],[e-15.5*s,-h+1.4,1],[e-9*s,-h+0.6],[e-4*s,-h+1.4]]);} // shelf fungi
+  x.save();x.globalCompositeOperation="destination-out";x.lineCap="round";x.lineWidth=1.05;
+  for(const [fx,h0,h1] of [[40,58,82],[73,12,32],[75,64,84]]){x.beginPath();for(let h=h0;h<=h1;h+=2){const X=fx+lean*h+N(fx,h/7)*1.8;h===h0?x.moveTo(X,-h):x.lineTo(X,-h);}x.stroke();} // bark fissures
+  // the hollow: a torn split, pointed at both ends, wider below the middle, its two sides lumpy and unequal, a splinter jutting into it
+  rlShape(x,[[49.6,-62,1],[51.6,-55],[54.4,-48],[56.8,-41.5],[57.4,-35],[55.2,-29.5],[56.4,-25.5,1],[53.6,-23.5],[50.6,-20,1],[47.6,-23.5],[44.4,-27.5],[43.6,-34],[46.2,-38.4,1],[44.4,-42.6],[46.4,-50],[48.2,-56.5]].map(([X,Y,k])=>[52+(X-50.6)*0.85,-37+(Y+41)*0.58,k]));
+  rlShape(x,[[74.6,-71,1],[77.2,-73,1],[78.6,-68.6],[76.8,-65.6],[74.6,-67.4]]); // a knot hole
+  x.restore();}
+function rlBoulders(x){const r=mvRng(17),b=(cx,cy,rx,ry,tilt)=>{x.beginPath();const n=14;for(let i=0;i<=n;i++){const a=Math.PI+i/n*Math.PI,k=0.86+r()*0.2;x.lineTo(cx+Math.cos(a+tilt)*rx*k,cy+Math.sin(a+tilt)*ry*k);}x.lineTo(cx+rx*0.9,6);x.lineTo(cx-rx*0.95,6);x.closePath();x.fill();};
+  b(24,2,28,30,0.12);b(74,4,30,24,-0.1);b(46,-18,24,20,0.25);b(98,4,14,12,0);}
+function rlMossRock(x){x.beginPath();x.moveTo(-6,4);x.quadraticCurveTo(-8,-26,18,-38);x.quadraticCurveTo(48,-46,70,-30);x.quadraticCurveTo(84,-14,82,4);x.closePath();x.fill();
+  x.lineCap="round";x.lineWidth=1.4;for(let i=0;i<9;i++){const px=8+i*8,py=-36+Math.abs(i-4)*1.6;x.beginPath();x.moveTo(px,py+3);x.quadraticCurveTo(px+1,py-4,px+3,py-7);x.stroke();}}
+// the moor's drystone wall (round 5e, in place of the design system's stone wall here): laid along the ground, so its foot and its top
+// follow the rise and fall of the hill; a row of coping stones set on edge along its top; one end tumbled into a heap of loose stones,
+// the other a rough cheek end, fallen stones at its foot. No straight edges anywhere.
+function rlDryWall(S,X,L,h,G,seed){const r=mvRng(seed);let Y=-1e9;for(let q=X;q<=X+L;q+=2)Y=Math.max(Y,G(q));Y+=3;let dm=0;for(let q=X;q<=X+L;q+=2)dm=Math.max(dm,Y-G(q));
+  const base=lx=>G(X+lx)-Y+4,oy=h+dm+18,sp=c2Sprite(S,L+30,oy+10,14,oy,x=>{const body=h-7,T0=16,T1=L-8;
+    const top=lx=>base(lx)-body+rlNoise(seed,lx/14)*1.6; // the body's top, a little uneven
+    // the body: from the heap's shoulder to the cheek end
+    const pts=[[T0-4,base(T0-4)+6,1]];for(let lx=T0-4;lx<=T0+2;lx+=2)pts.push([lx+(lx-T0)*0.2,top(lx)+(T0+2-lx)*1.4]);
+    for(let lx=T0+4;lx<=T1-4;lx+=4)pts.push([lx,top(lx)]);
+    pts.push([T1-1,top(T1-1)+0.5,1],[T1+1.4,top(T1)+5],[T1+0.6,top(T1)+11,1],[T1+2.6,top(T1)+15],[T1+2,base(T1)-body*0.42,1],[T1+3.8,base(T1)-body*0.3],[T1+4.6,base(T1)+6,1]);rlShape(x,pts);
+    // the coping: stones on edge, leaning a little this way and that
+    for(let lx=T0+1;lx<T1-3;){const w=4.6+r()*3.2,hh=4.6+r()*3.4,lean=(r()-0.5)*0.36,cx=lx+w/2,y0=top(cx)+1.2;x.save();x.translate(cx,y0);x.rotate(lean);
+      rlShape(x,[[-w/2,1.5,1],[-w/2+0.3,-hh*0.7],[-w*0.2,-hh],[w*0.25,-hh*0.96],[w/2-0.2,-hh*0.62],[w/2,1.5,1]]);x.restore();lx+=w+0.5;}
+    // the tumbled end: loose stones heaped up to the wall's shoulder
+    for(const [lx,ly,rx,ry] of [[3,-3.2,5.4,3.6],[11,-4,6,4.4],[7,-10,4.8,3.6],[16,-9,5.6,4.2],[12.5,-16,5,3.8],[18,-21,4.6,3.6],[-3.5,-1.6,3.6,2.6]]){const cy=base(lx)+ly+3,q=[];for(let k=0;k<7;k++){const a=k/7*Math.PI*2+r()*0.5,rr=0.78+r()*0.36;q.push([lx+Math.cos(a)*rx*rr,cy+Math.sin(a)*ry*rr]);}rlBlob(x,q);}
+    // fallen stones at the cheek end's foot
+    for(const [lx,rx,ry] of [[L-1,4.2,3],[L+6,3.2,2.4]]){const cy=base(lx)+1,q=[];for(let k=0;k<6;k++){const a=k/6*Math.PI*2+r()*0.6,rr=0.8+r()*0.3;q.push([lx+Math.cos(a)*rx*rr,cy+Math.sin(a)*ry*rr]);}rlBlob(x,q);}
+  });return{sp,X,Y,k:1,w:L,wr:[12,L-8]};}
+// a bank's face dressed so its line is broken: stones jutting out of it, and the place's own touch: roots hanging over the forest's lip,
+// grass over the graveyard's and the moor's, set stones in the old town's
+function rlFaces(c,T,cam,W,G){const Pt=T.pts,lv=T.lv,SD=T.seed;c.fillStyle=C2_INK;c.strokeStyle=C2_INK;c.lineCap="round";
+  for(let i=0;i<Pt.length-1;i++){if(Pt[i][2]!=="b")continue;const a0=Pt[i][0],a1=Pt[i+1][0];if(a1<cam-40||a0>cam+W+40)continue;
+    const up=Pt[i+1][1]>Pt[i][1],d=up?-1:1,r=mvRng(SD*3+i),top=up?a1:a0,F=u=>a0+(a1-a0)*u;
+    // the face's own outline pushed out into the air in small, uneven jags, so no pitch is one straight line (ink is only ever added)
+    const path=[];for(let X=a0-4;X<=a1+4;X+=1)path.push([X,G(X)]);const len=[0];for(let k=1;k<path.length;k++)len.push(len[k-1]+Math.hypot(path[k][0]-path[k-1][0],path[k][1]-path[k-1][1]));
+    const L=len[len.length-1],jag=[];let k=0;for(let a=0;a<=L;a+=3.2){while(k<len.length-2&&len[k+1]<a)k++;const p0=path[k],p1=path[k+1],f=(a-len[k])/Math.max(1e-6,len[k+1]-len[k]),px=p0[0]+(p1[0]-p0[0])*f,py=p0[1]+(p1[1]-p0[1])*f,
+      tl=Math.hypot(p1[0]-p0[0],p1[1]-p0[1])||1,tx=(p1[0]-p0[0])/tl,ty=(p1[1]-p0[1])/tl,amp=Math.sin(Math.PI*a/L)*(1-Math.abs(tx)*0.7)*(1.2+Math.abs(rlNoise(SD+i*5,a/5))*4.2);jag.push([px+ty*amp,py-tx*amp]);}
+    c.beginPath();c.moveTo(jag[0][0]-cam,jag[0][1]);for(const q of jag)c.lineTo(q[0]-cam,q[1]);c.lineTo(a1+4-cam,G(a1+4)+40);c.lineTo(a0-4-cam,G(a0-4)+40);c.closePath();c.fill();
+    for(const u of [0.14,0.36,0.58,0.8]){const X=F(u+(r()-0.5)*0.08),Y=G(X)+3+r()*4,rad=3.4+r()*3.2,cx=X-cam+d*rad*0.55,pts=[],n=lv==="storm"?5:7;
+      for(let k=0;k<n;k++){const ang=k/n*Math.PI*2+(lv==="storm"?0.6:r()*0.5),rr=rad*(lv==="storm"?0.95+r()*0.1:0.75+r()*0.4);pts.push([cx+Math.cos(ang)*rr*1.25,Y+Math.sin(ang)*rr*0.8]);}rlBlob(c,pts);}
+    if(lv==="mist")for(let k=0;k<3;k++){const X0=top-d*(3+k*5),Y0=G(X0)+3,L=18+r()*22;rlTaper(c,[X0-cam,Y0],[X0-cam+d*(6+r()*5),Y0+L*0.45],[X0-cam+d*(3+r()*4),Y0+L],2.8,0.7,8);}
+    if(lv==="night"||lv==="dawn")for(let k=0;k<6;k++){const X0=top-d*(1+k*2.6+r()),Y0=G(X0)+1.5,h=4+r()*5;c.lineWidth=1.2;c.beginPath();c.moveTo(X0-cam,Y0);c.quadraticCurveTo(X0-cam+d*1.5,Y0-h*0.6,X0-cam+d*(2+r()*2.5),Y0-h);c.stroke();}}}
+// the ground with its pits: solid between the pits, each pit a gap showing the air (ragged walls, lit lips, the place's dressing)
+function rlPath(c,T,cam,W,G){const lv=T.lv,A=AIR[lv],ink=C2_INK,pits=T.pits.filter(p=>p[1]>cam-80&&p[0]<cam+W+80);c.fillStyle=ink;
+  const segs=[];let x0=cam-20;for(const [pl,pr] of pits){segs.push([x0,pl+8]);x0=pr-8;}segs.push([x0,cam+W+20]);
+  for(const sg of segs){if(sg[1]<sg[0])continue;c.beginPath();c.moveTo(sg[0]-cam,LH+400);for(let x=Math.floor(sg[0]/2)*2;x<=sg[1];x+=2)c.lineTo(x-cam,G(x));c.lineTo(sg[1]-cam,G(sg[1]));c.lineTo(sg[1]-cam,LH+400);c.closePath();c.fill();}
+  for(const [pl,pr] of pits){const gt=Math.min(G(pl),G(pr)),g=c.createLinearGradient(0,gt,0,LH+60);g.addColorStop(0,mixc(ink,A,0.5));g.addColorStop(0.5,mixc(ink,A,0.2));g.addColorStop(1,ink);
+    // the pit's walls ragged, not ruled: each steps in and out a little on the way down
+    const wall=(x0,d,sd)=>{const out=[];for(let k=0;k<=16;k++){const y=G(x0)+k*6.5;out.push([x0+d*(Math.min(k,2)*1.2+k*0.25+Math.abs(rlNoise(sd,k*0.9))*5.2*Math.min(1,k/2)),y]);}return out;},wl=wall(pl,1,71+pl),wr=wall(pr,-1,72+pr);
+    c.fillStyle=g;c.beginPath();c.moveTo(pl-cam,G(pl));for(const p of wl)c.lineTo(p[0]-cam,p[1]);c.lineTo(pl+3-cam,LH+400);c.lineTo(pr-3-cam,LH+400);for(let i=wr.length-1;i>=0;i--)c.lineTo(wr[i][0]-cam,wr[i][1]);for(let X=pr-2;X>pl;X-=2)c.lineTo(X-cam,G(X));c.closePath();c.fill();}
+  // a faint rim of the place's light along the ground, so the rolling line reads against the dark layer behind
+  const inPit=x=>pits.some(p=>x>p[0]&&x<p[1]);
+  c.save();c.strokeStyle=LV[lv].edge;c.globalAlpha=0.32;c.lineWidth=1.3;c.beginPath();let on=false;for(let x=Math.floor(cam/2)*2-10;x<=cam+W+10;x+=2){if(inPit(x)){on=false;continue;}const X=x-cam,Y=G(x);on?c.lineTo(X,Y):c.moveTo(X,Y);on=true;}c.stroke();c.restore();
+  rlFaces(c,T,cam,W,G);c.fillStyle=ink;
+  // each pit's lips lit, and its dressing: the open grave's earth and spade; the ravine's roots; the bog's far water
+  for(const [pl,pr] of pits){
+  c.save();c.strokeStyle=LV[lv].edge;c.lineWidth=2;c.lineCap="round";for(const [a,b] of [[pl-12,pl],[pr,pr+12]]){c.beginPath();c.moveTo(a-cam,G(a));c.lineTo(b-cam,G(b));c.stroke();}c.restore();
+  c.fillStyle=ink;c.strokeStyle=ink;if(lv==="night"){c.beginPath();c.moveTo(pr+2-cam,G(pr));c.quadraticCurveTo(pr+16-cam,G(pr)-16,pr+34-cam,G(pr+34));c.closePath();c.fill();c.lineWidth=2.2;c.beginPath();c.moveTo(pr+20-cam,G(pr)-8);c.lineTo(pr+26-cam,G(pr)-40);c.stroke();c.fillRect(pr+21-cam,G(pr)-46,9,3);}
+  else if(lv==="mist"){c.lineCap="round";for(const [x,d,l] of [[pl-2,1,40],[pl+2,1,26],[pr+2,-1,34],[pr-1,-1,22]]){c.lineWidth=2;c.beginPath();c.moveTo(x-cam,G(x)+4);c.quadraticCurveTo(x+d*6-cam,G(x)+l*0.5,x+d*3-cam,G(x)+l);c.stroke();}}
+  else if(lv==="dawn"){c.strokeStyle=rgba("#dbe7ff",0.45);c.lineWidth=1.2;c.beginPath();c.moveTo(pl+8-cam,LH-28);c.lineTo(pr-8-cam,LH-28);c.stroke();}}}
+
+/* ---------- mvlevel.js: hill sections, and a whole level built from them ---------- */
+/* ============================== 4b round 5e: hill sections, and a whole level built from them ==============================
+   Seven section shapes, each starting and ending on the floor, their heights a share of the place's maximum (so the same section is a
+   mound in the old town and a hill on the moor). Each place strings ten of them in its own order, never the same one twice running, with a
+   flat lead-in at the start and the flat boss arena at the end. The checkpoints sit at the start, after the fifth section, and at the boss
+   door. The fly-through shows a place's whole level at about seven times walking pace, with a map of the level along the bottom. */
+const LV_SEC={
+  A:{name:"Ripples",L:820,pts:[[0,0,"s"],[210,0.14,"s"],[420,0.05,"s"],[630,0.17,"s"]],spots:[210,630]},
+  B:{name:"Long climb, crag drop",L:980,pts:[[0,0,"s"],[520,0.68,"s"],[660,0.78,"b"],[688,0.36,"s"],[900,0,"f"]],spots:[590]},
+  C:{name:"Bank and plateau",L:940,pts:[[0,0,"f"],[60,0,"b"],[88,0.42,"f"],[330,0.46,"s"],[460,0.58,"s"],[840,0,"f"]],spots:[200]},
+  D:{name:"Pit in the dip",L:860,pts:[[0,0,"s"],[170,0.24,"s"],[360,0,"f"],[440,0,"s"],[620,0.2,"s"],[800,0,"f"]],pits:[[378,422]],spots:[170,620]},
+  E:{name:"The big hill",L:1000,pts:[[0,0,"s"],[300,0.5,"b"],[328,0.86,"s"],[540,1,"s"],[880,0,"f"]],spots:[520]},
+  F:{name:"Terraces",L:920,pts:[[0,0,"f"],[40,0,"b"],[68,0.28,"f"],[230,0.31,"b"],[258,0.6,"s"],[440,0.68,"s"],[820,0,"f"]],spots:[150,440]},
+  G:{name:"Mound between pits",L:900,pts:[[0,0,"f"],[130,0,"s"],[310,0.32,"s"],[480,0.27,"s"],[680,0,"f"]],pits:[[64,108],[740,784]],spots:[390]}};
+const LV_ORDER={night:"ACDBFGEDAF",storm:"AFDCBGEADC",dawn:"ABDEFGCDEA",mist:"ACGFEDBADF"};
+const LV_LEAD=300,LV_ARENA=1300;
+// the level's terrain, in the same form as round 5d's stretches (rlT), so the same ground, banks, pits and camera rise draw it
+// the kit: a game may pass its own order of sections (the second loop shuffles them); the place's own order otherwise
+const _lvT={};
+function lvTerrain(lv,order){const ord=order||LV_ORDER[lv],id=lv+(ord===LV_ORDER[lv]?"":"-"+ord);if(_lvT[id])return _lvT[id];
+  for(const ch of ord)if(!LV_SEC[ch])throw new Error('Lantern Box: no hill section called "'+ch+'" (they are A to G).');
+  const pts=[[0,0,"f"]],pits=[],secs=[];let x=LV_LEAD;
+  for(let i=0;i<ord.length;i++){const S=LV_SEC[ord[i]];secs.push({id:ord[i],x0:x,x1:x+S.L});for(const p of S.pts)if(p[0]<S.L)pts.push([x+p[0],p[1],p[2]]);for(const q of S.pits||[])pits.push([x+q[0],x+q[1]]);x+=S.L;}
+  const arena=x;pts.push([arena,0,"f"]);const len=arena+LV_ARENA;pts.push([len,0,"f"],[len+4000,0,"f"]);
+  const cps=[{x:120,name:"start"},{x:secs[Math.min(4,secs.length-1)].x1,name:"middle"},{x:arena+60,name:"boss door"}];
+  return _lvT[id]={key:"level-"+id,lv,order:ord,pts,pits,max:RL_MAX[lv],seed:RL_SEED[lv]+100,rough:RL_ROUGH[lv],len,arena,secs,cps};}
+// each place's pieces (the same as round 5d's), one on each section's crest or plateau in turn, and its scenery scattered
+const _lvP={};
+function lvBuild(T,S){const key=T.key+"@"+S.toFixed(3);if(_lvP[key])return _lvP[key];const lv=T.lv,G=x=>tGround(T,x); // the kit: built from a level (lvTerrain), at the picture's sharpness S
+  const B=(k,seed,o)=>building(k,mvRng(seed),Object.assign({detail:2},o),S),sp=(w,h,ox,oy,fn)=>c2Sprite(S,w,h,ox,oy,fn),onFlat=(fn,wx)=>x=>{x.save();x.translate(0,-gY(wx));fn(x);x.restore();};
+  const put=(s,x,w,k,o)=>{let y=-1e9;for(let q=x;q<=x+w*(k||1);q+=4)y=Math.max(y,G(q));return Object.assign({sp:s,X:x,Y:y+3,k:k||1,w},o||{});};
+  let kinds;
+  if(lv==="night"){const a=sp(150,90,10,80,x=>drawWall(x,0,0,130,58,3)),b=sp(100,60,10,52,rlBoxTomb),c=sp(130,80,10,70,x=>drawWall(x,0,0,100,44,8));kinds=[[X=>put(a,X,130),130],[X=>put(b,X,80),80],[X=>put(c,X,100),100]];}
+  else if(lv==="storm"){const a=sp(96,64,8,54,x=>{rlCrate(x,0,44,42,51,0.02);rlBarrel(x,45,28,36,52);}),b=sp(176,88,12,78,rlCart),c=sp(64,62,8,56,x=>rlCrate(x,0,48,46,43,0));kinds=[[X=>put(a,X,74),74],[X=>put(b,X,110,1,{wr:[38,100]}),110],[X=>put(c,X,48),48]];}
+  else if(lv==="dawn"){const b=B("dolmen",21,{w:124,h:62}),c=sp(110,80,10,72,rlBoulders),d=sp(80,80,40,74,x=>drawCairn(x,0,0,1.3));let n=0;kinds=[[X=>rlDryWall(S,X,140,44,G,61+(n++)),140],[X=>put(b,X,124),124],[X=>put(c,X,100),100],[X=>put(d,X,60),60]];}
+  else{const a=sp(190,70,20,60,onFlat(x=>drawLog(x,0,150,150,30,2),150)),b=sp(80,70,30,64,x=>drawStumpProp(x,0,0,1.5,1)),c=sp(166,146,26,138,rlGreatStump),d=sp(100,60,10,52,rlMossRock);
+    kinds=[[X=>put(a,X,150,1,{desp:1}),150],[X=>put(b,X,40),40],[X=>put(c,X,110,1,{wr:[35,73]}),110],[X=>put(d,X,80),80]];}
+  const pieces=[];let n=0;for(const s of T.secs){for(const c of LV_SEC[s.id].spots){const [mk,w]=kinds[n++%kinds.length];pieces.push(mk(s.x0+c-w/2));}}
+  const desp=w=>{const y0=w.y;w.y=x=>{let m=-1e9;for(let d=-6;d<=6;d+=1.5)m=Math.max(m,y0(Math.max(w.x0,Math.min(w.x1,x+d))));return m;};return w;};
+  const walks=pieces.map(pl=>pl.desp?desp(c2Walk(pl,pl.X-6,pl.X+pl.w*pl.k+6,null,60)):pl.wr?c2Walk(pl,pl.X+pl.wr[0]*pl.k,pl.X+pl.wr[1]*pl.k,null,null):c2Walk(pl,pl.X-6,pl.X+pl.w*pl.k+6,null,pl.sp.perch?null:60));
+  // scenery: kept off pits, bank faces and pieces
+  const r=mvRng(RL_SEED[lv]*31),banks=[];for(let i=0;i<T.pts.length-1;i++)if(T.pts[i][2]==="b")banks.push([T.pts[i][0],T.pts[i+1][0]]);
+  const clear=(x,m)=>!T.pits.some(p=>x>p[0]-m-20&&x<p[1]+m+20)&&!banks.some(b=>x>b[0]-m-12&&x<b[1]+m+12)&&!pieces.some(p=>x>p.X-m&&x<p.X+p.w*p.k+m);
+  const dress=[],gap={night:[110,190],storm:[360,480],dawn:[300,460],mist:[420,600]}[lv];
+  for(let x=180;x<T.arena-100;x+=gap[0]+r()*(gap[1]-gap[0])){if(clear(x,lv==="mist"?70:14))dress.push([x,Math.floor(r()*6)]);}
+  const P={T,G,pieces,walks,dress};return _lvP[key]=P;}
+// the kit: pass "static" draws what never moves (into the path's tiles), "live" the candles and shrines (every frame), neither both
+function lvDress(c,P,cam,W,t,pass,rm){const lv=P.T.lv,G=P.G,st=pass!=="live",lp=pass!=="static";for(const [x,v] of P.dress){if(x<cam-160||x>cam+W+160)continue;const X=x-cam;
+  if(lv==="night"){if(st)drawGrave5(c,X,G(x)+4,1.45,v);if(v===2&&lp)drawCandle(c,X+26,G(x+26)+4,t,!!rm);}
+  else if(lv==="storm"){if(!st)continue;if(v===5)drawWell(c,X,G(x));else drawStreetLamp(c,X,G(x),GOLD_LIGHT);}
+  else if(lv==="dawn"){if(st)drawMenhir(c,X,G(x)+2,1,v%3);}
+  else{if(v===5){if(lp)drawShrine(c,X,G(x)+2,t,!!rm);}else if(st)drawFerns(c,X,x,110+v*10,v,G);}}}
+
 /* ============================== the tools: what a game calls, as lb.world ==============================
    The tools draw; games decide what happens. A frame is world.begin(ctx, { place, camX, rise }), then the things on the path
    in the order they should overlap, then world.end(). Things on the path are placed by x, along the path, and y, in picture
-   lines before the camera rises; y left out means standing on the ground at x. */
+   lines before the camera rises; y left out means standing on the ground at x.
+   Version 8: world.level(place, order) gives a place's whole level (its rolling ground, banks, pits, pieces and checkpoints),
+   and world.begin(ctx, { level, camX, rise }) draws it in place of the flat strip. Then y left out means standing on the level's
+   ground, and rise left out is the level's own camera rise where the wanderer is held (32% across the picture, as play.js). */
 function makeTools(env){
   const PLACE_SET={night:"village5",storm:"town",dawn:"moor",mist:"forest"};
   const STAND={crawler:3,ghoul2:2};          // how far a monster's feet sit below the ground line, as on the directions page
@@ -2917,13 +3149,32 @@ function makeTools(env){
     bossNames:BOSS_NAME,
     MONSTERS:["crawler","bat2","hatmaw","ghoul2","walker"],
     ground:gY,
+    level(place,order){ // version 8: a place's level, built from its hill sections (play.js's lvTerrain), in its own order unless one is given
+      if(!LV[place])throw new Error('Lantern Box: no place called "'+place+'".');
+      const T=lvTerrain(place,order);
+      if(!T.api){const banks=[];for(let i=0;i<T.pts.length-1;i++)if(T.pts[i][2]==="b")banks.push([T.pts[i][0],T.pts[i+1][0]]);
+        T.api={
+          place,order:T.order,length:T.len,arena:T.arena,
+          sections:T.secs.map(q=>({id:q.id,name:LV_SEC[q.id].name,x0:q.x0,x1:q.x1})),   // in play order; the flat start before them is LV_LEAD (300) long
+          checkpoints:T.cps.map(q=>({x:q.x,name:q.name})),                               // the start, after the fifth section, the boss's door
+          pits:T.pits.map(q=>q.slice()),                                                  // [x0, x1]: a gap in the path
+          banks,                                                                          // [x0, x1]: a steep face, up or down
+          ground:x=>tGround(T,x),                                                         // the ground's line at x, in picture lines (bigger is lower)
+          rise:x=>tRise(T,x),                                                             // how far the camera rises with the ground at x
+          pit:x=>T.pits.some(q=>x>q[0]&&x<q[1]),
+          pieces:()=>lvBuild(T,env.k()).walks.map(w=>({x0:w.x0,x1:w.x1,y:w.y})),        // the tops of the place's pieces, to stand on; y(x) between x0 and x1
+          _T:T};}
+      lvBuild(T,env.k()); // paint the pieces now, not in the first frame
+      return T.api;
+    },
     begin(ctx,o){
       o=o||{};
-      const S=env.k(),level=o.place||"night";
+      const L=o.level&&o.level._T?o.level:null,S=env.k(),level=L?L.place:(o.place||"night");
       FX=env.fx();
-      const rm=env.rm(),t=o.t==null?env.t():o.t,sc=sceneFor(S);
-      const opt={level,rm,walking:true,facing:1,hud:false,splash:"on",emberMouth:true,defeat:"cardwisp",dcol:EMBER.danger,dglow:EMBER.glow,win:GOLD_LIGHT,litP:LV[level].litP,sample:!!o.sample};
-      F={ctx,s:S,W:env.W(),t,rm,level,camX:o.camX||0,camY:o.rise||0,opt};
+      const rm=env.rm(),t=o.t==null?env.t():o.t,sc=sceneFor(S),W=env.W(),camX=o.camX||0;
+      const opt={level,rm,walking:true,facing:1,hud:false,splash:"on",emberMouth:true,defeat:"cardwisp",dcol:EMBER.danger,dglow:EMBER.glow,win:GOLD_LIGHT,litP:LV[level].litP,sample:!!o.sample,lvl:L?L._T:null};
+      const rise=o.rise!=null?o.rise:L?L.rise(camX+W*0.32):0;
+      F={ctx,s:S,W,t,rm,level,camX,camY:rise,opt,gy:L?L.ground:gY};
       sc.kitBegin(ctx,S,F.W,t,F.camX,F.camY,opt);
       frame("begin");
     },
@@ -2935,12 +3186,12 @@ function makeTools(env){
     },
     wanderer(x,o){ // o: y, walking (true), facing (1 or -1)
       const f=frame("wanderer");o=o||{};
-      drawWanderer(f.ctx,x-f.camX,o.y==null?gY(x)+1:o.y,f.t,o.walking!==false,o.facing||1,f.rm,LV[f.level].edge);
+      drawWanderer(f.ctx,x-f.camX,o.y==null?f.gy(x)+1:o.y,f.t,o.walking!==false,o.facing||1,f.rm,LV[f.level].edge);
     },
     monster(o){ // o: kind, x, y, ph (its pace, so neighbours differ), id (a monster's own name), defeat (0 to 1, over 1.6 s), seed
       const f=frame("monster"),s=f.s;
       if(!MON_BOX[o.kind])throw new Error('Lantern Box: no monster called "'+o.kind+'".');
-      const X=o.x-f.camX,Y=o.y==null?gY(o.x)+(STAND[o.kind]||0):o.y,m={kind:o.kind,X,Y,ph:o.ph||0,id:o.id};
+      const X=o.x-f.camX,Y=o.y==null?f.gy(o.x)+(STAND[o.kind]||0):o.y,m={kind:o.kind,X,Y,ph:o.ph||0,id:o.id};
       if(o.defeat==null){scene.monster(f.ctx,s,m,f.t,f.opt);return;}
       const d=defeatCanvas("M",260,250,s);
       scene.monsterInto(d.c,s,m,f.t,f.opt,0,0);
@@ -2948,7 +3199,7 @@ function makeTools(env){
     },
     boss(o){ // o: x, y, defeat (0 to 1, over 2.2 s). The boss is the place's own.
       const f=frame("boss"),s=f.s,lv=f.level;
-      const X=o.x-f.camX,Y=o.y==null?gY(o.x)+2:o.y;
+      const X=o.x-f.camX,Y=o.y==null?f.gy(o.x)+2:o.y;
       if(o.defeat==null){scene.bossAt(f.ctx,s,lv,f.t,f.opt,X,Y);return;}
       const u=clamp(o.defeat,0,1),d=defeatCanvas("B",460,330,s),K=scene.defK||(scene.defK={});
       bossInto(d.c,s,lv,f.t,f.opt,0,0,BOSS_NOD,true,K,BOSS_LOOK);
@@ -2958,14 +3209,14 @@ function makeTools(env){
     },
     splash(x,o){ // o: y, seed. The place's own splash of colour.
       const f=frame("splash");o=o||{};
-      drawSplash(f.ctx,PLACE_SET[f.level],"on",x-f.camX,(o.y==null?gY(x):o.y)+3,f.t,f.rm,o.seed||0,"green","intense");
+      drawSplash(f.ctx,PLACE_SET[f.level],"on",x-f.camX,(o.y==null?f.gy(x):o.y)+3,f.t,f.rm,o.seed||0,"green","intense");
     },
-    candle(x,y){const f=frame("candle");drawCandle(f.ctx,x-f.camX,(y==null?gY(x):y)+4,f.t,f.rm);},
+    candle(x,y){const f=frame("candle");drawCandle(f.ctx,x-f.camX,(y==null?f.gy(x):y)+4,f.t,f.rm);},
     wallLamp(x,y){const f=frame("wallLamp");drawWallLamp(f.ctx,x-f.camX,y,f.t,f.rm);},
-    post(x,y,lit){const f=frame("post");drawPost(f.ctx,x-f.camX,y==null?gY(x):y,lit!==false,GOLD_LIGHT);},
-    streetLamp(x,y){const f=frame("streetLamp");drawStreetLamp(f.ctx,x-f.camX,y==null?gY(x):y,GOLD_LIGHT);},
-    shrine(x,y){const f=frame("shrine");drawShrine(f.ctx,x-f.camX,(y==null?gY(x):y)+2,f.t,f.rm);},
-    potion(x,y){const f=frame("potion");drawPotion(f.ctx,x-f.camX,y==null?gY(x):y,f.t,f.rm);},
+    post(x,y,lit){const f=frame("post");drawPost(f.ctx,x-f.camX,y==null?f.gy(x):y,lit!==false,GOLD_LIGHT);},
+    streetLamp(x,y){const f=frame("streetLamp");drawStreetLamp(f.ctx,x-f.camX,y==null?f.gy(x):y,GOLD_LIGHT);},
+    shrine(x,y){const f=frame("shrine");drawShrine(f.ctx,x-f.camX,(y==null?f.gy(x):y)+2,f.t,f.rm);},
+    potion(x,y){const f=frame("potion");drawPotion(f.ctx,x-f.camX,y==null?f.gy(x):y,f.t,f.rm);},
     stringLights(ax,ay,qx,qy,bx,by,seed){ // lights along a curve from (ax, ay) to (bx, by), its string drawn by whatever holds it up
       const f=frame("stringLights");
       drawFairyKit(f.ctx,[ax-f.camX,ay,qx-f.camX,qy,bx-f.camX,by,seed||0],f.t,f.level,f.s);

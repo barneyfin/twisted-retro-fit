@@ -49,8 +49,10 @@ The path's scenery is the directions page's sample strip until levels are laid o
 | Button | Key | What it does |
 |---|---|---|
 | Place | 1 2 3 4 | The next place, or a place by number |
+| Ground | G | The place's whole level (its rolling ground, banks, pits and pieces, the camera rising with it; the default), or the flat strip |
+| Section | N | On a level: on to the next hill section, then the boss's arena, then back to the start |
 | Walk | arrows | Walks on its own, or by the left and right arrows |
-| Rise | up and down arrows | Raises and lowers the camera, up to half a picture |
+| Rise | up and down arrows | On the flat strip: raises and lowers the camera, up to half a picture (a level rises with its ground) |
 | Crowd | C | Eight monsters and the place's boss, on or off |
 | Defeat | D | Breaks the crowd and the boss into card pieces and wisps |
 | Hurt | | Lowers the health and mana bars |
@@ -58,11 +60,11 @@ The path's scenery is the directions page's sample strip until levels are laid o
 | Screens | | Opens any screen: pause, settings, three kinds of game over, initials, high scores, the rotate notice, the title |
 | Speed check | T | Runs the speed check |
 
-The readout at the top shows frames a second, the processor's time for a frame, the picture's size and sharpness, the Picture level in use, the memory the layers take, and what you're looking at. Effects, Reduce motion and Picture are in Settings, from the pause tile.
+The readout at the top shows frames a second, the processor's time for a frame, the picture's size and sharpness, the Picture level in use, the memory the layers take, and what you're looking at (on a level, which section and how far along). Effects, Reduce motion and Picture are in Settings, from the pause tile.
 
 ## The speed check
 
-Open the test page in Chrome with no other copy open, choose Start game, tap Speed check, and leave it alone for about half a minute. It runs each place in turn with eight monsters, the boss, the flyers, the rain and the camera rising, as phase 1's speed test did. It ends with a table, pass or fail against both targets, and a line to copy.
+Open the test page in Chrome with no other copy open, choose Start game, tap Speed check, and leave it alone for about half a minute. It runs each place in turn with eight monsters, the boss, the flyers and the rain, as phase 1's speed test did. Since kit 0.8.0 it walks up each place's big hill (section E) on its level, the camera rising with the ground, so its results are not quite comparable with earlier ones. It ends with a table, pass or fail against both targets, and a line to copy.
 
 - Phone: at least 30 frames a second, with each frame drawn in 25 ms or less.
 - Computer: 60 frames a second.
@@ -93,6 +95,15 @@ The phone still passes in every place. Against kit 0.4.0, each place lost 4 to 1
 | Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 72 fps / 9.8 ms | 58 / 13.9 ms | 77 / 10.1 ms | 63 / 11.2 ms | 25 / 41 ms | 111 MB |
 
 Within a few frames a second of kit 0.6.0 in every place (Dawn 5 better, Mist 1 worse), so the glow drawn every frame costs little. The slowest 5% is unchanged; the single longest frame was 41 ms. The computer was not measured again.
+
+### Results, 4 November 2026 (kit 0.8.0: step 4c-1, the crows and leaves; step 4c-2, each place's level)
+
+| Device | Picture | Run | Night | Blood Red Rain | Dawn | Mist | Slowest 5% / longest | Layers |
+|---|---|---|---|---|---|---|---|---|
+| Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-1, the flat strip | 80 fps / 12.8 ms | 58 / 14.8 ms | 73 / 13.5 ms | 70 / 13.7 ms | 25 / 27 ms | 107 MB |
+| Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-2, up the big hill | 73 fps / 10.3 ms | 57 / 14.3 ms | 75 / 10.7 ms | 66 / 13.0 ms | 25 / 37 ms | 111 MB |
+
+Both pass in every place. 4c-1 drew frames 1 to 3 ms slower than kit 0.7.0, Night (which has bats, not crows) as much as the others, so it is likely run-to-run variation; its longest frame was shorter. 4c-2's speed check walks up each place's big hill on its level with the camera rising, so it is not quite comparable with the flat-strip runs; the levels cost about what the flat strip did. The computer was not measured again.
 
 ## Picture: Automatic, Best, Faster, Fastest
 

@@ -28,7 +28,10 @@
 <body>
 <script>
 /* LB SAMPLER — Lantern Box's test page: every drawing part and every screen, with a frame-rate readout, and the speed check.
-   Keys: 1 2 3 4 a place · arrows walk and rise · C the crowd · D defeats · V the next part · T the speed check. Or the buttons.
+   Keys: 1 2 3 4 a place · arrows walk (and rise, on the flat strip) · G the place's level or the flat strip · N the next section ·
+   C the crowd · D defeats · V the next part · T the speed check. Or the buttons.
+   Version 8 (step 4c-2): each place's whole level, its rolling ground with the camera rising with it, is the default; the
+   speed check walks up each place's big hill (section E) with the crowd.
    It uses the kit's test hook (lb._debug) to open any screen; games do not. */
 const PLACE_NAMES = ['night', 'storm', 'dawn', 'mist'];
 const PLACE_LABEL = { night: 'Night', storm: 'Blood Red Rain', dawn: 'Dawn', mist: 'Mist' };
@@ -36,10 +39,19 @@ const CROWD = 8;                       // the speed target's crowd: eight monste
 const WALK = 2.4, RISE_STEP = 3, RISE_MAX = 270, RISE_EVERY = 8;
 const DEFEAT_MONSTER = 1.6, DEFEAT_BOSS = 2.2, REST = 1;   // seconds
 const WARM = 1.5, RUN = 4, LOAD = 2.5, TEST_PACE = 1;      // the speed check: seconds in each place, and lines a frame
+const HOLD = 0.32;                     // where the camera holds the wanderer on a level, as play.js does
 const SAMPLE_SCORES = [['MOR', 2480], ['VEX', 1960], ['BAR', 1120], ['OWL', 1040], ['RUE', 880], ['HEX', 760], ['ASH', 610], ['FEN', 450], ['IVY', 320], ['NOX', 180]];
 
 let G = null, LB = null;                  // the state of the run, and the kit
 let bar = null, readout = null, panel = null;
+const levelOf = (g, lb) => lb.world.level(PLACE_NAMES[g.place]);
+function checkStart(lb, i) { const L = lb.world.level(PLACE_NAMES[i]); return L.sections.find((q) => q.id === 'E').x0 - 120; } // the foot of the big hill
+function onLevel(g, lb, x) { // the camera on a level, and where the stand-in wanderer stands (on a piece's top when he is over one)
+  const L = levelOf(g, lb), camX = Math.max(0, Math.min(L.length - lb.W, x - lb.W * HOLD));
+  let y = L.ground(x);
+  for (const p of L.pieces()) if (x >= p.x0 && x <= p.x1) y = Math.min(y, p.y(x));
+  return { L, camX, y };
+}
 
 /* ---------- the parts: each drawing part in turn, with the camera still ---------- */
 function spread(lb, cam, n, i) { return cam + lb.W * (i + 0.7) / (n + 0.4); }
@@ -100,9 +112,10 @@ function device() { // the browser, the system and the graphics chip, as far as 
 const pct = (a, p) => { if (!a.length) return 0; const b = a.slice().sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(p * b.length))]; };
 function startCheck(g, lb) {
   closePanel();
-  Object.assign(g, { part: 0, crowd: true, autoWalk: false, rising: false, monsterAt: null, bossAt: null });
+  Object.assign(g, { part: 0, crowd: true, autoWalk: false, rising: false, monsterAt: null, bossAt: null, ground: true });
   g.check = { i: 0, phase: 'warm', t0: performance.now(), res: [], cur: null };
   g.place = 0;
+  g.x = checkStart(lb, 0);
 }
 function checkFrame(g, lb, now, gapMs, cpu) { // called once a frame
   const T = g.check, el = (now - T.t0) / 1000;
@@ -127,6 +140,7 @@ function checkFrame(g, lb, now, gapMs, cpu) { // called once a frame
       T.phase = 'warm';
       T.t0 = now;
       g.place = T.i;
+      g.x = checkStart(lb, T.i);
     }
   }
 }
@@ -136,7 +150,7 @@ function finishCheck(g, lb) {
   const ms = (c) => (c.keptUp ? 'under ' : '') + c.drawn.toFixed(1) + ' ms';
   const phone = R.every((r) => r.fps >= 29.5 && r.drawn <= 25), computer = R.every((r) => r.fps >= 58);
   const line = 'Lantern Box speed check, kit ' + lb.version + ' · ' + device() + ' · ' + p.width + ' × ' + p.height + ' at ' + p.sharpness.toFixed(2) + '× · Picture ' + lb.settings.picture + ' (' + p.level + ')' +
-    (lb.settings.reduceMotion ? ' · reduce motion' : '') + (lb.settings.effects ? '' : ' · effects off') + ' · ' +
+    (lb.settings.reduceMotion ? ' · reduce motion' : '') + (lb.settings.effects ? '' : ' · effects off') + ' · up the big hill · ' +
     R.map((r) => PLACE_LABEL[r.place].replace('Blood Red Rain', 'Rain') + ' ' + Math.round(r.fps) + ' fps / ' + ms(r)).join(' · ') +
     ' · slowest 5% ' + Math.round(Math.max(...R.map((r) => r.slow))) + ' ms · longest ' + Math.round(Math.max(...R.map((r) => r.max))) + ' ms · layers ' + Math.round(lb.world.stats.tileBytes / 1048576) + ' MB';
   openPanel((face, close) => {
@@ -241,6 +255,8 @@ function buildPieces(g, lb) {
   bar.className = 'lb-ui ls-bar';
   [
     ['Place', () => { g.place = (g.place + 1) % PLACE_NAMES.length; }],
+    ['Ground', () => { g.ground = !g.ground; }],
+    ['Section', () => nextSection(g, lb)],
     ['Walk', () => { g.autoWalk = !g.autoWalk; }],
     ['Rise', () => { g.rising = !g.rising; }],
     ['Crowd', () => { g.crowd = !g.crowd; }],
@@ -262,7 +278,7 @@ LanternBox.game({
 
   start(lb) {
     LB = lb;
-    const g = { place: 0, x: 600, facing: 1, walking: false, autoWalk: false, rise: 0, rising: false, crowd: true, part: 0, monsterAt: null, bossAt: null, health: 1, check: null,
+    const g = { place: 0, x: 600, facing: 1, walking: false, autoWalk: false, rise: 0, rising: false, ground: true, crowd: true, part: 0, monsterAt: null, bossAt: null, health: 1, check: null,
       last: 0, fpsN: 0, fpsT: 0, cpuSum: 0, fps: 0, cpu: 0 };
     G = g;
     buildPieces(g, lb);
@@ -270,16 +286,19 @@ LanternBox.game({
   },
 
   update(g, lb) {
-    if (g.check) { g.x += TEST_PACE; g.walking = true; g.facing = 1; g.rise = RISE_MAX * (0.5 - 0.5 * Math.cos(2 * Math.PI * lb.time / RISE_EVERY)); return; }
+    if (g.check) { g.x += TEST_PACE; g.walking = true; g.facing = 1; return; }
     const i = lb.input;
     PLACE_NAMES.forEach((p, n) => { if (i.keyPressed('Digit' + (n + 1))) g.place = n; });
     if (i.keyPressed('KeyC')) g.crowd = !g.crowd;
     if (i.keyPressed('KeyD')) { g.monsterAt = 0; g.bossAt = 0; }
     if (i.keyPressed('KeyV')) g.part = (g.part + 1) % PARTS.length;
     if (i.keyPressed('KeyT')) startCheck(g, lb);
+    if (i.keyPressed('KeyG')) g.ground = !g.ground;
+    if (i.keyPressed('KeyN')) nextSection(g, lb);
     const dir = g.autoWalk ? 1 : (i.right ? 1 : 0) - (i.left ? 1 : 0);
     g.walking = dir !== 0;
     if (dir) { g.facing = dir; g.x += dir * WALK; }
+    if (g.ground) g.x = Math.max(0, Math.min(levelOf(g, lb).length, g.x));
     if (i.up) g.rise = Math.min(RISE_MAX, g.rise + RISE_STEP);
     if (i.down) g.rise = Math.max(0, g.rise - RISE_STEP);
     if (g.rising) g.rise = RISE_MAX * (0.5 - 0.5 * Math.cos(2 * Math.PI * lb.time / RISE_EVERY));
@@ -308,9 +327,15 @@ LanternBox.game({
   },
 });
 
+function nextSection(g, lb) { // on a level: on to the start of the next section, then the boss's arena, then back to the start
+  if (!g.ground) return;
+  const L = levelOf(g, lb), next = L.sections.map((q) => q.x0).concat([L.arena]).find((x0) => x0 > g.x + 1);
+  g.x = next == null ? 120 : next;
+}
 function drawScene(ctx, g, lb, t, x) {
-  const w = lb.world, camX = x - lb.W * 0.28, part = g.check ? PARTS[0] : PARTS[g.part];
-  w.begin(ctx, { place: PLACE_NAMES[g.place], camX, rise: g.rise, t });
+  const w = lb.world, part = g.check ? PARTS[0] : PARTS[g.part];
+  const lv = g.ground ? onLevel(g, lb, x) : null, camX = lv ? lv.camX : x - lb.W * 0.28;
+  if (lv) w.begin(ctx, { level: lv.L, camX, t }); else w.begin(ctx, { place: PLACE_NAMES[g.place], camX, rise: g.rise, t });
   if (part.draw) part.draw(w, lb, g, camX);
   else if (part.crowd && g.crowd) {
     const gap = lb.W / CROWD, first = Math.ceil(camX / gap), bossX = camX + lb.W * 0.74;
@@ -318,12 +343,13 @@ function drawScene(ctx, g, lb, t, x) {
       const mx = j * gap, kind = w.MONSTERS[((j % 5) + 5) % 5], fly = kind === 'bat2';
       const beaten = g.monsterAt != null && g.monsterAt <= DEFEAT_MONSTER;
       if (g.monsterAt != null && !beaten) continue;   // gone, for a moment
-      w.monster({ kind, x: mx, y: fly ? 232 + Math.sin(t * 1.1 + j) * 22 : undefined, ph: j * 0.77 + 0.3, id: 'c' + j, defeat: beaten ? g.monsterAt / DEFEAT_MONSTER : undefined, seed: j });
+      const sky = (lv ? lv.L.ground(mx) : 468) - 236;   // flyers keep their height above the ground
+      w.monster({ kind, x: mx, y: fly ? sky + Math.sin(t * 1.1 + j) * 22 : undefined, ph: j * 0.77 + 0.3, id: 'c' + j, defeat: beaten ? g.monsterAt / DEFEAT_MONSTER : undefined, seed: j });
     }
     if (g.bossAt == null) w.boss({ x: bossX });
     else if (g.bossAt <= DEFEAT_BOSS) w.boss({ x: bossX, defeat: g.bossAt / DEFEAT_BOSS });
   }
-  if (!part.draw) w.wanderer(x, { walking: g.walking, facing: g.facing });
+  if (!part.draw) w.wanderer(x, { y: lv ? lv.y + 1 : undefined, walking: g.walking, facing: g.facing });
   w.end();
 }
 function showReadout(g, lb) {
@@ -332,7 +358,12 @@ function showReadout(g, lb) {
   lines[1].textContent = p.width + ' × ' + p.height + ' · ' + p.sharpness.toFixed(2) + '× · ' + p.level + (lb.settings.picture === 'auto' ? ' (automatic)' : '') + ' · layers ' + Math.round(lb.world.stats.tileBytes / 1048576) + ' MB';
   lines[2].textContent = g.check
     ? 'Speed check: ' + PLACE_LABEL[PLACE_NAMES[g.check.i]] + ', ' + (g.check.i + 1) + ' of 4. Please wait.'
-    : PLACE_LABEL[PLACE_NAMES[g.place]] + ' · ' + PARTS[g.part].name;
+    : PLACE_LABEL[PLACE_NAMES[g.place]] + ' · ' + PARTS[g.part].name + (g.ground ? ' · ' + whereOnLevel(g, lb) : ' · the flat strip');
+}
+function whereOnLevel(g, lb) {
+  const L = levelOf(g, lb), n = L.sections.findIndex((q) => g.x >= q.x0 && g.x < q.x1), q = L.sections[n];
+  const at = q ? 'section ' + q.id + ' (' + q.name + ', ' + (n + 1) + ' of ' + L.sections.length + ')' : g.x >= L.arena ? "the boss's arena" : 'the start';
+  return at + (L.pit(g.x) ? ', a pit' : '') + ' · ' + Math.round(g.x) + ' of ' + L.length;
 }
 </script>
 </body>
