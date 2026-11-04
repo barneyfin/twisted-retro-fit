@@ -4212,7 +4212,12 @@ function set(hud,st){const q=s=>hud.querySelector(s);
     if(on){setOnce(bb,"n",st.boss.name,v=>{bb.querySelector(".lb-bossbar-name").textContent=v;bb.setAttribute("aria-label",v);});bb.style.opacity=String(st.boss.a*ha);
       const tr=bb.querySelector(".lb-bossbar-track");tr.style.setProperty("--v",st.boss.hp.toFixed(3));tr.style.setProperty("--trace",Math.max(st.boss.hp,st.boss.trace).toFixed(3));setOnce(bb,"vn",Math.round(st.boss.hp*100),v=>bb.setAttribute("aria-valuenow",String(v)));}}}
 const CARDS={night:["Night","The Graveyard"],storm:["Blood Red Rain","The Old Town"],dawn:["Dawn","The Open Moor"],mist:["Mist","The Wind Bent Forest"]}; // from mv10.js: the places' names (Barney, 4 November 2026)
-return{build,set,ICON,oct};
+// the phone's stick (play.js, word for word; the review page's thumb mark has no style, so it never shows)
+function stickShow(hud,x,y,dx,dy,a,thumb){const s=hud.querySelector(".lb-stick");if(!s)return;s.style.left=x+"px";s.style.top=y+"px";s.style.opacity=String(a);
+  const k=s.querySelector(".lb-knob");k.style.transform=`translate(${dx}px,${dy}px)`;const sv=s.querySelector(".chev");
+  sv.querySelector(".l").classList.toggle("is-lit",dx<-12&&Math.abs(dx)>Math.abs(dy)*0.8);sv.querySelector(".r").classList.toggle("is-lit",dx>12&&Math.abs(dx)>Math.abs(dy)*0.8);sv.querySelector(".u").classList.toggle("is-lit",dy<-12&&-dy>Math.abs(dx)*0.8);
+  const th=hud.querySelector(".lb-thumb");if(th){th.style.opacity=String(thumb||0);th.style.left=(x+dx)+"px";th.style.top=(y+dy)+"px";}}
+return{build,set,stickShow,ICON,oct};
   })();
 
   function createGame(cfg) {
@@ -4393,7 +4398,9 @@ return{build,set,ICON,oct};
       fire: ['Space', 'KeyZ', 'KeyJ', 'Enter', 'NumpadEnter'],
       alt: ['ShiftLeft', 'ShiftRight', 'KeyX', 'KeyK']
     };
-    const GAME_CODES = new Set([].concat.apply([], Object.keys(KEYMAP).map((k) => KEYMAP[k])));
+    // version 8 (4c-6b): the named controls (the gameplay note's keys); in the full HUD on a touch device the stick and buttons press them too
+    const ACTIONS = { jump: ['Space'], attack: ['KeyJ'], cast: ['KeyK'], switch: ['KeyL'], roll: ['ShiftLeft', 'ShiftRight'], climb: ['ArrowUp', 'KeyW'] };
+    const GAME_CODES = new Set([].concat.apply([], Object.keys(KEYMAP).map((k) => KEYMAP[k]).concat(Object.keys(ACTIONS).map((k) => ACTIONS[k]))));
     const keys = new Set();
     const justKeys = new Set();
     const physical = new Set();   // keys physically down right now, whatever the screen
@@ -4413,16 +4420,34 @@ return{build,set,ICON,oct};
       key: (code) => keys.has(code),
       keyPressed: (code) => justKeys.has(code)
     };
+    Object.keys(ACTIONS).forEach((a) => { input[a] = false; input.pressed[a] = false; });
+    /* version 8 (4c-6b): the touch controls (TouchControls), in the full HUD on any touch device. The stick shows where the left thumb lands,
+       anywhere in the left half, and goes when it lifts; its knob travels 31 px; left, right and up as its chevrons light (up also climbs); a
+       quick flick sideways rolls. The three buttons press jump, attack and cast; a tap on the spell's socket presses switch. */
+    const FLICK_PX = 40, FLICK_MS = 120, FLICK_REST = 350;   // a flick: the thumb 40 px sideways within 0.12 s (starting figures, to tune in play)
+    const tc = { on: false, held: new Set(), just: new Set(), dirs: { left: false, right: false, up: false },
+      stick: { id: null, x: 0, y: 0, dx: 0, dy: 0, hist: [], rest: 0 } };
     function prepareInput() {
       for (const name in KEYMAP) {
         input[name] = KEYMAP[name].some((c) => keys.has(c));
         input.pressed[name] = KEYMAP[name].some((c) => justKeys.has(c));
       }
+      // the stick: what its chevrons light is what it presses
+      const s = tc.stick, on = s.id != null;
+      const d = { left: on && s.dx < -12 && Math.abs(s.dx) > Math.abs(s.dy) * 0.8, right: on && s.dx > 12 && Math.abs(s.dx) > Math.abs(s.dy) * 0.8, up: on && s.dy < -12 && -s.dy > Math.abs(s.dx) * 0.8 };
+      for (const n in d) { if (d[n]) { input[n] = true; if (!tc.dirs[n]) input.pressed[n] = true; } }
+      for (const a in ACTIONS) {
+        input[a] = ACTIONS[a].some((c) => keys.has(c)) || tc.held.has(a);
+        input.pressed[a] = ACTIONS[a].some((c) => justKeys.has(c)) || tc.just.has(a);
+      }
+      if (d.up) { input.climb = true; if (!tc.dirs.up) input.pressed.climb = true; }
+      tc.dirs = d;
       input.tap = tapPending;
-      input.any = justKeys.size > 0 || tapPending || pointer.pressed || pointer2.pressed;
+      input.any = justKeys.size > 0 || tapPending || pointer.pressed || pointer2.pressed || tc.just.size > 0;
     }
     function endTickInput() {
       justKeys.clear();
+      tc.just.clear();
       pointer.pressed = false;
       pointer.released = false;
       pointer.moved = false;
@@ -4440,6 +4465,53 @@ return{build,set,ICON,oct};
       pointer.id = null;
       pointer2.down = false;
       pointer2.id = null;
+      touchReset();
+    }
+    function touchReset() {   // the stick goes, the buttons let go
+      tc.held.clear();
+      tc.just.clear();
+      tc.dirs = { left: false, right: false, up: false };
+      const s = tc.stick;
+      s.id = null; s.dx = 0; s.dy = 0; s.hist = [];
+      const h = hudNodes && hudNodes.full;
+      if (h) { HUD8.stickShow(h, s.x, s.y, 0, 0, 0, 0); h.querySelectorAll('.lb-touch-btn.is-pressed').forEach((b) => { b.classList.remove('is-pressed'); b.__pid = null; }); }
+    }
+    function hudAt(h, e) { const r = h.getBoundingClientRect(), k = r.width / (h.offsetWidth || 1); return [(e.clientX - r.left) / k, (e.clientY - r.top) / k]; }
+    function stickDown(e) {   // a thumb landing in the left half (play.js's live stick)
+      const h = hudNodes && hudNodes.full, s = tc.stick;
+      if (!tc.on || !h || e.pointerType === 'mouse' || s.id != null) return false;
+      const [x, y] = hudAt(h, e), W = h.offsetWidth, H = h.offsetHeight;
+      if (x > W * 0.5) return false;
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      s.id = e.pointerId;
+      s.x = Math.max(60, Math.min(W * 0.5 - 60, x));
+      s.y = Math.max(70, Math.min(H - 60, y));
+      s.hist = [];
+      stickMove(e);
+      return true;
+    }
+    function stickMove(e) {
+      const h = hudNodes && hudNodes.full, s = tc.stick;
+      if (!h) return;
+      const [x, y] = hudAt(h, e), now = performance.now();
+      let dx = x - s.x, dy = y - s.y;
+      const dd = Math.hypot(dx, dy), r = 31;
+      if (dd > r) { dx *= r / dd; dy *= r / dd; }
+      s.dx = dx; s.dy = dy;
+      HUD8.stickShow(h, s.x, s.y, dx, dy, 1, 0);
+      // a flick: the thumb itself (not the knob) 40 px sideways within 0.12 s, mostly sideways
+      s.hist.push([now, x, y]);
+      while (s.hist.length > 1 && now - s.hist[0][0] > FLICK_MS) s.hist.shift();
+      const o = s.hist[0], fx = x - o[1], fy = y - o[2];
+      if (now >= s.rest && Math.abs(fx) >= FLICK_PX && Math.abs(fx) >= 2 * Math.abs(fy)) { tc.just.add('roll'); s.rest = now + FLICK_REST; s.hist = [[now, x, y]]; }
+    }
+    function stickUp(e) {
+      const s = tc.stick;
+      if (s.id == null || e.pointerId !== s.id) return false;
+      s.id = null; s.dx = 0; s.dy = 0; s.hist = [];
+      const h = hudNodes && hudNodes.full;
+      if (h) HUD8.stickShow(h, s.x, s.y, 0, 0, 0, 0);   // nothing shows at rest
+      return true;
     }
     const worldX = (e) => e.clientX / (V.w || 1) * V.W;
     const worldY = (e) => e.clientY / (V.h || 1) * H;
@@ -4458,6 +4530,7 @@ return{build,set,ICON,oct};
       audio.unlock();
       if (state.screen !== 'play') return;
       e.preventDefault();
+      if (stickDown(e)) return;   // version 8: in the full HUD on a touch device, a thumb in the left half is the stick
       if (pointer.down && e.pointerId !== pointer.id) {   // a second finger: the first keeps steering
         if (pointer2.down) return;                        // a third is ignored
         try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
@@ -4478,11 +4551,13 @@ return{build,set,ICON,oct};
     });
     canvas.addEventListener('pointermove', (e) => {
       if (state.screen !== 'play') return;
+      if (tc.stick.id != null && e.pointerId === tc.stick.id) { stickMove(e); return; }
       if (pointer2.down && e.pointerId === pointer2.id) { pointer2.x = worldX(e); pointer2.y = worldY(e); return; }
       if (pointer.down && e.pointerId !== pointer.id) return;
       setPointer(e);
     });
     const pointerEnd = (e) => {
+      if (stickUp(e)) return;
       if (pointer2.down && e.pointerId === pointer2.id) {
         pointer2.down = false;
         pointer2.released = true;
@@ -4567,7 +4642,9 @@ return{build,set,ICON,oct};
       hudNodes = null;
       if (!state.inGame) return;
       if (fullHud) {   // version 8: design system version 8's HUD, its tiles wired to the shell
-        const node = HUD8.build(hudLayer, V.phone, { full: !touch && !V.phone, touch: false });
+        tc.on = touch;   // version 8 (4c-6b): the touch controls on any touch device, at the design system's one size
+        const node = HUD8.build(hudLayer, V.phone, { full: !touch && !V.phone, touch: touch });
+        tc.stick.id = null; tc.held.clear(); tc.dirs = { left: false, right: false, up: false };   // a new HUD: nothing held over
         const full = node.querySelector('.lb-tile[aria-label="Full screen"]');
         if (full) full.replaceWith(fullscreenTile('lb-tile', '<span>' + ICON.fullscreen + '</span>'));
         const help = node.querySelector('.lb-tile[aria-label="How to play"]');
@@ -4575,7 +4652,23 @@ return{build,set,ICON,oct};
         const ps = node.querySelector('.lb-tile[aria-label="Pause"]');
         ps.addEventListener('click', () => { ps.blur(); pause(); });
         const sp = node.querySelector('.lb-spell');
-        sp.addEventListener('click', () => { sp.blur(); if (api.hud.onSwitch && state.screen === 'play') api.hud.onSwitch(state.game, api); });   // api.hud: this function has a hud of its own
+        sp.addEventListener('click', () => { sp.blur(); if (state.screen === 'play') tc.just.add('switch'); });   // a tap on the socket presses switch, as L does
+        node.querySelectorAll('.lb-touch-btn').forEach((b) => {   // jump, attack and cast: held while the finger stays down
+          const a = b.classList.contains('b-jump') ? 'jump' : b.classList.contains('b-attack') ? 'attack' : 'cast';
+          b.addEventListener('pointerdown', (e) => {
+            audio.unlock();
+            if (state.screen !== 'play') return;
+            e.preventDefault();
+            try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+            b.__pid = e.pointerId;
+            b.classList.add('is-pressed');
+            tc.held.add(a);
+            tc.just.add(a);
+          });
+          const up = (e) => { if (b.__pid == null || e.pointerId !== b.__pid) return; b.__pid = null; b.classList.remove('is-pressed'); tc.held.delete(a); };
+          ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => b.addEventListener(t, up));
+          b.addEventListener('contextmenu', (e) => e.preventDefault());
+        });
         hudNodes = { full: node };
         syncHud();
         return;
@@ -4675,8 +4768,7 @@ return{build,set,ICON,oct};
         else if (hp < b.hp) { const shown = b.hitT == null ? b.hp : b.hp + (b.trace - b.hp) * (1 - clamp((state.time - b.hitT - 0.35) / 0.6, 0, 1)); b.trace = Math.max(shown, b.hp); b.hitT = state.time; b.hp = hp; }
         else b.hp = hp;
       },
-      fade(a) { h8.hudA = clamp(+a, 0, 1); syncHud(); },                                // the HUD's own fade
-      onSwitch: null                                                                    // set by the game: a tap on the spell's socket switches spells
+      fade(a) { h8.hudA = clamp(+a, 0, 1); syncHud(); }                                 // the HUD's own fade (a tap on the spell's socket presses input.pressed.switch)
     };
     function fade(a) { h8.fade = clamp(+a || 0, 0, 1); if (!h8.card) fadeEl.style.opacity = String(h8.fade); }   // black over the picture
     // the place card (3 s, play stopped: the game holds its play until onDone): onBlack once it is dark (0.9 s), to move the world to the next place
@@ -5004,18 +5096,26 @@ return{build,set,ICON,oct};
       const btn = button(label, true);
       btn.style.width = '100%';
       const items = [{ el: btn, activate: close }];
+      // the controls: the touch controls drawn small on a touch device (4c-6b: they show on any), the keys on a computer
+      const controls = () => {
+        if (touch) {
+          const keys = el('div', 'lb-touchkeys');
+          (howTo.touchKeys || HOWTO_TOUCH).forEach((q) => keys.append(el('div', 'lb-touchkey', '<svg viewBox="0 0 34 34" aria-hidden="true">' + q[0] + '</svg><span>' + q[1] + '</span>')));
+          return keys;
+        }
+        const keys = el('div', 'lb-keys');
+        if (phone) keys.style.cssText = 'grid-template-columns:minmax(0,1fr);gap:6px';   // a computer's window at a phone's size: one column beside the goal
+        (howTo.keys || HOWTO_KEYS).forEach((q) => keys.append(el('div', 'lb-key', '<span class="caps">' + q[0].map((c) => (c.charAt(0) === ' ' ? c : kbd(c))).join('') + '</span>' + q[1])));
+        return keys;
+      };
       if (phone) {
         const left = el('div');
         left.style.cssText = 'display:flex;flex-direction:column;gap:10px';
         btn.style.marginTop = '4px';
         left.append(heading('lb-ht-t', 'How to play'), el('div', '', RULE).firstChild, ...goals, btn);
-        const keys = el('div', 'lb-touchkeys');
-        (howTo.touchKeys || HOWTO_TOUCH).forEach((q) => keys.append(el('div', 'lb-touchkey', '<svg viewBox="0 0 34 34" aria-hidden="true">' + q[0] + '</svg><span>' + q[1] + '</span>')));
-        face.append(left, keys);
+        face.append(left, controls());
       } else {
-        const keys = el('div', 'lb-keys');
-        (howTo.keys || HOWTO_KEYS).forEach((q) => keys.append(el('div', 'lb-key', '<span class="caps">' + q[0].map((c) => (c.charAt(0) === ' ' ? c : kbd(c))).join('') + '</span>' + q[1])));
-        face.append(heading('lb-ht-t', 'How to play'), el('div', '', RULE).firstChild, ...goals, keys, btn);
+        face.append(heading('lb-ht-t', 'How to play'), el('div', '', RULE).firstChild, ...goals, controls(), btn);
         if (!touch) { const hint = el('p', 'lb-hint', kbd('Esc') + ' ' + label.toLowerCase()); hint.style.textAlign = 'center'; face.append(hint); }
       }
       return { panel: panel, items: items, opts: { back: close } };
@@ -5461,12 +5561,15 @@ return{build,set,ICON,oct};
        lb.W, lb.H: the picture's size in lines (H is always 540; W follows the window). lb.touch: a touch device.
        lb.input: left, right, up, down, fire, alt (held), input.pressed.* (just pressed), input.tap, input.any, input.key(code),
          input.keyPressed(code), and two fingers: input.pointer and input.pointer2 (x, y in lines; down, pressed, released, dx, dy).
+         Version 8's named controls: input.jump (Space), attack (J), cast (K), switch (L), roll (Shift), climb (W or up), held and
+         in input.pressed. With the full HUD on a touch device the touch controls press them: the stick (left, right, up and climb;
+         a quick flick sideways presses roll), the jump, attack and cast buttons, and a tap on the spell's socket (switch).
        lb.addWisps(n), lb.wisps, lb.best: the score, in whole wisps. lb.gameOver(delay): ends the run (game over, then the
          initials if it makes the top ten). lb.hud.health(0..1), lb.hud.mana(0..1): the bars; mana: false in the config leaves
          the mana bar out. lb.sfx('name'), sfx.tone(o), sfx.noise(o). lb.music(0 or 1): the soundtrack to play.
        The full HUD (version 8; hud: 'full' in the config): lb.hud.armour(0..3) (a pip cracks or fills), lb.hud.lives(n) (a lantern
          gutters out), lb.hud.spells(list, sel, cost) (the spells known, e.g. ['heal', 'fire'], the chosen one, and its mana cost: its
-         picture dims while mana is short; a new choice turns it over), lb.hud.onSwitch = (g, lb) => ... (a tap on the spell's socket),
+         picture dims while mana is short; a new choice turns it over; a tap on the socket presses input.pressed.switch),
          lb.hud.line(kind, text) (a plaque line, 2 s; lines take turns; kind a loot picture or none), lb.hud.bossName(name) (2.6 s),
          lb.hud.boss({ name, hp 0..1 }) (the boss bar: it fills as the boss arrives, a hit leaves a trace that drains) and
          lb.hud.boss(null) (it goes), lb.hud.fade(0..1) (the HUD's own fade). lb.placeCard(place, onBlack, onDone): the place card

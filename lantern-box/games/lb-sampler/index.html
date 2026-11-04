@@ -14,7 +14,9 @@
 .ls-readout b{font-weight:700;color:var(--heading)}
 .ls-bar{position:fixed;left:12px;right:12px;bottom:10px;z-index:1;display:flex;flex-wrap:wrap;gap:6px;touch-action:manipulation}
 .ls-bar .lb-btn{height:var(--target);padding:0 11px;font-size:16px;background:var(--plaque-face)}
-.ls-bar[hidden],.ls-readout[hidden],.ls-panel[hidden]{display:none}
+.ls-bar.is-touch{right:184px}   /* on a touch device, clear of the jump, attack and cast buttons (since 4c-6b) */
+.ls-show{position:fixed;left:50%;bottom:10px;z-index:1;transform:translateX(-50%);height:var(--target);padding:0 14px;font-size:16px;background:var(--plaque-face)}
+.ls-bar[hidden],.ls-readout[hidden],.ls-panel[hidden],.ls-show[hidden]{display:none}
 .ls-panel{position:fixed;inset:0;z-index:1;display:flex;align-items:center;justify-content:center}
 .ls-panel>.lb-plaque{position:relative;flex:none;max-width:calc(100% - 12px);max-height:calc(100% - 12px);overflow:auto}
 .ls-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--space-3);row-gap:var(--space-1)}
@@ -32,8 +34,9 @@
    C the crowd · D defeats · V the next part · T the speed check. Or the buttons.
    Version 8 (step 4c-2): each place's whole level, its rolling ground with the camera rising with it, is the default; the
    speed check walks up each place's big hill (section E) with the crowd (since 4c-5b the crowd attacks and the boss fights).
-   Since 4c-6a it uses the full HUD (hud: 'full'), with How to play and the win: the HUD button plays the HUD's moments, and
-   L switches spells.
+   Since 4c-6a it uses the full HUD (hud: 'full'), with How to play and the win: the HUD button plays the HUD's moments.
+   Since 4c-6b the named controls play the wanderer's moves: Space jump, J sword, K cast, Shift roll, L switch spell; on a touch
+   device the stick walks (a flick rolls) and the three buttons jump, swing and cast. The readout names the last control pressed.
    It uses the kit's test hook (lb._debug) to open any screen; games do not. */
 const PLACE_NAMES = ['night', 'storm', 'dawn', 'mist'];
 const PLACE_LABEL = { night: 'Night', storm: 'Blood Red Rain', dawn: 'Dawn', mist: 'Mist' };
@@ -41,12 +44,12 @@ const CROWD = 8;                       // the speed target's crowd: eight monste
 const WALK = 2.4, RISE_STEP = 3, RISE_MAX = 270, RISE_EVERY = 8;
 const DEFEAT_MONSTER = 1.6, DEFEAT_BOSS = 2.2, REST = 1;   // seconds
 const WARM = 1.5, RUN = 4, LOAD = 2.5, TEST_PACE = 1;      // the speed check: seconds in each place, and lines a frame
-const TEST_PAGE = '4c-6a';               // the step of 4c this test page was built for, in the speed check's line (the kit is 0.8.0 throughout)
+const TEST_PAGE = '4c-6b';               // the step of 4c this test page was built for, in the speed check's line (the kit is 0.8.0 throughout)
 const HOLD = 0.32;                     // where the camera holds the wanderer on a level, as play.js does
 const SAMPLE_SCORES = [['MOR', 2480], ['VEX', 1960], ['BAR', 1120], ['OWL', 1040], ['RUE', 880], ['HEX', 760], ['ASH', 610], ['FEN', 450], ['IVY', 320], ['NOX', 180]];
 
 let G = null, LB = null;                  // the state of the run, and the kit
-let bar = null, readout = null, panel = null;
+let bar = null, readout = null, panel = null, showBar = null;
 const levelOf = (g, lb) => lb.world.level(PLACE_NAMES[g.place]);
 function checkStart(lb, i) { const L = lb.world.level(PLACE_NAMES[i]); return L.sections.find((q) => q.id === 'E').x0 - 120; } // the foot of the big hill
 function onLevel(g, lb, x) { // the camera on a level, and where the stand-in wanderer stands (on a piece's top when he is over one)
@@ -387,6 +390,8 @@ function screensPanel(g, lb) {
 }
 const LINES = [['heal', 'Heal mastered'], ['fire', 'Fireball mastered'], ['heal', 'Heal: restores deeper'], ['fire', 'Fireball: glows brighter'],
   ['reach', 'Sword: reaches beyond'], ['rune', 'Sword: bites deeper'], [null, 'Again, harder']];
+const CONTROLS = ['jump', 'attack', 'cast', 'switch', 'roll', 'climb'];   // the kit's named controls (4c-6b)
+const MOVE_OF = { jump: 'jump', attack: 'sword', roll: 'roll' };
 const BOSS_NAMES = { night: 'The Veiled Ghost', storm: 'The Tentacled Skull', dawn: 'The Moor Mother', mist: 'The Gaping Tree' };   // play.js's BS_NAME
 function showHud(g, lb) { lb.hud.armour(g.pips); lb.hud.lives(g.lives); lb.hud.spells(g.spells, g.sel, 0.3); lb.hud.mana(g.mana); }
 function switchSpell(g, lb) { if (g.spells.length > 1) { g.sel = (g.sel + 1) % g.spells.length; showHud(g, lb); } }
@@ -438,9 +443,10 @@ function hudPanel(g, lb) {
 function buildPieces(g, lb) {
   if (bar) bar.remove();
   if (readout) readout.remove();
+  if (showBar) showBar.remove();
   closePanel();
   bar = document.createElement('div');
-  bar.className = 'lb-ui ls-bar';
+  bar.className = 'lb-ui ls-bar' + (lb.touch ? ' is-touch' : '');
   [
     ['Place', () => { g.place = (g.place + 1) % PLACE_NAMES.length; }],
     ['Ground', () => { g.ground = !g.ground; }],
@@ -454,11 +460,15 @@ function buildPieces(g, lb) {
     ['HUD', () => hudPanel(g, lb)],
     ['Screens', () => screensPanel(g, lb)],
     ['Speed check', () => startCheck(g, lb)],
-  ].forEach(([label, fn]) => bar.append(button(label, false, fn)));
+  ].concat(lb.touch ? [['Hide', () => { g.barHidden = true; }]] : [])   // on a touch device: the whole screen for the thumbs
+    .forEach(([label, fn]) => bar.append(button(label, false, fn)));
+  showBar = button('Test buttons', false, () => { g.barHidden = false; });
+  showBar.classList.add('lb-ui', 'ls-show');
+  showBar.hidden = true;
   readout = document.createElement('div');
   readout.className = 'lb-ui lb-plaque is-hud ls-readout';
   readout.innerHTML = '<div class="lb-face"><div></div><div></div><div></div></div>';
-  document.body.append(bar, readout);
+  document.body.append(bar, readout, showBar);
 }
 
 LanternBox.game({
@@ -473,11 +483,11 @@ LanternBox.game({
     LB = lb;
     const g = { place: 0, x: 600, facing: 1, walking: false, autoWalk: false, rise: 0, rising: false, ground: true, crowd: true, part: 0, monsterAt: null, bossAt: null, health: 1, check: null,
       pips: 1, lives: 3, spells: ['heal', 'fire'], sel: 0, mana: 1, lineN: 0,   // the HUD's state (4c-6a)
+      move: null, lastPress: null,   // the move the controls asked for, and the last control pressed (4c-6b)
       last: 0, fpsN: 0, fpsT: 0, cpuSum: 0, fps: 0, cpu: 0 };
     G = g;
     buildPieces(g, lb);
     showHud(g, lb);
-    lb.hud.onSwitch = () => switchSpell(g, lb);
     return g;
   },
 
@@ -491,8 +501,15 @@ LanternBox.game({
     if (i.keyPressed('KeyT')) startCheck(g, lb);
     if (i.keyPressed('KeyG')) g.ground = !g.ground;
     if (i.keyPressed('KeyN')) nextSection(g, lb);
-    if (i.keyPressed('KeyL')) switchSpell(g, lb);
-    const dir = g.autoWalk ? 1 : (i.right ? 1 : 0) - (i.left ? 1 : 0);
+    // since 4c-6b: the named controls (keys, or the touch controls on a touch device) play the wanderer's moves
+    CONTROLS.forEach((a) => { if (i.pressed[a]) g.lastPress = a; });
+    if (i.pressed.switch) switchSpell(g, lb);
+    if (g.move && lb.world.move(g.move.name, (lb.time - g.move.t0) * lb.world.stepRate).done) { g.x += lb.world.move(g.move.name, 999).dx * g.facing; g.move = null; }
+    if (!g.move) {
+      const a = ['jump', 'attack', 'roll', 'cast'].find((n) => i.pressed[n]);
+      if (a) g.move = { name: a === 'cast' ? (g.spells.length ? (g.spells[g.sel % g.spells.length] === 'heal' ? 'heal' : 'fire') : 'fizzle') : MOVE_OF[a], t0: lb.time };
+    }
+    const dir = g.move ? 0 : g.autoWalk ? 1 : (i.right ? 1 : 0) - (i.left ? 1 : 0);   // he stands still for a move
     g.walking = dir !== 0;
     if (dir) { g.facing = dir; g.x += dir * WALK; }
     if (g.ground) g.x = Math.max(0, Math.min(levelOf(g, lb).length, g.x));
@@ -507,7 +524,10 @@ LanternBox.game({
     const now = performance.now(), gapMs = g.last ? now - g.last : 16.7, playing = lb.screen === 'play';
     g.last = now;
     const h8 = lb._debug.h8, topBusy = !!(h8.line || h8.lines.length || (h8.name && lb.time - h8.name.t0 < 2.6) || h8.card);
-    if (bar) { bar.hidden = !playing || !!g.check || !!panel || !!h8.boss || !!h8.card; readout.hidden = !playing || topBusy; }
+    if (bar) {
+      const aside = !playing || !!g.check || !!panel || !!h8.boss || !!h8.card;
+      bar.hidden = aside || !!g.barHidden; showBar.hidden = aside || !g.barHidden; readout.hidden = !playing || topBusy;
+    }
     // while the speed check times a frame, it draws eight in a row, each 1/60 s on from the last, so poses and layers change as often as in play
     const reps = g.check && g.check.phase === 'load' ? 8 : 1, c0 = performance.now();
     for (let r = 0; r < reps; r++) drawScene(ctx, g, lb, lb.time + r / 60, g.x + r * TEST_PACE);
@@ -549,7 +569,12 @@ function drawScene(ctx, g, lb, t, x) {
     if (g.bossAt == null) bossShow(w, lb, PLACE_NAMES[g.place], bossX, x, t, false);   // and the boss fights
     else if (g.bossAt <= DEFEAT_BOSS) w.boss({ x: bossX, defeat: g.bossAt / DEFEAT_BOSS });
   }
-  if (!part.draw) w.wanderer(x, { y: lv ? lv.y + 1 : undefined, walking: g.walking, facing: g.facing });
+  if (!part.draw) {   // since 4c-6b he plays the move the controls asked for, placed as the move moves him
+    const step = g.move && !g.check ? (t - g.move.t0) * w.stepRate : null, m = step != null ? w.move(g.move.name, step) : null;
+    const y0 = lv ? lv.y + 1 : undefined;
+    if (m) w.wanderer(x + m.dx * g.facing, { y: (y0 != null ? y0 : w.ground(x + m.dx * g.facing) + 1) + m.dy, move: g.move.name, step, facing: g.facing });
+    else w.wanderer(x, { y: y0, walking: g.walking, facing: g.facing });
+  }
   w.end();
 }
 function showReadout(g, lb) {
@@ -558,7 +583,7 @@ function showReadout(g, lb) {
   lines[1].textContent = p.width + ' × ' + p.height + ' · ' + p.sharpness.toFixed(2) + '× · ' + p.level + (lb.settings.picture === 'auto' ? ' (automatic)' : '') + ' · layers ' + Math.round(lb.world.stats.tileBytes / 1048576) + ' MB';
   lines[2].textContent = g.check
     ? 'Speed check: ' + PLACE_LABEL[PLACE_NAMES[g.check.i]] + ', ' + (g.check.i + 1) + ' of 4. Please wait.'
-    : PLACE_LABEL[PLACE_NAMES[g.place]] + ' · ' + PARTS[g.part].name + (g.ground ? ' · ' + whereOnLevel(g, lb) : ' · the flat strip');
+    : PLACE_LABEL[PLACE_NAMES[g.place]] + ' · ' + PARTS[g.part].name + (g.ground ? ' · ' + whereOnLevel(g, lb) : ' · the flat strip') + (g.lastPress ? ' · pressed: ' + g.lastPress : '');
 }
 function whereOnLevel(g, lb) {
   const part = PARTS[g.part], x = part.focus ? part.focus(g, lb) : g.x;   // a part that holds the camera on its own spot says where that is
