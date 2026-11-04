@@ -538,10 +538,19 @@ LanternBox.game({
     // since 4c-6b: the named controls (keys, or the touch controls on a touch device) play the wanderer's moves
     CONTROLS.forEach((a) => { if (i.pressed[a]) g.lastPress = a; });
     if (i.pressed.switch) switchSpell(g, lb);
-    if (g.move && lb.world.move(g.move.name, (lb.time - g.move.t0) * lb.world.stepRate).done) { if (g.move.name === 'jump') lb.sfx('land'); g.x += lb.world.move(g.move.name, 999).dx * g.facing; g.move = null; }
+    if (g.move) {   // he travels as the move moves him, so the camera follows him through it (a fix after 4c-8: it jumped at the end)
+      const m = lb.world.move(g.move.name, (lb.time - g.move.t0) * lb.world.stepRate);
+      g.x = moveX(g, lb, m);
+      if (m.done) { if (g.move.name === 'jump') lb.sfx('land'); g.move = null; }
+    }
     if (!g.move) {
       const a = ['jump', 'attack', 'roll', 'cast'].find((n) => i.pressed[n]);
-      if (a) { g.move = { name: a === 'cast' ? (g.spells.length ? (g.spells[g.sel % g.spells.length] === 'heal' ? 'heal' : 'fire') : 'fizzle') : MOVE_OF[a], t0: lb.time }; lb.sfx(SOUND_OF[g.move.name]); }
+      if (a) {
+        const name = a === 'cast' ? (g.spells.length ? (g.spells[g.sel % g.spells.length] === 'heal' ? 'heal' : 'fire') : 'fizzle') : MOVE_OF[a];
+        g.move = { name, t0: lb.time, x0: g.x, y0: standY(g, lb, g.x) };
+        g.move.y1 = standY(g, lb, moveX(g, lb, lb.world.move(name, 999)));   // where a jump lands
+        lb.sfx(SOUND_OF[name]);
+      }
     }
     lb.ambient(g.amb ? PLACE_NAMES[g.place] : null);   // the kit plays it only in play
     const dir = g.move ? 0 : g.autoWalk ? 1 : (i.right ? 1 : 0) - (i.left ? 1 : 0);   // he stands still for a move
@@ -585,8 +594,12 @@ function nextSection(g, lb) { // on a level: on to the start of the next section
   const L = levelOf(g, lb), next = L.sections.map((q) => q.x0).concat([L.arena]).find((x0) => x0 > g.x + 1);
   g.x = next == null ? 120 : next;
 }
+function moveX(g, lb, m) { const v = g.move.x0 + m.dx * g.facing; return g.ground ? Math.max(0, Math.min(levelOf(g, lb).length, v)) : v; }   // where a move has taken him
+function standY(g, lb, x) { return g.ground ? onLevel(g, lb, x).y + 1 : lb.world.ground(x) + 1; }   // the ground, or a piece's top, under him
 function drawScene(ctx, g, lb, t, x) {
   const w = lb.world, part = g.check ? PARTS[0] : PARTS[g.part];
+  const step = g.move && !g.check ? (t - g.move.t0) * w.stepRate : null, m = step != null ? w.move(g.move.name, step) : null;
+  if (m) x = moveX(g, lb, m);   // mid-move, he and the camera are where the move has taken him at this frame's time
   const fx = part.focus && g.ground && !g.check ? part.focus(g, lb) : x;   // a part may hold the camera on its own spot
   const lv = g.ground ? onLevel(g, lb, fx) : null, camX = lv ? lv.camX : x - lb.W * 0.28;
   if (lv) w.begin(ctx, { level: lv.L, camX, t }); else w.begin(ctx, { place: PLACE_NAMES[g.place], camX, rise: g.rise, t });
@@ -605,9 +618,10 @@ function drawScene(ctx, g, lb, t, x) {
     else if (g.bossAt <= DEFEAT_BOSS) w.boss({ x: bossX, defeat: g.bossAt / DEFEAT_BOSS });
   }
   if (!part.draw) {   // since 4c-6b he plays the move the controls asked for, placed as the move moves him
-    const step = g.move && !g.check ? (t - g.move.t0) * w.stepRate : null, m = step != null ? w.move(g.move.name, step) : null;
     const y0 = lv ? lv.y + 1 : undefined;
-    if (m) w.wanderer(x + m.dx * g.facing, { y: (y0 != null ? y0 : w.ground(x + m.dx * g.facing) + 1) + m.dy, move: g.move.name, step, facing: g.facing });
+    // a jump's ground blends from where he left to where he lands under its arc; a roll keeps to the ground under him
+    const base = m && g.move.name === 'jump' ? g.move.y0 + (g.move.y1 - g.move.y0) * Math.min(1, step / m.steps) : (y0 != null ? y0 : w.ground(x) + 1);
+    if (m) w.wanderer(x, { y: base + m.dy, move: g.move.name, step, facing: g.facing });
     else w.wanderer(x, { y: y0, walking: g.walking, facing: g.facing });
   }
   w.end();
