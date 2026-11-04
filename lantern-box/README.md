@@ -56,7 +56,7 @@ The path's scenery is the directions page's sample strip until levels are laid o
 | Crowd | C | Eight monsters and the place's boss, on or off |
 | Defeat | D | Breaks the crowd and the boss into card pieces and wisps |
 | Hurt | | Lowers the health and mana bars |
-| Parts | V | Each drawing part in turn: the place alone, the monsters, defeats, the boss, the wanderer walking and standing, his moves (jump, sword, roll, fireball, hurt, the life lost), casting, the sword's six looks, climbing the place's first bank and walking off the crag (on a level), the splash, the lights |
+| Parts | V | Each drawing part in turn: the place alone, the monsters, defeats, the boss, the wanderer walking and standing, his moves (jump, sword, roll, fireball, hurt, the life lost), casting, the sword's six looks, the spells (heal at three strengths, not enough mana, fireballs and their bursts), the loot (resting, dropping, picked up), the checkpoint (lighting, and the return after a life lost), climbing the place's first bank and walking off the crag (on a level), the splash, the lights |
 | Screens | | Opens any screen: pause, settings, three kinds of game over, initials, high scores, the rotate notice, the title |
 | Speed check | T | Runs the speed check |
 
@@ -64,7 +64,7 @@ The readout at the top shows frames a second, the processor's time for a frame, 
 
 ## The speed check
 
-Open the test page in Chrome with no other copy open, choose Start game, tap Speed check, and leave it alone for about half a minute. It runs each place in turn with eight monsters, the boss, the flyers and the rain, as phase 1's speed test did. Since kit 0.8.0 it walks up each place's big hill (section E) on its level, the camera rising with the ground, so its results are not quite comparable with earlier ones. It ends with a table, pass or fail against both targets, and a line to copy.
+Open the test page in Chrome with no other copy open, choose Start game, tap Speed check, and leave it alone for about half a minute. It runs each place in turn with eight monsters, the boss, the flyers and the rain, as phase 1's speed test did. Since kit 0.8.0 it walks up each place's big hill (section E) on its level, the camera rising with the ground, so its results are not quite comparable with earlier ones. It ends with a table, pass or fail against both targets, and a line to copy; since step 4c-4 the line names the step the test page was built for, so a cached copy shows.
 
 - Phone: at least 30 frames a second, with each frame drawn in 25 ms or less.
 - Computer: 60 frames a second.
@@ -103,8 +103,9 @@ Within a few frames a second of kit 0.6.0 in every place (Dawn 5 better, Mist 1 
 | Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-1, the flat strip | 80 fps / 12.8 ms | 58 / 14.8 ms | 73 / 13.5 ms | 70 / 13.7 ms | 25 / 27 ms | 107 MB |
 | Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-2, up the big hill | 73 fps / 10.3 ms | 57 / 14.3 ms | 75 / 10.7 ms | 66 / 13.0 ms | 25 / 37 ms | 111 MB |
 | Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-3, the wanderer, up the big hill | 74 fps / 10.4 ms | 57 / 14.1 ms | 78 / 11.2 ms | 66 / 13.1 ms | 25 / 33 ms | 111 MB |
+| Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-4 test page, up the big hill | 76 fps / 9.9 ms | 60 / 13.5 ms | 83 / 10.3 ms | 71 / 11.6 ms | 24 / 26 ms | 111 MB |
 
-Both pass in every place. 4c-1 drew frames 1 to 3 ms slower than kit 0.7.0, Night (which has bats, not crows) as much as the others, so it is likely run-to-run variation; its longest frame was shorter. 4c-2's speed check walks up each place's big hill on its level with the camera rising, so it is not quite comparable with the flat-strip runs; the levels cost about what the flat strip did. 4c-3's posable wanderer, painted once per pose step, made no difference that shows. The computer was not measured again.
+Both pass in every place. 4c-1 drew frames 1 to 3 ms slower than kit 0.7.0, Night (which has bats, not crows) as much as the others, so it is likely run-to-run variation; its longest frame was shorter. 4c-2's speed check walks up each place's big hill on its level with the camera rising, so it is not quite comparable with the flat-strip runs; the levels cost about what the flat strip did. 4c-3's posable wanderer, painted once per pose step, made no difference that shows. The speed check's scene does not include 4c-4's spells, loot and checkpoints (they are on screen only for moments in play); its run is within run-to-run variation of 4c-3's. The computer was not measured again.
 
 ## Picture: Automatic, Best, Faster, Fastest
 

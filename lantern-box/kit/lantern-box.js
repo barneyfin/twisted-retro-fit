@@ -3421,10 +3421,188 @@ function mvDrawKit(x,s,X,Y,P,tq,f,edge,k,o){k=k||K132;f=f||1;o=o||{};const eA=o.
   const m=x.getTransform(),px=Math.round(X*m.a+m.e-F.ox),py=Math.round(Y*m.d+m.f-F.oy); // whole device pixels, as the kit places its bosses
   const put=cv=>{x.save();x.setTransform(1,0,0,1,0,0);x.drawImage(cv,px,py);x.restore();};
   if(eA>0){x.save();x.globalAlpha=eA;put(F.E);x.restore();}
+  if(o.aura&&o.aura.a>0){const A=o.aura,top=Y-A.h*100*k;x.save();x.beginPath();x.rect(X-140*k,top,280*k,Y+30*k-top);x.clip();x.globalAlpha=Math.min(1,A.a); // the heal (4c-4): as mvDraw, drawn while it lasts
+    for(let i=0;i<8;i++){const an=i*Math.PI/4;x.save();x.translate(X+Math.cos(an)*A.w*k/1.32,Y+Math.sin(an)*A.w*k/1.32);x.scale(f*k,k);x.fillStyle=x.strokeStyle=A.col;MV_RM=!!o.rm;try{mvSil(x,P,tq);}finally{MV_RM=false;}x.restore();}x.restore();}
   put(F.I);
   if(o.feet!==false&&FX){const g=x.createRadialGradient(X,Y+1,1,X,Y+1,30*k/1.32);g.addColorStop(0,"rgba(255,201,106,"+(0.2*pl)+")");g.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=g;x.fillRect(X-32*k,Y-6*k,64*k,14*k);}
   return G;}
 const MV_SH={};                                    // the life lost's card pieces, cut once for each sharpness
+
+/* ---------- 4c-4. mvspells.js: heal and fireball, stronger with each scroll, and not enough mana (the review loops are left out) ---------- */
+/* ============================== 4b round 3: the spells ==============================
+   Heal and fireball, both in the lantern's gold (decided in round 2), and how each grows stronger with each scroll.
+   The rule for growth works for any number of levels; how many there are stays Claude Code's starting figure. */
+const SP_PALE="#fff0c0";
+// ---------- heal
+function healEnv(u){return u<0||u>1?0:Math.min(1,u/0.18)*(u>0.68?(1-u)/0.32:1);}
+function fxRingHalf(c,X,Y,k,ru,front,lvl){if(ru<=0||ru>=1)return;const cy=Y-(4+ru*90)*k,a=Math.sin(ru*Math.PI)*0.95,rx=(24+lvl*1.5)*k,ry=5.5*k;
+  c.save();c.globalCompositeOperation="screen";c.strokeStyle=rgbaS(MV_LAMP,a);c.lineWidth=(1.6+lvl*0.25)*k;c.shadowColor=MV_GOLD;c.shadowBlur=FX?6:0;c.beginPath();
+  c.ellipse(X,cy,rx,ry,0,front?0:Math.PI,front?Math.PI:Math.PI*2);c.stroke();c.restore();}
+function healRings(c,X,Y,k,u,lvl,front){for(let j=0;j<lvl-1;j++)fxRingHalf(c,X,Y,k,(u-0.08-j*0.16)/0.62,front,lvl);}
+function healMotes(c,X,Y,k,u,lvl,tq){const r=mvRng(77+lvl),n=4+lvl*4;for(let i=0;i<n;i++){const st=r()*0.45,lu=(u-st)/0.55;const px0=(r()-0.5)*(40+lvl*6)*k,h=70+r()*34+lvl*6;
+  if(lu<0||lu>1)continue;fxMote(c,X+px0+Math.sin(tq*6+i)*2*k,Y-(4+lu*h)*k,(1.1+r()*0.7+lvl*0.12)*k,Math.sin(lu*Math.PI),i%3?MV_LAMP:"#fff6dc");}}
+function healGlow(c,X,Y,k,u,lvl,col){const e=healEnv(u);if(e<=0||!FX)return; /* the kit: Effects off, no glow */const cy=Y-44*k-u*12*k;c.save();c.globalCompositeOperation="screen";
+  const g=c.createRadialGradient(X,cy,4,X,cy,(54+lvl*8)*k);g.addColorStop(0,rgbaS(col||SP_PALE,(0.34+0.1*lvl)*e));g.addColorStop(0.5,rgbaS(MV_GOLD,(0.16+0.06*lvl)*e));g.addColorStop(1,rgbaS(MV_GOLD,0));
+  c.fillStyle=g;c.fillRect(X-90*k,cy-90*k,180*k,180*k);c.restore();}
+// draw a healing wanderer: A = a glow rising round it with motes; B = the lantern's light runs up its outline in gold, with motes
+function drawHealer(c,X,Y,P,tq,f,edge,u,lvl,kind,o){o=o||{};const k=K132;
+  if(u>=0&&u<=1){healRings(c,X,Y,k,u,lvl,false);if(kind==="A")healGlow(c,X,Y,k,u,lvl);else healGlow(c,X,Y,k,u,lvl*0.6);}
+  const aura=kind==="B"&&u>=0&&u<=1?{col:MV_LAMP,h:Math.min(1,u/0.42)*1.05,a:healEnv(u)*1.1,w:1.5+0.5*(lvl-1)}:null;
+  const G=mvDraw(c,X,Y,P,tq,f,edge,k,Object.assign({aura},o));fxHand(c,X,Y,f,k,P,G);
+  if(u>=0&&u<=1){healRings(c,X,Y,k,u,lvl,true);healMotes(c,X,Y,k,u,lvl,tq);}return G;}
+// ---------- fireball
+function fxFire(c,x,y,f,k,tq,a,lvl){const sc=1+0.3*(lvl-1),fl=[0,1.5,-1,0.8][Math.floor(tq*12)%4];fxGlowAt(c,x,y,(20+lvl*3)*k*sc,Math.min(1,0.62+0.08*lvl)*a,MV_GOLD);
+  c.save();c.globalAlpha=a;c.translate(x,y);c.scale(f*k*sc,k*sc);c.fillStyle=MV_GOLD;const tl=17+lvl*4;
+  c.beginPath();c.moveTo(6,0);c.quadraticCurveTo(5,-6,0,-5.5);c.quadraticCurveTo(-8,-5+fl,-tl,-1+fl*0.6);c.quadraticCurveTo(-8,2,-9-lvl,6+fl*0.5);c.quadraticCurveTo(-2,6,0,5.5);c.quadraticCurveTo(5,6,6,0);c.fill();
+  if(lvl>=2){c.beginPath();c.moveTo(-2,-4);c.quadraticCurveTo(-9,-9-fl,-tl*0.75,-7+fl);c.quadraticCurveTo(-9,-4,-4,-2);c.fill();}
+  if(lvl>=3){c.beginPath();c.moveTo(-2,4);c.quadraticCurveTo(-9,10+fl,-tl*0.7,8-fl);c.quadraticCurveTo(-9,5,-4,2);c.fill();}
+  c.fillStyle=MV_LAMP;c.beginPath();c.ellipse(1.2,0,4.2,3.3,0,0,Math.PI*2);c.fill();c.fillStyle="#fff8e6";c.beginPath();c.ellipse(2,0,2,1.6,0,0,Math.PI*2);c.fill();c.restore();
+  for(let i=1;i<=2+lvl;i++)fxMote(c,x-f*(14*sc+i*7+fl*2)*k,y+((i*37+Math.floor(tq*12))%5-2)*k*sc,(1.4-i*0.18)*k,a*(1-i/(3+lvl)),MV_LAMP);}
+function fxBurstL(c,x,y,k,u,lvl){if(u<0||u>1)return;const sc=1+0.3*(lvl-1);fxGlowAt(c,x,y,(18+u*22)*k*sc,0.85*(1-u),MV_GOLD);fxGlowAt(c,x,y,(8+u*6)*k*sc,0.8*(1-u)*(1-u),"#fff6dc");
+  for(let j=0;j<lvl;j++){const uj=(u-j*0.1)/(1-j*0.1);if(uj<0)continue;const r=mvRng(5+j*13),n=8+j*3;
+    for(let i=0;i<n;i++){const a=(i+r()*0.6)/n*Math.PI*2,d=(5+uj*(18+j*12+r()*8))*k*sc;fxMote(c,x+Math.cos(a)*d,y+Math.sin(a)*d+uj*uj*7*k,(1.5-uj)*k*(1+j*0.15),1-uj,j%2?MV_GOLD:MV_LAMP);}}}
+function fxFizzle(c,x,y,k,u){if(u<0||u>1)return; // not enough mana, over 0.6 s: the hand's light gutters, pops into falling sparks, and a cloud of smoke curls up
+  if(u<0.3){const v=u/0.3;fxGlowAt(c,x,y,(18-v*12)*k,0.85*(1-v),MV_GOLD);fxMote(c,x,y,(3.4-v*3.2)*k,1,MV_LAMP);}
+  const r=mvRng(9);for(let i=0;i<11;i++){const a=-0.2-r()*2.6,sp=14+r()*18,lu=(u-0.1)/0.75;if(lu<0||lu>1)continue;
+    const px=x+Math.cos(a)*sp*lu*k,py=y+Math.sin(a)*sp*lu*k+lu*lu*44*k;fxMote(c,px,py,(2.1-lu*1.1)*k,1-lu*lu,i%2?MV_GOLD:MV_LAMP);}
+  for(let i=0;i<4;i++){const lu=(u-0.1-i*0.07)/0.8;if(lu<0||lu>1)continue;const px=x+(2+(i%2)*6-i+lu*(6+i*3))*k,py=y-(3+lu*(30+i*7))*k,rr=(6+lu*(17+i*3))*k,al=Math.min(1,lu*4)*(1-lu);
+    let g=c.createRadialGradient(px,py,0,px,py,rr);g.addColorStop(0,rgbaS("#332d36",0.92*al));g.addColorStop(0.65,rgbaS("#332d36",0.6*al));g.addColorStop(1,rgbaS("#332d36",0));c.fillStyle=g;c.fillRect(px-rr,py-rr,rr*2,rr*2);
+    g=c.createRadialGradient(px-rr*0.3,py-rr*0.35,0,px-rr*0.3,py-rr*0.35,rr*0.62);g.addColorStop(0,rgbaS("#b4a8b8",0.75*al));g.addColorStop(1,rgbaS("#b4a8b8",0));c.fillStyle=g;c.fillRect(px-rr,py-rr,rr*2,rr*2);}}
+
+/* ---------- mvloot.js: the loot on the ground, dropping and picked up (the review scenes are left out) ---------- */
+/* ============================== 4b round 4: the loot ==============================
+   Ink cut-outs with a glowing part in their own colour, hovering a little above the ground over a pool of their light, bobbing slowly.
+   Each has a clue besides colour: its outline (round flask, tall vial, hanging scroll, sword, rune stone, shield) and an emblem matching the HUD
+   (the heart on the health potion, the flame on the mana potion, the spell's picture on a scroll, the rune on the stone).
+   Origin (X, Y) is the ground point under the item; sizes in picture pixels (play size). */
+const L_RED="#e0473c",L_TEAL="#5fdcca",L_TEAL2="#2a9f8f";
+const LOOT=[{k:"health",n:"health potion"},{k:"mana",n:"mana potion"},{k:"heal",n:"heal scroll"},{k:"fire",n:"fireball scroll"},{k:"reach",n:"sword: longer reach"},{k:"rune",n:"sword: stronger hits"},{k:"shield",n:"armour"}];
+const lootCol=k=>k==="health"?L_RED:k==="mana"?L_TEAL:MV_GOLD;
+function lHeart(c,x,y,s){c.beginPath();c.moveTo(x,y+s*0.9);c.bezierCurveTo(x-s*1.4,y-s*0.1,x-s*0.7,y-s*1.05,x,y-s*0.35);c.bezierCurveTo(x+s*0.7,y-s*1.05,x+s*1.4,y-s*0.1,x,y+s*0.9);c.fill();}
+function lFlame(c,x,y,s){c.beginPath();c.moveTo(x,y-s*1.25);c.quadraticCurveTo(x+s*0.95,y-s*0.2,x+s*0.6,y+s*0.55);c.quadraticCurveTo(x,y+s*1.05,x-s*0.6,y+s*0.55);c.quadraticCurveTo(x-s*0.85,y-s*0.1,x-s*0.15,y-s*0.55);c.quadraticCurveTo(x-s*0.05,y-s*0.15,x+s*0.1,y-s*0.1);c.quadraticCurveTo(x+s*0.25,y-s*0.6,x,y-s*1.25);c.fill();}
+function lDiamond(c,x,y,rx,ry){c.beginPath();c.moveTo(x,y-ry);c.lineTo(x+rx,y);c.lineTo(x,y+ry);c.lineTo(x-rx,y);c.closePath();c.fill();}
+function lSpellPic(c,kind,x,y,s,col){c.save();c.fillStyle=c.strokeStyle=col;c.lineCap="round";c.lineJoin="round";
+  if(kind==="heal"){c.lineWidth=1.1*s;c.beginPath();c.ellipse(x,y+1.6*s,3.6*s,1.25*s,0,0,Math.PI*2);c.stroke();c.lineWidth=1.3*s;c.beginPath();c.moveTo(x,y+1.2*s);c.lineTo(x,y-3.2*s);c.stroke();
+    c.beginPath();c.moveTo(x-2*s,y-1.6*s);c.lineTo(x,y-3.6*s);c.lineTo(x+2*s,y-1.6*s);c.stroke();}
+  else{c.beginPath();c.arc(x+2*s,y,2.4*s,0,Math.PI*2);c.fill();
+    for(const q of [[0.9,-1.9,-4.2,-3.8,-0.4,-0.7],[0.2,-0.6,-5.8,0.2,0.2,0.9],[0.9,1.9,-3.9,3.4,-0.4,0.8]]){c.beginPath();c.moveTo(x+q[0]*s,y+q[1]*s);c.lineTo(x+q[2]*s,y+q[3]*s);c.lineTo(x+q[4]*s,y+q[5]*s);c.closePath();c.fill();}}
+  c.restore();}
+// the item's own drawing, at (0,0) = its base, before any hover; col = the edge it is drawn with (its own light), body = ink
+function lootShape(c,k,t,rm){const col=lootCol(k);c.lineJoin="round";c.lineCap="round";const edge=()=>{c.lineWidth=1.3;c.strokeStyle=col;c.stroke();c.fillStyle=MV_INK;c.fill();};
+  if(k==="health"){c.beginPath();c.arc(0,-9,8,0,Math.PI*2);c.rect(-2.6,-23,5.2,8);c.rect(-4.2,-25.5,8.4,3);edge();
+    c.save();c.beginPath();c.arc(0,-9,6.4,0,Math.PI*2);c.clip();c.fillStyle=L_RED;c.fillRect(-8,-11.5,16,12);c.restore();
+    c.fillStyle=MV_INK;lHeart(c,0,-6.6,2.6);c.fillStyle="rgba(255,255,255,0.6)";c.beginPath();c.arc(-3,-12,1.3,0,Math.PI*2);c.fill();}
+  else if(k==="mana"){c.beginPath();c.moveTo(-4.8,-1.5);c.lineTo(-4.8,-16);c.quadraticCurveTo(-4.8,-19,-2.2,-21.5);c.lineTo(-2.2,-26.5);c.lineTo(-3.4,-26.5);c.lineTo(-3.4,-29);c.lineTo(3.4,-29);c.lineTo(3.4,-26.5);c.lineTo(2.2,-26.5);c.lineTo(2.2,-21.5);c.quadraticCurveTo(4.8,-19,4.8,-16);c.lineTo(4.8,-1.5);c.quadraticCurveTo(4.8,0.5,2.8,0.5);c.lineTo(-2.8,0.5);c.quadraticCurveTo(-4.8,0.5,-4.8,-1.5);c.closePath();edge();
+    c.save();c.beginPath();c.rect(-3.4,-15.5,6.8,14.6);c.clip();c.fillStyle=L_TEAL;c.fillRect(-4,-15.5,8,15);c.fillStyle=L_TEAL2;c.fillRect(-4,-4,8,4);c.restore();
+    c.fillStyle=MV_INK;lFlame(c,0,-8,3.1);c.fillStyle="rgba(255,255,255,0.55)";c.fillRect(-2.6,-14.5,1,8);}
+  else if(k==="heal"||k==="fire"){c.save();c.shadowColor=MV_GOLD;c.shadowBlur=FX?6:0;c.fillStyle="#fff0c0";c.beginPath();c.moveTo(-6,-23);c.lineTo(6,-23);c.lineTo(6,-7.5);for(let i=0;i<=4;i++)c.lineTo(6-i*3,-7.5+(i%2?1.2:0));c.closePath();c.fill();c.restore();
+    c.fillStyle=MV_LAMP;c.fillRect(-6,-23,12,2);lSpellPic(c,k,0,-15,1,MV_INK);
+    for(const y of [-25.5,-8]){c.beginPath();c.rect(-8,y,16,3.2);c.arc(-8.6,y+1.6,1.9,0,Math.PI*2);c.arc(8.6,y+1.6,1.9,0,Math.PI*2);edge();}}
+  else if(k==="reach"){c.beginPath();c.moveTo(-2.4,-28);c.lineTo(2.4,-28);c.lineTo(0.5,-2);c.lineTo(-0.5,-2);c.closePath();c.rect(-6.5,-30.2,13,2.4);c.rect(-1.3,-35.5,2.6,5.5);c.moveTo(1.9,-37.2);c.arc(0,-37.2,1.9,0,Math.PI*2);edge();
+    c.strokeStyle=MV_LAMP;c.lineWidth=0.8;c.beginPath();c.moveTo(0.9,-27.5);c.lineTo(0.2,-4);c.stroke();}
+  else if(k==="rune"){c.beginPath();c.moveTo(-5,0);c.lineTo(-7.2,-9.5);c.lineTo(-3.6,-21.5);c.lineTo(2.8,-24.5);c.lineTo(7,-13);c.lineTo(5.4,0);c.closePath();edge();
+    c.save();c.shadowColor=MV_GOLD;c.shadowBlur=FX?5:0;c.fillStyle=MV_GOLD;lDiamond(c,0,-11,2.6,4.4);c.strokeStyle=MV_GOLD;c.lineWidth=1.1;c.beginPath();c.moveTo(-4.3,-15);c.lineTo(-4.3,-7);c.moveTo(4.3,-15);c.lineTo(4.3,-7);c.stroke();c.restore();}
+  else if(k==="shield"){c.beginPath();c.moveTo(-7.5,-24);c.lineTo(7.5,-24);c.lineTo(7.5,-14);c.quadraticCurveTo(7.3,-5,0,-0.5);c.quadraticCurveTo(-7.3,-5,-7.5,-14);c.closePath();edge();
+    c.strokeStyle=MV_GOLD;c.lineWidth=0.9;c.beginPath();c.moveTo(0,-22);c.lineTo(0,-3);c.moveTo(-5.5,-15);c.lineTo(5.5,-15);c.stroke();c.fillStyle=MV_GOLD;lDiamond(c,0,-15,2.3,2.3);}}
+// an item resting: its pool of light on the ground, a soft glow, a slow bob and, now and then, a glint. o: {a, sc, lift, x, y, pool, glint}
+function drawLoot(c,k,X,Y,t,o){o=o||{};const col=lootCol(k),a=o.a==null?1:o.a,sc=o.sc||1,b=o.bob==null?Math.sin(t*5)*1.6:o.bob,hov=o.hov==null?4:o.hov,pl=o.pool==null?1:o.pool;
+  if(pl>0&&FX){c.save();c.translate(X,Y+1);c.scale(1,0.32);const g=c.createRadialGradient(0,0,1,0,0,24);g.addColorStop(0,rgbaS(col,0.55*pl*a));g.addColorStop(1,rgbaS(col,0));c.fillStyle=g;c.fillRect(-26,-26,52,52);c.restore();}
+  const x=X+(o.x||0),y=Y-hov-b+(o.y||0);fxGlowAt(c,x,y-13*sc,20*sc,(0.32+0.08*Math.sin(t*5))*a,col);
+  c.save();c.globalAlpha=a;c.translate(x,y);c.scale(sc,sc);if(o.rot)c.rotate(o.rot);lootShape(c,k,t);c.restore();
+  if(k==="health"||k==="mana"){const r=k==="health"?L_RED:L_TEAL;for(let i=0;i<3;i++){const ph=(t*0.5+i/3)%1;fxMote(c,x+Math.sin(ph*6+i)*4*sc,y-(k==="mana"?30:26)*sc-ph*16*sc,1.1*sc,0.75*(1-ph)*a,r);}}
+  if(o.glint!==false){const gp=((t+(o.seed||0))%2.6)/0.45;if(gp<1){const s=Math.sin(gp*Math.PI)*3.2*sc;c.save();c.globalAlpha=a;c.fillStyle="#fff6dc";c.translate(x+6*sc,y-24*sc);
+    c.beginPath();c.moveTo(0,-s*1.6);c.lineTo(s*0.3,-s*0.3);c.lineTo(s*1.6,0);c.lineTo(s*0.3,s*0.3);c.lineTo(0,s*1.6);c.lineTo(-s*0.3,s*0.3);c.lineTo(-s*1.6,0);c.lineTo(-s*0.3,-s*0.3);c.closePath();c.fill();c.restore();}}}
+// dropping out of a defeated monster (u 0..1 over 0.45 s): a hop from where it fell to its resting place, a little bounce, its light coming up
+function drawLootDrop(c,k,X,Y,mx,my,u,t){if(u<0)return;if(u>=1){drawLoot(c,k,X,Y,t);return;}const v=Math.min(1,u/0.8),x=mx+(X-mx)*v,y0=my+((Y-4)-my)*v-Math.sin(v*Math.PI)*22;
+  const sq=u>0.8?1-Math.sin((u-0.8)/0.2*Math.PI)*0.18:1;drawLoot(c,k,x,Y,t,{x:0,y:y0-(Y-4),hov:0,bob:0,pool:Math.max(0,(u-0.6)/0.4),glint:false,sc:sq});}
+// picked up (u 0..1 over 0.5 s): it lifts and flies into the wanderer's chest, shrinking, then a gold glint and a ring of its motes
+function drawLootPick(c,k,X,Y,cx,cy,u,t){if(u<0||u>1)return;const col=lootCol(k),e=u*u,x=X+(cx-X)*e,y=(Y-4)+(cy-(Y-4))*e-Math.sin(u*Math.PI)*18;
+  if(u<0.8)drawLoot(c,k,X,Y,t,{x:x-X,y:y-(Y-4),hov:0,bob:0,sc:1-u*0.75,a:1-u*0.3,pool:1-u*1.6,glint:false});
+  if(u>0.65){const g=(u-0.65)/0.35,s=(2+g*6)*(1-g*0.4);fxGlowAt(c,cx,cy,(10+g*10),0.9*(1-g),MV_GOLD);c.save();c.globalAlpha=1-g;c.fillStyle="#fff6dc";c.translate(cx,cy);
+    c.beginPath();c.moveTo(0,-s*1.6);c.lineTo(s*0.3,-s*0.3);c.lineTo(s*1.6,0);c.lineTo(s*0.3,s*0.3);c.lineTo(0,s*1.6);c.lineTo(-s*0.3,s*0.3);c.lineTo(-s*1.6,0);c.lineTo(-s*0.3,-s*0.3);c.closePath();c.fill();c.restore();
+    for(let i=0;i<8;i++){const a=i/8*Math.PI*2,d=4+g*14;fxMote(c,cx+Math.cos(a)*d,cy+Math.sin(a)*d,1.2*(1-g),1-g,col);}}}
+
+/* ---------- from mvlevel.js: an edge colour at another strength ---------- */
+// the place's edge colours are rgba strings: the same colour at another strength
+const lvA=(e,a)=>/^rgba/.test(e)?e.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/,"rgba($1,$2,$3,"+a+")"):rgba(e,a);
+
+/* ---------- mvlamp.js: the checkpoint lanterns, option B (each place's own post); posts A and C and the review loops are left out ---------- */
+/* ============================== 4b round 6: the checkpoint lanterns ==============================
+   A lantern on a post that lights as the wanderer passes (the gameplay note: start, middle, boss door). The lantern is the wanderer's own
+   lantern made big (ring, links, a pointed cap, a tapered glass box, a tray), so a checkpoint reads as "his light". Three directions for the
+   post: A the waymark post with an arm (one post everywhere), B each place's own post, C the pilgrim's crook (one post everywhere).
+   Unlit: dark glass with a cold glint, and the place's lit edge round post and lantern, so it can be seen ahead. Lighting (0.5 s): a gold
+   spark leaps from the wanderer's lantern, the glass flares white-gold with a ring and a burst of motes, then settles. Lit: gold glass, a
+   flickering flame, a halo, a pool of light on the ground, motes rising. Gold only: the lantern's light, never ember. */
+const CP_PK=1.2,CP_LK=1.3; // the posts and the lantern drawn larger than first sketched, so a checkpoint stands out at play size
+function cpBlobAt(c,cx,cy,rx,ry,seed){const r=mvRng(seed),q=[];for(let k=0;k<7;k++){const a=k/7*Math.PI*2+r()*0.5,rr=0.78+r()*0.34;q.push([cx+Math.cos(a)*rx*rr,cy+Math.sin(a)*ry*rr]);}rlBlob(c,q);}
+// the posts, drawn in col with the ground at y 0; each returns the hook the lantern hangs from
+function cpPostB(c,col,lv){c.fillStyle=col;c.strokeStyle=col;c.lineCap="round";c.lineJoin="round";
+  if(lv==="night"){ // the graveyard: a wrought-iron crook on a stone plinth
+    rlShape(c,[[-9.4,4,1],[-9,-12.6],[-5.6,-16.4,1],[5.6,-16.4,1],[9,-12.6],[9.4,4,1]]);
+    rlTaper(c,[0,-15],[0.8,-76],[0,-136],4.4,3.4,12);rlBlob(c,[[-3.8,-79],[3.8,-79],[4,-74],[-4,-74]]);
+    rlShape(c,[[-2.6,-134.6,1],[0,-146,1],[2.6,-134.6,1]]);
+    c.lineWidth=2.8;c.beginPath();c.moveTo(0,-128.6);c.bezierCurveTo(14,-133,30,-135,34,-124.6);c.stroke();
+    c.lineWidth=1.9;c.beginPath();c.moveTo(34,-124.6);c.bezierCurveTo(36,-118,30,-116,28.4,-120.2);c.bezierCurveTo(27.4,-123.4,31.2,-124.4,31.6,-122);c.stroke();
+    c.lineWidth=1.6;c.beginPath();c.moveTo(1.6,-114);c.bezierCurveTo(8,-118,15,-126,21,-130.4);c.stroke();
+    c.beginPath();c.moveTo(1.6,-114);c.bezierCurveTo(-1,-116,1,-119,3,-117.6);c.stroke();
+    c.lineWidth=1.7;c.beginPath();c.moveTo(24,-132.2);c.quadraticCurveTo(24.8,-128,24,-124.4);c.stroke();return[24,-124.4];}
+  if(lv==="storm"){ // the old town: a timber post on a stone bollard, an iron sign bracket (not a street lamp: the lantern hangs, it doesn't sit on top)
+    rlShape(c,[[-8.4,4,1],[-8,-17.6],[-4.4,-21.6,1],[4.4,-21.6,1],[8,-17.6],[8.4,4,1]]);
+    rlTaper(c,[0,-18],[-0.9,-80],[0.6,-138],7.2,6,12);rlShape(c,[[-4.6,-136.6,1],[0,-143,1],[4.6,-136.6,1]]);
+    c.lineWidth=2.6;c.beginPath();c.moveTo(1,-128.4);c.quadraticCurveTo(18,-130,35,-128);c.stroke();
+    c.lineWidth=1.8;c.beginPath();c.moveTo(2,-108);c.bezierCurveTo(10,-112,22,-118,28,-127.6);c.stroke();
+    c.beginPath();c.moveTo(14,-115.4);c.bezierCurveTo(13,-121,18,-123,19.6,-120);c.bezierCurveTo(20.6,-118,18.4,-116.6,17.4,-118.4);c.stroke();
+    rlShape(c,[[34,-131,1],[38,-128.4,1],[34,-125.8,1]]);
+    c.lineWidth=1.7;c.beginPath();c.moveTo(31.6,-128.4);c.quadraticCurveTo(32.4,-125,31.6,-121.6);c.stroke();return[31.6,-121.6];}
+  if(lv==="dawn"){ // the moor: a gnarled waymark stake, leaning, a peg for the lantern, a cairn at its foot
+    for(const [x,y,rx,ry,s] of [[-12,1,6,4,31],[0,0.6,7,4.6,32],[11.4,1,5,3.6,33],[-6,-5.6,5.4,4,34],[5.4,-6.4,5,3.6,35],[0,-11.6,4.4,3.4,36]])cpBlobAt(c,x,y,rx,ry,s);
+    rlTaper(c,[0,-4],[-3.4,-70],[4,-134],10,7,16);cpBlobAt(c,-4.6,-58,3.4,4.4,37);cpBlobAt(c,3.6,-100,3,3.8,38);
+    rlShape(c,[[1.4,-133,1],[3,-139,1],[5,-134.6,1],[7,-137.6,1],[8,-132,1]]);
+    rlTaper(c,[3.4,-117],[16,-123],[27.6,-117.4],4.8,3.6,8);return[26.4,-115.4];}
+  // the forest: a sapling pole lashed upright, its top bent over and drooping
+  rlBlob(c,[[-8,4],[-5.6,-2],[2,-4.4],[7.6,-1],[8.6,4]]);
+  rlTaper(c,[0,3],[-2.4,-90],[8,-138],7.4,5,16);rlTaper(c,[8,-138],[22.4,-153],[32.6,-128],5,3,12);
+  rlTaper(c,[3,-109],[-6,-118],[-11,-127],2.4,0.8,6);rlTaper(c,[20.4,-147],[25,-158],[22.6,-165],2,0.6,6);
+  for(const [x,y] of [[4.6,-121],[5.6,-126]])rlBlob(c,[[x-4.6,y-1.2],[x+4.6,y-2],[x+4.8,y+0.8],[x-4.4,y+1.6]]);
+  return[32.4,-127.6];}
+// the lantern, hung from (0,0): frame in col
+const CP_GLASS=[[-6.6,21],[6.6,21],[5.6,39.4],[-5.6,39.4]];
+function cpFrame(c,col){c.fillStyle=col;c.strokeStyle=col;c.lineCap="round";c.lineJoin="round";
+  c.lineWidth=1.6;c.beginPath();c.arc(0,2.4,2.4,0,Math.PI*2);c.stroke();
+  c.lineWidth=1.3;c.beginPath();c.ellipse(0,7.2,1.5,2.4,0,0,Math.PI*2);c.stroke();c.beginPath();c.ellipse(0,11.4,1.5,2.4,0,0,Math.PI*2);c.stroke();
+  rlShape(c,[[0,12.6,1],[2.6,14.4],[6.6,17.2],[9.6,19.6,1],[-9.6,19.6,1],[-6.6,17.2],[-2.6,14.4]]);
+  rlShape(c,[[-9.2,19,1],[9.2,19,1],[8.8,21.4,1],[-8.8,21.4,1]]);
+  rlShape(c,[[-9,20,1],[-6.6,20,1],[-5.6,40,1],[-7.9,40,1]]);rlShape(c,[[9,20,1],[6.6,20,1],[5.6,40,1],[7.9,40,1]]);
+  rlShape(c,[[-9.8,39.2,1],[9.8,39.2,1],[10.6,42.4],[8.2,44.8,1],[-8.2,44.8,1],[-10.6,42.4]]);}
+function cpLantern(c,X,Y,ang,lit,flare,edge,t){c.save();c.translate(X,Y);c.rotate(ang);c.scale(CP_LK,CP_LK);const path=()=>{c.beginPath();CP_GLASS.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();};
+  path();c.fillStyle="#241f29";c.fill();
+  if(lit<1){c.save();c.globalAlpha=1-lit;c.strokeStyle=lvA(edge,0.7);c.lineWidth=1.2;c.lineCap="round";c.beginPath();c.moveTo(-4.2,23.6);c.lineTo(-2.2,31);c.stroke();c.beginPath();c.arc(-1.6,34.2,0.7,0,Math.PI*2);c.fillStyle=lvA(edge,0.6);c.fill();c.restore();}
+  if(lit>0){c.save();c.globalAlpha=lit;path();const g=c.createRadialGradient(0,32,1,0,30,14);g.addColorStop(0,"#fff6dc");g.addColorStop(0.45,MV_GLASS);g.addColorStop(1,"#c98a34");c.fillStyle=g;c.fill();
+    const fl=1+0.12*Math.sin(t*5.3)+0.07*Math.sin(t*8.7);c.fillStyle="#fffaf0";c.beginPath();c.moveTo(0,35.6-9*fl);c.quadraticCurveTo(3,32.6,0,36);c.quadraticCurveTo(-3,32.6,0,35.6-9*fl);c.fill();c.restore();}
+  if(flare>0){c.save();c.globalAlpha=flare;path();c.fillStyle="#fffaf0";c.fill();c.restore();}
+  c.save();c.translate(1.3,-1.3);cpFrame(c,lvA(edge,0.85));c.restore();cpFrame(c,INK);c.restore();
+  return[X-Math.sin(ang)*30*CP_LK,Y+Math.cos(ang)*30*CP_LK];}
+// a whole checkpoint at (X,Y): post (with its lit edge), lantern, and its light. st = {lit, flare, ring, spark:[from x,y,u]}
+function cpDraw(c,dir,lv,X,Y,st,t){const edge=LV[lv].edge,post=(col)=>cpPostB(c,col,lv); /* the kit: option B only */
+  c.save();c.translate(X,Y);c.scale(CP_PK,CP_PK);c.save();c.translate(1.1,-1.1);post(lvA(edge,0.85));c.restore();const h=post(INK);c.restore();
+  const hx=X+h[0]*CP_PK,hy=Y+h[1]*CP_PK,ang=0.05*Math.sin(t*1.6)+0.025*Math.sin(t*2.9),lit=st.lit||0,fl=st.flare||0;
+  if(lit>0&&FX){c.save();c.globalCompositeOperation="screen";c.translate(hx,Y);c.scale(2.6,0.5);const g=c.createRadialGradient(0,0,0,0,0,26);g.addColorStop(0,rgbaS(MV_GOLD,0.34*lit));g.addColorStop(1,rgbaS(MV_GOLD,0));c.fillStyle=g;c.fillRect(-26,-26,52,52);c.restore();} // the pool on the ground
+  const gc=[hx-Math.sin(ang)*30*CP_LK,hy+Math.cos(ang)*30*CP_LK];
+  if(lit>0&&FX){c.save();const g=c.createRadialGradient(gc[0],gc[1],4,gc[0],gc[1],90);g.addColorStop(0,rgbaS(MV_GOLD,0.2*lit));g.addColorStop(1,rgbaS(MV_GOLD,0));c.fillStyle=g;c.fillRect(gc[0]-90,gc[1]-90,180,180);c.restore();} // a warm wash that still shows on the pale places
+  if(lit>0||fl>0){const pu=1+0.05*Math.sin(t*3.1);fxGlowAt(c,gc[0],gc[1],(64+50*fl)*pu,0.5*lit+0.5*fl,MV_GOLD);fxGlowAt(c,gc[0],gc[1],120,0.16*lit,MV_GOLD);}
+  cpLantern(c,hx,hy,ang,lit,fl,edge,t);
+  if(lit>0||fl>0)fxGlowAt(c,gc[0],gc[1],16+10*fl,0.55*lit+0.4*fl,"#fff0c0");
+  if(st.ring>0&&st.ring<1){const u=st.ring;c.save();c.strokeStyle=rgbaS(MV_LAMP,(1-u)*0.9);c.lineWidth=2.4*(1-u)+0.6;c.beginPath();c.arc(gc[0],gc[1],10+40*u,0,Math.PI*2);c.stroke();c.restore();
+    const r=mvRng(91);for(let i=0;i<10;i++){const a=r()*Math.PI*2,d=(14+r()*36)*u;fxMote(c,gc[0]+Math.cos(a)*d,gc[1]+Math.sin(a)*d-12*u*u,1.5,1-u,i%3?MV_LAMP:"#fff6dc");}}
+  if(lit>0.6){for(let i=0;i<3;i++){const ph=((t*0.45+i/3)%1),x=gc[0]+Math.sin(t*1.7+i*2)*5,y=hy+10-ph*52;fxMote(c,x,y,1.3,Math.sin(ph*Math.PI)*0.85*lit,i%2?MV_LAMP:"#fff6dc");}}
+  return gc;}
+// the spark leaping from the wanderer's lantern to the checkpoint's glass, with a short tail
+function cpSpark(c,from,to,u){const [sx,sy]=from,[ex,ey]=to,mx=(sx+ex)/2,my=Math.min(sy,ey)-34;for(let j=0;j<4;j++){const v=Math.max(0,u-j*0.08),m=1-v,x=m*m*sx+2*m*v*mx+v*v*ex,y=m*m*sy+2*m*v*my+v*v*ey;
+  fxGlowAt(c,x,y,18-j*3.5,0.9-j*0.18,MV_GOLD);fxMote(c,x,y,3.2-j*0.6,1-j*0.2,"#fff6dc");}}
+// the lighting's timing, s seconds after the wanderer comes within reach: spark 0 to 0.18, flare and ring 0.18 to 0.32, settled by 0.5
+function cpState(s){if(s==null||s<0)return{lit:0};const st={lit:0,flare:0,ring:0};if(s<0.18){st.spark=s/0.18;return st;}
+  const u=(s-0.18);st.flare=Math.max(0,1-u/0.14)*(u<0.14?1:0)+(u>=0.14&&u<0.32?Math.max(0,1-(u-0.14)/0.18)*0.35:0);st.lit=Math.min(1,u/0.14);st.ring=u<0.5?u/0.5:0;return st;}
 
 /* ============================== the tools: what a game calls, as lb.world ==============================
    The tools draw; games decide what happens. A frame is world.begin(ctx, { place, camX, rise }), then the things on the path
@@ -3513,8 +3691,19 @@ function makeTools(env){
       let G=null;
       if(o.shatter!=null)mvShatter(c,MV_SH,X-fc*6*K132,Y,fc,Math.min(1,Math.max(0,o.shatter/1.1)),e);
       else{
-        G=mvDrawKit(c,f.s,X,Y,P,tq,fc,e,K132,{edgeA:o.safe!=null?moPulse(o.safe):1,rm:f.rm,feet:o.feet});
+        // 4c-4: heal { t: seconds since the cast's "go" step, level }, as drawHealer (option B); form: seconds since he began to form again at
+        // a checkpoint (as moReturn: he fades in in its light); fizzle: seconds since the "fiz" step (not enough mana, at the casting hand)
+        const hu=o.heal?(o.heal.t||0)/0.6:-1,hl=o.heal?Math.max(1,o.heal.level||1):1,heal=hu>=0&&hu<=1;
+        if(heal){healRings(c,X,Y,K132,hu,hl,false);healGlow(c,X,Y,K132,hu,hl*0.6);}
+        const fa=o.form!=null?Math.max(0,Math.min(1,(o.form-0.12)/0.3)):1;
+        if(fa<1){c.save();c.globalAlpha=fa;}
+        const mo={edgeA:o.form!=null?0.4+0.6*fa:o.safe!=null?moPulse(o.safe):1,rm:f.rm,feet:o.form!=null?true:o.feet,aura:heal?{col:MV_LAMP,h:Math.min(1,hu/0.42)*1.05,a:healEnv(hu)*1.1,w:1.5+0.5*(hl-1)}:null};
+        if(fa<1){MV_RM=!!f.rm;try{G=mvDraw(c,X,Y,P,tq,fc,e,K132,mo);}finally{MV_RM=false;}} // forming: each shape fades on its own, as play.js draws him
+        else G=mvDrawKit(c,f.s,X,Y,P,tq,fc,e,K132,mo);
+        if(fa<1)c.restore();
         fxHand(c,X,Y,fc,K132,P,G);
+        if(heal){healRings(c,X,Y,K132,hu,hl,true);healMotes(c,X,Y,K132,hu,hl,tq);}
+        if(o.fizzle!=null){const G2=mvGeo(PF.thrust,0),hp=G2.T(G2.fHd[0],G2.fHd[1]);fxFizzle(c,X+fc*(hp[0]*K132+3),Y+hp[1]*K132,K132,o.fizzle/0.6);}
         if(name==="sword"&&(mv.tag==="strike"||mv.tag==="follow")){const L=lvl||{r:0,s:0},a=mv.tag==="strike"?[tipAng(withLvl(PS.wind,L)),tipAng(P),0.85]:[tipAng(withLvl(PS.strike,L))-0.5,tipAng(P),0.4];
           fxSlash(c,X,Y,fc,K132,P,a[0],a[1],a[2],e,L);}
         if(o.hurt){const ch=mvPt(G,P,X,Y,fc,K132,12,-21),u=o.hurt.t||0;if(o.hurt.kind==="armour")fxShards(c,ch[0],ch[1],fc,K132,u/0.5,e);else fxEmber(c,ch[0],ch[1],fc,K132,u/0.45);}
@@ -3523,6 +3712,33 @@ function makeTools(env){
       const pt=(bx,by)=>{const p=mvPt(G,P,X,Y,fc,K132,bx,by);return{x:p[0]+f.camX,y:p[1]};};
       const hd=G?G.T(G.fHd[0],G.fHd[1]):[P.hx+4,P.hy-16];
       return{tag:mv.tag,done:mv.done,chest:pt(4,-22),hit:pt(12,-21),lantern:pt(13.4,3.5),hand:{x:x+fc*hd[0]*K132,y:Y+hd[1]*K132}};
+    },
+    // version 8 (4c-4): the spells, the loot and the checkpoints. Times are seconds since the moment began; positions are x along the path
+    // and y in picture lines, as the wanderer returns them.
+    fireball(x,y,o){ // o: facing, level (1 up). The game moves it (straight, at chest height, until it hits a monster or leaves the screen)
+      const f=frame("fireball");o=o||{};fxFire(f.ctx,x-f.camX,y,o.facing||1,K132,Math.floor(f.t*MV_RATE)/MV_RATE,1,Math.max(1,o.level||1));
+    },
+    fireBurst(x,y,o){ // o: t (0.4 s), level: the fireball bursting where it hits
+      const f=frame("fireBurst");o=o||{};fxBurstL(f.ctx,x-f.camX,y,K132,(o.t||0)/0.4,Math.max(1,o.level||1));
+    },
+    LOOT:LOOT.map(q=>q.k),
+    loot(kind,x,o){ // kind: one of world.LOOT; o: y, seed (so neighbours glint apart), drop { x, y, t } (out of a monster that fell at x, y: 0.45 s),
+      // pick { x, y, t } (into the wanderer's chest at x, y: 0.5 s). It stays until picked up; it never times out or blinks.
+      const f=frame("loot");o=o||{};if(!LOOT.some(q=>q.k===kind))throw new Error('Lantern Box: no loot called "'+kind+'".');
+      const c=f.ctx,X=x-f.camX,Y=o.y==null?f.gy(x)+1:o.y; // drawn as play.js draws it: a handful of shapes, every frame
+      if(o.pick)drawLootPick(c,kind,X,Y,o.pick.x-f.camX,o.pick.y,(o.pick.t||0)/0.5,f.t);
+      else if(o.drop)drawLootDrop(c,kind,X,Y,o.drop.x-f.camX,o.drop.y,(o.drop.t||0)/0.45,f.t);
+      else drawLoot(c,kind,X,Y,f.t,{seed:o.seed||0});
+    },
+    checkpoint(x,o){ // the place's checkpoint lantern on its post. o: y; lit: seconds since it began to light (true: lit; left out: unlit); from: the
+      // wanderer's lantern ({ x, y }), for the spark that leaps from it as it lights (the first 0.18 s). Returns the glass's centre.
+      const f=frame("checkpoint");o=o||{};const c=f.ctx,X=x-f.camX,Y=o.y==null?f.gy(x)+3:o.y,st=o.lit===true?{lit:1}:cpState(o.lit==null||o.lit===false?null:o.lit);
+      const gc=cpDraw(c,"B",f.level,X,Y,st,f.t);
+      if(st.spark!=null&&o.from)cpSpark(c,[o.from.x-f.camX,o.from.y],gc,st.spark);
+      return{x:gc[0]+f.camX,y:gc[1]};
+    },
+    spark(from,to,u){ // a gold spark between two points ({ x, y }), u 0 to 1: the return at a checkpoint sends one from its glass to his lantern (0.3 s)
+      const f=frame("spark");cpSpark(f.ctx,[from.x-f.camX,from.y],[to.x-f.camX,to.y],Math.max(0,Math.min(1,u)));
     },
     monster(o){ // o: kind, x, y, ph (its pace, so neighbours differ), id (a monster's own name), defeat (0 to 1, over 1.6 s), seed
       const f=frame("monster"),s=f.s;
@@ -4626,9 +4842,12 @@ function makeTools(env){
          whole level (L.length, L.arena, L.sections, L.checkpoints, L.pits, L.banks, L.ground(x), L.rise(x), L.pit(x), L.pieces());
          world.begin(ctx, { level: L, camX }) draws it in place of the flat strip, rising with its ground, and y left out stands
          things on its ground. The wanderer (version 8): world.wanderer(x, { y, move, step, facing, sword: { reach, bite }, safe,
-         hurt: { kind, t }, shatter, pit }) draws him in one of world.moves at a puppet step (12 a second; walking or standing
-         in time if move is left out) and returns his chest, hand and lantern; world.move(name, step) gives a move's length, tag
-         and where the review loops have him stand. Then:
+         hurt: { kind, t }, shatter, pit, heal: { t, level }, fizzle, form }) draws him in one of world.moves at a puppet step (12 a
+         second; walking or standing in time if move is left out) and returns his chest, hand and lantern; world.move(name, step)
+         gives a move's length, tag and where the review loops have him stand. The spells, loot and checkpoints (version 8):
+         world.fireball(x, y, { facing, level }), world.fireBurst(x, y, { t, level }), world.loot(kind, x, { y, seed, drop, pick })
+         (kinds in world.LOOT), world.checkpoint(x, { y, lit, from }) (returns its glass), world.spark(from, to, u). Times are
+         seconds since the moment began. Then:
          world.monster({ kind, x, y, ph, id, defeat, seed }) (kinds in
          world.MONSTERS; give each monster its own id; defeat 0 to 1 breaks it into card pieces and a wisp, over 1.6 s),
          world.boss({ x, y, defeat }) (the place's own; defeat over 2.2 s), world.splash(x, { y, seed }), world.candle(x, y),
