@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gloam Hallow</title><!-- the kit replaces this with the game's title -->
+<!-- The kit and the soundtrack. build.py copies them, the fonts and their licences into dist/gloam-hallow.html. Keep data-lb-inline. -->
+<link rel="stylesheet" href="../../kit/lantern-box.css" data-lb-inline>
+<script src="../../kit/lantern-box.js" data-lb-inline></script>
+<script src="music.js" data-lb-inline></script>
+</head>
+<body>
+<script>
+/* GLOAM HALLOW — Lantern Box's pilot game: a hooded wanderer fights through four places in one night and the next day.
+   The rules are lantern-box/GAMEPLAY-gloam-hallow.md; the look, the moves and the moments are the design system's, drawn by the kit.
+   Step 4d-1: moving through the four places, with no monsters yet: walking, jumping, climbing banks and pieces, walking off edges,
+   rolling, pits that cost a life, the checkpoints and the return to them, three lives, the place cards, the soundtrack and each
+   place's background sound. Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
+
+const PLACES = ['night', 'storm', 'dawn', 'mist'];
+const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
+
+// Moving (picture lines and seconds; starting figures, to tune in play)
+const STRIDE = 5.5 * 1.32;       // a walking step's length in the kit's poses (the wanderer is drawn 1.32 times the design's size)
+const WALK = STRIDE * 12;        // so walking at 12 steps a second, about 87 lines a second, never slides his feet
+// a jump is the kit's jump move: 76 lines high and 58 forward (44 and 58 x 1.32), half a second in the air, so it clears a 44-line pit
+// from up to 14 lines before its edge
+const JUMP_V = 608, GRAV = 2432;  // up 76 lines in 0.25 s
+const AIR_JUMP = 116;             // across, in a jump (58 lines in 0.5 s)
+const AIR = WALK;                 // across, falling off an edge
+const FALL_MAX = 900;
+const COYOTE = 0.08;             // a jump still works this long after walking off an edge
+const BANK_MIN = 20;             // a bank rising this high or more blocks the way: jump or climb it
+const STEP_UP = 16;              // a piece's side this high or lower is simply stepped onto
+const CLIMB_MIN = 40, CLIMB_MAX = 135;   // the faces a climb takes: a jump clears under about 72, a climb up to about 130
+const JUMP_CLIMB = 66;           // jump pressed at the foot of a face higher than this climbs it (a standing jump only just clears 67 to 73)
+const ROLL_T = 0.5;              // the roll: 6 puppet steps, 82 lines
+const LIVES = 3;
+const RETURN_AT = 46;            // he forms again this far past the checkpoint that brought him back
+
+let G = null;                    // the run's state, for the console while testing
+
+LanternBox.game({
+  id: 'gloam-hallow',
+  title: ['Gloam', 'Hallow'],
+  hud: 'full',
+  howTo: { goal: ['Cut your path through four blighted lands, felling the terror bound to each. Sever the roots of The Gaping Tree to break the night.',
+    'Three chances to break the dark. Fall, and return to the glow of your last lit lantern.'] },
+  win: { heading: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.', lifeBonus: 10 },
+  music: [{ data: window.GLOAM_HALLOW_MUSIC_1 }, { data: window.GLOAM_HALLOW_MUSIC_2 }],
+  place: 'night',
+  // Testing (delete for the finished game): where a run starts, and help for trying it out
+  test: { options: [
+    { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
+    { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
+    { id: 'safe', name: "Can't be hurt", toggle: true, note: 'Nothing takes health, armour or lives.' },
+    { id: 'all', name: 'Every spell and sword upgrade', toggle: true, note: 'All of them from the start (once there are spells).' },
+  ] },
+
+  start(lb) {
+    const t = lb.test || {};
+    const g = { p: Math.max(0, PLACES.indexOf(t.place || 'night')), lives: LIVES, safe: !!t.safe, mode: 'card', facing: 1, x: 60, y: 0, vy: 0,
+      on: null, mt: 0, walkDist: 0, air: null, airT: 0, landT: 9, lantern: null, glass: [], out: false };
+    G = g;
+    loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
+    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(0); lb.hud.lives(LIVES); lb.hud.spells([], 0, 0);
+    lb.fade(1);   // black until the first place card lifts
+    lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; });
+    return g;
+  },
+
+  update(g, lb) {
+    const dt = 1 / 60;
+    g.mt += dt;
+    if (g.mode === 'card') { if (g.out) g.x += WALK * dt; return; }            // play stops for the place card; leaving a place he walks on
+    if (g.mode === 'pit') return pitUpdate(g, lb, dt);
+    if (g.mode === 'return') return returnUpdate(g, lb, dt);
+    if (g.mode === 'over') return;
+    const i = lb.input, dir = (i.right ? 1 : 0) - (i.left ? 1 : 0);
+    if (g.mode === 'climb') return climbUpdate(g, lb, dt);
+    if (g.mode === 'roll') return rollUpdate(g, lb, dt);
+    if (g.mode === 'air') return airUpdate(g, lb, dt, dir, i);
+    // on the ground (or a piece's top)
+    if (dir) g.facing = dir;
+    g.landT += dt;
+    const face = faceAhead(g);
+    // jump at the foot of a face too tall to jump climbs it instead (Barney's choice: the phone's jump button "just works")
+    if (i.pressed.jump) return face && face.h > JUMP_CLIMB && face.h <= CLIMB_MAX ? startClimb(g, lb, face) : jump(g, lb);
+    if (i.pressed.roll) { g.mode = 'roll'; g.mt = 0; g.rollX = g.x; lb.sfx('roll'); return; }
+    if (face && i.climb && face.h >= CLIMB_MIN && face.h <= CLIMB_MAX) return startClimb(g, lb, face);
+    if (dir) {
+      const r = stepTo(g, g.x + dir * WALK * dt);
+      g.walkDist += Math.abs(r.moved);
+      if (r.drop) startDrop(g);
+    }
+    checkpoints(g, lb);
+    leavePlace(g, lb);
+  },
+
+  draw(ctx, g, lb) {
+    const w = lb.world, L = g.L, camX = Math.max(0, Math.min(L.length - lb.W, g.x - lb.W * 0.32));
+    w.begin(ctx, { level: L, camX });
+    g.cps.forEach((cp, k) => { g.glass[k] = w.checkpoint(cp.x, { lit: cp.lit === true ? true : cp.lit != null ? lb.time - cp.lit : undefined, from: g.lantern || undefined }); });
+    const r = drawWanderer(g, lb, w);
+    if (r && r.lantern) g.lantern = r.lantern;
+    w.end();
+  },
+});
+
+/* ---------- places ---------- */
+function loadPlace(g, lb, p, ci) {   // the place's level and its checkpoints; ci: start at its first, second or third checkpoint (Testing)
+  g.p = p;
+  g.L = lb.world.level(PLACES[p]);
+  g.pieces = g.L.pieces();
+  g.cps = g.L.checkpoints.map((c, k) => ({ x: c.x, lit: k < ci || (ci > 0 && k === ci) ? true : null }));
+  g.lastCp = ci;
+  g.x = ci > 0 ? g.cps[ci].x + RETURN_AT : 60;
+  g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1; g.walkDist = 0;
+}
+function enterPlace(g, lb) {         // once the place card's black is down: the place's sound and track
+  g.out = false;
+  lb.ambient(PLACES[g.p]);
+  lb.music(TRACK[PLACES[g.p]]);
+}
+function leavePlace(g, lb) {         // walking on out of the boss's arena: the next place's card, or after the Mist the win
+  if (g.x < g.L.length + 30 || g.out) return;
+  if (g.p === PLACES.length - 1) { g.mode = 'over'; lb.win(); return; }
+  g.out = true; g.mode = 'card';
+  lb.placeCard(PLACES[g.p + 1], () => { lb.fade(0); loadPlace(g, lb, g.p + 1, 0); enterPlace(g, lb); }, () => { g.mode = 'ground'; g.mt = 0; });
+}
+function checkpoints(g, lb) {        // a checkpoint lights as he passes it, and becomes where he returns
+  g.cps.forEach((cp, k) => {
+    if (cp.lit == null && g.x >= cp.x - 20) { cp.lit = lb.time; g.lastCp = Math.max(g.lastCp, k); lb.sfx('checkpoint'); }
+  });
+}
+
+/* ---------- the ground, the banks and the pieces ---------- */
+function groundAt(g, x) { return g.L.pit(x) ? Infinity : g.L.ground(x); }
+function pieceUnder(g, x, y) { return g.pieces.find((p) => x >= p.x0 && x <= p.x1 && Math.abs(p.y(x) - y) < 2) || null; }
+function surfaceAt(g, x) {           // where he stands at x: a piece's top or the ground
+  const p = g.pieces.find((q) => x >= q.x0 && x <= q.x1);
+  return p ? p.y(x) : g.L.ground(x);
+}
+function bankRise(g, b) { return g.L.ground(b[0] - 1) - g.L.ground(b[1] + 1); }   // positive: the ground rises going right
+// a face in front of him, within a few lines: a bank rising his way or a piece's side; h is how high it stands over his feet
+function faceAhead(g) {
+  if (g.on) return null;
+  const f = g.facing;
+  for (const b of g.L.banks) {
+    const rise = bankRise(g, b) * f;
+    if (rise < BANK_MIN) continue;
+    const foot = f > 0 ? b[0] - 3 : b[1] + 3, gap = (foot - g.x) * f;
+    if (gap >= -4 && gap <= 8) return { foot, h: g.y - g.L.ground(f > 0 ? b[1] + 1 : b[0] - 1), kind: 'bank' };
+  }
+  for (const p of g.pieces) {
+    const side = f > 0 ? p.x0 : p.x1, foot = side - f * 3, gap = (foot - g.x) * f, top = p.y(side + f);
+    if (gap >= -4 && gap <= 8 && g.y - top > STEP_UP) return { foot, h: g.y - top, kind: 'piece', piece: p };
+  }
+  return null;
+}
+// walk along the ground (or a piece's top) towards xn: stops at a bank or a tall piece's side, steps onto a low piece, and says
+// whether he walked off an edge, a down-bank or into a pit
+function stepTo(g, xn) {
+  const x0 = g.x, f = Math.sign(xn - x0) || g.facing;
+  if (g.on) {   // on a piece's top
+    const p = g.on;
+    if (xn >= p.x0 && xn <= p.x1) { g.x = xn; g.y = p.y(xn); return { moved: xn - x0 }; }
+    g.x = xn; g.on = null;
+    if (g.L.pit(xn) || g.L.ground(xn) - g.y > 3) return { moved: xn - x0, drop: true };
+    g.y = g.L.ground(xn); return { moved: xn - x0 };
+  }
+  for (const b of g.L.banks) {   // a bank rising his way stops him at its foot; one falling away is an edge
+    const rise = bankRise(g, b) * f, foot = f > 0 ? b[0] - 3 : b[1] + 3;
+    if (rise >= BANK_MIN && (foot - x0) * f >= 0 && (xn - foot) * f > 0) { g.x = foot; return { moved: foot - x0, blocked: true }; }
+    if (rise <= -BANK_MIN) { const lip = f > 0 ? b[0] : b[1]; if ((lip - x0) * f >= 0 && (xn - lip) * f > 0) { g.x = xn; return { moved: xn - x0, drop: true }; } }
+  }
+  for (const p of g.pieces) {    // a piece: its side stops him if tall, or he steps onto it
+    const side = f > 0 ? p.x0 : p.x1;
+    if ((side - x0) * f >= 0 && (xn - side) * f >= 0) {
+      const top = p.y(side + f);
+      if (g.y - top > STEP_UP) { const foot = side - f * 3; g.x = (foot - x0) * f > 0 ? foot : x0; return { moved: g.x - x0, blocked: true }; }
+      if (top - g.y > 3) { g.x = xn; return { moved: xn - x0, drop: true }; }   // a piece lower than the ground beside it: down onto it
+      g.x = xn; g.on = p; g.y = p.y(Math.max(p.x0, Math.min(p.x1, xn))); return { moved: xn - x0 };
+    }
+  }
+  g.x = Math.max(10, xn);
+  if (g.L.pit(g.x)) return { moved: g.x - x0, drop: true };
+  g.y = g.L.ground(g.x);
+  return { moved: g.x - x0 };
+}
+
+/* ---------- moves ---------- */
+function jump(g, lb) { g.mode = 'air'; g.air = 'jump'; g.airT = 0; g.vy = -JUMP_V; g.on = null; g.mt = 0; lb.sfx('jump'); }
+function startDrop(g) { g.mode = 'air'; g.air = 'drop'; g.airT = 0; g.vy = 0; g.on = null; g.mt = 0; }
+function airUpdate(g, lb, dt, dir, i) {
+  g.airT += dt;
+  if (g.air === 'drop' && g.airT < COYOTE && i.pressed.jump) return jump(g, lb);
+  if (dir) g.facing = dir;
+  // across: stopped by ground or a piece's side above his feet
+  if (dir) {
+    const xn = g.x + dir * (g.air === 'jump' ? AIR_JUMP : AIR) * dt;
+    const wall = groundAt(g, xn) < g.y - 2 || g.pieces.some((p) => xn >= p.x0 && xn <= p.x1 && !(g.x >= p.x0 && g.x <= p.x1) && p.y(xn) < g.y - 2);
+    if (!wall) g.x = Math.max(10, xn);
+  }
+  // down: gravity, then landing on a piece's top or the ground
+  const y0 = g.y;
+  g.vy = Math.min(FALL_MAX, g.vy + GRAV * dt);
+  g.y += g.vy * dt;
+  if (g.vy > 0) {
+    const p = g.pieces.find((q) => g.x >= q.x0 && g.x <= q.x1 && y0 <= q.y(g.x) + 1 && g.y >= q.y(g.x));
+    if (p) return land(g, lb, p.y(g.x), p);
+    const gy = groundAt(g, g.x);
+    if (gy !== Infinity && g.y >= gy) return land(g, lb, gy, null);
+    const pit = g.L.pits.find((q) => g.x > q[0] && g.x < q[1]);
+    if (pit && g.y > g.L.ground(g.x) + 20) return startPit(g, lb, pit);
+  }
+}
+function land(g, lb, y, p) {
+  const hard = g.vy > 300;
+  g.y = y; g.on = p; g.vy = 0; g.mode = 'ground'; g.landT = hard ? 0 : 9; g.mt = 0;
+  if (hard) lb.sfx('land');
+  checkpoints(g, lb);
+}
+function startClimb(g, lb, face) {
+  const steps = lb.world.move('climb', 0).steps, end = lb.world.move('climb', steps);
+  g.mode = 'climb'; g.mt = 0;
+  g.climb = { foot: face.foot, y0: g.y, h: face.h, scale: face.h / (96 * 1.32), steps, endDx: end.dx };
+  g.x = face.foot;
+}
+function climbUpdate(g, lb, dt) {
+  const c = g.climb, s = g.mt * lb.world.stepRate;
+  if (s < c.steps) return;
+  g.x = c.foot + g.facing * c.endDx;   // up: on the top, a little way in
+  g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.mode = 'ground'; g.mt = 0; g.landT = 9;
+}
+function rollUpdate(g, lb, dt) {
+  const s = Math.min(g.mt, ROLL_T) * lb.world.stepRate, m = lb.world.move('roll', s);
+  const r = stepTo(g, g.rollX + g.facing * m.dx);
+  if (r.drop) return startDrop(g);
+  if (r.blocked) g.rollX = g.x - g.facing * m.dx;   // against a face: he rolls on the spot
+  if (g.mt >= ROLL_T) { g.mode = 'ground'; g.mt = 0; g.landT = 9; }
+  checkpoints(g, lb);
+}
+
+/* ---------- a fall into a pit, the life lost and the return (the design system's timings: play.js's loopLost) ---------- */
+function startPit(g, lb, pit) {
+  g.mode = 'pit'; g.mt = 0;
+  g.pitFall = { pit, x0: g.x, y0: g.y, lip: g.L.ground(g.x) };
+}
+function pitUpdate(g, lb, dt) {
+  const t = g.mt, P = g.pitFall;
+  if (!P.broke && t >= 0.34) {         // he breaks into card pieces as he falls into the dark
+    P.broke = true;
+    lb.sfx('lifeLost');
+    if (!g.safe) { g.lives--; lb.hud.lives(g.lives); }
+    if (g.lives <= 0) { g.mode = 'over'; lb.gameOver(1.6); return; }
+  }
+  const tOut = 0.34 + 0.8, tBlack = tOut + 0.35, tRet = tBlack + 0.3;
+  lb.fade(t < tOut ? 0 : Math.min(1, (t - tOut) / 0.35));
+  if (t >= tRet) {                     // back at the last lit checkpoint, forming in its light
+    const cp = g.cps[g.lastCp];
+    g.x = cp.x + RETURN_AT; g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1;
+    g.mode = 'return'; g.mt = 0;
+    lb.hud.health(0); lb.hud.mana(0);
+  }
+}
+function returnUpdate(g, lb, dt) {
+  const t = g.mt;
+  lb.fade(Math.max(0, 1 - t / 0.35));
+  const q = Math.round(Math.max(0, Math.min(1, (t - 0.3) / 0.5)) * 8) / 8;   // health and mana fill in steps
+  lb.hud.health(q); lb.hud.mana(q);
+  if (t >= 0.9) { g.mode = 'ground'; g.mt = 0; g.landT = 9; }
+}
+
+/* ---------- drawing him ---------- */
+function drawWanderer(g, lb, w) {
+  const R = w.stepRate, y = g.y + 1, f = g.facing;
+  switch (g.mode) {
+    case 'pit': {
+      const t = g.mt, P = g.pitFall;
+      if (t < 0.34) return w.wanderer(P.x0 + 26 * f * t, { move: 'jump', step: 5, y: P.y0 + 1 + 0.5 * 980 * t * t, pit: P.pit, facing: f });
+      if (t < 0.34 + 1.1) return w.wanderer(P.x0 + 26 * f * t, { pit: P.pit, shatter: t - 0.34, y: P.lip + 1 + 0.5 * 980 * 0.34 * 0.34, facing: f });
+      return null;
+    }
+    case 'return': {
+      const r = w.wanderer(g.x, { move: 'idle', step: g.mt * R, form: g.mt, y, facing: f });
+      if (g.mt < 0.3 && g.glass[g.lastCp]) w.spark(g.glass[g.lastCp], r.lantern, g.mt / 0.3);
+      return r;
+    }
+    case 'over': return null;
+    case 'climb': {
+      const c = g.climb, s = Math.min(g.mt * R, c.steps - 1e-3), m = w.move('climb', s);
+      return w.wanderer(c.foot + f * m.dx, { move: 'climb', step: s, y: c.y0 + 1 + m.dy * c.scale, facing: f });
+    }
+    case 'roll': return w.wanderer(g.x, { move: 'roll', step: Math.min(g.mt, ROLL_T) * R, y, facing: f });
+    case 'air': {
+      if (g.air === 'drop') return w.wanderer(g.x, { move: 'drop', step: g.airT < 1 / R ? 0 : 1.5, y, facing: f });
+      const step = g.airT < 1 / R ? 1 : g.vy < -250 ? 2.5 : g.vy <= 250 ? 4 : 5.5;   // launch, rising, the top, falling
+      return w.wanderer(g.x, { move: 'jump', step, y, facing: f });
+    }
+    default: {
+      if (g.landT < 2 / R) return w.wanderer(g.x, { move: 'jump', step: 7 + g.landT * R, y, facing: f });   // landing, then recovering
+      const walking = g.mode === 'ground' && (lb.input.left || lb.input.right) || (g.mode === 'card' && g.out);
+      if (walking) return w.wanderer(g.x, { move: 'walk', step: g.out ? g.x / STRIDE : g.walkDist / STRIDE, y, facing: f });
+      return w.wanderer(g.x, { move: 'idle', step: lb.time * R, y, facing: f });
+    }
+  }
+}
+</script>
+</body>
+</html>

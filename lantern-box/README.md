@@ -8,6 +8,7 @@ The arcade's third style kit: backlit cut-out silhouettes in layered, coloured a
 
 Open `dist/<name>.html` in the Retro Games folder by double-clicking it. Each is one file that works offline. They are made by the build, and are not kept in git.
 
+- `dist/gloam-hallow.html`: Gloam Hallow, the pilot game, being built (step 4d). Settings has a Testing panel while it is.
 - `dist/lb-sampler.html`: the test page.
 - `dist/lb-empty.html`: the empty game. The arrow keys or A and D (or the stick on a touch device) walk along Night's level, J (or the attack button) earns wisps for health, and K (or the cast button) ends the run.
 
