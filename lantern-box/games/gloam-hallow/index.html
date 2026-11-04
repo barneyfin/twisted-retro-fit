@@ -15,9 +15,11 @@
    The rules are lantern-box/GAMEPLAY-gloam-hallow.md; the look, the moves and the moments are the design system's, drawn by the kit.
    Step 4d-1: moving through the four places: walking, jumping, climbing banks and pieces, walking off edges, rolling, pits that cost a
    life, the checkpoints and the return to them, three lives, the place cards, the soundtrack and each place's background sound.
-   Step 4d-2a: the fight, with Night's three monsters (the crawler, the flyer and the mouth-hat) in every place for now: the sword, each
-   monster's way of coming at him, hits, defeats and wisps, being hurt, armour, the second of safety, the roll, health running out, and
-   about 40% of the monsters beaten since the checkpoint coming back after a life lost.
+   Step 4d-2a: the fight with the crawler, the flyer and the mouth-hat: the sword, each monster's way of coming at him, hits, defeats
+   and wisps, being hurt, armour, the second of safety, the roll, health running out, and about 40% of the monsters beaten since the
+   checkpoint coming back after a life lost.
+   Step 4d-2b: the ghoul and the walker, each place's own mix growing place by place, the roll carrying on through a body, and a crowd
+   of monsters for the speed check (Testing).
    Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
@@ -51,12 +53,23 @@ const COMEBACK = 0.4;            // the share of the monsters beaten since the c
 // Each kind: the share of health a touch or attack takes (small 10%, medium 15%, large 25%), hits to defeat, wisps, its body (x0, x1 as
 // it faces left, then y0, y1 from its feet; measured from the kit's drawings), and how it comes at him. Ground monsters keep to their
 // own stretch of ground, between the pits, steep banks and pieces either side (Barney: they never climb onto a piece).
+// The ghoul and the walker reach out (zone: where the claw or the branch arm sweeps, from the kit's drawing, while it sweeps), reach
+// up onto a piece, and can be rolled through (through: the roll passes their bodies, as it passes under a flyer).
 const MON = {
   crawler: { dmg: 0.10, hp: 1, wisps: 1, box: [-25, 23, -24, 2], ground: true, speed: 140, range: 125, keep: 175, cd: 0.8, atk: 'lunge' },   // the lunge carries it 170 on, so from 125 it ends well past him
-  bat2:    { dmg: 0.10, hp: 1, wisps: 1, box: [-25, 25, -18, 8], speed: 60, range: [90, 210], cd: 1.1, atk: 'dive', hover: 120 },
+  bat2:    { dmg: 0.10, hp: 1, wisps: 1, box: [-25, 25, -18, 8], speed: 60, range: [90, 210], cd: 1.1, atk: 'dive', hover: 120, through: true },
   hatmaw:  { dmg: 0.15, hp: 2, wisps: 2, box: [-37, 36, -75, 0], ground: true, speed: 110, range: 75, keep: 100, cd: 0.7, atk: 'bite', push: 10 },
+  // the ghoul lurches in, holds off just beyond the sword's reach while it gathers itself, then swipes over and down at head height
+  // (its claw reaches 84 from its middle and comes no lower than 46 above the ground; counted from 56, so a roll gets under it on a
+  // slope): roll through under it, then strike
+  ghoul2:  { dmg: 0.15, hp: 3, wisps: 2, box: [-41, 18, -92, 0], ground: true, speed: 90, range: 92, keep: 135, cd: 1.0, atk: 'swipe', push: 8,
+    up: true, through: true, zone: { swipe: [0.58, 0.8, -86, -35, -130, -56] } },
+  // the walker stalks and sweeps its branch arms: arms up, a high sweep 112 to 200 above the ground (it passes over him standing, but
+  // not jumping or up on a piece); a crouch, a low sweep at his knees (jump it)
+  walker:  { dmg: 0.25, hp: 5, wisps: 5, box: [-28, 31, -193, 0], ground: true, speed: 32, range: 100, keep: 150, cd: 1.2, atk: 'sweep',
+    up: true, through: true, zone: { high: [0.74, 0.92, -106, -25, -200, -112], low: [0.74, 0.92, -104, -45, -42, -12] } },   // the arms reach out from 0.74 s
 };
-const ATK_T = { lunge: 0.88, dive: 1.4, bite: 1.0 };   // each attack's length, signal to recovered (the kit's)
+const ATK_T = { lunge: 0.88, dive: 1.4, bite: 1.0, swipe: 1.35, high: 1.3, low: 1.25 };   // each attack's length, signal to recovered (the kit's)
 // The encounters: two or three hand-made patterns for each section shape (where along it, 0 to 1, and which role), one picked at
 // random for each section, each run. S a small ground monster, F a flyer, M a medium one.
 const PATTERNS = {
@@ -68,7 +81,16 @@ const PATTERNS = {
   F: [[[0.2, 'S'], [0.5, 'F'], [0.7, 'S']], [[0.35, 'M'], [0.6, 'F']]],                                            // terraces
   G: [[[0.5, 'M'], [0.15, 'F'], [0.85, 'F']], [[0.48, 'S'], [0.58, 'S'], [0.3, 'F']]],                            // a mound between two pits
 };
-const ROLES = { S: 'crawler', F: 'bat2', M: 'hatmaw' };   // 4d-2a: Night's three kinds, everywhere for now
+// How it gets harder, place by place (the gameplay note): Night, small and medium monsters; Blood Red Rain, more kinds (the ghoul) and
+// more at once; Dawn, the walkers join; the Mist, the most at once. M is a mouth-hat or a ghoul; big: the chance an M is a walker
+// instead; extra: spots added to each section's pattern, anywhere along it, each a small, flying or medium monster.
+const MIX = {
+  night: { M: ['hatmaw'], big: 0, extra: 0 },
+  storm: { M: ['hatmaw', 'ghoul2'], big: 0, extra: 1 },
+  dawn:  { M: ['hatmaw', 'ghoul2'], big: 0.35, extra: 1 },
+  mist:  { M: ['hatmaw', 'ghoul2'], big: 0.35, extra: 2 },
+};
+const CROWD = ['crawler', 'bat2', 'hatmaw', 'ghoul2', 'walker', 'crawler', 'bat2', 'walker'];   // Testing: eight at once past the start
 
 let G = null;                    // the run's state, for the console while testing
 
@@ -85,7 +107,7 @@ LanternBox.game({
   test: { options: [
     { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
     { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
-    { id: 'mons', name: 'Monsters', choices: [['normal', 'Normal'], ['none', 'None']] },
+    { id: 'mons', name: 'Monsters', choices: [['normal', 'Normal'], ['none', 'None'], ['crowd', 'A crowd']] },
     { id: 'safe', name: "Can't be hurt", toggle: true, note: 'Nothing takes health, armour or lives.' },
     { id: 'armour', name: 'Start with 3 armour', toggle: true, note: 'Until armour is found as loot.' },
     { id: 'all', name: 'Every spell and sword upgrade', toggle: true, note: 'All of them from the start (the spells come later).' },
@@ -96,7 +118,7 @@ LanternBox.game({
     const g = { p: Math.max(0, PLACES.indexOf(t.place || 'night')), lives: LIVES, safe: !!t.safe, mode: 'card', facing: 1, x: 60, y: 0, vy: 0,
       on: null, mt: 0, walkDist: 0, air: null, airT: 0, landT: 9, lantern: null, glass: [], out: false,
       health: 1, mana: 1, armour: t.armour ? 3 : 0, sword: { reach: t.all ? 2 : 0, bite: t.all ? 2 : 0 },
-      safeT: 0, hurtT: 9, hurtKind: 'health', atkBuf: 0, swHit: false, mons: [], noMons: t.mons === 'none' };
+      safeT: 0, hurtT: 9, hurtKind: 'health', atkBuf: 0, swHit: false, mons: [], monsTest: t.mons || 'normal' };
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
     lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); lb.hud.spells([], 0, 0);
@@ -288,15 +310,22 @@ function climbUpdate(g, lb, dt) {
   g.x = c.foot + g.facing * c.endDx;   // up: on the top, a little way in
   g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.mode = 'ground'; g.mt = 0; g.landT = 9;
 }
-function startRoll(g, lb) { g.mode = 'roll'; g.mt = 0; g.rollX = g.x; lb.sfx('roll'); }
+function startRoll(g, lb) { g.mode = 'roll'; g.mt = 0; g.rollX = g.x; g.rollOn = 0; lb.sfx('roll'); }
 function rollUpdate(g, lb, dt) {
   const s = Math.min(g.mt, ROLL_T) * lb.world.stepRate, m = lb.world.move('roll', s);
-  const r = stepTo(g, g.rollX + g.facing * m.dx);
+  const r = g.mt < ROLL_T ? stepTo(g, g.rollX + g.facing * m.dx) : stepTo(g, g.x + g.facing * ROLL_ON * dt);
   if (r.drop) return startDrop(g);
-  if (r.blocked) g.rollX = g.x - g.facing * m.dx;   // against a face: he rolls on the spot
-  if (g.mt >= ROLL_T) { g.mode = 'ground'; g.mt = 0; g.landT = 9; }
+  if (r.blocked) { g.rollX = g.x - g.facing * m.dx; g.rollOn = ROLL_ON_T; }   // against a face: he rolls on the spot
+  if (g.mt >= ROLL_T) {
+    // rolling through a ghoul or a walker: a roll that would end inside its body carries on until he is clear (4d-2b)
+    const inside = r.blocked ? null : g.mons.find((q) => alive(q) && MON[q.kind].through && MON[q.kind].ground && overlapsBody(g, q));
+    g.rollOn += dt;
+    if (!inside || g.rollOn > ROLL_ON_T) { g.mode = 'ground'; g.mt = 0; g.landT = 9; }
+  }
   checkpoints(g, lb);
 }
+const ROLL_ON = 130, ROLL_ON_T = 0.4;   // a roll carrying on through a body: lines a second, and for no longer than this
+function overlapsBody(g, m) { const b = monBox(m), w = BODY_W + 10; return !(b[1] < g.x - w || b[0] > g.x + w); }   // clear by 10 (the ghoul leans back 8 after its swipe)
 
 /* ---------- a life lost (a fall into a pit, or health run out) and the return (the design system's timings: play.js's loopLost) ---------- */
 function startLost(g, lb, kind, pit) {
@@ -364,16 +393,16 @@ function defeat(g, lb, m) {            // card pieces and its wisp rising to the
 }
 
 /* ---------- being hurt (4d-2a) ---------- */
-// a monster's body (or its attack, which is its body moving) touching his: the roll keeps him under anything higher than 38 lines
+// a monster's body (or its attack, which is its body moving) touching his, or a claw or branch arm sweeping through him: the roll keeps
+// him under anything higher than 38 lines, and through the bodies of flyers, ghouls and walkers
 function hurtCheck(g, lb) {
   if (g.safe || g.safeT > 0) return;
   if (g.mode !== 'ground' && g.mode !== 'air' && g.mode !== 'roll' && g.mode !== 'sword') return;
-  const h = g.mode === 'roll' ? ROLL_H : BODY_H, x0 = g.x - BODY_W, x1 = g.x + BODY_W, y0 = g.y - h, y1 = g.y;
+  const rolling = g.mode === 'roll', h = rolling ? ROLL_H : BODY_H, x0 = g.x - BODY_W, x1 = g.x + BODY_W, y0 = g.y - h, y1 = g.y;
+  const meets = (b) => b && !(b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1);
   for (const m of g.mons) {
     if (!alive(m)) continue;
-    const b = monBox(m);
-    if (b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1) continue;
-    return hurt(g, lb, m);
+    if (meets(atkZone(m, g)) || (!(rolling && MON[m.kind].through) && meets(monBox(m)))) return hurt(g, lb, m);
   }
 }
 function hurt(g, lb, m) {
@@ -418,8 +447,25 @@ function atkMove(a) {
       if (u < 0.4) return { dx: 4 * E(u / 0.4), dy: 0, ph: 'signal' };
       if (u < 0.75) { const v = (u - 0.4) / 0.35; return { dx: L(4, -58, v), dy: -96 * v * (1 - v), ph: 'attack' }; }
       return { dx: -58, dy: 0, ph: u < 1 ? 'recover' : 'done' };
+    case 'swipe':                      // the ghoul leans 8 into its swipe (moSwipe), in four steps, and back
+      if (u < 0.45) return { dx: 0, dy: 0, ph: 'signal' };
+      if (u < 0.7) return { dx: -8 * E(Math.floor((u - 0.45) / 0.25 * 4) / 4), dy: 0, ph: 'attack' };
+      if (u < 0.95) return { dx: -8, dy: 0, ph: 'recover' };
+      return { dx: -8 * (1 - E((u - 0.95) / 0.4)), dy: 0, ph: u < 1.35 ? 'recover' : 'done' };
+    case 'high': case 'low':           // the walker sweeps where it stands
+      return { dx: 0, dy: 0, ph: u < 0.5 ? 'signal' : u < 0.8 ? 'attack' : u < ATK_T[a.name] ? 'recover' : 'done' };
   }
   return { dx: 0, dy: 0, ph: 'done' };
+}
+// where a ghoul's claw or a walker's arm sweeps, while it sweeps (the kit's drawing), in the path's lines; null at other times
+// Its heights count from the higher of the ground under the monster and under the sweep, so on a slope a roll still gets under a
+// claw and a standing wanderer under a high sweep, as on the flat
+function atkZone(m, g) {
+  const z = m.atk && MON[m.kind].zone && MON[m.kind].zone[m.atk.name];
+  if (!z || m.atk.t < z[0] || m.atk.t > z[1]) return null;
+  const x0 = m.f === 1 ? m.px - z[3] : m.px + z[2], x1 = m.f === 1 ? m.px - z[2] : m.px + z[3];
+  const base = Math.min(m.py, g.L.ground((x0 + x1) / 2));
+  return [x0, x1, base + z[4], base + z[5]];
 }
 // a ground monster's stretch: between the pits, steep banks and pieces either side of x, its feet kept clear of their edges
 function patchAt(g, x, K) {
@@ -431,19 +477,26 @@ function patchAt(g, x, K) {
 function spawnMonsters(g, lb) {
   g.mons = [];
   g.walls = g.L.pits.concat(g.L.banks.filter((b) => Math.abs(bankRise(g, b)) >= BANK_MIN), g.pieces.map((p) => [p.x0, p.x1]));
-  if (g.noMons) return;
+  if (g.monsTest === 'none') return;
+  const mix = MIX[PLACES[g.p]];
+  const kindOf = (role) => role === 'S' ? 'crawler' : role === 'F' ? 'bat2' : lb.rand() < mix.big ? 'walker' : lb.pick(mix.M);
   let n = 0;
   for (const s of g.L.sections) {
-    const pats = PATTERNS[s.id], pat = pats[Math.floor(lb.rand() * pats.length)];
+    const pats = PATTERNS[s.id], pat = pats[Math.floor(lb.rand() * pats.length)].slice();
+    for (let e = 0; e < mix.extra; e++) pat.push([0.12 + lb.rand() * 0.8, lb.pick(['S', 'S', 'F', 'M'])]);
     for (const [u, role] of pat) {
-      const m = makeMonster(g, ROLES[role], s.x0 + u * (s.x1 - s.x0), n++);
+      const m = makeMonster(g, kindOf(role), s.x0 + u * (s.x1 - s.x0), n++);
       if (m) g.mons.push(m);
     }
   }
+  if (g.monsTest === 'crowd') {        // Testing: eight more just past the start, all coming at once (the speed check)
+    const s = g.L.sections[0];
+    CROWD.forEach((kind, k) => { const m = makeMonster(g, kind, s.x0 + 160 + k * 60, n++, true); if (m) g.mons.push(m); });
+  }
 }
-function makeMonster(g, kind, x0, n) {
+function makeMonster(g, kind, x0, n, near) {
   const K = MON[kind];
-  if (g.L.checkpoints.some((c) => x0 > c.x - 120 && x0 < c.x + 320)) return null;   // never by a checkpoint, so a return is safe
+  if (!near && g.L.checkpoints.some((c) => x0 > c.x - 120 && x0 < c.x + 320)) return null;   // never by a checkpoint, so a return is safe
   let x = x0, patch = null;
   if (K.ground) {
     for (const off of [0, 25, -25, 50, -50, 80, -80]) { const p = patchAt(g, x0 + off, K); if (p) { patch = p; x = clampTo(x0 + off, p); break; } }
@@ -512,11 +565,17 @@ function monsterUpdate(m, g, lb, dt, busy) {
     place(m, g, m.bx, 0);
     return;
   }
-  // a ground monster: it comes for him while he is on its stretch of ground, and waits at its edge while he is on a piece or beyond
-  const reach = !busy && !g.on && g.x > m.patch[0] - 60 && g.x < m.patch[1] + 60;
+  // a ground monster: it comes for him while he is on its stretch of ground, and waits at its edge while he is on a piece or beyond;
+  // the ghoul and the walker reach up onto a piece beside their stretch
+  const near = g.x > m.patch[0] - 60 && g.x < m.patch[1] + 60;
+  const reach = !busy && near && (!g.on || K.up);
   let goal;
   if (reach) {
-    if (m.cd <= 0 && ad <= K.range && ad > 18) { startAttack(m, K.atk); return; }
+    if (m.cd <= 0 && ad <= K.range && ad > 18) {
+      // the walker: a high sweep at him up on a piece, otherwise high or low, half and half
+      startAttack(m, K.atk === 'sweep' ? (g.on || lb.rand() < 0.5 ? 'high' : 'low') : K.atk);
+      return;
+    }
     goal = g.x - m.f * (m.cd <= 0 ? K.range * 0.8 : K.keep);   // in to striking range, or holding off while it gathers itself
   } else goal = clampTo(g.x, m.patch);
   goal = clampTo(goal, m.patch);
@@ -528,6 +587,8 @@ function monsterUpdate(m, g, lb, dt, busy) {
     if (want || air) { m.walkT += dt; if (air && want) v = K.speed; }
     else m.walkT = 0;
   }
+  else if (m.kind === 'ghoul2') { if (want) { m.walkT += dt; v = K.speed * Math.max(0, Math.sin(m.walkT * 4.5)) ** 2; } }   // it lurches
+  else if (want) v = K.speed;          // the walker stalks, slow and steady
   m.moving = want || (m.kind === 'hatmaw' && m.walkT > 0);
   const s = Math.sign(goal - m.bx);
   let nx = m.bx + s * Math.min(Math.abs(goal - m.bx), v * dt);
@@ -584,7 +645,7 @@ function drawWanderer(g, lb, w) {
       const c = g.climb, s = Math.min(g.mt * R, c.steps - 1e-3), m = w.move('climb', s);
       return w.wanderer(c.foot + f * m.dx, o({ move: 'climb', step: s, y: c.y0 + 1 + m.dy * c.scale }));
     }
-    case 'roll': return w.wanderer(g.x, o({ move: 'roll', step: Math.min(g.mt, ROLL_T) * R }));
+    case 'roll': return w.wanderer(g.x, o({ move: 'roll', step: g.mt < ROLL_T ? g.mt * R : 3 + ((g.mt - ROLL_T) * R) % 1 }));   // carrying on: tumbling still
     case 'sword': return w.wanderer(g.x, o({ move: 'sword', step: Math.min(g.mt * R, 3.99) }));
     case 'hurt': return w.wanderer(g.x, o({ move: 'hurt', step: Math.min(g.mt * R, 2.99) }));
     case 'air': {
