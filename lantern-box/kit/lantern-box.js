@@ -493,14 +493,14 @@ const MOON={x:0.64,y:0.36,r:80,col:"#ffe2a6",halo:"#ffae63"};
 const TINTS=[0.52,0.45,0.31,0.14];
 /* each level is a different place: its own sky, light, air, mist, flyers, and what fills each layer and the path */
 const LV={
-  night:{name:"Night",place:"the graveyard at the edge of the village",set:"village",tints:[0.856,0.702,0.394,0.24],lift:60,cw4:760,back:0.16,light:"moon",fly:"bats",litP:0.18,edge:"rgba(255,231,184,0.9)",vig:0.5,crest:0.5,mist:null,
-    desc:"walks a black path through the graveyard at the edge of the village, past graves, a ruined wall and a crooked manor, chapel or cottage, under a detailed moon in an amber-to-violet sky"},
-  storm:{name:"Blood-red rain",place:"the old town",set:"town",tints:[0.9,0.76,0.48,0.14],lift:70,light:"moon",fly:"bats",litP:0.26,edge:"rgba(255,206,184,0.85)",vig:0.5,crest:0.32,mist:null,
-    desc:"walks the old town's street in blood-red rain, past street lamps, barrels, a well, a gate arch and a tavern or a tall townhouse, with crowded rooftops behind"},
-  dawn:{name:"Dawn",place:"the open moor",set:"moor",tints:[0.82,0.64,0.4,0.22],lift:30,light:"setmoon",fly:"crows",litP:0.06,edge:"rgba(214,228,255,0.9)",vig:0.42,crest:0.42,
+  night:{name:"Night",place:"The Graveyard",set:"village",tints:[0.856,0.702,0.394,0.24],lift:60,cw4:760,back:0.16,light:"moon",fly:"bats",litP:0.18,edge:"rgba(255,231,184,0.9)",vig:0.5,crest:0.5,mist:null,
+    desc:"walks a black path through The Graveyard at the edge of the village, past graves, a ruined wall and a crooked manor, chapel or cottage, under a detailed moon in an amber-to-violet sky"},
+  storm:{name:"Blood Red Rain",place:"The Old Town",set:"town",tints:[0.9,0.76,0.48,0.14],lift:70,light:"moon",fly:"bats",litP:0.26,edge:"rgba(255,206,184,0.85)",vig:0.5,crest:0.32,mist:null,
+    desc:"walks The Old Town's street in Blood Red Rain, past street lamps, barrels, a well, a gate arch and a tavern or a tall townhouse, with crowded rooftops behind"},
+  dawn:{name:"Dawn",place:"The Open Moor",set:"moor",tints:[0.82,0.64,0.4,0.22],lift:30,light:"setmoon",fly:"crows",litP:0.06,edge:"rgba(214,228,255,0.9)",vig:0.42,crest:0.42,
     mist:null,hollows:{col:"#dfe8f6",a:[0,0,0.62,0.475,0.323],F:[0,0,378,412,448]},
-    desc:"crosses the open moor in cold blue dawn light, past standing stones, cairns, dry-stone walls and a dolmen, with a pale moon setting on the right and daybreak glowing on the left"},
-  mist:{name:"Mist",place:"the wind-bent forest",set:"forest",tints:[0.9,0.77,0.57,0.42],lift:35,cw4:520,back:0.26,light:"sun",fly:"fewcrows",litP:0.1,edge:"rgba(236,242,214,0.85)",vig:0.3,crest:0,
+    desc:"crosses The Open Moor in cold blue dawn light, past standing stones, cairns, dry-stone walls and a dolmen, with a pale moon setting on the right and daybreak glowing on the left"},
+  mist:{name:"Mist",place:"The Wind Bent Forest",set:"forest",tints:[0.9,0.77,0.57,0.42],lift:35,cw4:520,back:0.26,light:"sun",fly:"fewcrows",litP:0.1,edge:"rgba(236,242,214,0.85)",vig:0.3,crest:0,
     mist:{col:"#eef2dc",bands:[[0,104,1,4],[1,378,1,5],[2,424,0.9,8],[3,456,0.55,11]]},
     desc:"walks a green forest at midday in thick mist, every tree bent the same way by the wind, the sun a pale disc, past stumps, ferns, a fallen trunk, a candlelit shrine and a woodcutter's hut"}
 };
@@ -1242,7 +1242,7 @@ class Scene{
     const key=Math.round(W)+"@"+s.toFixed(3)+lv;
     if(this.cache.key===key)return;
     this.cache={key};const cs=Math.min(s,1.25),L=LV[lv];
-    if(lv!=="mist"){this.cache.cl0=renderCutClouds(W*2,cs,lv,0,hsh(91,1));this.cache.cl1=renderCutClouds(W*2,cs,lv,1,hsh(91,2));}
+    if(lv!=="mist"){this.cache.cl0=renderCutClouds(W*2,cs,lv,0,hsh(91,1));this.cache.cl1=renderCutClouds(W*2,cs,lv,1,hsh(91,2));this.cache.clB=cloudFoot([this.cache.cl0,this.cache.cl1],cs);} /* version 10: clB */
     if(L.light!=="sun")this.cache.moon=this.ver===3?moonSprite(Math.min(2,s),lv==="storm"):moonSprite4(Math.min(2,s),lv);
     if(L.mist)this.cache.mist=L.mist.bands.map((b,i)=>renderMist(W*2,cs,L.mist.col,hsh(93,i,lv.length)));
   }
@@ -1263,7 +1263,18 @@ class Scene{
     const W2=W*2;
     const mb=after=>{if(!L.mist)return;at([0.03,0.12,0.28,0.5][after]);L.mist.bands.forEach((b,i)=>{if(b[0]!==after)return;const cv=this.cache.mist[i],k=[0.03,0.12,0.28,0.5][after]*(rm?0.4:1),ox=posmod(t*b[3]*(rm?0.4:1)+camX*k,W2);
       ctx.save();ctx.globalAlpha=b[2];ctx.drawImage(cv,-ox,b[1]-100,W2,200);ctx.drawImage(cv,-ox+W2,b[1]-100,W2,200);ctx.restore();});};
-    if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);at(k);ctx.drawImage(cv,-ox,0,W2,LH);ctx.drawImage(cv,-ox+W2,0,W2,LH);}
+    /* version 10: the clouds are also drawn into CF, a picture of the clouds' band (the top of the picture down to the clouds'
+       foot); thr(paint, mix) then paints a part into OV, keeps it only where a cloud is (source-in), takes it from the cloud's
+       colour towards ink (source-atop) and lays it over the part already drawn: lit through the cloud */
+    const cbH=this.cache.clB?Math.min(ctx.canvas.height,Math.ceil(this.cache.clB*s)+2):0,CF=cbH?(this._cf=fitCanvas(this._cf,ctx.canvas.width,cbH)):null,cf=CF&&CF.getContext("2d");
+    if(cf){cf.setTransform(1,0,0,1,0,0);cf.clearRect(0,0,CF.width,CF.height);}
+    if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);at(k);ctx.drawImage(cv,-ox,0,W2,LH);ctx.drawImage(cv,-ox+W2,0,W2,LH);
+      if(cf){cf.setTransform(ctx.getTransform());cf.drawImage(cv,-ox,0,W2,LH);cf.drawImage(cv,-ox+W2,0,W2,LH);}}
+    const thr=(paint,mix)=>{if(!cf)return;const OV=this._ov=fitCanvas(this._ov,CF.width,CF.height),v=OV.getContext("2d");
+      v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-over";v.globalAlpha=1;v.clearRect(0,0,OV.width,OV.height);paint(v);
+      v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-in";v.drawImage(CF,0,0);
+      v.globalCompositeOperation="source-atop";v.globalAlpha=1-mix;v.fillStyle=INK;v.fillRect(0,0,OV.width,OV.height);v.globalAlpha=1;v.globalCompositeOperation="source-over";
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(OV,0,0);ctx.restore();};
     at(0);
     if(lv==="storm"){
       const st=lightning(t);
@@ -1273,13 +1284,13 @@ class Scene{
     mb(0);
     if(this.ver>=5&&L.light==="sun"){at(0.05);drawFarRanges(ctx,W,camX,rm,lv);}
     const f=k=>rm?k*0.4:k;
-    at(0.12);this.layer(ctx,off,s,W,t,camX*f(0.12),1,tn[0],o);mb(1);
+    at(0.12);this.layer(ctx,off,s,W,t,camX*f(0.12),1,tn[0],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[0]*THRU_CLOUD);} /* version 10 */mb(1);
     if(lv==="storm"){at(1);drawRain(ctx,W,t,0,rm);}
-    at(0.28);this.layer(ctx,off,s,W,t,camX*f(0.28),2,tn[1],o);mb(2);
+    at(0.28);this.layer(ctx,off,s,W,t,camX*f(0.28),2,tn[1],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[1]*THRU_CLOUD);} /* version 10 */mb(2);
     if(L.light==="sun"){at(0);drawRays(ctx,W,t,rm);}
     at(0.34);
-    if(L.fly==="bats")drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));
-    else if(L.fly==="crows")drawCrowFlocks(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));else drawCrowsAlone(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),3,false);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),0); /* version 8 */
+    if(L.fly==="bats"){drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));{const M=ctx.getTransform();thr(v=>{v.setTransform(M);drawSwarm(v,W,t,camX*f(0.34),rm,INK);},tn[1]*0.9*THRU_CLOUD);}} /* version 10 */
+    else if(L.fly==="crows")drawCrowFlocks(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],0.25)); /* version 9: a quarter towards the air, was tn[1]*0.9 */else drawCrowsAlone(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),3,false);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),0); /* version 8 */
     at(0.5);this.layer(ctx,off,s,W,t,camX*f(0.5),3,tn[2],o);mb(3);
     at(0.62);
     if(L.fly==="bats")drawBigBats(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7));
@@ -1518,7 +1529,24 @@ class Scene{
    pose only in steps (8 a second at its own pace), so each pose is painted once and reused until the next step. */
 const TWP=1024,TMP=840;                    // a tile's width, and the margin drawn round it so glows and wide shapes join up (device pixels)
 const POSE_RATE={crawler:1.3,bat2:1.6,ghoul2:1,walker:0.6}; // the pace of each puppet monster's steps (see pz)
-const KIT={frame:0,built:false,builds:0,buildMs:0,poses:0,bytes:0};
+const KIT={frame:0,built:false,builds:0,buildMs:0,poses:0,bytes:0,thru:true,thruN:0};   // thru: version 10's lit-through-a-cloud (off only for the test page's comparison); thruN: composites last frame
+// version 10: how high a layer tile's own picture reaches, in strips THRU_CH device pixels wide: for each strip the highest row with anything
+// in it, two blocks (16 rows) higher to be safe. Read once, when the tile is built, from an eighth-size copy made by halving three times, so
+// every pixel counts (shrunk in one step, a thin spire could fall between the pixels sampled and be missed)
+const THRU_CH=128;
+function thruTops(cv){const n=Math.ceil(cv.width/THRU_CH),cw=THRU_CH/8,tops=new Array(n).fill(cv.height);
+  if(!KIT.th){KIT.th=[mk(1,1),mk(1,1),document.createElement("canvas")];KIT.thx=KIT.th[2].getContext("2d",{willReadFrequently:true});}
+  let src=cv,sw=cv.width,sh=cv.height;
+  for(let j=0;j<3;j++){const c=KIT.th[j],w=Math.max(1,Math.ceil(sw/2)),h=Math.max(1,Math.ceil(sh/2));if(c.width<w)c.width=w;if(c.height<h)c.height=h;
+    const x=j===2?KIT.thx:c.getContext("2d");x.setTransform(1,0,0,1,0,0);x.clearRect(0,0,c.width,c.height);x.imageSmoothingEnabled=true;x.drawImage(src,0,0,sw,sh,0,0,w,h);src=c;sw=w;sh=h;}
+  const w=sw,h=sh,d=KIT.thx.getImageData(0,0,w,h).data;
+  for(let s=0;s<n;s++){const x0=s*cw,x1=Math.min(w,x0+cw);find:for(let r=0;r<h;r++)for(let i=(r*w+x0)*4+3,e=(r*w+x1)*4;i<e;i+=4)if(d[i]>0){tops[s]=Math.max(0,r*8-16);break find;}}
+  return tops;}
+// version 10: the far bat swarm's flocks on screen (drawSwarm's own test), each as a box in lines that holds all its bats (their spread, wobble
+// and size, with room to spare)
+function swarmBoxes(W,t,lx,rm){const span=W+760,v=rm?26:68,out=[];
+  for(let f=0;f<2;f++){const cx=W+380-posmod(t*v+f*span*0.55+lx,span),cy=205+f*46+Math.sin(t*0.45+f*2)*18;if(cx>=-220&&cx<=W+220)out.push([cx-120,cy-56,cx+120,cy+56]);}
+  return out;}
 let FX=true;                               // the Effects setting: glow round lights, eyes and splashes
 // a boss's picture moves only with its pose time, pz(t*rate): rate*8 steps a second (night 5.6, storm 6.4, dawn 5.6, mist 4.8),
 // so it is repainted exactly when its pose steps. The rates are the boss functions' own (BOSS.night ... BOSS.mist): keep them in step
@@ -1566,10 +1594,17 @@ Object.assign(Scene.prototype,{
     this.collect={fairies:[],eyes:[]};
     this.layer(b,sc.a,s,Ws,t,lx,L,tint,o);
     const col=this.collect;this.collect=null;
+    // version 10: in a place with clouds, layers 1 and 2 also keep the layer's own picture (Scene.layer's off, before layer 2's haze
+    // glow and the hazes) down to the clouds' foot, and the highest line it reaches, for the composite in front of the clouds (16 rows
+    // spare: under Reduce motion the camera's rise can carry the clouds a few lines further down than layer 1)
+    let thru=null;
+    if(L<=2&&this.cache.clB){const rows=Math.min(sc.h,Math.ceil(this.cache.clB*s)+16);thru=mk(TWP,rows);thru.getContext("2d").drawImage(sc.a,TMP,0,TWP,rows,0,0,TWP,rows);
+      thru.tops=thruTops(thru);thru.top=Math.min(...thru.tops);if(thru.top>=rows)thru=null;}
     const x0=i*TW,x1=x0+TW; // the lights and eyes this tile owns, kept in world positions
     const fairies=col.fairies.map(f=>[f[0]+lx,f[1],f[2]+lx,f[3],f[4]+lx,f[5],f[6]]).filter(f=>f[0]>=x0&&f[0]<x1);
     const eyes=col.eyes.map(e=>Object.assign({},e,{X:e.X+lx})).filter(e=>e.X>=x0&&e.X<x1);
-    return this.tileFinish(sc,i,t0,{fairies,eyes});
+    const tile=this.tileFinish(sc,i,t0,{fairies,eyes,thru});if(thru)tile.bytes+=thru.width*thru.height*4;
+    return tile;
   },
   buildPlayTile(i,s,t,o){
     const t0=performance.now(),sc=this.scratch(s),TW=TWP/s,TM=TMP/s,b=this.tileStart(sc,s);
@@ -1601,6 +1636,7 @@ Object.assign(Scene.prototype,{
       for(const f of tl.fairies)drawFairyKit(ctx,[f[0]-lx,f[1],f[2]-lx,f[3],f[4]-lx,f[5],f[6]],t,o.level,s);
       if(tl.eyes.length)drawTreeEyes(ctx,tl.eyes.map(e=>Object.assign({},e,{X:e.X-lx})),t,L,o.rm);
     }
+    return tiles;
   },
   bossAt(ctx,s,lv,t,o,bx,by){ // the boss, repainted into its own canvas when its pose steps (E is also bossInto's cache); its glow onto the scene each frame
     if(!this.kit){bossInto(ctx,s,lv,t,o,Math.round((bx-230)*s),Math.round((by-300)*s)+(this.dyS||0),BOSS_NOD,false,this.bossK||(this.bossK={}),BOSS_LOOK);return;}
@@ -1629,10 +1665,59 @@ Object.assign(Scene.prototype,{
       this.vig=mk(Math.ceil(W*s),Math.ceil(LH*s));const c=this.vig.getContext("2d");c.setTransform(s,0,0,s,0,0);
       const vg=c.createRadialGradient(W/2,LH*0.45,LH*0.35,W/2,LH*0.5,W*0.72);vg.addColorStop(0,"rgba(0,0,0,0)");vg.addColorStop(1,"rgba(0,0,0,"+L.vig+")");c.fillStyle=vg;c.fillRect(0,0,W,LH);
     }
+    // version 10 (lit through a cloud), the kit's way. All its work in other pictures is done here, before anything is drawn on the screen:
+    // a phone's graphics chip saves and reloads the whole screen each time drawing turns to another picture and back, so the screen is then
+    // drawn in one go, each part's lit-through picture laid on at its depth. The work is planned first: where layer 1's and layer 2's tiles
+    // reach above the clouds' foot (runs of side-by-side strips, each from its highest strip down to the foot, runs close together merged)
+    // and a box round the far swarm's flocks on screen; the band's picture CF is made once, over the area they share, and each part is
+    // composited, as Scene.render's thr does, only inside its rectangles, where outside them it has nothing in front of a cloud: the same
+    // picture as the whole band (Barney's choice after the Pixel's figures)
+    const clp=[];KIT.thruN=0;
+    if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);clp.push([cv,ox,k]);}
+    const cbH=this.cache.clB&&KIT.thru?Math.max(0,Math.min(ctx.canvas.height,Math.ceil(Math.max(...clp.map(q=>this.cache.clB*s+off(q[2]))))+2)):0;
+    const L1x=camX*f(0.12),L1y=off(f(0.12),0.12),L2x=camX*f(0.28),L2y=off(f(0.28),0.28),SWy=off(f(0.34),0.34);
+    const lit={L1:null,L2:null,sw:null};
+    if(cbH){
+      const runsFor=(tiles,lx,dy)=>{const runs=[];let run=null;
+        for(const q of tiles){const tx=Math.round(q.i*TWP-lx*s);if(!q.thru){run=null;continue;}
+          q.thru.tops.forEach((tp,c)=>{if(tp+dy>=cbH){run=null;return;}const x0=tx+c*THRU_CH;
+            if(run&&run.x1===x0){run.x1=x0+THRU_CH;run.y0=Math.min(run.y0,tp+dy);}else runs.push(run={x0,x1:x0+THRU_CH,y0:tp+dy,q:[]});if(!run.q.some(e=>e[0]===q))run.q.push([q,tx]);});}
+        const out=[];for(const r of runs){const l=out[out.length-1];   // runs no more than two strips apart become one
+          if(l&&r.x0-l.x1<=2*THRU_CH){l.x1=r.x1;l.y0=Math.min(l.y0,r.y0);for(const e of r.q)if(!l.q.some(g=>g[0]===e[0]))l.q.push(e);}else out.push(r);}
+        return out;};
+      const box=(a,b,c)=>{const rx=Math.max(0,Math.floor(a)),ry=Math.max(0,Math.floor(b)),rw=Math.min(ctx.canvas.width,Math.ceil(c))-rx,rh=cbH-ry;return rw>0&&rh>0?[rx,ry,rw,rh]:null;};
+      const bound=R=>{const x0=Math.min(...R.map(r=>r[0])),y0=Math.min(...R.map(r=>r[1])),x1=Math.max(...R.map(r=>r[0]+r[2]));return[x0,y0,x1-x0,cbH-y0];};
+      const t1=this.kitTiles("L1",L1x,W,s,i=>this.buildLayerTile(1,i,s,t,tn[0],o)),t2=this.kitTiles("L2",L2x,W,s,i=>this.buildLayerTile(2,i,s,t,tn[1],o));
+      // each part in one rectangle round all its runs (a clip of one rectangle is cheap for a phone's graphics chip; one of many rectangles is
+      // not). On Barney's Pixel this cost the same as compositing the whole band, and it touches far fewer pixels for slower devices
+      const one=(x0,y0,x1)=>{const R=box(x0,y0,x1);return R?[R]:[];};
+      const r1=runsFor(t1,L1x,L1y),r2=runsFor(t2,L2x,L2y);
+      const R1=r1.length?one(Math.min(...r1.map(r=>r.x0)),Math.min(...r1.map(r=>r.y0)),Math.max(...r1.map(r=>r.x1))):[],R2=r2.length?one(Math.min(...r2.map(r=>r.x0)),Math.min(...r2.map(r=>r.y0)),Math.max(...r2.map(r=>r.x1))):[];
+      let RS=[];if(L.fly==="bats"){const bs=swarmBoxes(W,t,camX*f(0.34),rm);if(bs.length)RS=one(Math.min(...bs.map(b=>b[0]))*s-2,Math.min(...bs.map(b=>b[1]))*s+SWy-2,Math.max(...bs.map(b=>b[2]))*s+2);}
+      const all=R1.concat(R2,RS);
+      if(all.length){
+        const CF=this._cf=fitCanvas(this._cf,ctx.canvas.width,cbH),cf=CF.getContext("2d"),U=bound(all);
+        cf.save();cf.setTransform(1,0,0,1,0,0);cf.beginPath();cf.rect(U[0],U[1],U[2],U[3]);cf.clip();cf.clearRect(U[0],U[1],U[2],U[3]);
+        for(const [cv,ox,k] of clp){cf.setTransform(s,0,0,s,0,off(k));cf.drawImage(cv,-ox,0,W2,LH);cf.drawImage(cv,-ox+W2,0,W2,LH);}cf.restore();
+        // one part into its own picture: painted, kept only where a cloud is (source-in, in one step over the part's area, since source-in clears
+        // whatever its own drawing doesn't cover), taken from the cloud's colour towards ink by 1 - mix (source-atop), all inside its rectangles
+        const comp=(key,R,paint,mix)=>{if(!R.length)return null;const OV=this[key]=fitCanvas(this[key],CF.width,CF.height),v=OV.getContext("2d"),B=bound(R);
+          v.save();v.setTransform(1,0,0,1,0,0);v.beginPath();for(const r of R)v.rect(r[0],r[1],r[2],r[3]);v.clip();v.clearRect(B[0],B[1],B[2],B[3]);
+          v.globalCompositeOperation="source-over";v.globalAlpha=1;paint(v);
+          v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-in";v.drawImage(CF,B[0],B[1],B[2],B[3],B[0],B[1],B[2],B[3]);
+          v.globalCompositeOperation="source-atop";v.globalAlpha=1-mix;v.fillStyle=INK;v.fillRect(B[0],B[1],B[2],B[3]);v.restore();KIT.thruN++;return{OV,R};};
+        const tilesOf=runs=>{const q=[];for(const r of runs)for(const e of r.q)if(!q.some(g=>g[0]===e[0]))q.push(e);return q;};
+        const q1=tilesOf(r1),q2=tilesOf(r2);
+        lit.L1=comp("_ov1",R1,v=>{v.setTransform(1,0,0,1,0,L1y);for(const [q,tx] of q1)v.drawImage(q.thru,tx,0);},tn[0]*THRU_CLOUD);
+        lit.L2=comp("_ov2",R2,v=>{v.setTransform(1,0,0,1,0,L2y);for(const [q,tx] of q2)v.drawImage(q.thru,tx,0);},tn[1]*THRU_CLOUD);
+        lit.sw=comp("_ov3",RS,v=>{v.setTransform(s,0,0,s,0,SWy);const kf=KIT.fly;KIT.fly=s;drawSwarm(v,W,t,camX*f(0.34),rm,INK);KIT.fly=kf;},tn[1]*0.9*THRU_CLOUD);
+      }
+    }
+    const layOn=p=>{if(!p)return;ctx.save();ctx.setTransform(1,0,0,1,0,0);for(const r of p.R)ctx.drawImage(p.OV,r[0],r[1],r[2],r[3],r[0],r[1],r[2],r[3]);ctx.restore();};
     ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";ctx.drawImage(this.sky,0,off(0));
     const mb=after=>{if(!L.mist)return;L.mist.bands.forEach((b,i)=>{if(b[0]!==after)return;const cv=this.cache.mist[i],k=[0.03,0.12,0.28,0.5][after]*(rm?0.4:1),ox=posmod(t*b[3]*(rm?0.4:1)+camX*k,W2);
       at(k,[0.03,0.12,0.28,0.5][after]);ctx.save();ctx.globalAlpha=b[2];ctx.drawImage(cv,-ox,b[1]-100,W2,200);ctx.drawImage(cv,-ox+W2,b[1]-100,W2,200);ctx.restore();});};
-    if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);at(k);ctx.drawImage(cv,-ox,0,W2,LH);ctx.drawImage(cv,-ox+W2,0,W2,LH);}
+    for(const [cv,ox,k] of clp){at(k);ctx.drawImage(cv,-ox,0,W2,LH);ctx.drawImage(cv,-ox+W2,0,W2,LH);}
     at(0);
     if(lv==="storm"){
       const st=lightning(t);
@@ -1641,13 +1726,14 @@ Object.assign(Scene.prototype,{
     }
     mb(0);
     if(L.light==="sun"){at(f(0.05),0.05);drawFarRanges(ctx,W,camX,rm,lv);}
-    this.kitLayer(ctx,s,W,t,camX*f(0.12),1,tn[0],o,off(f(0.12),0.12));mb(1);
+    this.kitLayer(ctx,s,W,t,L1x,1,tn[0],o,L1y);layOn(lit.L1); /* version 10 */mb(1);
     if(lv==="storm"){at(0,1);drawRain(ctx,W,t,0,rm);}   // the rain stays put
-    this.kitLayer(ctx,s,W,t,camX*f(0.28),2,tn[1],o,off(f(0.28),0.28));mb(2);
+    this.kitLayer(ctx,s,W,t,L2x,2,tn[1],o,L2y);layOn(lit.L2); /* version 10 */mb(2);
     if(L.light==="sun"){at(0);drawRays(ctx,W,t,rm);}
     at(f(0.34),0.34);KIT.fly=s;
-    if(L.fly==="bats")drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));
-    else if(L.fly==="crows")drawCrowFlocks(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));else drawCrowsAlone(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),3,false);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),0); // version 8
+    if(L.fly==="bats"){drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));   // version 10: the far swarm too, when it is on screen
+      layOn(lit.sw);}
+    else if(L.fly==="crows")drawCrowFlocks(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],0.25)); /* version 9: a quarter towards the air, was tn[1]*0.9 */else drawCrowsAlone(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),3,false);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),0); // version 8
     KIT.fly=null;this.kitLayer(ctx,s,W,t,camX*f(0.5),3,tn[2],o,off(f(0.5),0.5));mb(3);KIT.fly=s;
     at(f(0.62),0.62);
     if(L.fly==="bats")drawBigBats(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7));
@@ -1916,6 +2002,14 @@ function streakPts(r,w,h){ // a long lens of cloud: a wavering top, a flatter to
   return top.concat(bot.reverse());
 }
 function streakPath(x,pts,X,Y){x.beginPath();pts.forEach((p,i)=>i?x.lineTo(X+p[0],Y+p[1]):x.moveTo(X+p[0],Y+p[1]));x.closePath();}
+/* version 10: lit through a cloud. THRU_CLOUD is the share of a part's tint used when it is mixed towards the cloud behind it
+   (token thru-cloud); cloudFoot finds, once, the lowest line any cloud reaches; fitCanvas keeps an offscreen picture sized */
+const THRU_CLOUD=0.75;
+function cloudFoot(cvs,cs){let foot=0;for(const c of cvs){const w=c.width,h=c.height,d=c.getContext("2d").getImageData(0,0,w,h).data; // the kit: one read per cloud picture, the same rows and samples (row by row, Chrome warns)
+    for(let r=h-1;r>=0;r-=2){let hit=false;for(let i=r*w*4+3,e=i+w*4;i<e;i+=16)if(d[i]>6){hit=true;break;}
+      if(hit){foot=Math.max(foot,(r+3)/cs);break;}}}
+  return foot;}
+function fitCanvas(c,w,h){if(!c)c=mk(w,h);if(c.width!==w||c.height!==h){c.width=w;c.height=h;}return c;}
 function renderCutClouds(W2,s,lv,depth,seed){
   const c=mk(W2*s,LH*s),x=c.getContext("2d");x.setTransform(s,0,0,s,0,0);
   const r=rng32(seed),storm=lv==="storm",pal=CLOUD_PAL[lv][depth];
@@ -3752,16 +3846,16 @@ function moSlash(c,pts,w,a){if(pts.length<2||a<=0)return;c.save();c.globalCompos
 const _pivot=(x,P,px,py)=>{x.translate(px,py);x.rotate(P.tilt||0);x.scale(P.sx||1,P.sy||1);x.translate(-px,-py);x.translate(P.dx||0,P.dy||0);};
 Object.assign(MON_BOX,{crawlerP:[-60,-60,52,20],bat2P:[-52,-60,52,40],hatmawP:[-70,-110,60,14],ghoulP:[-95,-140,40,12],walkerP:[-125,-226,70,12]});
 Object.assign(MONSTER,{
-  // the kit (Barney, 4 November 2026): the signal eyes are drawn over the design system's own only while the pose is frozen (P.t), where they line
-  // up with them; unfrozen, the monster's own eyes move with its scuttle, flap or hop and a second pair showed
+  // version 9 (play.js 1.0.1): the mouth-hat's signal eyes follow its hop, as bundle.js's hatmaw moves its own eyes; the crawler's and the
+  // flyer's own eyes never move, so their signal eyes always sat on them (the kit's earlier gate on P.t is gone)
   // the crawler: squash, stretch and tilt on the design system's own crawler; its legs freeze when P.t is set; the mouth gapes when P.jaw
   crawlerP(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-12);const det=MONSTER.crawler(x,P.t!=null?P.t:t,m,rm);x.restore();
     return(c,o)=>{c.save();_pivot(c,P,0,-12);det(c,o);const j=P.jaw||0,h=P.hot||0;moHot(c,-20,-12,8+h*7,h*0.8);
       if(j>0){moMouth(c,[[-29,-15.6-j*3],[-20,-14.2-j*2.4],[-13,-12.6],[-20,-9.6+j*2.6],[-28,-9.4+j*3.4]],-18,-12,9+j*3);moTeeth(c,[[-27,-15.4-j*2.6],[-26,-12.6-j],[-25,-15-j*2.4],[-22,-14.6-j*2],[-21,-12.2-j*0.6],[-20,-14.2-j*1.8],[-26.6,-9.6+j*3],[-25.6,-12.2+j],[-24.6,-9.8+j*2.6],[-21.6,-10+j*2.2],[-20.6,-12+j*0.8],[-19.6,-10.2+j*2]]);}
-      if(P.t!=null)moEyes(c,o,[[-21,-16.2,0.2],[-17.5,-17.2,0.2]],1.5,1,h);c.restore();};},
+      moEyes(c,o,[[-21,-16.2,0.2],[-17.5,-17.2,0.2]],1.5,1,h);c.restore();};},
   // the flyer: the design system's flyer, tilted along its dive; its wings freeze (P.t) when it folds them to dive
   bat2P(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-2);const det=MONSTER.bat2(x,P.t!=null?P.t:t,m,rm);x.restore();
-    return(c,o)=>{c.save();_pivot(c,P,0,-2);det(c,o);const h=P.hot||0;moHot(c,0,-4,6+h*8,h);if(P.t!=null)moEyes(c,o,[[-1.6,-7.2,0.3],[1.6,-7.2,-0.3]],1.1,0.8,h);c.restore();};},
+    return(c,o)=>{c.save();_pivot(c,P,0,-2);det(c,o);const h=P.hot||0;moHot(c,0,-4,6+h*8,h);moEyes(c,o,[[-1.6,-7.2,0.3],[1.6,-7.2,-0.3]],1.1,0.8,h);c.restore();};},
   // the mouth-hat: its own hop frozen (P.t), then squash, hop and a mouth that gapes and snaps (P.bite)
   hatmawP(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-8);const det=MONSTER.hatmaw(x,P.t!=null?P.t:t,m,rm);x.restore();
     return(c,o)=>{c.save();_pivot(c,P,0,-8);det(c,o);const b=P.bite||0,h=P.hot||0;moHot(c,-11,-24,10+h*8,h*0.7);
@@ -3769,7 +3863,8 @@ Object.assign(MONSTER,{
         c.fillStyle="#2a0507";c.strokeStyle=MO.ember;c.lineWidth=0.9;c.shadowColor=MO.glow;c.shadowBlur=FX?5:0;c.beginPath();[[-22,-30],[-16,-34],[-10,-34.2],[-4,-32],[1,-29],[-2,-23],[-8,-17],[-14,-15.8],[-21,-17]].forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fill();c.stroke();c.shadowBlur=0;
         moMouth(c,[[-14,-27],[-8,-28],[-5,-25],[-8,-21],[-13,-21.6]],-9,-24.6,5);
         moTeeth(c,[[-20,-31.4],[-18,-25],[-16,-32],[-14,-32.6],[-12,-26],[-10,-32.8],[-8,-32.2],[-6,-26.4],[-4,-31.4],[-18,-17.2],[-16,-23],[-14,-16.4],[-11.6,-16.6],[-9.6,-22.6],[-7.6,-17.4]]);c.restore();}
-      if(P.t!=null)moEyes(c,o,[[-13,-41,0.35],[-5,-43,0.15]],3.4,1.4,h);c.restore();};},
+      {const tt=P.t!=null?P.t:t,hop=Math.max(0,Math.sin(tt*(rm?1.4:2.6)+m.ph)),sq=1-hop*0.06;c.save();c.translate(0,-hop*(rm?3:9));c.scale(1/sq,sq); /* version 9: the signal eyes follow the hop, as bundle.js's hatmaw moves its own eyes */
+      moEyes(c,o,[[-13,-41,0.35],[-5,-43,0.15]],3.4,1.4,h);c.restore();}c.restore();};},
   // the ghoul, posable: its front arm (P.a: upper arm, forearm angles) can wind up and swipe; P.op opens the jaw; P.slash draws the sweep
   ghoulP(x,t,m,rm){const P=m.P||{},tq=pz(t+m.ph,rm), /* the kit: Reduce motion as ghoul2 */s1=P.s1!=null?P.s1:Math.sin(tq*3),bob=P.bob!=null?P.bob:Math.abs(s1)*2,op=P.op!=null?P.op:3+Math.max(0,Math.sin(tq*1.7))*3,lean=P.lean||0;
     x.save();x.translate(P.dx||0,-bob);
@@ -3945,7 +4040,7 @@ function bsMove(lv,name,u,A){const bx=A.bx,wx=A.wx,G=A.G,t=A.t,fx=[],r={X:bx,st:
       if((w=W(0.45,0.8))!=null){r.X=lerpN(bx+14,wx+40,ease(w));st.tilt=-0.14;r.hot=1;glide(bx+14,wx+40,w,1,-0.14);}
       if((w=W(0.8,1.6))!=null){const v=ease(w);r.X=lerpN(wx+40,bx,v);st.alpha=1-0.15*Math.sin(w*Math.PI);st.tilt=-0.14*(1-v);}}
     else if(name==="behind"){ // fades out and reappears behind you (keep moving): the fight's 3.5 s to 6.4 s, the wanderer at wx when it begins
-      if((w=W(0,0.5))!=null){st.alpha=1-0.38*Math.sin(w*Math.PI); /* Barney: a smooth fade out and back in, not play.js's flicker at 8 a second */r.hot=ease(w);
+      if((w=W(0,0.5))!=null){st.alpha=1-0.38*Math.sin(w*Math.PI); /* version 9 (Barney's choice): a smooth fade out and back in, as play.js 1.0.1 */r.hot=ease(w);
         fx.push(x=>{for(let k=0;k<6;k++){const ph=(t*1.3+k/6)%1;fxMote(x,bx-40+k*16,G(bx)-30-ph*150,1.6,Math.sin(ph*Math.PI)*0.8,"#f0c9e0");}});}
       if((w=W(0.5,0.8))!=null){st.alpha=1-ease(w);r.hot=1-w;}
       if(u>=0.8&&u<1.1)st.alpha=0;
@@ -4237,7 +4332,8 @@ function makeTools(env){
       drawFairyKit(f.ctx,[ax-f.camX,ay,qx-f.camX,qy,bx-f.camX,by,seed||0],f.t,f.level,f.s);
     },
     // for the test page's readout
-    get stats(){return{tileBytes:KIT.bytes,poses:KIT.poses,builds:KIT.builds};}
+    get stats(){return{tileBytes:KIT.bytes,poses:KIT.poses,builds:KIT.builds,thru:KIT.thruN};},
+    _thruCloud(on){KIT.thru=on!==false;},   // test only: version 10's lit-through-a-cloud off and on, for the test page's Cloud check
   };
 }
   return { makeTools: makeTools };

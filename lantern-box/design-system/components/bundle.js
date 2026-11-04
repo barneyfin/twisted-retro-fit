@@ -1,4 +1,4 @@
-/* Lantern Box: the World's drawing code, design system version 8 (4 November 2026).
+/* Lantern Box: the World's drawing code, design system version 10 (4 November 2026).
    Everything from "helpers" to "the sample strip" below is the drawing code of the signed-off look, the Gloam Hallow
    directions page at round 12 (1 November 2026), with the places' changes of versions 2 to 5 (made in Claude Code and
    chosen by Barney: among them each place's lift, the layer tints, the moor's stone circles and backdrop doors ending at
@@ -12,6 +12,14 @@
    Version 8 (4 November 2026, step 4b round 12): the boss names capitalised (they are names); the crows redrawn side on,
    beating their wings, as flocks over the moor and alone nearer (crowSide, drawCrowFlocks, drawCrowsAlone); leaves blowing
    across the Mist (drawLeaves). Everything else from the play-parts rounds is in play.js, beside this file.
+   Version 9 (4 November 2026, found while building the kit): the moor's crow flocks drawn a quarter of the way from ink
+   towards the air, so they show against the dawn sky across the whole width (they were tinted as backdrop layer 2); the
+   place list (LV) uses the agreed names, proper names capitalised (Night, The Graveyard; Blood Red Rain, The Old Town;
+   Dawn, The Open Moor; Mist, The Wind Bent Forest).
+   Version 10 (4 November 2026, Barney's option A): whatever stands in front of a cloud is lit through it. Where a cloud is
+   behind them, backdrop layers 1 and 2 and the far bat swarm are ink mixed towards the cloud's own colour, by THRU_CLOUD of
+   their tint, instead of towards the air, so they read a step darker than the cloud rather than lighter (Scene.render,
+   cloudFoot). Only the clouds' band is composited.
    Only the page's own controls are left out. It draws the mock-up way: every layer redrawn every frame. Games draw the same
    shapes the kit's way (layers painted once in tiles and slid, poses painted once per puppet step), as the speed test proved.
    The door at the bottom (LanternBox.world) chooses the approved settings and names the parts. */
@@ -41,14 +49,14 @@ const MOON={x:0.64,y:0.36,r:80,col:"#ffe2a6",halo:"#ffae63"};
 const TINTS=[0.52,0.45,0.31,0.14];
 /* each level is a different place: its own sky, light, air, mist, flyers, and what fills each layer and the path */
 const LV={
-  night:{name:"Night",place:"the graveyard at the edge of the village",set:"village",tints:[0.856,0.702,0.394,0.24],lift:60,cw4:760,back:0.16,light:"moon",fly:"bats",litP:0.18,edge:"rgba(255,231,184,0.9)",vig:0.5,crest:0.5,mist:null,
-    desc:"walks a black path through the graveyard at the edge of the village, past graves, a ruined wall and a crooked manor, chapel or cottage, under a detailed moon in an amber-to-violet sky"},
-  storm:{name:"Blood-red rain",place:"the old town",set:"town",tints:[0.9,0.76,0.48,0.14],lift:70,light:"moon",fly:"bats",litP:0.26,edge:"rgba(255,206,184,0.85)",vig:0.5,crest:0.32,mist:null,
-    desc:"walks the old town's street in blood-red rain, past street lamps, barrels, a well, a gate arch and a tavern or a tall townhouse, with crowded rooftops behind"},
-  dawn:{name:"Dawn",place:"the open moor",set:"moor",tints:[0.82,0.64,0.4,0.22],lift:30,light:"setmoon",fly:"crows",litP:0.06,edge:"rgba(214,228,255,0.9)",vig:0.42,crest:0.42,
+  night:{name:"Night",place:"The Graveyard",set:"village",tints:[0.856,0.702,0.394,0.24],lift:60,cw4:760,back:0.16,light:"moon",fly:"bats",litP:0.18,edge:"rgba(255,231,184,0.9)",vig:0.5,crest:0.5,mist:null,
+    desc:"walks a black path through The Graveyard at the edge of the village, past graves, a ruined wall and a crooked manor, chapel or cottage, under a detailed moon in an amber-to-violet sky"},
+  storm:{name:"Blood Red Rain",place:"The Old Town",set:"town",tints:[0.9,0.76,0.48,0.14],lift:70,light:"moon",fly:"bats",litP:0.26,edge:"rgba(255,206,184,0.85)",vig:0.5,crest:0.32,mist:null,
+    desc:"walks The Old Town's street in Blood Red Rain, past street lamps, barrels, a well, a gate arch and a tavern or a tall townhouse, with crowded rooftops behind"},
+  dawn:{name:"Dawn",place:"The Open Moor",set:"moor",tints:[0.82,0.64,0.4,0.22],lift:30,light:"setmoon",fly:"crows",litP:0.06,edge:"rgba(214,228,255,0.9)",vig:0.42,crest:0.42,
     mist:null,hollows:{col:"#dfe8f6",a:[0,0,0.62,0.475,0.323],F:[0,0,378,412,448]},
-    desc:"crosses the open moor in cold blue dawn light, past standing stones, cairns, dry-stone walls and a dolmen, with a pale moon setting on the right and daybreak glowing on the left"},
-  mist:{name:"Mist",place:"the wind-bent forest",set:"forest",tints:[0.9,0.77,0.57,0.42],lift:35,cw4:520,back:0.26,light:"sun",fly:"fewcrows",litP:0.1,edge:"rgba(236,242,214,0.85)",vig:0.3,crest:0,
+    desc:"crosses The Open Moor in cold blue dawn light, past standing stones, cairns, dry-stone walls and a dolmen, with a pale moon setting on the right and daybreak glowing on the left"},
+  mist:{name:"Mist",place:"The Wind Bent Forest",set:"forest",tints:[0.9,0.77,0.57,0.42],lift:35,cw4:520,back:0.26,light:"sun",fly:"fewcrows",litP:0.1,edge:"rgba(236,242,214,0.85)",vig:0.3,crest:0,
     mist:{col:"#eef2dc",bands:[[0,104,1,4],[1,378,1,5],[2,424,0.9,8],[3,456,0.55,11]]},
     desc:"walks a green forest at midday in thick mist, every tree bent the same way by the wind, the sun a pale disc, past stumps, ferns, a fallen trunk, a candlelit shrine and a woodcutter's hut"}
 };
@@ -790,7 +798,7 @@ class Scene{
     const key=Math.round(W)+"@"+s.toFixed(3)+lv;
     if(this.cache.key===key)return;
     this.cache={key};const cs=Math.min(s,1.25),L=LV[lv];
-    if(lv!=="mist"){this.cache.cl0=renderCutClouds(W*2,cs,lv,0,hsh(91,1));this.cache.cl1=renderCutClouds(W*2,cs,lv,1,hsh(91,2));}
+    if(lv!=="mist"){this.cache.cl0=renderCutClouds(W*2,cs,lv,0,hsh(91,1));this.cache.cl1=renderCutClouds(W*2,cs,lv,1,hsh(91,2));this.cache.clB=cloudFoot([this.cache.cl0,this.cache.cl1],cs);} /* version 10: clB */
     if(L.light!=="sun")this.cache.moon=this.ver===3?moonSprite(Math.min(2,s),lv==="storm"):moonSprite4(Math.min(2,s),lv);
     if(L.mist)this.cache.mist=L.mist.bands.map((b,i)=>renderMist(W*2,cs,L.mist.col,hsh(93,i,lv.length)));
   }
@@ -811,7 +819,18 @@ class Scene{
     const W2=W*2;
     const mb=after=>{if(!L.mist)return;at([0.03,0.12,0.28,0.5][after]);L.mist.bands.forEach((b,i)=>{if(b[0]!==after)return;const cv=this.cache.mist[i],k=[0.03,0.12,0.28,0.5][after]*(rm?0.4:1),ox=posmod(t*b[3]*(rm?0.4:1)+camX*k,W2);
       ctx.save();ctx.globalAlpha=b[2];ctx.drawImage(cv,-ox,b[1]-100,W2,200);ctx.drawImage(cv,-ox+W2,b[1]-100,W2,200);ctx.restore();});};
-    if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);at(k);ctx.drawImage(cv,-ox,0,W2,LH);ctx.drawImage(cv,-ox+W2,0,W2,LH);}
+    /* version 10: the clouds are also drawn into CF, a picture of the clouds' band (the top of the picture down to the clouds'
+       foot); thr(paint, mix) then paints a part into OV, keeps it only where a cloud is (source-in), takes it from the cloud's
+       colour towards ink (source-atop) and lays it over the part already drawn: lit through the cloud */
+    const cbH=this.cache.clB?Math.min(ctx.canvas.height,Math.ceil(this.cache.clB*s)+2):0,CF=cbH?(this._cf=fitCanvas(this._cf,ctx.canvas.width,cbH)):null,cf=CF&&CF.getContext("2d");
+    if(cf){cf.setTransform(1,0,0,1,0,0);cf.clearRect(0,0,CF.width,CF.height);}
+    if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);at(k);ctx.drawImage(cv,-ox,0,W2,LH);ctx.drawImage(cv,-ox+W2,0,W2,LH);
+      if(cf){cf.setTransform(ctx.getTransform());cf.drawImage(cv,-ox,0,W2,LH);cf.drawImage(cv,-ox+W2,0,W2,LH);}}
+    const thr=(paint,mix)=>{if(!cf)return;const OV=this._ov=fitCanvas(this._ov,CF.width,CF.height),v=OV.getContext("2d");
+      v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-over";v.globalAlpha=1;v.clearRect(0,0,OV.width,OV.height);paint(v);
+      v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-in";v.drawImage(CF,0,0);
+      v.globalCompositeOperation="source-atop";v.globalAlpha=1-mix;v.fillStyle=INK;v.fillRect(0,0,OV.width,OV.height);v.globalAlpha=1;v.globalCompositeOperation="source-over";
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(OV,0,0);ctx.restore();};
     at(0);
     if(lv==="storm"){
       const st=lightning(t);
@@ -821,13 +840,13 @@ class Scene{
     mb(0);
     if(this.ver>=5&&L.light==="sun"){at(0.05);drawFarRanges(ctx,W,camX,rm,lv);}
     const f=k=>rm?k*0.4:k;
-    at(0.12);this.layer(ctx,off,s,W,t,camX*f(0.12),1,tn[0],o);mb(1);
+    at(0.12);this.layer(ctx,off,s,W,t,camX*f(0.12),1,tn[0],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[0]*THRU_CLOUD);} /* version 10 */mb(1);
     if(lv==="storm"){at(1);drawRain(ctx,W,t,0,rm);}
-    at(0.28);this.layer(ctx,off,s,W,t,camX*f(0.28),2,tn[1],o);mb(2);
+    at(0.28);this.layer(ctx,off,s,W,t,camX*f(0.28),2,tn[1],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[1]*THRU_CLOUD);} /* version 10 */mb(2);
     if(L.light==="sun"){at(0);drawRays(ctx,W,t,rm);}
     at(0.34);
-    if(L.fly==="bats")drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));
-    else if(L.fly==="crows")drawCrowFlocks(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));else drawCrowsAlone(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),3,false);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),0); /* version 8 */
+    if(L.fly==="bats"){drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));{const M=ctx.getTransform();thr(v=>{v.setTransform(M);drawSwarm(v,W,t,camX*f(0.34),rm,INK);},tn[1]*0.9*THRU_CLOUD);}} /* version 10 */
+    else if(L.fly==="crows")drawCrowFlocks(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],0.25)); /* version 9: a quarter towards the air, was tn[1]*0.9 */else drawCrowsAlone(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),3,false);if(lv==="mist")drawLeaves(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9),0); /* version 8 */
     at(0.5);this.layer(ctx,off,s,W,t,camX*f(0.5),3,tn[2],o);mb(3);
     at(0.62);
     if(L.fly==="bats")drawBigBats(ctx,W,t,camX*f(0.62),rm,mixc(INK,AIR[lv],tn[2]*0.7));
@@ -1272,6 +1291,14 @@ function streakPts(r,w,h){ // a long lens of cloud: a wavering top, a flatter to
   return top.concat(bot.reverse());
 }
 function streakPath(x,pts,X,Y){x.beginPath();pts.forEach((p,i)=>i?x.lineTo(X+p[0],Y+p[1]):x.moveTo(X+p[0],Y+p[1]));x.closePath();}
+/* version 10: lit through a cloud. THRU_CLOUD is the share of a part's tint used when it is mixed towards the cloud behind it
+   (token thru-cloud); cloudFoot finds, once, the lowest line any cloud reaches; fitCanvas keeps an offscreen picture sized */
+const THRU_CLOUD=0.75;
+function cloudFoot(cvs,cs){let foot=0;for(const c of cvs){const x=c.getContext("2d"),w=c.width;
+    for(let r=c.height-1;r>=0;r-=2){const d=x.getImageData(0,r,w,1).data;let hit=false;for(let i=3;i<d.length;i+=16)if(d[i]>6){hit=true;break;}
+      if(hit){foot=Math.max(foot,(r+3)/cs);break;}}}
+  return foot;}
+function fitCanvas(c,w,h){if(!c)c=mk(w,h);if(c.width!==w||c.height!==h){c.width=w;c.height=h;}return c;}
 function renderCutClouds(W2,s,lv,depth,seed){
   const c=mk(W2*s,LH*s),x=c.getContext("2d");x.setTransform(s,0,0,s,0,0);
   const r=rng32(seed),storm=lv==="storm",pal=CLOUD_PAL[lv][depth];
@@ -2409,7 +2436,7 @@ function splash(ctx, place, X, Y, t, rm, seed) { // the place's splash of colour
   drawSplash(ctx, PLACE_SET[place] || "village5", "on", X, Y, t || 0, !!rm, seed || 0, "green", "intense");
 }
 return {
-  version: "8.0.0",
+  version: "10.0.0",
   world: {
     LH: LH, GROUND: gY, PLACES: ["night", "storm", "dawn", "mist"], places: LV, bossNames: BOSS_NAME,
     pal: { INK: INK, SKY: SKY, AIR: AIR, HAZE: HAZE, MOON: MOON, MOONPAL: MOONPAL, CLOUD_PAL: CLOUD_PAL, EMBER: EMBER, WITCH: WITCH,
@@ -2425,7 +2452,7 @@ return {
       drawStumpProp: drawStumpProp, drawFerns: drawFerns, drawLog: drawLog,
       drawCandle: drawCandle, drawWallLamp: drawWallLamp, drawStreetLamp: drawStreetLamp, drawPost: drawPost, drawShrine: drawShrine,
       drawPotion: drawPotion, drawFairy: drawFairy,
-      drawBat: drawBat, drawCrow: drawCrow, crowSide: crowSide, drawCrowFlocks: drawCrowFlocks, drawCrowsAlone: drawCrowsAlone, drawLeaves: drawLeaves, leafShape: leafShape, drawSwarm: drawSwarm, drawBigBats: drawBigBats, drawCrows: drawCrows,
+      drawBat: drawBat, drawCrow: drawCrow, THRU_CLOUD: THRU_CLOUD, cloudFoot: cloudFoot, crowSide: crowSide, drawCrowFlocks: drawCrowFlocks, drawCrowsAlone: drawCrowsAlone, drawLeaves: drawLeaves, leafShape: leafShape, drawSwarm: drawSwarm, drawBigBats: drawBigBats, drawCrows: drawCrows,
       drawMoon: drawMoon, moonSprite4: moonSprite4, drawStars: drawStars, drawDaybreak: drawDaybreak, drawSetMoon: drawSetMoon,
       drawSun: drawSun, drawRays: drawRays, drawRain: drawRain, drawBolt: drawBolt, lightning: lightning,
       renderCutClouds: renderCutClouds, renderMist: renderMist,

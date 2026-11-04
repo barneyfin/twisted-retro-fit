@@ -1,9 +1,13 @@
-/* Lantern Box: the play parts, design system version 8 (4 November 2026). Version 1.0.0 of this file.
+/* Lantern Box: the play parts, design system version 9 (4 November 2026). Version 1.0.1 of this file.
    Everything designed and agreed for Gloam Hallow in step 4b, the play-parts rounds 1 to 12 (3 and 4 November 2026), as the
    review page drew it, in the order it loads. It runs beside bundle.js (LanternBox.world, here LB and LP) and reads it.
    This is the spec for the kit change (step 4c): Claude Code turns it into kit code; the drawing, sizes and timings here are
    the agreed ones, and the loops (loopX functions) are the reference for each moment's timing. Starting figures (damage,
    speeds, rates) are marked so in the gameplay note.
+   Version 1.0.1 (design system 9, two fixes found while building the kit, Barney, 4 November 2026): the mouth-hat's
+   signal eyes follow its hop as its own eyes do, so no second pair shows at rest (the crawler's and the flyer's own eyes
+   never move, so theirs already sat on them); the Veiled Ghost's "behind" signal fades smoothly out and back in instead
+   of flickering 8 times a second (the limit is 3 a second for anything bigger than a character).
      wand.js, pstrip.js, moves.js   the wanderer as a posable puppet: poses, the play strip, his lantern and tie belt (rounds 1, 2)
      mvmoves.js, mvscene.js         the moves (walk, jump, climb, roll, sword, cast, hurt, life lost) and their effects
      mvloops.js                     the moves' review loops
@@ -1356,7 +1360,8 @@ Object.assign(LP.MONSTER,{
         c.fillStyle="#2a0507";c.strokeStyle=MO.ember;c.lineWidth=0.9;c.shadowColor=MO.glow;c.shadowBlur=5;c.beginPath();[[-22,-30],[-16,-34],[-10,-34.2],[-4,-32],[1,-29],[-2,-23],[-8,-17],[-14,-15.8],[-21,-17]].forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fill();c.stroke();c.shadowBlur=0;
         moMouth(c,[[-14,-27],[-8,-28],[-5,-25],[-8,-21],[-13,-21.6]],-9,-24.6,5);
         moTeeth(c,[[-20,-31.4],[-18,-25],[-16,-32],[-14,-32.6],[-12,-26],[-10,-32.8],[-8,-32.2],[-6,-26.4],[-4,-31.4],[-18,-17.2],[-16,-23],[-14,-16.4],[-11.6,-16.6],[-9.6,-22.6],[-7.6,-17.4]]);c.restore();}
-      moEyes(c,o,[[-13,-41,0.35],[-5,-43,0.15]],3.4,1.4,h);c.restore();};},
+      {const tt=P.t!=null?P.t:t,hop=Math.max(0,Math.sin(tt*(rm?1.4:2.6)+m.ph)),sq=1-hop*0.06;c.save();c.translate(0,-hop*(rm?3:9));c.scale(1/sq,sq); /* version 9: the signal eyes follow the hop, as bundle.js's hatmaw moves its own eyes */
+      moEyes(c,o,[[-13,-41,0.35],[-5,-43,0.15]],3.4,1.4,h);c.restore();}c.restore();};},
   // the ghoul, posable: its front arm (P.a: upper arm, forearm angles) can wind up and swipe; P.op opens the jaw; P.slash draws the sweep
   ghoulP(x,t,m,rm){const P=m.P||{},tq=Math.floor((t+m.ph)*8)/8,s1=P.s1!=null?P.s1:Math.sin(tq*3),bob=P.bob!=null?P.bob:Math.abs(s1)*2,op=P.op!=null?P.op:3+Math.max(0,Math.sin(tq*1.7))*3,lean=P.lean||0;
     x.save();x.translate(P.dx||0,-bob);
@@ -1559,7 +1564,7 @@ const BS_FIGHT={
       const glide=(x0,x1,u,flip,tilt)=>{const tr2=[];for(let k=5;k>=0;k--){const v2=ease(Math.max(0,u-k*0.07)),XX=lerpN(x0,x1,v2);tr2.push(bsPt(XX,G(bx)+4,{flip,tilt,dy:st.dy},H[0],H[1]));}fx.push(x=>moSlash(x,tr2,5,1));};
       if((u=win(t,2.05,2.4))!=null){X=lerpN(bx+14,wx+40,ease(u));st.tilt=-0.14;hot=1;glide(bx+14,wx+40,u,1,-0.14);}
       if((u=win(t,2.4,3.2))!=null){const v=ease(u);X=lerpN(wx+40,bx,v);st.alpha=1-0.15*Math.sin(u*Math.PI);st.tilt=-0.14*(1-v);}
-      if((u=win(t,3.5,4.0))!=null){st.alpha=Math.floor(t*8)%2?0.62:1;hot=ease(u);fx.push(x=>{for(let k=0;k<6;k++){const ph=(t*1.3+k/6)%1;fxMote(x,bx-40+k*16,G(bx)-30-ph*150,1.6,Math.sin(ph*Math.PI)*0.8,"#f0c9e0");}});}
+      if((u=win(t,3.5,4.0))!=null){st.alpha=1-0.38*Math.sin(u*Math.PI); /* version 9: a smooth fade, was a flicker 8 times a second */hot=ease(u);fx.push(x=>{for(let k=0;k<6;k++){const ph=(t*1.3+k/6)%1;fxMote(x,bx-40+k*16,G(bx)-30-ph*150,1.6,Math.sin(ph*Math.PI)*0.8,"#f0c9e0");}});}
       if((u=win(t,4.0,4.3))!=null){st.alpha=1-ease(u);hot=1-u;}
       if(t>=4.3&&t<4.6)st.alpha=0;
       const back=wx+82-125;
