@@ -20,6 +20,8 @@
    checkpoint coming back after a life lost.
    Step 4d-2b: the ghoul and the walker, each place's own mix growing place by place, the roll carrying on through a body, and a crowd
    of monsters for the speed check (Testing).
+   Step 4d-3: mana, the heal and the fireball (three levels each, from scrolls), not enough mana's fizzle, switching spells, and the
+   loot: potions, armour, scrolls and sword upgrades dropped by monsters and picked up by touch, and health potions on pieces and hills.
    Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
@@ -92,6 +94,22 @@ const MIX = {
 };
 const CROWD = ['crawler', 'bat2', 'hatmaw', 'ghoul2', 'walker', 'crawler', 'bat2', 'walker'];   // Testing: eight at once past the start
 
+// Spells, mana and loot (4d-3; starting figures, Barney's where he gave them)
+const MANA_RATE = 0.04;          // mana refills 4% a second on its own
+const SPELL = {                  // three levels each, from scrolls: heal 40% of health for 30% of mana, a fireball 2 blows for 25%
+  heal: { cost: 0.30, amount: [0, 0.40, 0.55, 0.70] },
+  fire: { cost: 0.25, dmg: [0, 2, 3, 4] },
+};
+const FIRE_SPEED = 420;          // the fireball, lines a second, straight at chest height until it hits a monster or leaves the screen
+const CAST_BUF = 0.15;           // cast pressed this long before he is free still casts
+const POTION = { health: 0.35, mana: 0.5 };   // what a potion refills
+// a defeat's drop (the gameplay note): a health or a mana potion 1 in 6 each, armour 1 in 20; a walker first has 1 in 4 to drop a
+// spell scroll or a sword upgrade (one he can still use)
+const DROP = { health: 1 / 6, mana: 1 / 6, shield: 1 / 20, upgrade: 1 / 4 };
+const PIECE_POTION = 0.35;       // the scenery potions made real: about one piece in three holds a health potion, and each big hill's crest
+const LINES = { heal: ['Heal mastered', 'Heal: restores deeper'], fire: ['Fireball mastered', 'Fireball: glows brighter'],
+  reach: 'Sword: reaches beyond', rune: 'Sword: bites deeper' };
+
 let G = null;                    // the run's state, for the console while testing
 
 LanternBox.game({
@@ -118,10 +136,12 @@ LanternBox.game({
     const g = { p: Math.max(0, PLACES.indexOf(t.place || 'night')), lives: LIVES, safe: !!t.safe, mode: 'card', facing: 1, x: 60, y: 0, vy: 0,
       on: null, mt: 0, walkDist: 0, air: null, airT: 0, landT: 9, lantern: null, glass: [], out: false,
       health: 1, mana: 1, armour: t.armour ? 3 : 0, sword: { reach: t.all ? 2 : 0, bite: t.all ? 2 : 0 },
-      safeT: 0, hurtT: 9, hurtKind: 'health', atkBuf: 0, swHit: false, mons: [], monsTest: t.mons || 'normal' };
+      safeT: 0, hurtT: 9, hurtKind: 'health', atkBuf: 0, swHit: false, mons: [], monsTest: t.mons || 'normal',
+      spells: { heal: t.all ? 3 : 0, fire: t.all ? 3 : 0 }, spellList: t.all ? ['heal', 'fire'] : [], sel: 0, castBuf: 0, cast: null, healT: 9,
+      manaShown: 1, loot: [], shots: [], chest: null, hand: null };
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
-    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); lb.hud.spells([], 0, 0);
+    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); hudSpells(g, lb);
     lb.fade(1);   // black until the first place card lifts
     lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; });
     return g;
@@ -135,9 +155,16 @@ LanternBox.game({
     if (g.safeT > 0) g.safeT -= dt;
     g.hurtT += dt;
     if (g.atkBuf > 0) g.atkBuf -= dt;
+    if (g.castBuf > 0) g.castBuf -= dt;
+    g.healT += dt;
     if (lb.input.pressed.attack) g.atkBuf = ATTACK_BUF;   // swings at once on the ground; pressed while busy, as soon as he is free
+    if (lb.input.pressed.cast) g.castBuf = CAST_BUF;      // the same for a cast
+    if (lb.input.pressed.switch) switchSpell(g, lb);
+    if (g.mode !== 'lost' && g.mode !== 'return' && g.mana < 1) { g.mana = Math.min(1, g.mana + MANA_RATE * dt); hudMana(g, lb, false); }
     moveUpdate(g, lb, dt);
     monstersUpdate(g, lb, dt);
+    shotsUpdate(g, lb, dt);
+    lootUpdate(g, lb, dt);
     hurtCheck(g, lb);
   },
 
@@ -145,10 +172,12 @@ LanternBox.game({
     const w = lb.world, L = g.L, camX = camAt(g, lb);
     w.begin(ctx, { level: L, camX });
     g.cps.forEach((cp, k) => { g.glass[k] = w.checkpoint(cp.x, { lit: cp.lit === true ? true : cp.lit != null ? lb.time - cp.lit : undefined, from: g.lantern || undefined }); });
+    drawLoot(g, lb, w, camX);
     drawMonsters(g, lb, w, camX, false);
     const r = drawWanderer(g, lb, w);
-    if (r && r.lantern) g.lantern = r.lantern;
+    if (r && r.lantern) { g.lantern = r.lantern; g.chest = r.chest; g.hand = r.hand; }
     drawMonsters(g, lb, w, camX, true);   // flyers in front of him
+    drawShots(g, lb, w);
     w.end();
   },
 });
@@ -165,6 +194,7 @@ function moveUpdate(g, lb, dt) {
   if (g.mode === 'air') return airUpdate(g, lb, dt, dir, i);
   if (g.mode === 'hurt') return hurtUpdate(g, lb, dt);
   if (g.mode === 'sword') return swordUpdate(g, lb, dt, i);
+  if (g.mode === 'cast') return castUpdate(g, lb, dt);
   // on the ground (or a piece's top)
   if (dir) g.facing = dir;
   g.landT += dt;
@@ -173,6 +203,7 @@ function moveUpdate(g, lb, dt) {
   if (i.pressed.jump) return face && face.h > JUMP_CLIMB && face.h <= CLIMB_MAX ? startClimb(g, lb, face) : jump(g, lb);
   if (i.pressed.roll) return startRoll(g, lb);
   if (g.atkBuf > 0) return startSwing(g, lb);
+  if (g.castBuf > 0 && g.spellList.length) return startCast(g, lb);
   if (face && i.climb && face.h >= CLIMB_MIN && face.h <= CLIMB_MAX) return startClimb(g, lb, face);
   if (dir) {
     const r = stepTo(g, g.x + dir * WALK * dt);
@@ -193,6 +224,7 @@ function loadPlace(g, lb, p, ci) {   // the place's level and its checkpoints; c
   g.x = ci > 0 ? g.cps[ci].x + RETURN_AT : 60;
   g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1; g.walkDist = 0;
   spawnMonsters(g, lb);
+  placeLoot(g, lb);
 }
 function enterPlace(g, lb) {         // once the place card's black is down: the place's sound and track
   g.out = false;
@@ -346,7 +378,8 @@ function lostUpdate(g, lb, dt) {
     const cp = g.cps[g.lastCp];
     g.x = cp.x + RETURN_AT; g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1;
     g.mode = 'return'; g.mt = 0; g.safeT = 0; g.hurtT = 9;
-    g.armour = 0; lb.hud.armour(0);    // a lost life loses the armour; spells and sword upgrades are kept
+    g.armour = 0; lb.hud.armour(0);    // a lost life loses the armour; spells and sword upgrades are kept, and loot picked up stays picked up
+    g.shots = []; g.cast = null; g.castBuf = 0;
     lb.hud.health(0); lb.hud.mana(0);
     monstersReturn(g, lb);
   }
@@ -378,18 +411,136 @@ function swordHits(g, lb) {
     if (!alive(m)) continue;
     const b = monBox(m);
     if (b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1) continue;
-    hits++; m.awake = true;
-    m.hp -= 1 + 0.5 * g.sword.bite; m.hitT = 0;
-    if (m.hp <= 0.01) defeat(g, lb, m);
-    else if (MON[m.kind].push && !m.atk) { m.bx = clampTo(m.bx + f * MON[m.kind].push, m.patch); place(m, g, m.bx, 0); }
+    hits++;
+    damage(g, lb, m, 1 + 0.5 * g.sword.bite, f);
   }
   if (hits) lb.sfx('hit');
+}
+function damage(g, lb, m, n, dir) {    // a blow or a fireball: it flares and jolts (the kit's); a medium one is pushed back a little
+  m.awake = true; m.hp -= n; m.hitT = 0;
+  if (m.hp <= 0.01) defeat(g, lb, m);
+  else if (MON[m.kind].push && !m.atk) { m.bx = clampTo(m.bx + dir * MON[m.kind].push, m.patch); place(m, g, m.bx, 0); }
 }
 function defeat(g, lb, m) {            // card pieces and its wisp rising to the score (the kit's, 1.6 s); the wisps count as it arrives
   m.st = 'defeat'; m.t = 0; m.atk = null; m.wdx = 0; m.ody = 0; m.beatenAt = lb.time;
   lb.sfx('defeat');
   const n = MON[m.kind].wisps;
   lb.after(0.9, () => lb.addWisps(n));
+  dropLoot(g, lb, m);
+}
+
+/* ---------- spells and mana (4d-3) ---------- */
+function hudMana(g, lb, now) { if (now || Math.abs(g.mana - g.manaShown) >= 0.01 || g.mana >= 1) { lb.hud.mana(g.mana); g.manaShown = g.mana; } }
+function hudSpells(g, lb) { const sp = g.spellList[g.sel]; lb.hud.spells(g.spellList.slice(), g.sel, sp ? SPELL[sp].cost : 0); }
+function switchSpell(g, lb) { if (g.spellList.length < 2) return; g.sel = (g.sel + 1) % g.spellList.length; hudSpells(g, lb); }
+// on the ground: the chosen spell, or, short of mana, the hand's light sputtering out (the kit's fizzle), nothing cast
+function startCast(g, lb) {
+  const sp = g.spellList[g.sel], cost = SPELL[sp].cost;
+  g.castBuf = 0; g.mode = 'cast'; g.mt = 0;
+  if (g.mana < cost - 1e-6) { g.cast = { move: 'fizzle', spell: sp, done: false }; return; }
+  g.mana -= cost; hudMana(g, lb, true);
+  g.cast = { move: sp === 'heal' ? 'heal' : 'fire', spell: sp, done: false };
+}
+function castUpdate(g, lb, dt) {
+  const c = g.cast, s = g.mt * lb.world.stepRate, steps = lb.world.move(c.move, 0).steps;
+  if (!c.done && c.move === 'heal') {  // the heal: a pale gold glow rises round him as the hand goes up (its "go" step)
+    c.done = true; g.healT = 0; lb.sfx('heal');
+    g.health = Math.min(1, g.health + SPELL.heal.amount[g.spells.heal]); lb.hud.health(g.health);
+  }
+  if (!c.done && s >= 1) {             // the throw (the fireball leaves on its "thr" step), or the fizzle's spark
+    c.done = true;
+    if (c.move === 'fizzle') lb.sfx('fizzle');
+    else {
+      // from just in front of him at chest height (the hand drawn last frame was still back in the wind-up)
+      g.shots.push({ x: g.x + g.facing * 28, y: g.y - 52, f: g.facing, level: g.spells.fire, burst: null });
+      lb.sfx('fireball');
+    }
+  }
+  if (s >= steps) { g.mode = 'ground'; g.mt = 0; g.landT = 9; }
+}
+function shotsUpdate(g, lb, dt) {     // each fireball flies on until it hits a monster (and bursts there) or leaves the screen
+  const camX = camAt(g, lb);
+  for (const s of g.shots) {
+    if (s.burst != null) { s.burst += dt; if (s.burst >= 0.4) s.gone = true; continue; }
+    s.x += s.f * FIRE_SPEED * dt;
+    const m = g.mons.find((q) => { if (!alive(q)) return false; const b = monBox(q); return !(b[1] < s.x - 10 || b[0] > s.x + 10 || b[3] < s.y - 10 || b[2] > s.y + 10); });
+    if (m) { s.burst = 0; lb.sfx('burst'); damage(g, lb, m, SPELL.fire.dmg[s.level], s.f); }
+    else if (s.x < camX - 60 || s.x > camX + lb.W + 60) s.gone = true;
+  }
+  if (g.shots.some((s) => s.gone)) g.shots = g.shots.filter((s) => !s.gone);
+}
+
+/* ---------- loot (4d-3) ---------- */
+function dropLoot(g, lb, m) {
+  let kind = null;
+  if (m.kind === 'walker' && lb.rand() < DROP.upgrade) {
+    const can = [];
+    if (g.spells.heal < 3) can.push('heal'); if (g.spells.fire < 3) can.push('fire');
+    if (g.sword.reach < 2) can.push('reach'); if (g.sword.bite < 2) can.push('rune');
+    if (can.length) kind = lb.pick(can);
+  }
+  if (!kind) { const r = lb.rand(); kind = r < DROP.health ? 'health' : r < DROP.health + DROP.mana ? 'mana' : r < DROP.health + DROP.mana + DROP.shield ? 'shield' : null; }
+  if (!kind) return;
+  let x = m.px;                        // where it fell, never into a pit: to its nearer edge
+  const pit = g.L.pits.find((p) => x > p[0] - 14 && x < p[1] + 14);
+  if (pit) x = x - pit[0] < pit[1] - x ? pit[0] - 16 : pit[1] + 16;
+  g.loot.push({ kind, x, y: surfaceAt(g, x), drop: 0, from: { x: m.px, y: m.py + (MON[m.kind].ground ? -30 : 0) }, seed: g.loot.length + 1 });
+}
+function placeLoot(g, lb) {            // the scenery potions made real: on about one piece in three, and on each big hill's crest
+  g.loot = []; g.shots = [];
+  g.pieces.forEach((p, k) => {
+    if (lb.rand() >= PIECE_POTION || p.x0 > g.L.arena) return;
+    const x = (p.x0 + p.x1) / 2; g.loot.push({ kind: 'health', x, y: p.y(x), seed: 100 + k });
+  });
+  g.L.sections.filter((s) => s.id === 'E').forEach((s, k) => {
+    let best = null;
+    for (let x = s.x0 + 40; x < s.x1 - 40; x += 8) if (!g.L.pit(x) && !g.pieces.some((p) => x > p.x0 - 20 && x < p.x1 + 20) && (best == null || g.L.ground(x) < g.L.ground(best))) best = x;
+    if (best != null) g.loot.push({ kind: 'health', x: best, y: g.L.ground(best), seed: 200 + k });
+  });
+}
+function lootUpdate(g, lb, dt) {
+  const camX = camAt(g, lb), free = g.mode !== 'lost' && g.mode !== 'return';
+  for (const it of g.loot) {
+    if (it.drop != null) { it.drop += dt; if (it.drop >= 0.45) it.drop = null; continue; }   // out of the fallen monster (0.45 s)
+    if (it.pick != null) { it.pick += dt; if (it.pick >= 0.5) it.gone = true; continue; }   // lifting into him (0.5 s)
+    if (it.x < camX - 200) { it.gone = true; continue; }   // left behind off the screen
+    // touched: it hovers a little above the ground (or a piece) at his feet
+    if (free && Math.abs(it.x - g.x) < BODY_W + 12 && it.y > g.y - BODY_H && it.y - 34 < g.y + 2 && take(g, lb, it)) it.pick = 0;
+  }
+  if (g.loot.some((it) => it.gone)) g.loot = g.loot.filter((it) => !it.gone);
+}
+function take(g, lb, it) {             // false: not needed now (health, mana or armour full), so it stays for later
+  switch (it.kind) {
+    case 'health': if (g.health >= 0.999) return false; g.health = Math.min(1, g.health + POTION.health); lb.hud.health(g.health); break;
+    case 'mana': if (g.mana >= 0.999) return false; g.mana = Math.min(1, g.mana + POTION.mana); hudMana(g, lb, true); break;
+    case 'shield': if (g.armour >= 3) return false; g.armour++; lb.hud.armour(g.armour); break;
+    case 'heal': case 'fire': {        // the first scroll teaches the spell (and chooses it); later ones make it stronger
+      const first = g.spells[it.kind] === 0;
+      g.spells[it.kind] = Math.min(3, g.spells[it.kind] + 1);
+      if (first) { g.spellList.push(it.kind); g.sel = g.spellList.length - 1; }
+      hudSpells(g, lb); lb.hud.line(it.kind, LINES[it.kind][first ? 0 : 1]);
+      break;
+    }
+    case 'reach': g.sword.reach = Math.min(2, g.sword.reach + 1); lb.hud.line('reach', LINES.reach); break;
+    case 'rune': g.sword.bite = Math.min(2, g.sword.bite + 1); lb.hud.line('rune', LINES.rune); break;
+  }
+  lb.sfx('pickup');
+  return true;
+}
+function drawLoot(g, lb, w, camX) {
+  for (const it of g.loot) {
+    if (it.x < camX - 60 || it.x > camX + lb.W + 60) continue;
+    const o = { y: it.y + 1, seed: it.seed };
+    if (it.drop != null) o.drop = { x: it.from.x, y: it.from.y, t: it.drop };
+    else if (it.pick != null) o.pick = { x: (g.chest || { x: g.x }).x, y: (g.chest || { y: g.y - 56 }).y, t: it.pick };
+    w.loot(it.kind, it.x, o);
+  }
+}
+function drawShots(g, lb, w) {
+  for (const s of g.shots) {
+    if (s.burst == null) w.fireball(s.x, s.y, { facing: s.f, level: s.level });
+    else w.fireBurst(s.x, s.y, { t: s.burst, level: s.level });
+  }
 }
 
 /* ---------- being hurt (4d-2a) ---------- */
@@ -397,7 +548,7 @@ function defeat(g, lb, m) {            // card pieces and its wisp rising to the
 // him under anything higher than 38 lines, and through the bodies of flyers, ghouls and walkers
 function hurtCheck(g, lb) {
   if (g.safe || g.safeT > 0) return;
-  if (g.mode !== 'ground' && g.mode !== 'air' && g.mode !== 'roll' && g.mode !== 'sword') return;
+  if (g.mode !== 'ground' && g.mode !== 'air' && g.mode !== 'roll' && g.mode !== 'sword' && g.mode !== 'cast') return;
   const rolling = g.mode === 'roll', h = rolling ? ROLL_H : BODY_H, x0 = g.x - BODY_W, x1 = g.x + BODY_W, y0 = g.y - h, y1 = g.y;
   const meets = (b) => b && !(b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1);
   for (const m of g.mons) {
@@ -619,9 +770,10 @@ function drawMonsters(g, lb, w, camX, flyers) {
 /* ---------- drawing him ---------- */
 function drawWanderer(g, lb, w) {
   const R = w.stepRate, y = g.y + 1, f = g.facing;
-  // always: his sword's upgrades; after a hit, its sparks or shards (0.5 s) and the second of safety's slow pulse
+  // always: his sword's upgrades; after a hit, its sparks or shards (0.5 s) and the second of safety's slow pulse; after a heal, its glow
+  // (0.6 s, on past the move)
   const o = (more) => Object.assign({ y, facing: f, sword: g.sword, hurt: g.hurtT < 0.5 ? { kind: g.hurtKind, t: g.hurtT } : undefined,
-    safe: g.safeT > 0 ? SAFE_T - g.safeT : undefined }, more);
+    safe: g.safeT > 0 ? SAFE_T - g.safeT : undefined, heal: g.healT < 0.6 ? { t: g.healT, level: g.spells.heal } : undefined }, more);
   switch (g.mode) {
     case 'lost': {
       const t = g.mt, P = g.lost;
@@ -648,6 +800,10 @@ function drawWanderer(g, lb, w) {
     case 'roll': return w.wanderer(g.x, o({ move: 'roll', step: g.mt < ROLL_T ? g.mt * R : 3 + ((g.mt - ROLL_T) * R) % 1 }));   // carrying on: tumbling still
     case 'sword': return w.wanderer(g.x, o({ move: 'sword', step: Math.min(g.mt * R, 3.99) }));
     case 'hurt': return w.wanderer(g.x, o({ move: 'hurt', step: Math.min(g.mt * R, 2.99) }));
+    case 'cast': {                     // heal, the fireball's throw, or the fizzle (its sparks from the "fiz" step)
+      const c = g.cast, steps = w.move(c.move, 0).steps;
+      return w.wanderer(g.x, o({ move: c.move, step: Math.min(g.mt * R, steps - 0.01), fizzle: c.move === 'fizzle' && g.mt * R >= 1 ? g.mt - 1 / R : undefined }));
+    }
     case 'air': {
       if (g.air === 'drop') return w.wanderer(g.x, o({ move: 'drop', step: g.airT < 1 / R ? 0 : 1.5 }));
       const step = g.airT < 1 / R ? 1 : g.vy < -250 ? 2.5 : g.vy <= 250 ? 4 : 5.5;   // launch, rising, the top, falling
