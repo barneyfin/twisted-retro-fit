@@ -22,7 +22,7 @@ Retro Kit's split between World (the playfield) and Interface (glass panels arou
 
 ## Arcade rules (every kit, every game)
 
-- Every game is one self-contained HTML file that works offline. The kit, fonts and code are copied in. No network requests, no outside libraries and no image files. The only extra allowed is a soundtrack MP3 that Barney supplies, built into the file (a City Nights or Lantern Box game may have two).
+- Every game is one self-contained HTML file that works offline. The kit, fonts and code are copied in. No network requests, no outside libraries and no image files. The only extras allowed are a soundtrack MP3 that Barney supplies, built into the file (a City Nights or Lantern Box game may have two), and short sound effects that Barney supplies from a royalty-free library, built into the file, with their source and licence noted beside the kit, under 100 KB in all (Barney, 2026-11-04).
 - Controls are desktop keyboard and phone touch (phone held sideways). No gamepad. Players are adults and teens.
 - Names and art are invented. Mechanics may be borrowed from classic games; titles, characters, logos, music and recognisable looks may not. If a design starts to resemble a famous character, change it.
 - Each kit has its own identity. It must not look like another kit in the arcade, nor like a style that is everywhere today.
