@@ -14,35 +14,44 @@
    The kit's rules: ARCADE.md and lantern-box/design-system/README.md.
    Build:  python lantern-box/kit/build.py <name>   (the game is finished only when it builds with no warnings)
    The kit owns every screen outside play and the HUD; the game supplies its rules and its picture. Everything lb offers
-   is listed in lantern-box/kit/lantern-box.js under "Public API". This template walks the wanderer through the first
-   place with the arrow keys, and spends health to earn wisps, so every screen can be reached: Space or a tap earns 10
-   wisps for a tenth of the health, and X or a second finger ends the run at once. */
+   is listed in lantern-box/kit/lantern-box.js under "Public API". This template walks the wanderer along the first
+   place's level (the arrow keys or A and D, or the stick on a touch device) with design system version 8's HUD and the
+   place's background sound, and spends health to earn wisps, so every screen can be reached: J (or the attack button)
+   earns 10 wisps for a tenth of the health, and K (or the cast button) ends the run at once. */
 LanternBox.game({
   id: 'my-game',                  // the folder name: lowercase-with-hyphens; high scores are saved under it
   title: ['My', 'Game'],          // an invented name, in sentence case, on two short lines (about 9 letters each at most)
 
+  hud: 'full',                    // design system version 8's HUD: armour, lives, the spell, the '?' tile, the boss bar, the plaque lines
+  howTo: { goal: ['What the player is trying to do, in a line or two.', 'How their lives work, in a line.'] },   // How to play, in the game's words
+  win: { heading: 'The end.', line: 'A line to close on.', lifeBonus: 10 },                                  // the win screen's words (lb.win())
+
   // New game: build and return this game's state.
   start(lb) {
-    return { health: 1, x: 400, facing: 1, walking: false };
+    lb.ambient('night');          // the place's background sound, heard during play
+    return { level: lb.world.level('night'), health: 1, x: 120, facing: 1, walking: false };
   },
 
-  // Rules: called 60 times a second during play.
+  // Rules: called 60 times a second during play. The named controls (input.jump, attack, cast, switch, roll, climb) come
+  // from the keys, or from the touch controls on a touch device.
   update(g, lb) {
     g.walking = lb.input.left !== lb.input.right;
-    if (g.walking) { g.facing = lb.input.right ? 1 : -1; g.x += g.facing * 1.6; }
+    if (g.walking) { g.facing = lb.input.right ? 1 : -1; g.x = lb.clamp(g.x + g.facing * 1.6, 0, g.level.length); }
     if (lb.ending) return;
-    if (lb.input.pressed.fire || lb.input.tap) {
+    if (lb.input.pressed.attack) {
+      lb.sfx('swing');
       lb.addWisps(10);
       g.health = Math.round((g.health - 0.1) * 10) / 10;
       lb.hud.health(g.health);
       if (g.health <= 0) lb.gameOver();
     }
-    if (lb.input.pressed.alt || lb.input.pointer2.pressed) lb.gameOver(0);
+    if (lb.input.pressed.cast) lb.gameOver(0);
   },
 
-  // Picture: called every frame, in a picture 540 lines tall (lb.H) and lb.W wide.
+  // Picture: called every frame, in a picture 540 lines tall (lb.H) and lb.W wide. The camera holds the wanderer a third of
+  // the way across and rises with the level's ground; things given no y stand on it.
   draw(ctx, g, lb) {
-    lb.world.begin(ctx, { place: 'night', camX: g.x - lb.W * 0.3 });
+    lb.world.begin(ctx, { level: g.level, camX: lb.clamp(g.x - lb.W * 0.32, 0, g.level.length - lb.W) });
     lb.world.wanderer(g.x, { walking: g.walking, facing: g.facing });
     lb.world.end();
   },

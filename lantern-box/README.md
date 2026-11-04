@@ -9,7 +9,7 @@ The arcade's third style kit: backlit cut-out silhouettes in layered, coloured a
 Open `dist/<name>.html` in the Retro Games folder by double-clicking it. Each is one file that works offline. They are made by the build, and are not kept in git.
 
 - `dist/lb-sampler.html`: the test page.
-- `dist/lb-empty.html`: the empty game. The arrow keys walk, Space or a tap earns wisps for health, and X or a second finger ends the run.
+- `dist/lb-empty.html`: the empty game. The arrow keys or A and D (or the stick on a touch device) walk along Night's level, J (or the attack button) earns wisps for health, and K (or the cast button) ends the run.
 
 ## Build
 
@@ -33,15 +33,16 @@ It prints a line for each game, then `Done, no warnings.` Add a game's folder na
 A frame of the World looks like this. The game decides what happens, and the tools only draw:
 
 ```js
-lb.world.begin(ctx, { place: 'night', camX: g.x - lb.W * 0.3, rise: g.rise });
-lb.world.monster({ kind: 'crawler', x: 900, ph: 1.3, id: 'crawler-1' });
-lb.world.wanderer(g.x, { walking: g.walking, facing: g.facing });
+const L = lb.world.level('night');                       // the place's level: its rolling ground, banks, pits and pieces
+lb.world.begin(ctx, { level: L, camX: g.x - lb.W * 0.32 });
+lb.world.monster({ kind: 'crawler', x: 900, ph: 1.3, id: 'crawler-1', attack: g.lunge });
+lb.world.wanderer(g.x, { move: g.move, step: g.step, facing: g.facing });
 lb.world.end();
 ```
 
-Each place is already seen from a little above the path (its lift, set in the design system), so the back layers stay apart on a phone; `rise` lifts the camera further, for example to follow a jump.
+Each place is already seen from a little above the path (its lift, set in the design system), so the back layers stay apart on a phone; on a level the camera rises with the ground where the wanderer is held, and `rise` can lift it further.
 
-The path's scenery is the directions page's sample strip until levels are laid out (step 4a). Monsters have their existing poses and face one way until Gloam Hallow's play parts are designed (step 4b).
+Since kit 0.8 (design system version 8, step 4c) the tools draw Gloam Hallow's play parts: each place's level, the wanderer's moves, the spells, loot and checkpoints, the posable monsters and their attacks, and the bosses' arrivals and attacks. The shell has the full HUD (`hud: 'full'`), How to play, the win, the place card, the touch controls and the named controls, and the design system's sounds. The tools draw and play; the game decides what happens. Without a level, the path is the directions page's sample strip. Monsters face left, as the design system draws them.
 
 ## The test page
 
@@ -68,7 +69,7 @@ The readout (under the HUD, and out of the way while a plaque line, the boss's n
 
 ## The speed check
 
-Open the test page in Chrome with no other copy open, choose Start game, tap Speed check, and leave it alone for about half a minute. It runs each place in turn with eight monsters, the boss, the flyers and the rain, as phase 1's speed test did. Since kit 0.8.0 it walks up each place's big hill (section E) on its level, the camera rising with the ground, so its results are not quite comparable with earlier ones. It ends with a table, pass or fail against both targets, and a line to copy; since step 4c-4 the line names the step the test page was built for, so a cached copy shows. Since 4c-5b its crowd attacks about half the time and its boss fights, so it measures the heaviest case.
+Open the test page in Chrome with no other copy open, choose Start game, tap Speed check, and leave it alone for about half a minute. It runs each place in turn with eight monsters, the boss, the flyers and the rain, as phase 1's speed test did. Since kit 0.8.0 it walks up each place's big hill (section E) on its level, the camera rising with the ground, so its results are not quite comparable with earlier ones. It ends with a table, pass or fail against both targets, and a line to copy; since step 4c-4 the line names the step the test page was built for, so a cached copy shows. Since 4c-5b its crowd attacks about half the time and its boss fights, so it measures the heaviest case. Since 4c-8 a fifth leg follows the four: the Mist at its boss's arena (the Gaping Tree fighting, the crowd attacking, the boss bar showing), as the design system's speed target asks; the line says "up the big hill, then the Mist at its boss" and adds "Mist boss". The places' background sound is off during the check.
 
 - Phone: at least 30 frames a second, with each frame drawn in 25 ms or less.
 - Computer: 60 frames a second.
