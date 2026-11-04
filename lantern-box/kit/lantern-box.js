@@ -2708,7 +2708,7 @@ BOSS_BOXES.mist=[-132,-262,160,12]; // measured over a stepping cycle, upright a
    Same look as the ghost, skull and tree: graded blacks inside ink edges, ember rim and glow, a few lit lines, the glow behind. */
 BOSS.dawn=function(x,t,rm,nod,look){
   const N=nd(nod),TONE=look&&look.tone,LIT=NOD_COL.dawn,tq=pz(t*0.7,rm);
-  const hv=Math.sin(tq*2)*3,sw=Math.sin(tq*1.2)*0.16,ht=Math.sin(tq*0.9)*0.06,op=2+Math.max(0,Math.sin(tq*1.4))*4;
+  const hv=Math.sin(tq*2)*3,sw=BOSS_SW!=null?BOSS_SW:Math.sin(tq*1.2)*0.16, /* version 8: a move may set the claw arm (BOSS_SW) */ht=Math.sin(tq*0.9)*0.06,op=2+Math.max(0,Math.sin(tq*1.4))*4;
   // a limb, antler or leg segment: ink, then graded across its width (charcoal on its upper side falling to ink), then a lit line
   const drawSegs=(list,dark)=>{for(const s of list){x.fillStyle=INK;taper(x,[s[0],s[1],s[2],s[3],s[4],s[5]]);}
     if(TONE)for(const s of list){if(s[4]<3.5)continue;const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=dy/L,ny=-dx/L,f=ny<0||(ny===0&&nx<0)?1:-1,w=(s[4]+s[5])/2,mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2;
@@ -3627,14 +3627,16 @@ function moSlash(c,pts,w,a){if(pts.length<2||a<=0)return;c.save();c.globalCompos
 const _pivot=(x,P,px,py)=>{x.translate(px,py);x.rotate(P.tilt||0);x.scale(P.sx||1,P.sy||1);x.translate(-px,-py);x.translate(P.dx||0,P.dy||0);};
 Object.assign(MON_BOX,{crawlerP:[-60,-60,52,20],bat2P:[-52,-60,52,40],hatmawP:[-70,-110,60,14],ghoulP:[-95,-140,40,12],walkerP:[-125,-226,70,12]});
 Object.assign(MONSTER,{
+  // the kit (Barney, 4 November 2026): the signal eyes are drawn over the design system's own only while the pose is frozen (P.t), where they line
+  // up with them; unfrozen, the monster's own eyes move with its scuttle, flap or hop and a second pair showed
   // the crawler: squash, stretch and tilt on the design system's own crawler; its legs freeze when P.t is set; the mouth gapes when P.jaw
   crawlerP(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-12);const det=MONSTER.crawler(x,P.t!=null?P.t:t,m,rm);x.restore();
     return(c,o)=>{c.save();_pivot(c,P,0,-12);det(c,o);const j=P.jaw||0,h=P.hot||0;moHot(c,-20,-12,8+h*7,h*0.8);
       if(j>0){moMouth(c,[[-29,-15.6-j*3],[-20,-14.2-j*2.4],[-13,-12.6],[-20,-9.6+j*2.6],[-28,-9.4+j*3.4]],-18,-12,9+j*3);moTeeth(c,[[-27,-15.4-j*2.6],[-26,-12.6-j],[-25,-15-j*2.4],[-22,-14.6-j*2],[-21,-12.2-j*0.6],[-20,-14.2-j*1.8],[-26.6,-9.6+j*3],[-25.6,-12.2+j],[-24.6,-9.8+j*2.6],[-21.6,-10+j*2.2],[-20.6,-12+j*0.8],[-19.6,-10.2+j*2]]);}
-      moEyes(c,o,[[-21,-16.2,0.2],[-17.5,-17.2,0.2]],1.5,1,h);c.restore();};},
+      if(P.t!=null)moEyes(c,o,[[-21,-16.2,0.2],[-17.5,-17.2,0.2]],1.5,1,h);c.restore();};},
   // the flyer: the design system's flyer, tilted along its dive; its wings freeze (P.t) when it folds them to dive
   bat2P(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-2);const det=MONSTER.bat2(x,P.t!=null?P.t:t,m,rm);x.restore();
-    return(c,o)=>{c.save();_pivot(c,P,0,-2);det(c,o);const h=P.hot||0;moHot(c,0,-4,6+h*8,h);moEyes(c,o,[[-1.6,-7.2,0.3],[1.6,-7.2,-0.3]],1.1,0.8,h);c.restore();};},
+    return(c,o)=>{c.save();_pivot(c,P,0,-2);det(c,o);const h=P.hot||0;moHot(c,0,-4,6+h*8,h);if(P.t!=null)moEyes(c,o,[[-1.6,-7.2,0.3],[1.6,-7.2,-0.3]],1.1,0.8,h);c.restore();};},
   // the mouth-hat: its own hop frozen (P.t), then squash, hop and a mouth that gapes and snaps (P.bite)
   hatmawP(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-8);const det=MONSTER.hatmaw(x,P.t!=null?P.t:t,m,rm);x.restore();
     return(c,o)=>{c.save();_pivot(c,P,0,-8);det(c,o);const b=P.bite||0,h=P.hot||0;moHot(c,-11,-24,10+h*8,h*0.7);
@@ -3642,7 +3644,7 @@ Object.assign(MONSTER,{
         c.fillStyle="#2a0507";c.strokeStyle=MO.ember;c.lineWidth=0.9;c.shadowColor=MO.glow;c.shadowBlur=FX?5:0;c.beginPath();[[-22,-30],[-16,-34],[-10,-34.2],[-4,-32],[1,-29],[-2,-23],[-8,-17],[-14,-15.8],[-21,-17]].forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fill();c.stroke();c.shadowBlur=0;
         moMouth(c,[[-14,-27],[-8,-28],[-5,-25],[-8,-21],[-13,-21.6]],-9,-24.6,5);
         moTeeth(c,[[-20,-31.4],[-18,-25],[-16,-32],[-14,-32.6],[-12,-26],[-10,-32.8],[-8,-32.2],[-6,-26.4],[-4,-31.4],[-18,-17.2],[-16,-23],[-14,-16.4],[-11.6,-16.6],[-9.6,-22.6],[-7.6,-17.4]]);c.restore();}
-      moEyes(c,o,[[-13,-41,0.35],[-5,-43,0.15]],3.4,1.4,h);c.restore();};},
+      if(P.t!=null)moEyes(c,o,[[-13,-41,0.35],[-5,-43,0.15]],3.4,1.4,h);c.restore();};},
   // the ghoul, posable: its front arm (P.a: upper arm, forearm angles) can wind up and swipe; P.op opens the jaw; P.slash draws the sweep
   ghoulP(x,t,m,rm){const P=m.P||{},tq=pz(t+m.ph,rm), /* the kit: Reduce motion as ghoul2 */s1=P.s1!=null?P.s1:Math.sin(tq*3),bob=P.bob!=null?P.bob:Math.abs(s1)*2,op=P.op!=null?P.op:3+Math.max(0,Math.sin(tq*1.7))*3,lean=P.lean||0;
     x.save();x.translate(P.dx||0,-bob);
@@ -3746,6 +3748,171 @@ function moAttack(kind,a){const u=a.t||0;
     case"walker:low":return moSweepLow(u);}
   throw new Error('Lantern Box: the '+kind+' has no attack called "'+a.name+'" (it has '+(MO_ATTACKS[kind]||[]).join(", ")+').');}
 
+/* ---------- 4c-5b. mvboss.js: the bosses' attacks, signals, ground warnings and arrival (the fight scripts, BS_FIGHT, are review loops: each boss's
+   arrival and three attacks are lifted out below; the canvas boss bar and plaque are left to the HTML HUD, 4c-6) ---------- */
+/* ============================== 4b round 8: the bosses' attacks, signals, arrival and bar ==============================
+   The design system's four bosses (version 7), drawn by its own bossInto and moved as card puppets: whole-body glides, leaps, rises,
+   leans, fades and turns. What a boss reaches out with that isn't in its drawing (tentacles, a long branch, roots, bolts, splinters,
+   a wave of pale fire) is drawn here in the same way: ink with the ember rim and glow. Signals follow round 7's language, made bigger:
+   a wind-up, eyes flaring and the part that will hurt burning, and for anything that comes up from or down onto the ground, an ember
+   warning on the ground where it will land (the gameplay note's ember glow for the skull, cracks for the tree). A hit: the boss jolts
+   back, its rim flares once and the bar drops, a lighter trace draining after it. Arrival: the boss comes in, its name on a brass
+   plaque at the top for 2 s, and the bar fills along the bottom with its name above. */
+// from mvscene.js: a burst of motes (round 2's), which the fights use for slams, landings and dust
+function fxBurst(c,x,y,k,u,col,core){if(u<0||u>1)return;fxGlowAt(c,x,y,(18+u*20)*k,0.8*(1-u),col);const r=mvRng(5);
+  for(let i=0;i<9;i++){const a=r()*Math.PI*2,d=(6+u*(20+r()*14))*k;fxMote(c,x+Math.cos(a)*d,y+Math.sin(a)*d+u*u*8*k,(1.4-u)*k,1-u,core||MV_LAMP);}}
+function bsPt(X,Y,st,lx,ly){const c=Math.cos(st.tilt||0),s=Math.sin(st.tilt||0),px=lx*(st.flip||1)*(st.sx||1),py=ly*(st.sy||1);return[X+(st.dx||0)+px*c-py*s,Y+(st.dy||0)+px*s+py*c];}
+// ink shapes with the bosses' ember rim and glow: fn draws the paths (fills); called three times
+function bsRim(x,S,fn){x.save();x.fillStyle=INK;x.strokeStyle=INK;x.lineCap="round";x.lineJoin="round";
+  if(FX){x.shadowColor=rgba(MO.ember,0.95);x.shadowBlur=2.5*S;fn(x);x.shadowColor=rgba(MO.glow,0.6);x.shadowBlur=11*S;fn(x);}else hardRim(x,rgba(MO.ember,0.95),S,()=>fn(x)); /* the kit: Effects off, the thin hard rim */
+  x.shadowColor="transparent";x.shadowBlur=0;fn(x);x.restore();}
+function bsTaper(x,p0,p1,p2,w0,w1){rlTaper(x,p0,p1,p2,w0,w1,16);}
+// an ember warning on the ground: a glowing patch, flickering in steps, with cracks when cr is set
+function bsWarn(x,X,G,w,a,t,cr){if(a<=0)return;const fl=0.85+0.15*Math.sin(Math.floor(t*12)*2.1);x.save();x.globalCompositeOperation="screen";x.translate(X,G(X)+2);x.scale(w/30,0.55);
+  const g=x.createRadialGradient(0,0,0,0,0,30);g.addColorStop(0,rgba("#ffe2b0",0.95*a*fl));g.addColorStop(0.35,rgba(MO.ember,0.8*a*fl));g.addColorStop(1,rgba(MO.glow,0));x.fillStyle=g;x.fillRect(-30,-30,60,60);x.restore();
+  {x.save();x.globalCompositeOperation="screen";const gy=G(X),g2=x.createLinearGradient(0,gy,0,gy-56);g2.addColorStop(0,rgba(MO.ember,0.5*a*fl));g2.addColorStop(1,rgba(MO.glow,0));x.fillStyle=g2;x.beginPath();x.ellipse(X,gy,w*0.42,56,0,Math.PI,0);x.fill();x.restore();} // light rising from it
+  if(cr){x.save();x.strokeStyle=rgba(MO.ember,0.9*a);x.shadowColor=MO.glow;x.shadowBlur=FX?6:0;x.lineWidth=1.6;x.lineCap="round";const r=mvRng(Math.round(X));for(let k=0;k<5;k++){let px=X+(r()-0.5)*w*0.5,py=G(px)+1;x.beginPath();x.moveTo(px,py);for(let j=0;j<3;j++){px+=(r()-0.5)*w*0.5*cr;py=G(px)+1+r()*1.2;x.lineTo(px,py);}x.stroke();}x.restore();}}
+const bsWin=(t,a,b)=>t>=a&&t<b?(t-a)/(b-a):null;
+let _S0=1; // the picture's sharpness, for the reach's rim (set by the tools)
+// the skull's tentacle: from a root, arching up and over, its tip coming down onto the ground (down: 0 raised high, 1 slammed)
+function bsTentacle(x,S,root,tip,down,sd,t){const top=[(root[0]+tip[0])/2,Math.min(root[1],tip[1])-150-40*(1-down)],tp=[tip[0]+(1-down)*sd*30,tip[1]-(1-down)*170];
+  bsRim(x,S,c=>{bsTaper(c,root,top,tp,22,6);});x.save();x.fillStyle="#c0603a";for(let k=1;k<8;k++){const u=k/8,m=1-u,px=m*m*root[0]+2*m*u*top[0]+u*u*tp[0],py=m*m*root[1]+2*m*u*top[1]+u*u*tp[1];x.beginPath();x.arc(px,py+4,2.2*(1-u*0.6),0,Math.PI*2);x.fill();}x.restore();}
+// a wave of pale fire rolling along the ground (the ghost's wail)
+function bsWave(x,X,G,sd,a,t){x.save();x.globalCompositeOperation="screen";for(let k=0;k<5;k++){const px=X-sd*k*10,h=(42-k*6)*(0.85+0.15*Math.sin(Math.floor(t*12)+k)),g=x.createLinearGradient(0,G(px),0,G(px)-h);g.addColorStop(0,rgba("#ffd9a0",0.8*a));g.addColorStop(0.5,rgba(MO.ember,0.55*a));g.addColorStop(1,rgba("#f0c9e0",0));
+  x.fillStyle=g;x.beginPath();x.moveTo(px-8,G(px)+2);x.quadraticCurveTo(px-sd*4,G(px)-h*0.6,px+sd*2,G(px)-h);x.quadraticCurveTo(px+sd*6,G(px)-h*0.5,px+8,G(px)+2);x.closePath();x.fill();}x.restore();}
+function bsBolt(x,X,Y,t){fxGlowAt(x,X,Y,16,0.8,MO.ember);x.save();x.fillStyle="#ffd9a0";x.beginPath();x.arc(X,Y,3.2,0,Math.PI*2);x.fill();x.restore();moSlash(x,[[X-26,Y-4],[X-12,Y-2],[X,Y]],4,0.8);}
+function bsSplinter(x,X,Y,a){x.save();x.translate(X,Y);x.rotate(a);x.fillStyle=INK;x.shadowColor=rgba(MO.ember,0.95);x.shadowBlur=FX?3:0;x.beginPath();x.moveTo(12,0);x.lineTo(-10,-2.6);x.lineTo(-13,0);x.lineTo(-10,2.4);x.closePath();x.fill();x.restore();fxGlowAt(x,X+Math.cos(a)*11,Y+Math.sin(a)*11,7,0.7,MO.ember);}
+// the tree's long branch, grown out of its left side branch, swinging over and down
+// the tree's long branch: grown from inside the trunk and drawn behind it, so it joins without a seam; its silhouette takes the bosses'
+// ember rim and glow, and each length is graded across its width like the tree's own limbs (charcoal on its upper side, falling to ink)
+const BS_CH=["#060508","#17141b","#27232d","#3a3544","#504a5c"]; // the card blacks (design system version 7)
+function bsGradedTaper(x,p0,p1,p2,w0,w1){const dx=p2[0]-p0[0],dy=p2[1]-p0[1],L=Math.hypot(dx,dy)||1;let nx=dy/L,ny=-dx/L;if(ny>0){nx=-nx;ny=-ny;} // n points to the upper side
+  const w=(w0+w1)/2,mx=(p0[0]+p2[0])/2,my=(p0[1]+p2[1])/2,hi=w>=6?BS_CH[4]:BS_CH[3],g=x.createLinearGradient(mx+nx*w*0.42,my+ny*w*0.42,mx-nx*w*0.42,my-ny*w*0.42);
+  g.addColorStop(0,BS_CH[2]);g.addColorStop(0.3,hi);g.addColorStop(0.68,BS_CH[2]);g.addColorStop(1,BS_CH[0]);x.save();x.fillStyle=g;rlTaper(x,p0,p1,p2,w0*0.7,w1*0.7,16);x.restore();}
+// the tree's long branch, in the tree's own picture: rooted inside the trunk and drawn before the tree's pieces, so the trunk covers its
+// root and the rim goes round tree and branch as one shape; each length graded across its width like the tree's limbs
+function bsBranchPts(br){const o=[4,-96],L=(250+46)*br.grow;const P=[o];let p=o,ang=br.ang;[[0.42,0],[0.31,0.42],[0.27,-0.36]].forEach(([f,da])=>{ang+=da;const q=[p[0]+Math.cos(ang)*L*f,p[1]+Math.sin(ang)*L*f];P.push(q);p=q;});return P;}
+function bsBranchLocal(br){return uc=>{const P=bsBranchPts(br),W=[26,13,7,2],segs=[0,1,2].map(i=>{const a=P[i],b=P[i+1];return[a,[(a[0]+b[0])/2+(b[1]-a[1])*0.06,(a[1]+b[1])/2-(b[0]-a[0])*0.06],b,W[i],W[i+1]+1];}),
+    twigs=[[1,22,-0.9],[2,16,0.8],[2,12,-0.7],[3,10,0.6]].map(([i,dl,dd])=>{const p=P[i],a0=Math.atan2(P[i][1]-P[i-1][1],P[i][0]-P[i-1][0])+dd;return[p,[p[0]+Math.cos(a0)*dl*0.5,p[1]+Math.sin(a0)*dl*0.5],[p[0]+Math.cos(a0+0.3)*dl,p[1]+Math.sin(a0+0.3)*dl],2.6,0.6];});
+  for(const q of segs)bsTaper(uc,...q);for(const q of twigs)bsTaper(uc,...q);for(const q of segs)bsGradedTaper(uc,...q);uc.fillStyle=INK;};}
+function bsBranchFx(x,X,Y,st,br){const P=bsBranchPts(br),tip=bsPt(X,Y,st,P[3][0],P[3][1]);moHot(x,tip[0],tip[1],14+12*br.hot,br.hot);
+  if(br.sw!=null){const pts=[];for(let k=6;k>=0;k--){const aa=lerpN(-1.75,-3.05,Math.max(0,br.sw-k*0.1)),q=bsBranchPts({grow:br.grow,ang:aa})[3];pts.push(bsPt(X,Y,st,q[0],q[1]));}moSlash(x,pts,6,1);}}
+/* ---------- the kit: each boss's arrival and three attacks as a game plays them, lifted out of the fights (BS_FIGHT) word for word ----------
+   u: seconds since the move began. A: bx, where the boss stands; wx, the wanderer (where he is as the move begins); G, the ground; t, the
+   time; targets, where a slam, roots or crawlers come (the fights' own places round the wanderer if left out). Each move is drawn as the
+   fights draw it, facing the way it was designed (BS_DESIGN: the moor mother's sickle and bolts come after her leap, turned round); the tool
+   mirrors it about the boss when the game has the boss facing the other way (the arenas are flat). */
+const BS_ATTACKS={night:["lunge","behind","wail"],storm:["slam","snap","call"],dawn:["leap","sickle","bolts"],mist:["roots","branch","splinters"]};
+const BS_PHASES={ // [the signal ends, the attack ends, the move ends], seconds
+  night:{arrive:[0,1.0,1.0],lunge:[0.45,0.8,1.6],behind:[0.5,1.75,2.9],wail:[0.6,2.0,2.0]},
+  storm:{arrive:[0,1.1,1.1],slam:[0.8,1.5,1.5],snap:[0.35,0.57,0.95],call:[0.6,0.6,1.2]},
+  dawn:{arrive:[0,1.2,1.2],leap:[0.5,1.2,1.45],sickle:[0.55,0.9,1.45],bolts:[0.5,1.4,1.4]},
+  mist:{arrive:[0,1.3,1.3],roots:[0.75,1.45,1.45],branch:[0.55,0.9,1.35],splinters:[0.5,1.2,1.2]}};
+const BS_DESIGN={dawn:{sickle:-1,bolts:-1}};       // the facing a move was designed in (1, facing left as drawn, unless listed)
+const BS_SIG={night:{eyes:[[-8,-190],[5,-190]],hands:[[-70,-62],[72,-45]]},storm:{eyes:[[-25,-98],[23,-98]],mouth:[0,-60]},dawn:{eyes:[[-7,-175],[8,-176]]},mist:{eyes:[[-12,-84],[10,-82]],mouth:[0,-52]}};
+const BS_HIT={night:10,storm:10,dawn:10,mist:8};   // how far a hit jolts each boss back
+function bsMove(lv,name,u,A){const bx=A.bx,wx=A.wx,G=A.G,t=A.t,fx=[],r={X:bx,st:{},hot:0,fx};let st=r.st,w;const W=(a,b)=>bsWin(u,a,b);
+  if(lv==="night"){st.dy=-5*Math.sin(t*1.7);const H=[-70,-62];
+    const glide=(x0,x1,uu,flip,tilt)=>{const tr2=[];for(let k=5;k>=0;k--){const v2=ease(Math.max(0,uu-k*0.07)),XX=lerpN(x0,x1,v2);tr2.push(bsPt(XX,G(bx)+4,{flip,tilt,dy:st.dy},H[0],H[1]));}fx.push(x=>moSlash(x,tr2,5,1));};
+    if(name==="arrive"){if((w=W(0,1.0))!=null){st.alpha=ease(w);st.dx=120*(1-ease(w));}}                       // fades in
+    else if(name==="lunge"){ // rears back, then glides at you with its hooked claws (roll under): the fight's 1.6 s to 3.2 s
+      if((w=W(0,0.45))!=null){const v=ease(w);st.dx=14*v;st.tilt=0.08*v;r.hot=v;}
+      if((w=W(0.45,0.8))!=null){r.X=lerpN(bx+14,wx+40,ease(w));st.tilt=-0.14;r.hot=1;glide(bx+14,wx+40,w,1,-0.14);}
+      if((w=W(0.8,1.6))!=null){const v=ease(w);r.X=lerpN(wx+40,bx,v);st.alpha=1-0.15*Math.sin(w*Math.PI);st.tilt=-0.14*(1-v);}}
+    else if(name==="behind"){ // fades out and reappears behind you (keep moving): the fight's 3.5 s to 6.4 s, the wanderer at wx when it begins
+      if((w=W(0,0.5))!=null){st.alpha=1-0.38*Math.sin(w*Math.PI); /* Barney: a smooth fade out and back in, not play.js's flicker at 8 a second */r.hot=ease(w);
+        fx.push(x=>{for(let k=0;k<6;k++){const ph=(t*1.3+k/6)%1;fxMote(x,bx-40+k*16,G(bx)-30-ph*150,1.6,Math.sin(ph*Math.PI)*0.8,"#f0c9e0");}});}
+      if((w=W(0.5,0.8))!=null){st.alpha=1-ease(w);r.hot=1-w;}
+      if(u>=0.8&&u<1.1)st.alpha=0;
+      const back=wx-125,to=wx-22;
+      if((w=W(1.1,1.35))!=null){const uu=w;r.X=back;st.flip=-1;st.alpha=ease(w);fx.push(x=>moHot(x,back,G(back)-120,90*(1-uu)+30,1-uu));}
+      if((w=W(1.35,1.45))!=null){r.X=back;st.flip=-1;r.hot=1;}
+      if((w=W(1.45,1.75))!=null){r.X=lerpN(back,to,ease(w));st.flip=-1;st.tilt=0.14;r.hot=1;glide(back,to,w,-1,0.14);}
+      if((w=W(1.75,2.1))!=null){r.X=to;st.flip=-1;st.alpha=1-ease(w);}
+      if(u>=2.1&&u<2.5)st.alpha=0;
+      if((w=W(2.5,2.9))!=null){st.alpha=ease(w);}}
+    else if(name==="wail"){ // rises and wails, a wave of pale fire rolling out along the ground both ways (jump it): the fight's 6.6 s to 8.6 s
+      if((w=W(0,0.6))!=null){const v=ease(w);st.dy=-5*Math.sin(t*1.7)-18*v;st.sy=1+0.06*v;r.hot=v;}
+      if((w=W(0.6,2.0))!=null){st.dy=-5*Math.sin(t*1.7)-18*(1-ease(clamp01(w*3)));r.hot=1-w;const d=(u-0.6)*330,uu=w;fx.push(x=>{for(const sd of [-1,1])bsWave(x,bx+sd*(40+d),G,sd,1-uu*0.7,t);});}}
+  }else if(lv==="storm"){
+    if(name==="arrive"){if((w=W(0,1.1))!=null){st.dy=150*(1-ease(w));st.clipY=G(bx)+4;st.alpha=Math.min(1,w*2);}}       // rises from the street
+    else if(name==="slam"){ // tentacles slam down from either side onto ember warnings (get off the glow): the fight's 1.5 s to 3.0 s
+      const L0=A.targets?A.targets[0]:wx,R0=A.targets?A.targets[1]:wx+190;r.targets=[L0,R0];
+      if((w=W(0,0.8))!=null){const a=ease(w);fx.push(x=>{bsWarn(x,L0,G,90,a,t,0.5);bsWarn(x,R0,G,90,a,t,0.5);});r.hot=0.4*w;}
+      if((w=W(0.8,1.5))!=null){const uu=w,down=w<0.25?ease(w/0.25):w<0.6?1:1-ease((w-0.6)/0.4);fx.push(x=>{bsWarn(x,L0,G,90,1-uu,t,0.5);bsWarn(x,R0,G,90,1-uu,t,0.5);
+        bsTentacle(x,_S0,[L0-260,G(L0)+40],[L0+10,G(L0)+2],down,-1,t);bsTentacle(x,_S0,bsPt(bx,G(bx)+4,{},-72,-60),[R0,G(R0)+2],down,1,t);
+        if(uu>0.22&&uu<0.5){const v=(uu-0.22)/0.28;for(const p of [L0,R0])fxBurst(x,p,G(p)-4,1.2,v,MO.ember);}});}}
+    else if(name==="snap"){ // draws back and snaps its jaw when you are close (roll away): the fight's 4.15 s to 5.1 s
+      if((w=W(0,0.35))!=null){const v=ease(w);st.dx=12*v;r.hot=v;}
+      if((w=W(0.35,0.57))!=null){const v=ease(w);st.dx=12-82*v;st.tilt=-0.06*v;r.hot=1;fx.push(x=>{const m=bsPt(bx,G(bx)+4,st,0,-58);moHot(x,m[0],m[1],44*v,v);});}
+      if((w=W(0.57,0.95))!=null){const v=ease(w);st.dx=-70*(1-v);st.tilt=-0.06*(1-v);}}
+    else if(name==="call"){ // rises and calls up crawlers through cracked warnings (fight them): the fight's 5.3 s to 6.5 s; they rise from 0.6 s
+      const sp=A.targets||[wx+200,wx+290];r.targets=sp;
+      if((w=W(0,0.6))!=null){const v=ease(w);st.dy=-14*v;r.hot=v;fx.push(x=>{for(const p of sp)bsWarn(x,p,G,46,v,t,0.6);});}
+      if(u>=0.6&&u<1.2){st.dy=-14*(1-ease((u-0.6)/0.6));}}
+  }else if(lv==="dawn"){
+    if(name==="arrive"){if((w=W(0,1.2))!=null){st.dx=150*(1-ease(w));st.alpha=Math.min(1,w*2);st.dy=-Math.abs(Math.sin(w*Math.PI*4))*5;}}   // strides in
+    else if(name==="leap"){ // crouches, then leaps right over you on her spider legs (roll under), landing 30 behind you, turned: the fight's 1.6 s to 3.05 s
+      const land=wx-30;r.endX=land;r.endFacing=-1;
+      if((w=W(0,0.5))!=null){const v=ease(w);st.sy=1-0.1*v;st.sx=1+0.04*v;r.hot=v;}
+      if((w=W(0.5,1.2))!=null){r.X=lerpN(bx,land,ease(w));st.dy=-170*4*w*(1-w);st.flip=w<0.5?1:-1;st.tilt=(w<0.5?-1:1)*0.12*Math.sin(w*Math.PI);r.hot=1-w;}
+      if(u>=1.2){r.X=land;st.flip=-1;}
+      if((w=W(1.2,1.45))!=null){const uu=w;st.sy=1-0.08*Math.sin(w*Math.PI);fx.push(x=>fxBurst(x,land,G(land)-4,2,uu,"#bcd2ff"));}}
+    else if(name==="sickle"){ // raises her sickle behind her, then lunges and sweeps it along the ground (jump it): the fight's 3.3 s to 4.75 s, turned
+      st.flip=-1;const tipL=(th)=>{const dx=70,dy=100,c=Math.cos(th),s2=Math.sin(th);return[28+dx*c-dy*s2,-142+dx*s2+dy*c];};
+      if((w=W(0,0.55))!=null){const v=ease(w);st.tilt=-0.05*v;st.sickle=-1.5*v;r.sick=v;r.hot=v*0.6;}
+      if((w=W(0.55,0.9))!=null){const stp=Math.floor(w*5)/5,v=ease(stp),th=lerpN(-1.5,1.65,v);st.sickle=th;st.dx=70*v;st.tilt=-0.05+0.13*v;r.sick=1;
+        const pts=[];for(let k=6;k>=0;k--){const ww=ease(Math.max(0,stp-k*0.07)),t2=lerpN(-1.5,1.65,ww);pts.push(bsPt(bx,G(bx)+4,{flip:-1,dx:70*ww,tilt:-0.05+0.13*ww},...tipL(t2)));}fx.push(x=>moSlash(x,pts,7,1));}
+      if((w=W(0.9,1.45))!=null){const v=ease(w);st.sickle=1.65*(1-v);st.dx=70*(1-v);st.tilt=0.08*(1-v);r.sick=0.4*(1-v);}
+      if(st.sickle!=null)r.sickPt=tipL(st.sickle);}
+    else if(name==="bolts"){ // her shoulder eyes swell, then spit a spread of ember bolts (roll through): the fight's 4.9 s to 6.3 s, turned
+      st.flip=-1;
+      if((w=W(0,0.5))!=null){r.eyes2=ease(w);r.hot=0.3;}
+      if((w=W(0.5,1.4))!=null){r.eyes2=1-w;const o=bsPt(bx,G(bx)+4,{flip:-1},31,-145);fx.push(x=>{for(const k of [-1,0,1]){const d=(u-0.5)*430,px=o[0]+d,py=o[1]+d*(0.18+k*0.16);if(d<620&&py<G(px))bsBolt(x,px,py,t);}});}}
+  }else{
+    if(name==="arrive"){if((w=W(0,1.3))!=null){const uu=w;st.dy=210*(1-ease(w));st.clipY=G(bx)+6;   // tears up out of the ground
+      fx.push(x=>{const r2=mvRng(3);for(let k=0;k<10;k++){const a=r2()*Math.PI,d=uu*120*(0.5+r2());fxMote(x,bx+Math.cos(a)*d*(r2()<0.5?-1:1),G(bx)-Math.sin(a)*d*0.8+uu*uu*80,2.2,1-uu,"#2a2a22");}});}}
+    else if(name==="roots"){ // the ground cracks and glows, then roots burst up through it (get off the cracks): the fight's 1.5 s to 2.95 s
+      const cr=A.targets||[wx-40,wx-5,wx+30];r.targets=cr;
+      if((w=W(0,0.75))!=null){const v=ease(w);r.hot=0.5*v;fx.push(x=>{for(const p of cr)bsWarn(x,p,G,44,v,t,1);});}
+      if((w=W(0.75,1.45))!=null){const up=w<0.3?ease(w/0.3):w<0.65?1:1-ease((w-0.65)/0.35);fx.push(x=>{bsRim(x,_S0,c=>{const r2=mvRng(9);for(const p of cr)for(let k=0;k<2;k++){const bx2=p+(k?14:-10),h=(60+r2()*36)*up,lean=(r2()-0.5)*0.5;bsTaper(c,[bx2,G(bx2)+6],[bx2+lean*h*0.4,G(bx2)-h*0.5],[bx2+lean*h,G(bx2)-h],9,1.5);}});});}}
+    else if(name==="branch"){ // a side branch burns, then a long crooked branch grows out and sweeps across at head height (roll under): 3.25 s to 4.6 s
+      if((w=W(0,0.55))!=null){const v=ease(w);st.tilt=0.035*v;r.hot=v*0.6;r.br={grow:0.3*v,ang:-1.75,hot:v};}
+      if((w=W(0.55,0.9))!=null){const v=ease(w);r.br={grow:lerpN(0.3,1,v),ang:lerpN(-1.75,-3.05,v),hot:1,sw:v};st.tilt=0.035-0.06*v;}
+      if((w=W(0.9,1.35))!=null){const v=ease(w);r.br={grow:1-v,ang:-3.05,hot:1-v};st.tilt=-0.025*(1-v);}}
+    else if(name==="splinters"){ // its maw burns, then spits a fan of splinters (roll through to the trunk): the fight's 4.9 s to 6.1 s
+      if((w=W(0,0.5))!=null){r.hot=ease(w);}
+      if((w=W(0.5,1.2))!=null){const o=bsPt(bx,G(bx)+4,{},0,-52);fx.push(x=>{for(let k=0;k<5;k++){const d=(u-0.5)*470,a=Math.PI+(k-2)*0.11,px=o[0]+Math.cos(a)*d,py=o[1]+Math.sin(a)*d;if(d<600)bsSplinter(x,px,py,a);}});r.hot=1-w;}}
+  }
+  if(name!=="arrive"&&BS_ATTACKS[lv].indexOf(name)<0)throw new Error('Lantern Box: '+BOSS_NAME[lv]+' has no move called "'+name+'" (it has arrive, '+BS_ATTACKS[lv].join(", ")+').');
+  const ph=BS_PHASES[lv][name];r.phase=u<ph[0]?"signal":u<ph[1]?"attack":u<ph[2]?"recover":"done";
+  return r;}
+// as bsDraw, the kit's way: the boss's picture repainted only when its pose steps or a setting it shows changes (a flare, the sickle, the
+// branch), its glow drawn onto the scene every frame, the moves (glide, leap, rise, lean, fade, turn) made when it is placed
+let BOSS_SW=null;                                   // the moor mother's claw arm, when a move sets it (play.js swapped Math.sin for this)
+const BSK={};
+function bsDrawKit(x,S,lv,X,Y,t,opts,st,br){const a=st.alpha==null?1:st.alpha;if(a<=0.01)return;
+  const step=opts.rm?-KIT.frame:Math.floor(t*(BOSS_STEP[lv]||1)*8),key=step+"|"+(st.flare?1:0)+"|"+(st.sickle==null?"":st.sickle.toFixed(4))+"|"+(br&&br.grow>0?JSON.stringify(br):"")+"|"+FX;
+  let K=BSK[lv];if(!K||K.S!==S){K=BSK[lv]={S,B:mk(Math.ceil(460*S),Math.ceil(330*S)),bcache:{},key:null};}
+  if(K.key!==key){const B=K.B,bc=B.getContext("2d");bc.setTransform(1,0,0,1,0,0);bc.clearRect(0,0,B.width,B.height);
+    const one=(o2)=>{BOSS_SW=st.sickle!=null&&lv==="dawn"?-st.sickle:null;try{bossInto(bc,S,lv,t,o2,0,0,BOSS_NOD,true,K.bcache,BOSS_LOOK);}finally{BOSS_SW=null;}};
+    if(br&&br.grow>0){const U=K.U&&K.US===S?K.U:(K.US=S,K.U=mk(B.width,B.height)),uc=U.getContext("2d");
+      uc.setTransform(1,0,0,1,0,0);uc.clearRect(0,0,U.width,U.height);uc.setTransform(S,0,0,S,230*S,300*S);uc.fillStyle=INK;uc.strokeStyle=INK;uc.lineCap="round";uc.lineJoin="round";
+      bsBranchLocal(br)(uc);uc.fillStyle=INK;uc.strokeStyle=INK;const det=BOSS[lv](uc,t,opts.rm,BOSS_NOD,BOSS_LOOK);
+      const rim=(o2)=>{if(FX){bc.shadowColor=rgba(o2.dcol,0.95);bc.shadowBlur=2.5*S;bc.drawImage(U,0,0);bc.shadowColor=rgba(o2.dglow,0.6);bc.shadowBlur=11*S;bc.drawImage(U,0,0);bc.shadowColor="transparent";bc.shadowBlur=0;}
+        else hardRim(bc,rgba(o2.dcol,0.95),S,()=>bc.drawImage(U,0,0));}; // the kit: Effects off, the thin hard rim
+      rim(opts);if(st.flare)rim(Object.assign({},opts,{dcol:"#ffb070"}));bc.drawImage(U,0,0);bc.save();bc.setTransform(S,0,0,S,230*S,300*S);det(bc,opts);bc.restore();}
+    else{one(opts);if(st.flare)one(Object.assign({},opts,{dcol:"#ffb070"}));}
+    K.key=key;KIT.poses++;}
+  const X1=X+(st.dx||0),Y1=Y+(st.dy||0);if(st.glow!==0&&FX)bossGlow(x,X1,Y1,lv,a*(st.glow==null?1:st.glow));
+  x.save();x.globalAlpha=a;if(st.clipY!=null){x.beginPath();x.rect(X1-400,-2000,800,2000+st.clipY);x.clip();}x.translate(X1,Y1);x.rotate(st.tilt||0);x.scale((st.flip||1)*(st.sx||1),st.sy||1);x.drawImage(K.B,-230,-300,460,330);x.restore();}
+// the signals drawn with the boss, as the fights draw them: its eyes, mouth and hands burning hotter, the sickle's edge, the shoulder eyes
+function bsSignals(x,lv,X,Y,st,r){const hot=r.hot,sg=BS_SIG[lv];
+  if(hot>0&&(st.alpha==null||st.alpha>0.3)){for(const p of sg.eyes){const w=bsPt(X,Y,st,p[0],p[1]);moHot(x,w[0],w[1],10+12*hot,hot);}if(sg.mouth){const w=bsPt(X,Y,st,sg.mouth[0],sg.mouth[1]);moHot(x,w[0],w[1],14+14*hot,hot*0.8);}
+    if(sg.hands){for(const h of sg.hands){const w=bsPt(X,Y,st,h[0],h[1]);moHot(x,w[0],w[1],10+10*hot,hot);}}}
+  if(r.sick){const w=bsPt(X,Y,st,...(r.sickPt||[98,-42]));moHot(x,w[0],w[1],16+16*r.sick,r.sick);}
+  if(r.eyes2){for(const p of [[24,-150],[33,-147],[27,-141],[36,-139]]){const w=bsPt(X,Y,st,p[0],p[1]);moHot(x,w[0],w[1],6+8*r.eyes2,r.eyes2);}}}
+
 /* ============================== the tools: what a game calls, as lb.world ==============================
    The tools draw; games decide what happens. A frame is world.begin(ctx, { place, camX, rise }), then the things on the path
    in the order they should overlap, then world.end(). Things on the path are placed by x, along the path, and y, in picture
@@ -3806,13 +3973,14 @@ function makeTools(env){
       const rm=env.rm(),t=o.t==null?env.t():o.t,sc=sceneFor(S),W=env.W(),camX=o.camX||0;
       const opt={level,rm,walking:true,facing:1,hud:false,splash:"on",emberMouth:true,defeat:"cardwisp",dcol:EMBER.danger,dglow:EMBER.glow,win:GOLD_LIGHT,litP:LV[level].litP,sample:!!o.sample,lvl:L?L._T:null};
       const rise=o.rise!=null?o.rise:L?L.rise(camX+W*0.32):0;
-      F={ctx,s:S,W,t,rm,level,camX,camY:rise,opt,gy:L?L.ground:gY};
+      F={ctx,s:S,W,t,rm,level,camX,camY:rise,opt,gy:L?L.ground:gY,late:[]};
       sc.kitBegin(ctx,S,F.W,t,F.camX,F.camY,opt);
       frame("begin");
     },
     end(){
       frame("end");
       scene.kitEnd(F.ctx,F.s,F.W,F.t,F.camX,F.camY,F.opt);
+      if(F.late.length){frame("end");for(const fn of F.late)fn(F.ctx);} // version 8: a boss's warnings and reach, after the fore layer (as the fights draw them)
       F.ctx.setTransform(1,0,0,1,0,0);
       F=null;
     },
@@ -3892,6 +4060,9 @@ function makeTools(env){
       let dx=at?at.dx:0,dy=at?at.dy:0;if(hit){dx+=8;if(o.kind==="bat2")dy-=6;}
       const x=o.x+dx,X=x-f.camX,Y=(o.y==null?f.gy(x)+(STAND[o.kind]||0):o.y)+dy,m={kind:MON_P[o.kind],X,Y,ph:o.ph||0,id:o.id,P:at?at.P:{}};
       const out=at?{phase:at.phase,dx,dy}:{phase:null,dx,dy};
+      if(o.rise!=null&&o.rise<0.35){ // version 8 (4c-5b): rising out of the ground (the skull's crawlers): 0.35 s, its legs still, dust bursting
+        const rv=clamp(o.rise/0.35,0,1),c=f.ctx,gy=f.gy(x);m.Y+=(1-rv)*26;m.P=Object.assign({t:1.0},m.P);
+        c.save();c.beginPath();c.rect(X-80,-2000,160,2000+gy+4);c.clip();scene.monster(c,s,m,f.t,f.opt,hit);c.restore();fxBurst(c,X,gy-2,1,rv,"#3a2a22");return out;}
       if(o.defeat==null){scene.monster(f.ctx,s,m,f.t,f.opt,hit);return out;}
       const d=defeatCanvas("M",260,250,s);
       scene.monsterInto(d.c,s,m,f.t,f.opt,0,0);
@@ -3899,10 +4070,27 @@ function makeTools(env){
       return out;
     },
     ATTACKS:MO_ATTACKS,
+    BOSS_ATTACKS:BS_ATTACKS,
+    BOSS_MOVES:Object.fromEntries(Object.keys(BS_PHASES).map(lv=>[lv,Object.fromEntries(Object.keys(BS_PHASES[lv]).map(n=>[n,BS_PHASES[lv][n][2]]))])), // each move's length, seconds
     boss(o){ // o: x, y, defeat (0 to 1, over 2.2 s). The boss is the place's own.
+      // version 8 (4c-5b): arrive (seconds since its arrival began); attack { name (in world.BOSS_ATTACKS), t (seconds), at (the wanderer's x as it
+      // began), targets (where a slam, roots or crawlers come; the fights' own places round him if left out) }; facing (1 facing left as drawn, -1
+      // turned round); hit (seconds since a blow: it jolts back and its rim flares once, 0.13 s). Returns its phase, where it is (x) and which way it
+      // faces after the move (the moor mother's leap turns her). Its warnings and its reach are drawn after the fore layer, in world.end().
       const f=frame("boss"),s=f.s,lv=f.level;
-      const X=o.x-f.camX,Y=o.y==null?f.gy(o.x)+2:o.y;
-      if(o.defeat==null){scene.bossAt(f.ctx,s,lv,f.t,f.opt,X,Y);return;}
+      if(o.defeat==null){
+        const name=o.arrive!=null?"arrive":o.attack?o.attack.name:null,u=o.arrive!=null?o.arrive:o.attack?(o.attack.t||0):0,fl=o.facing||1;
+        const design=name?((BS_DESIGN[lv]&&BS_DESIGN[lv][name])||1):1,mir=fl!==design,X0=o.x,m=x=>mir?2*X0-x:x; // a turned boss: the move mirrored about it
+        const at=o.attack&&o.attack.at!=null?o.attack.at:X0-300,tg=o.attack&&o.attack.targets?o.attack.targets.map(m):null;
+        _S0=s;const r=name?bsMove(lv,name,u,{bx:X0,wx:m(at),G:f.gy,t:f.t,targets:tg}):{X:X0,st:lv==="night"?{dy:-5*Math.sin(f.t*1.7)}:{},hot:0,fx:[],phase:null};
+        if(o.hit!=null&&o.hit>=0&&o.hit<0.13){r.st.dx=(r.st.dx||0)+BS_HIT[lv]*(r.st.flip||1);r.st.flare=true;}
+        const Y=o.y==null?(lv==="dawn"?f.gy(r.X)+4:f.gy(X0)+4):o.y; // as the fights place them: the moor mother on the ground where she is, the others where they stand
+        const c=f.ctx,place=k=>{k.translate(-f.camX,0);if(mir){k.translate(X0,0);k.scale(-1,1);k.translate(-X0,0);}};
+        c.save();place(c);bsDrawKit(c,s,lv,r.X,Y,f.t,f.opt,r.st,r.br);if(r.br&&r.br.grow>0)bsBranchFx(c,r.X,Y,r.st,r.br);bsSignals(c,lv,r.X,Y,r.st,r);c.restore();
+        if(r.fx.length)F.late.push(k=>{k.save();place(k);try{for(const fn of r.fx)fn(k);}finally{k.restore();}});
+        return{phase:r.phase,x:m(r.endX!=null&&r.phase==="done"?r.endX:r.X),facing:r.endFacing!=null&&u>=BS_PHASES[lv][name][1]?(mir?-r.endFacing:r.endFacing):fl,targets:r.targets?r.targets.map(m):undefined};
+      }
+      const X=o.x-f.camX,Y=o.y==null?f.gy(o.x)+4:o.y;
       const u=clamp(o.defeat,0,1),d=defeatCanvas("B",460,330,s),K=scene.defK||(scene.defK={});
       bossInto(d.c,s,lv,f.t,f.opt,0,0,BOSS_NOD,true,K,BOSS_LOOK);
       const fade=Math.max(0,1-u*2.2/0.8); // the glow fades as it falls apart
@@ -5001,7 +5189,8 @@ function makeTools(env){
          world.monster({ kind, x, y, ph, id, defeat, seed, attack, hit }) (kinds in world.MONSTERS; give each monster its own id;
          defeat 0 to 1 breaks it into card pieces and a wisp, over 1.6 s; version 8: the posable monsters, attack { name, t } with
          names in world.ATTACKS, moving it from x and returning dx, dy and its phase; hit, seconds since a blow: 0.13 s of flare),
-         world.boss({ x, y, defeat }) (the place's own; defeat over 2.2 s), world.splash(x, { y, seed }), world.candle(x, y),
+         world.boss({ x, y, defeat, arrive, attack, facing, hit }) (the place's own; defeat over 2.2 s; version 8: its arrival and
+         three attacks, names in world.BOSS_ATTACKS, lengths in world.BOSS_MOVES; its warnings and reach are drawn in world.end()), world.splash(x, { y, seed }), world.candle(x, y),
          world.wallLamp(x, y), world.post(x, y, lit), world.streetLamp(x, y), world.shrine(x, y), world.potion(x, y),
          world.stringLights(ax, ay, qx, qy, bx, by, seed). begin({ sample: true }) adds the directions page's monsters and
          wanderer to the path. Without a level, the path's scenery is the directions page's sample strip.
