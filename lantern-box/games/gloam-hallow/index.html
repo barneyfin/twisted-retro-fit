@@ -22,6 +22,8 @@
    of monsters for the speed check (Testing).
    Step 4d-3: mana, the heal and the fireball (three levels each, from scrolls), not enough mana's fizzle, switching spells, and the
    loot: potions, armour, scrolls and sword upgrades dropped by monsters and picked up by touch, and health potions on pieces and hills.
+   Step 4d-4: the four bosses, each in its arena at the place's end: the camera locking, its arrival, name and bar, its three attacks
+   and their answers, blows and fireballs, its defeat, 25 wisps and its sure drop; a life lost restarts at its door.
    Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
@@ -110,6 +112,20 @@ const PIECE_POTION = 0.35;       // the scenery potions made real: about one pie
 const LINES = { heal: ['Heal mastered', 'Heal: restores deeper'], fire: ['Fireball mastered', 'Fireball: glows brighter'],
   reach: 'Sword: reaches beyond', rune: 'Sword: bites deeper' };
 
+// The bosses (4d-4; starting figures): health in blows (a fight of about a minute), each attack's share of health (Barney: 20 to 30%),
+// where it stands from the arena's right end, its body as it faces left (from the kit's drawing, measured against a ruler), and the
+// pause between its moves. The kit's facing: 1 faces left as drawn, -1 turned round.
+const BOSS = {
+  night: { hp: 40, at: 260, body: [-50, 50, -236, -5], rest: [0.9, 1.5], dmg: { lunge: 0.2, behind: 0.2, wail: 0.25 } },
+  storm: { hp: 45, at: 240, body: [-60, 60, -182, -40], rest: [1.0, 1.6], dmg: { slam: 0.25, snap: 0.2, call: 0 } },
+  dawn:  { hp: 50, at: 300, body: [-55, 60, -210, -40], rest: [0.8, 1.3], dmg: { leap: 0.25, sickle: 0.25, bolts: 0.2 } },
+  mist:  { hp: 55, at: 200, body: [-60, 75, -230, 0], rest: [1.0, 1.5], dmg: { roots: 0.25, branch: 0.3, splinters: 0.2 } },
+};
+const BOSS_WISPS = 25;
+const BOSS_TOUCH = 0.15;         // its body hurts on touch too (not while he rolls through it), so it is struck from the sword's reach
+const HEAD_H = 100;              // his height to the top of his hat: a boss's attack that touches the hat hurts
+const DESIGN_FACING = { dawn: { sickle: -1, bolts: -1 } };   // the kit's: the moor mother's sickle and bolts are drawn turned round
+
 let G = null;                    // the run's state, for the console while testing
 
 LanternBox.game({
@@ -161,7 +177,8 @@ LanternBox.game({
     if (lb.input.pressed.cast) g.castBuf = CAST_BUF;      // the same for a cast
     if (lb.input.pressed.switch) switchSpell(g, lb);
     if (g.mode !== 'lost' && g.mode !== 'return' && g.mana < 1) { g.mana = Math.min(1, g.mana + MANA_RATE * dt); hudMana(g, lb, false); }
-    moveUpdate(g, lb, dt);
+    if (!(g.boss && g.boss.st === 'arrive')) moveUpdate(g, lb, dt);   // play stops while the boss comes in
+    bossUpdate(g, lb, dt);
     monstersUpdate(g, lb, dt);
     shotsUpdate(g, lb, dt);
     lootUpdate(g, lb, dt);
@@ -173,6 +190,7 @@ LanternBox.game({
     w.begin(ctx, { level: L, camX });
     g.cps.forEach((cp, k) => { g.glass[k] = w.checkpoint(cp.x, { lit: cp.lit === true ? true : cp.lit != null ? lb.time - cp.lit : undefined, from: g.lantern || undefined }); });
     drawLoot(g, lb, w, camX);
+    drawBoss(g, lb, w);
     drawMonsters(g, lb, w, camX, false);
     const r = drawWanderer(g, lb, w);
     if (r && r.lantern) { g.lantern = r.lantern; g.chest = r.chest; g.hand = r.hand; }
@@ -182,7 +200,10 @@ LanternBox.game({
   },
 });
 
-function camAt(g, lb) { return Math.max(0, Math.min(g.L.length - lb.W, g.x - lb.W * 0.32)); }
+function camAt(g, lb) {                // following him, and held at the arena's end while a boss is fought (the camera locks)
+  if (g.boss && g.boss.lock) return Math.max(0, g.L.length - lb.W);
+  return Math.max(0, Math.min(g.L.length - lb.W, g.x - lb.W * 0.32));
+}
 
 /* ---------- moving (4d-1) ---------- */
 function moveUpdate(g, lb, dt) {
@@ -225,6 +246,7 @@ function loadPlace(g, lb, p, ci) {   // the place's level and its checkpoints; c
   g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1; g.walkDist = 0;
   spawnMonsters(g, lb);
   placeLoot(g, lb);
+  g.boss = newBoss(g);
 }
 function enterPlace(g, lb) {         // once the place card's black is down: the place's sound and track
   g.out = false;
@@ -380,6 +402,10 @@ function lostUpdate(g, lb, dt) {
     g.mode = 'return'; g.mt = 0; g.safeT = 0; g.hurtT = 9;
     g.armour = 0; lb.hud.armour(0);    // a lost life loses the armour; spells and sword upgrades are kept, and loot picked up stays picked up
     g.shots = []; g.cast = null; g.castBuf = 0;
+    if (g.boss && g.boss.st !== 'done') {   // a life lost in a boss fight: back at its door, the boss whole again, its crawlers gone
+      g.boss = newBoss(g); lb.hud.boss(null);
+      g.mons = g.mons.filter((m) => !m.summoned);
+    }
     lb.hud.health(0); lb.hud.mana(0);
     monstersReturn(g, lb);
   }
@@ -414,6 +440,8 @@ function swordHits(g, lb) {
     hits++;
     damage(g, lb, m, 1 + 0.5 * g.sword.bite, f);
   }
+  const bb = bossBody(g);
+  if (bb && !(bb[1] < x0 || bb[0] > x1 || bb[3] < y0 || bb[2] > y1)) { hits++; bossDamage(g, lb, 1 + 0.5 * g.sword.bite); }
   if (hits) lb.sfx('hit');
 }
 function damage(g, lb, m, n, dir) {    // a blow or a fireball: it flares and jolts (the kit's); a medium one is pushed back a little
@@ -464,10 +492,217 @@ function shotsUpdate(g, lb, dt) {     // each fireball flies on until it hits a 
     if (s.burst != null) { s.burst += dt; if (s.burst >= 0.4) s.gone = true; continue; }
     s.x += s.f * FIRE_SPEED * dt;
     const m = g.mons.find((q) => { if (!alive(q)) return false; const b = monBox(q); return !(b[1] < s.x - 10 || b[0] > s.x + 10 || b[3] < s.y - 10 || b[2] > s.y + 10); });
+    const bb = m ? null : bossBody(g);
     if (m) { s.burst = 0; lb.sfx('burst'); damage(g, lb, m, SPELL.fire.dmg[s.level], s.f); }
+    else if (bb && !(bb[1] < s.x - 10 || bb[0] > s.x + 10 || bb[3] < s.y - 10 || bb[2] > s.y + 10)) { s.burst = 0; lb.sfx('burst'); bossDamage(g, lb, SPELL.fire.dmg[s.level]); }
     else if (s.x < camX - 60 || s.x > camX + lb.W + 60) s.gone = true;
   }
   if (g.shots.some((s) => s.gone)) g.shots = g.shots.filter((s) => !s.gone);
+}
+
+/* ---------- the bosses (4d-4) ---------- */
+// The fight: walking into the arena's end locks the camera and brings the boss in its own way (its name on the plaque, the bar filling;
+// play stops for its arrival); it chooses among its three attacks, each the kit's own (signal, attack, recovery), with a pause between;
+// a blow or a fireball jolts it and its rim flares (the kit's), and the bar drops. At no health: its card pieces and golden wisp (the
+// kit's, 2.2 s), 25 wisps, its sure drop (a spell scroll he lacks, else a sword or spell upgrade he can use), and the camera lets go.
+// A life lost in the fight brings him back at the boss's door, the boss whole again.
+const ease3 = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v)), lerp3 = (a, b, v) => a + (b - a) * v, win3 = (u, a, b) => (u >= a && u < b ? (u - a) / (b - a) : null);
+function newBoss(g) {
+  const P = PLACES[g.p], B = BOSS[P];
+  return { st: 'wait', place: P, name: '', hp: B.hp, max: B.hp, bx: g.L.length - B.at, f: 1, move: null, rest: 1.2, t: 0, hitT: null,
+    last: null, lock: false };
+}
+function bossUpdate(g, lb, dt) {
+  const b = g.boss;
+  if (!b || b.st === 'done') return;
+  if (b.hitT != null) b.hitT += dt;
+  if (b.st === 'wait') {               // he walks in as far as the camera's stop at the arena's end, on his feet: it begins
+    if (g.x >= g.L.length - lb.W * 0.68 && g.mode === 'ground' && !g.out) {
+      b.st = 'arrive'; b.t = 0; b.lock = true; b.name = lb.world.bossNames[b.place];
+      lb.hud.bossName(b.name); lb.hud.boss({ name: b.name, hp: 1 }); lb.sfx('bossArrives');
+    }
+    return;
+  }
+  // the camera holds and so do the arena's ends while it lasts
+  if (b.lock) { const l = Math.max(0, g.L.length - lb.W) + 20, r = g.L.length - 30; if (g.x < l) g.x = l; if (g.x > r) g.x = r; }
+  b.t += dt;
+  if (b.st === 'arrive') { if (b.t >= lb.world.BOSS_MOVES[b.place].arrive) { b.st = 'fight'; b.t = 0; b.rest = 0.8; } return; }
+  if (b.st === 'defeat') { if (b.t >= 2.2) { b.st = 'done'; b.lock = false; } return; }
+  if (g.mode === 'lost' || g.mode === 'return') return;
+  if (b.move) {
+    b.move.t += dt;
+    if (b.move.name === 'call' && !b.move.called && b.move.t >= 0.6) { b.move.called = true; callCrawlers(g, lb, b); }
+    if (b.move.t >= lb.world.BOSS_MOVES[b.place][b.move.name]) endBossMove(g, lb, b);
+    return;
+  }
+  b.rest -= dt;
+  if (b.rest <= 0) startBossMove(g, lb, b);
+}
+// its choice: what suits where he is, never the same twice running when it has another
+function startBossMove(g, lb, b) {
+  const d = Math.abs(g.x - b.bx), faceHim = g.x < b.bx ? 1 : -1, opts = [];
+  const add = (name, w) => { if (w > 0) opts.push([name, b.last === name ? w * 0.25 : w]); };
+  if (b.place === 'night') { add('lunge', d > 100 && d < 520 ? 2 : 0); add('behind', 1.4); add('wail', 1.2); }
+  if (b.place === 'storm') { add('snap', d < 170 ? 3 : 0); add('slam', 2); add('call', g.mons.filter((m) => m.summoned && alive(m)).length < 2 ? 1.3 : 0); }
+  if (b.place === 'dawn') { add('sickle', d < 180 ? 3 : 0); add('leap', d > 60 && d < 380 ? 2 : 0); add('bolts', d > 150 ? 2 : 0); }
+  if (b.place === 'mist') { add('branch', d < 330 ? 2 : 0); add('roots', 2); add('splinters', d > 110 ? 1.5 : 0); }
+  let r = lb.rand() * opts.reduce((a, o) => a + o[1], 0), name = opts[0][0];
+  for (const o of opts) { if ((r -= o[1]) <= 0) { name = o[0]; break; } }
+  if (b.place !== 'mist') b.f = faceHim;   // it turns to him (the tree never turns)
+  const lo = Math.max(0, g.L.length - lb.W) + 40, hi = g.L.length - 40;
+  let at = g.x;
+  if (name === 'leap') at = b.f === 1 ? Math.max(at, lo + 70) : Math.min(at, hi - 70);   // so she lands inside the arena
+  if (name === 'behind') at = b.f === 1 ? Math.max(at, lo + 130) : Math.min(at, hi - 130);   // so the ghost comes back into sight behind him
+  const m = { name, t: 0, at };
+  if (name === 'slam') m.targets = [g.x, Math.max(lo, Math.min(hi, g.x + 190 * (b.bx > g.x ? 1 : -1)))];
+  if (name === 'call') m.targets = [Math.max(lo, g.x - 120), Math.min(hi, g.x + 120)];
+  if (name === 'roots') m.targets = [g.x - 30, g.x, g.x + 30];   // centred on him, so walking off either way in the warning's 0.75 s clears them
+  b.move = m; b.last = name;
+}
+function endBossMove(g, lb, b) {
+  const m = b.move;
+  if (m.name === 'leap') { b.bx = bossLand(b, m); b.f = -b.f; }   // she lands behind him, turned round
+  b.move = null;
+  const R = BOSS[b.place].rest; b.rest = R[0] + lb.rand() * (R[1] - R[0]);
+}
+// the kit's own moves, in their design's frame (facing left, x from the boss) and back again: mirrored about the boss when it faces
+// the other way from the way the move was drawn
+function bossMir(b, name) { const d = (DESIGN_FACING[b.place] && DESIGN_FACING[b.place][name]) || 1; return b.f !== d; }
+function bossLand(b, m) { const mir = bossMir(b, 'leap'), wx = mir ? 2 * b.bx - m.at : m.at, land = wx - 30; return mir ? 2 * b.bx - land : land; }
+// where the boss's body is now (for blows and fireballs), or null while it can't be struck (arriving, faded, in the air, beaten)
+function bossBody(g) {
+  const b = g.boss;
+  if (!b || b.st !== 'fight') return null;
+  const B = BOSS[b.place].body, m = b.move, u = m ? m.t : 0;
+  let x = b.bx, flipped = b.f === -1;
+  if (m && b.place === 'night') {
+    const mir = bossMir(b, m.name), wx = mir ? 2 * b.bx - m.at : m.at, M = (v) => (mir ? 2 * b.bx - v : v);
+    let w;
+    if (m.name === 'lunge') { if ((w = win3(u, 0.45, 0.8)) != null) x = M(lerp3(b.bx + 14, wx + 40, ease3(w))); else if ((w = win3(u, 0.8, 1.6)) != null) x = M(lerp3(wx + 40, b.bx, ease3(w))); }
+    if (m.name === 'behind') {
+      if (u >= 0.6 && u < 1.15 || u >= 1.8 && u < 2.6) return null;   // faded out
+      const back = wx - 125, to = wx - 22;
+      if (u >= 1.15 && u < 1.8) { x = M(u < 1.45 ? back : lerp3(back, to, ease3(Math.min(1, (u - 1.45) / 0.3)))); flipped = !flipped; }
+    }
+  }
+  if (m && b.place === 'dawn' && m.name === 'leap' && u >= 0.5 && u < 1.2) return null;   // in the air
+  if (m && b.place === 'dawn' && m.name === 'sickle') { const mir = bossMir(b, 'sickle'), v = sickleV(u); x = mir ? b.bx - 70 * v : b.bx + 70 * v; }
+  if (m && b.place === 'storm' && m.name === 'snap') { const dx = snapDx(u); x = b.f === 1 ? b.bx + dx : b.bx - dx; }
+  const G = g.L.ground(x);
+  return flipped ? [x - B[1], x - B[0], G + B[2], G + B[3]] : [x + B[0], x + B[1], G + B[2], G + B[3]];
+}
+function snapDx(u) { let w; if ((w = win3(u, 0, 0.35)) != null) return 12 * ease3(w); if ((w = win3(u, 0.35, 0.57)) != null) return 12 - 82 * ease3(w); if ((w = win3(u, 0.57, 0.95)) != null) return -70 * (1 - ease3(w)); return 0; }
+function sickleV(u) { let w; if ((w = win3(u, 0.55, 0.9)) != null) return ease3(Math.floor(w * 5) / 5); if ((w = win3(u, 0.9, 1.45)) != null) return 1 - ease3(w); return 0; }
+// what of its attack can hurt him now: each piece a box ([x0, x1, y0, y1], or a circle [x, y, r]), with the share of health it takes;
+// counted from the ground under it. Rolling, he passes through bolts and splinters ("roll through"), and under what is higher than 38.
+function bossHits(g, rolling) {
+  const b = g.boss;
+  if (!b || b.st !== 'fight') return null;
+  const hit = b.move ? bossAttackHits(g, b, rolling) : null;
+  if (hit || rolling) return hit;
+  const bb = bossBody(g);              // touching its body (none while it is faded, in the air or beaten)
+  return bb && !(bb[1] < g.x - BODY_W || bb[0] > g.x + BODY_W || bb[3] < g.y - BODY_H || bb[2] > g.y) ? { dmg: BOSS_TOUCH, x: b.bx } : null;
+}
+function bossAttackHits(g, b, rolling) {
+  const m = b.move, u = m.t, P = b.place, dmg = BOSS[P].dmg[m.name], mir = bossMir(b, m.name), M = (v) => (mir ? 2 * b.bx - v : v);
+  const wx = mir ? 2 * b.bx - m.at : m.at, Gd = (xd) => g.L.ground(M(xd)), h = rolling ? ROLL_H : HEAD_H;
+  const me = [g.x - BODY_W, g.x + BODY_W, g.y - h, g.y];
+  const box = (x0, x1, y0, y1) => { const a = M(x0), c = M(x1); return !(Math.max(a, c) < me[0] || Math.min(a, c) > me[1] || y1 < me[2] || y0 > me[3]); };
+  const ball = (xd, y, r) => { const x = M(xd), cx = Math.max(me[0], Math.min(me[1], x)), cy = Math.max(me[2], Math.min(me[3], y)); return (x - cx) ** 2 + (y - cy) ** 2 < r * r; };
+  const at = (ok, x) => (ok ? { dmg, x: M(x) } : null);
+  let w;
+  if (P === 'night') {
+    if (m.name === 'lunge' && (w = win3(u, 0.45, 0.8)) != null) { const X = lerp3(b.bx + 14, wx + 40, ease3(w)), G = Gd(X - 70); return at(box(X - 95, X - 45, G - 80, G - 44), X); }   // the hooked claws, chest high
+    if (m.name === 'behind' && (w = win3(u, 1.45, 1.75)) != null) { const X = lerp3(wx - 125, wx - 22, ease3(w)), G = Gd(X + 70); return at(box(X + 45, X + 95, G - 80, G - 44), X); }
+    if (m.name === 'wail' && u >= 0.6 && u < 2.0) {   // a wave of pale fire each way along the ground: five crests, 42 high at the front, lower behind
+      const d = 40 + (u - 0.6) * 330;
+      // against his feet (5 either side), each crest at the low end of its flicker (85%), so a jump has a fair moment to clear it
+      for (const sd of [-1, 1]) for (let k = 0; k < 5; k++) { const px = b.bx + sd * (d - k * 10), G = Gd(px); if (box(px - 6, px + 6, G - (42 - k * 6) * 0.85, G) && Math.abs(M(px) - g.x) < 11) return { dmg, x: M(b.bx) }; }
+    }
+  }
+  if (P === 'storm') {
+    if (m.name === 'slam' && u >= 0.92 && u < 1.25) {   // the tentacles coming down onto the glow
+      const T = m.targets.map((t) => (mir ? 2 * b.bx - t : t)), tips = [T[0] + 10, T[1]];
+      for (const p of tips) { const G = Gd(p); if (box(p - 38, p + 38, G - 170, G)) return { dmg, x: M(p) }; }
+    }
+    if (m.name === 'snap' && u >= 0.42 && u < 0.62) { const X = b.bx + snapDx(u), G = Gd(X); return at(box(X - 55, X + 20, G - 110, G - 10), X); }   // the jaw
+  }
+  if (P === 'dawn') {
+    if (m.name === 'leap' && u >= 1.15 && u < 1.32) { const land = wx - 30, G = Gd(land); return at(box(land - 60, land + 60, G - 110, G), land); }   // her landing
+    if (m.name === 'sickle' && (w = win3(u, 0.55, 0.9)) != null) {
+      // the sickle sweeping along the ground (drawn turned round), in five steps: the blade's path from the last step to this one, as the
+      // kit's ember trail shows it, low under her and rising in front
+      const stp = Math.floor(w * 5) / 5, v1 = ease3(stp), v0 = ease3(Math.max(0, stp - 0.2)), G = Gd(b.bx);
+      for (let k = 0; k <= 8; k++) {
+        const v = lerp3(v0, v1, k / 8), th = lerp3(-1.5, 1.65, v), tilt = -0.05 + 0.13 * v, c = Math.cos(tilt), s = Math.sin(tilt);
+        const lx = -(28 + 70 * Math.cos(th) - 100 * Math.sin(th)), ly = -142 + 70 * Math.sin(th) + 100 * Math.cos(th);
+        const X = b.bx + 70 * v + lx * c - ly * s, Y = G + 4 + lx * s + ly * c;
+        if (ball(X, Y, 16)) return at(true, X);
+      }
+    }
+    if (m.name === 'bolts' && u >= 0.5 && u < 1.4 && !rolling) {   // three ember bolts fanning down from her shoulder eyes
+      const d = (u - 0.5) * 430, ox = b.bx - 31, oy = Gd(b.bx) - 141;
+      if (d < 620) for (const k of [-1, 0, 1]) { const px = ox + d, py = oy + d * (0.18 + k * 0.16); if (py < Gd(px) && ball(px, py, 9)) return { dmg, x: M(px) }; }
+    }
+  }
+  if (P === 'mist') {
+    if (m.name === 'roots' && u >= 0.8 && u < 1.35) {   // the roots bursting up through the cracks
+      const ww = (u - 0.75) / 0.7, up = ww < 0.3 ? ease3(ww / 0.3) : ww < 0.65 ? 1 : 1 - ease3((ww - 0.65) / 0.35);
+      // two roots at each crack, 10 before and 14 after it, each 9 thick (the kit's), up to 96 high
+      if (up > 0.3) for (const t of m.targets) { const p = mir ? 2 * b.bx - t : t, G = Gd(p); if (box(p - 15, p + 19, G - 96 * up, G)) return { dmg, x: M(p) }; }
+    }
+    if (m.name === 'branch' && u >= 0.55 && u < 0.95) {   // the long branch sweeping across (the kit's bsBranchPts), its pieces as circles
+      const v = ease3(Math.min(1, (u - 0.55) / 0.35)), grow = lerp3(0.3, 1, v), ang0 = lerp3(-1.75, -3.05, v), tilt = 0.035 - 0.06 * v, c = Math.cos(tilt), s = Math.sin(tilt);
+      const L = 296 * grow, G = Gd(b.bx) + 4, pts = [[4, -96]]; let p = pts[0], a = ang0;
+      [[0.42, 0], [0.31, 0.42], [0.27, -0.36]].forEach(([f, da]) => { a += da; p = [p[0] + Math.cos(a) * L * f, p[1] + Math.sin(a) * L * f]; pts.push(p); });
+      const R = [13, 7, 4, 2];
+      for (let i = 0; i < 3; i++) for (let k = 0; k <= 6; k++) {
+        const q = k / 6, lx = lerp3(pts[i][0], pts[i + 1][0], q), ly = lerp3(pts[i][1], pts[i + 1][1], q), r = lerp3(R[i], R[i + 1], q) + 4;
+        const X = b.bx + lx * c - ly * s, Y = G + lx * s + ly * c;
+        if (ball(X, Y, r)) return { dmg, x: M(X) };
+      }
+    }
+    if (m.name === 'splinters' && u >= 0.5 && u < 1.2 && !rolling) {   // a fan of five splinters from its maw
+      const d = (u - 0.5) * 470, ox = b.bx, oy = Gd(b.bx) - 48;
+      if (d < 600) for (let k = 0; k < 5; k++) { const a = Math.PI + (k - 2) * 0.11, px = ox + Math.cos(a) * d, py = oy + Math.sin(a) * d; if (ball(px, py, 9)) return { dmg, x: M(px) }; }
+    }
+  }
+  return null;
+}
+function bossDamage(g, lb, n) {
+  const b = g.boss;
+  if (!b || b.st !== 'fight') return;
+  b.hp = Math.max(0, b.hp - n); b.hitT = 0;
+  lb.hud.boss({ name: b.name, hp: b.hp / b.max });
+  if (b.hp > 0) return;
+  // beaten: its card pieces and golden wisp, the bar goes, its sure drop, and its crawlers break up with it
+  b.st = 'defeat'; b.t = 0; b.move = null;
+  lb.sfx('bossDefeated'); lb.hud.boss(null);
+  lb.after(1.2, () => lb.addWisps(BOSS_WISPS));
+  g.mons.forEach((m) => { if (m.summoned && alive(m)) { m.st = 'defeat'; m.t = 0; m.atk = null; m.beatenAt = lb.time; } });
+  const can = [];
+  for (const sp of ['heal', 'fire']) if (g.spells[sp] === 0) can.push(sp);
+  if (!can.length) { if (g.spells.heal < 3) can.push('heal'); if (g.spells.fire < 3) can.push('fire'); if (g.sword.reach < 2) can.push('reach'); if (g.sword.bite < 2) can.push('rune'); }
+  const kind = can.length ? (can.length > 1 && g.spells.heal === 0 && g.spells.fire === 0 ? 'heal' : lb.pick(can)) : 'health';
+  const x = Math.max(g.L.length - lb.W + 60, Math.min(g.L.length - 60, b.bx - 60 * b.f));
+  g.loot.push({ kind, x, y: g.L.ground(x), drop: 0, from: { x: b.bx, y: g.L.ground(b.bx) - 120 }, seed: 77 });
+}
+function callCrawlers(g, lb, b) {      // the skull's call: crawlers rise out of the cracked warnings (the kit's rise, 0.35 s)
+  for (const t of b.move.targets) {
+    const n = 900 + g.mons.length, m = { id: 'c' + n, kind: 'crawler', sx: t, sy: 0, alt: 0, patch: [Math.max(0, g.L.length - lb.W) + 40, g.L.length - 40], ph: (n * 0.37) % 1, seed: n, summoned: true };
+    resetMonster(g, m); m.awake = true; m.riseT = 0; m.cd = 0.8;
+    g.mons.push(m);
+  }
+}
+function drawBoss(g, lb, w) {
+  const b = g.boss;
+  if (!b || b.st === 'wait' || b.st === 'done') return;
+  if (b.st === 'defeat') { w.boss({ x: b.bx, defeat: Math.min(1, b.t / 2.2) }); return; }
+  const o = { x: b.bx, facing: b.f };
+  if (b.st === 'arrive') o.arrive = b.t;
+  else if (b.move) o.attack = { name: b.move.name, t: b.move.t, at: b.move.at, targets: b.move.targets };
+  if (b.hitT != null && b.hitT < 0.13) o.hit = b.hitT;
+  w.boss(o);
 }
 
 /* ---------- loot (4d-3) ---------- */
@@ -552,17 +787,19 @@ function hurtCheck(g, lb) {
   const rolling = g.mode === 'roll', h = rolling ? ROLL_H : BODY_H, x0 = g.x - BODY_W, x1 = g.x + BODY_W, y0 = g.y - h, y1 = g.y;
   const meets = (b) => b && !(b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1);
   for (const m of g.mons) {
-    if (!alive(m)) continue;
-    if (meets(atkZone(m, g)) || (!(rolling && MON[m.kind].through) && meets(monBox(m)))) return hurt(g, lb, m);
+    if (!alive(m) || (m.riseT != null && m.riseT < 0.35)) continue;   // a crawler still rising out of the ground can't hurt yet
+    if (meets(atkZone(m, g)) || (!(rolling && MON[m.kind].through) && meets(monBox(m)))) return hurt(g, lb, MON[m.kind].dmg, m.px);
   }
+  const hit = bossHits(g, rolling);
+  if (hit) return hurt(g, lb, hit.dmg, hit.x);
 }
-function hurt(g, lb, m) {
+function hurt(g, lb, dmg, fromX) {
   g.safeT = SAFE_T; g.hurtT = 0; g.atkBuf = 0;
   if (g.armour > 0) { g.armour--; lb.hud.armour(g.armour); g.hurtKind = 'armour'; lb.sfx('crack'); }   // a pip goes before any health
-  else { g.health = Math.max(0, g.health - MON[m.kind].dmg); lb.hud.health(g.health); g.hurtKind = 'health'; lb.sfx('hurt'); }
+  else { g.health = Math.max(0, g.health - dmg); lb.hud.health(g.health); g.hurtKind = 'health'; lb.sfx('hurt'); }
   if (g.health <= 0.001) return startLost(g, lb, 'health', null);
   if (g.mode === 'air') return;        // in the air: the sparks and the second of safety, and on he goes
-  g.facing = m.px >= g.x ? 1 : -1;     // turned to it and knocked back a step (the kit's hurt move)
+  g.facing = fromX >= g.x ? 1 : -1;    // turned to it and knocked back a step (the kit's hurt move)
   g.mode = 'hurt'; g.mt = 0; g.hurtX = g.x;
 }
 function hurtUpdate(g, lb, dt) {
@@ -689,6 +926,7 @@ function monstersUpdate(g, lb, dt) {
 function startAttack(m, name, extra) { m.atk = Object.assign({ name, t: 0 }, extra || {}); m.moving = false; }
 function monsterUpdate(m, g, lb, dt, busy) {
   const K = MON[m.kind];
+  if (m.riseT != null && m.riseT < 0.35) { m.riseT += dt; return; }   // a called crawler still rising out of the ground
   if (m.atk) {                         // signal, attack, recover: it moves as the attack moves it, facing the way it began
     m.atk.t += dt;
     const mv = atkMove(m.atk);
@@ -763,6 +1001,7 @@ function drawMonsters(g, lb, w, camX, flyers) {
     if (m.atk) o.attack = m.atk.name === 'dive' ? { name: 'dive', t: m.atk.t, dir: -1, dx: m.atk.dx, dy: m.atk.dy } : { name: m.atk.name, t: m.atk.t };
     else if (m.kind === 'hatmaw' && m.walkT > 0) o.attack = { name: 'hop', t: m.walkT };
     if (m.hitT != null && m.hitT < 0.13) o.hit = m.hitT;
+    if (m.riseT != null && m.riseT < 0.35) o.rise = m.riseT;
     w.monster(o);
   }
 }
