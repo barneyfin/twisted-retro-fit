@@ -1346,7 +1346,7 @@ class Scene{
     const T=H.tmp,tc=T.getContext("2d");
     tc.setTransform(1,0,0,1,0,0);tc.globalCompositeOperation="source-over";tc.clearRect(0,0,T.width,T.height);tc.setTransform(s,0,0,s,130*s,230*s);
     tc.fillStyle=INK;tc.strokeStyle=INK;tc.lineCap="round";tc.lineJoin="round";
-    {const b=MON_BOX[m.kind]||[-128,-228,128,18],w=b[2]-b[0],h=b[3]-b[1];CARD={box:[b[0]+w*0.44,b[1]+h*0.3,Math.max(w,h)*0.62],edge:m.kind==="bat2"||m.kind==="crawler"?1.2:1.7};}
+    {const bk=(typeof MON_BASE!=="undefined"&&MON_BASE[m.kind])||m.kind,b=MON_BOX[bk]||[-128,-228,128,18],w=b[2]-b[0],h=b[3]-b[1];CARD={box:[b[0]+w*0.44,b[1]+h*0.3,Math.max(w,h)*0.62],edge:bk==="bat2"||bk==="crawler"?1.2:1.7};} // version 8: a posable monster graded as its own kind (Barney, 4 November 2026)
     let det;try{det=MONSTER[m.kind](tc,t,m,o.rm);}finally{CARD=null;} // graded card pieces while the monster draws (version 6)
     c.save();c.setTransform(1,0,0,1,0,0);
     const bb=MON_BOX[m.kind]||[-128,-228,128,18],sx=Math.max(0,Math.floor((130+bb[0])*s)),sy=Math.max(0,Math.floor((230+bb[1])*s)),sw=Math.min(T.width-sx,Math.ceil((bb[2]-bb[0])*s)),sh=Math.min(T.height-sy,Math.ceil((bb[3]-bb[1])*s));
@@ -1358,14 +1358,15 @@ class Scene{
     c.setTransform(s,0,0,s,dx+130*s,dy+230*s);det(c,o);
     c.restore();
   }
-  monster(ctx,s,m,t,o){
-    if(!this.kit){this.monsterInto(ctx,s,m,t,o,Math.round((m.X-130)*s),Math.round((m.Y-230)*s));return;}
-    const bb=MON_BOX[m.kind]||[-128,-228,128,18],G=18,id=m.id||(m.kind+"|"+m.ph),r=POSE_RATE[m.kind];
+  monster(ctx,s,m,t,o,flare){ // version 8 (4c-5a): flare, the hit's ember rim flaring once (a second rim in a hotter ember, as play.js's moDraw)
+    const into=(c,dx,dy)=>{this.monsterInto(c,s,m,t,o,dx,dy);if(flare)this.monsterInto(c,s,m,t,Object.assign({},o,{dcol:"#ffb070",dglow:MO.glow}),dx,dy);};
+    if(!this.kit){into(ctx,Math.round((m.X-130)*s),Math.round((m.Y-230)*s));return;}
+    const bb=MON_BOX[m.kind]||[-128,-228,128,18],G=18,id=m.id||(m.kind+"|"+m.ph),bk=(typeof MON_BASE!=="undefined"&&MON_BASE[m.kind])||m.kind,moving=flare||(m.P&&Object.keys(m.P).length>0),r=moving?0:POSE_RATE[bk];
     const step=(r&&!o.rm)?Math.floor((r*t+m.ph)*8):-KIT.frame;
     let E=this.poses.get(id);
     if(!E){E={cv:mk((bb[2]-bb[0]+2*G)*s,(bb[3]-bb[1]+2*G)*s),step:null};this.poses.set(id,E);}
     if(E.step!==step){const c=E.cv.getContext("2d");c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,E.cv.width,E.cv.height);
-      this.monsterInto(c,s,m,t,o,Math.round((G-130-bb[0])*s),Math.round((G-230-bb[1])*s));E.step=step;KIT.poses++;}
+      into(c,Math.round((G-130-bb[0])*s),Math.round((G-230-bb[1])*s));E.step=step;KIT.poses++;}
     E.used=KIT.frame;
     ctx.drawImage(E.cv,Math.round((m.X+bb[0]-G)*s)/s,Math.round((m.Y+bb[1]-G)*s)/s,E.cv.width/s,E.cv.height/s);
   }
@@ -3604,6 +3605,147 @@ function cpSpark(c,from,to,u){const [sx,sy]=from,[ex,ey]=to,mx=(sx+ex)/2,my=Math
 function cpState(s){if(s==null||s<0)return{lit:0};const st={lit:0,flare:0,ring:0};if(s<0.18){st.spark=s/0.18;return st;}
   const u=(s-0.18);st.flare=Math.max(0,1-u/0.14)*(u<0.14?1:0)+(u>=0.14&&u<0.32?Math.max(0,1-(u-0.14)/0.18)*0.35:0);st.lit=Math.min(1,u/0.14);st.ring=u<0.5?u/0.5:0;return st;}
 
+/* ---------- 4c-5a. mvmon.js: the five monsters made posable, with their attacks' signals and hit reactions (the duels' timelines are review loops; each attack's recipe is lifted out below) ---------- */
+/* ============================== 4b round 7: the monsters' attacks ==============================
+   Posable copies of the five monsters, registered beside the design system's own (MONSTER.crawlerP and so on), drawn by the Scene's
+   own monsterInto, so the graded card, the ember rim and glow and the ember details are exactly the design system's. Each attack has a
+   signal first, in one language for all five: the monster winds up (crouches, draws back, raises its arms), its eyes flare and its ember
+   parts (mouth, claws, the walker's hollow chest) burn hotter. Then the attack, then a recovery (the opening). Hit: it jolts back a puppet
+   step and its ember rim flares once (the gameplay note's moment); a one-hit monster then breaks into card pieces. Ember for danger only. */
+const MO={ember:"#ff7a3a",glow:"#ff5a1f",bone:"#d8ccb6"};
+function moLimb(x,ax,ay,segs){let px=ax,py=ay;for(const g of segs){const nx=px+Math.sin(g[1])*g[0],ny=py+Math.cos(g[1])*g[0];cardTaper(x,[px,py,nx,ny,g[2],g[3]]);px=nx;py=ny;}return[px,py];}
+function moMouth(c,pts,cx,cy,r){c.save();const g=c.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,"#ffd9a0");g.addColorStop(0.45,MO.ember);g.addColorStop(1,"#5a0c08");
+  c.fillStyle=g;c.shadowColor=MO.glow;c.shadowBlur=FX?8:0;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fill();c.restore();}
+function moTeeth(c,list){c.save();c.fillStyle=MO.bone;for(const q of list){c.beginPath();c.moveTo(q[0],q[1]);c.lineTo(q[2],q[3]);c.lineTo(q[4],q[5]);c.closePath();c.fill();}c.restore();}
+function moSeam(c,pts,w){c.save();c.strokeStyle=rgba(MO.ember,0.9);c.shadowColor=MO.glow;c.shadowBlur=FX?5:0;c.lineWidth=w||1.1;c.lineCap="round";c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();c.restore();}
+function moEyes(c,o,list,rx,ry,hot){c.save();c.fillStyle=o.dcol;c.shadowColor=o.dglow;c.shadowBlur=FX?7+hot*12:0;for(const e of list){c.beginPath();c.ellipse(e[0],e[1],rx*(1+hot*0.35),ry*(1+hot*0.35),e[2],0,Math.PI*2);c.fill();}
+  if(hot>0&&FX){c.globalCompositeOperation="screen";for(const e of list){const g=c.createRadialGradient(e[0],e[1],0,e[0],e[1],rx*5);g.addColorStop(0,rgba(MO.ember,0.55*hot));g.addColorStop(1,rgba(MO.ember,0));c.fillStyle=g;c.fillRect(e[0]-rx*5,e[1]-rx*5,rx*10,rx*10);}}c.restore();}
+function moHot(c,x,y,r,a){if(a<=0||!FX)return; /* the kit: Effects off, no glow */c.save();c.globalCompositeOperation="screen";const g=c.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,rgba("#ffd9a0",0.8*a));g.addColorStop(0.35,rgba(MO.ember,0.6*a));g.addColorStop(1,rgba(MO.glow,0));c.fillStyle=g;c.fillRect(x-r,y-r,r*2,r*2);c.restore();}
+// an attack's sweep: an ember crescent along the path the claws or branches have just taken (pts newest last)
+function moSlash(c,pts,w,a){if(pts.length<2||a<=0)return;c.save();c.globalCompositeOperation="screen";c.lineCap="round";c.lineJoin="round";
+  for(let i=1;i<pts.length;i++){const u=i/(pts.length-1);c.strokeStyle=rgba(i===pts.length-1?"#ffd9a0":MO.ember,a*(0.25+0.75*u));c.shadowColor=MO.glow;c.shadowBlur=FX?8:0;c.lineWidth=w*(0.25+0.75*u);c.beginPath();c.moveTo(pts[i-1][0],pts[i-1][1]);c.lineTo(pts[i][0],pts[i][1]);c.stroke();}c.restore();}
+const _pivot=(x,P,px,py)=>{x.translate(px,py);x.rotate(P.tilt||0);x.scale(P.sx||1,P.sy||1);x.translate(-px,-py);x.translate(P.dx||0,P.dy||0);};
+Object.assign(MON_BOX,{crawlerP:[-60,-60,52,20],bat2P:[-52,-60,52,40],hatmawP:[-70,-110,60,14],ghoulP:[-95,-140,40,12],walkerP:[-125,-226,70,12]});
+Object.assign(MONSTER,{
+  // the crawler: squash, stretch and tilt on the design system's own crawler; its legs freeze when P.t is set; the mouth gapes when P.jaw
+  crawlerP(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-12);const det=MONSTER.crawler(x,P.t!=null?P.t:t,m,rm);x.restore();
+    return(c,o)=>{c.save();_pivot(c,P,0,-12);det(c,o);const j=P.jaw||0,h=P.hot||0;moHot(c,-20,-12,8+h*7,h*0.8);
+      if(j>0){moMouth(c,[[-29,-15.6-j*3],[-20,-14.2-j*2.4],[-13,-12.6],[-20,-9.6+j*2.6],[-28,-9.4+j*3.4]],-18,-12,9+j*3);moTeeth(c,[[-27,-15.4-j*2.6],[-26,-12.6-j],[-25,-15-j*2.4],[-22,-14.6-j*2],[-21,-12.2-j*0.6],[-20,-14.2-j*1.8],[-26.6,-9.6+j*3],[-25.6,-12.2+j],[-24.6,-9.8+j*2.6],[-21.6,-10+j*2.2],[-20.6,-12+j*0.8],[-19.6,-10.2+j*2]]);}
+      moEyes(c,o,[[-21,-16.2,0.2],[-17.5,-17.2,0.2]],1.5,1,h);c.restore();};},
+  // the flyer: the design system's flyer, tilted along its dive; its wings freeze (P.t) when it folds them to dive
+  bat2P(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-2);const det=MONSTER.bat2(x,P.t!=null?P.t:t,m,rm);x.restore();
+    return(c,o)=>{c.save();_pivot(c,P,0,-2);det(c,o);const h=P.hot||0;moHot(c,0,-4,6+h*8,h);moEyes(c,o,[[-1.6,-7.2,0.3],[1.6,-7.2,-0.3]],1.1,0.8,h);c.restore();};},
+  // the mouth-hat: its own hop frozen (P.t), then squash, hop and a mouth that gapes and snaps (P.bite)
+  hatmawP(x,t,m,rm){const P=m.P||{};x.save();_pivot(x,P,0,-8);const det=MONSTER.hatmaw(x,P.t!=null?P.t:t,m,rm);x.restore();
+    return(c,o)=>{c.save();_pivot(c,P,0,-8);det(c,o);const b=P.bite||0,h=P.hot||0;moHot(c,-11,-24,10+h*8,h*0.7);
+      if(b>0){const cx=-11,cy=-24,k=1+b*0.55;c.save();c.translate(cx,cy);c.scale(k,1+b*0.95);c.translate(-cx,-cy);
+        c.fillStyle="#2a0507";c.strokeStyle=MO.ember;c.lineWidth=0.9;c.shadowColor=MO.glow;c.shadowBlur=FX?5:0;c.beginPath();[[-22,-30],[-16,-34],[-10,-34.2],[-4,-32],[1,-29],[-2,-23],[-8,-17],[-14,-15.8],[-21,-17]].forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fill();c.stroke();c.shadowBlur=0;
+        moMouth(c,[[-14,-27],[-8,-28],[-5,-25],[-8,-21],[-13,-21.6]],-9,-24.6,5);
+        moTeeth(c,[[-20,-31.4],[-18,-25],[-16,-32],[-14,-32.6],[-12,-26],[-10,-32.8],[-8,-32.2],[-6,-26.4],[-4,-31.4],[-18,-17.2],[-16,-23],[-14,-16.4],[-11.6,-16.6],[-9.6,-22.6],[-7.6,-17.4]]);c.restore();}
+      moEyes(c,o,[[-13,-41,0.35],[-5,-43,0.15]],3.4,1.4,h);c.restore();};},
+  // the ghoul, posable: its front arm (P.a: upper arm, forearm angles) can wind up and swipe; P.op opens the jaw; P.slash draws the sweep
+  ghoulP(x,t,m,rm){const P=m.P||{},tq=pz(t+m.ph,rm), /* the kit: Reduce motion as ghoul2 */s1=P.s1!=null?P.s1:Math.sin(tq*3),bob=P.bob!=null?P.bob:Math.abs(s1)*2,op=P.op!=null?P.op:3+Math.max(0,Math.sin(tq*1.7))*3,lean=P.lean||0;
+    x.save();x.translate(P.dx||0,-bob);
+    for(const q of [[s1,5],[-s1,11]])moLimb(x,q[1],-48,[[21,-0.45+q[0]*0.25,6.5,4.2],[19,0.65-q[0]*0.2,4.2,3],[11,-0.25,3,1.4]]);
+    x.save();x.translate(8,-48);x.rotate(lean);x.translate(-8,48);
+    x.beginPath();x.moveTo(15,-50);x.quadraticCurveTo(18,-72,-2,-86);x.quadraticCurveTo(-12,-91,-20,-84);x.quadraticCurveTo(-6,-76,2,-47);x.closePath();cardFill(x);
+    for(let i=0;i<5;i++){const u=i/4,bx=15+(-6-15)*u,by=-58+(-86+58)*u-Math.sin(u*Math.PI)*5;x.beginPath();x.moveTo(bx-2.4,by+1.6);x.lineTo(bx+3+u*2,by-6);x.lineTo(bx+2.4,by+1.4);x.closePath();cardFill(x);}
+    x.beginPath();x.moveTo(-15,-87);x.lineTo(-30,-89);x.lineTo(-40,-84);x.lineTo(-39,-80);x.lineTo(-18,-79);x.closePath();cardFill(x);
+    x.beginPath();x.moveTo(-18,-78);x.lineTo(-37,-79+op);x.lineTo(-35,-75+op);x.lineTo(-17,-73);x.closePath();cardFill(x);
+    const claws=(h,ang)=>{x.lineWidth=1.4;for(let k=0;k<3;k++){const a=ang+(k-1)*0.32;x.beginPath();x.moveTo(h[0],h[1]);x.lineTo(h[0]+Math.sin(a)*6.5,h[1]+Math.cos(a)*6.5);x.lineTo(h[0]+Math.sin(a+0.25)*8,h[1]+Math.cos(a+0.25)*8);x.stroke();}};
+    {const q=-s1,h=moLimb(x,-8,-82,[[25,-0.4+q*0.22,4.6,3.4],[27,-0.08-q*0.25,3.4,2.2]]);claws(h,-0.3);} // the back arm hangs
+    const a=P.a||[-0.4+s1*0.22,-0.08-s1*0.25],hand=moLimb(x,-14,-82,[[25,a[0],4.6,3.4],[27,a[1],3.4,2.2]]);claws(hand,a[1]-0.2);
+    x.restore();x.restore();
+    return(c,o)=>{c.save();c.translate(P.dx||0,-bob);c.translate(8,-48);c.rotate(lean);c.translate(-8,48);const h=P.hot||0;
+      moMouth(c,[[-18,-78.6],[-38,-79.4],[-36,-77.6+op],[-18,-73.6]],-22,-77,12);
+      moTeeth(c,[[-35,-79.2],[-33.6,-76.4],[-32.2,-79.1],[-30,-78.9],[-28.8,-76],[-27.4,-78.8],[-25,-78.7],[-24,-76.2],[-23,-78.6],[-34,-76.4+op],[-32.8,-78.8+op*0.6],[-31.6,-76.2+op],[-28.6,-75.8+op*0.8],[-27.6,-78.2+op*0.4],[-26.6,-75.6+op*0.8]]);
+      moSeam(c,[[10,-62],[7,-66],[9,-70]],1);moSeam(c,[[2,-74],[-1,-78]],1);moHot(c,hand[0],hand[1],8+h*10,h);
+      if(P.slash)moSlash(c,P.slash.map(an=>{const e=[-14+Math.sin(an[0])*25,-82+Math.cos(an[0])*25];return[e[0]+Math.sin(an[1])*30,e[1]+Math.cos(an[1])*30];}),4.2,P.slashA==null?1:P.slashA);
+      moEyes(c,o,[[-33,-85,0.3],[-27,-86,0.3]],2.2,1.2,h);c.restore();};},
+  // the walker, posable: both branch arms (P.arms: [left, right], each three angles), a crouch on its stilts (P.crouch) and a hollow chest that burns hotter
+  walkerP(x,t,m,rm){const P=m.P||{},tq=pz(t*0.6+m.ph,rm), /* the kit: Reduce motion as walker */s1=P.s1!=null?P.s1:Math.sin(tq*2.4),cr=P.crouch||0,low=cr*46;
+    x.save();x.scale(1.15,1);x.translate(P.dx||0,0);
+    for(const q of [[s1,-3],[-s1,5]])moLimb(x,q[1],-112+low,[[44,-0.2+q[0]*0.18-cr*0.95,8,6],[46,0.32-q[0]*0.16+cr*1.25,6,4],[20,-0.12,4,2]]);
+    x.translate(0,low);
+    x.beginPath();x.moveTo(-8,-108);x.quadraticCurveTo(-12,-140,-6,-168);x.lineTo(8,-168);x.quadraticCurveTo(14,-140,10,-108);x.closePath();cardFill(x);
+    x.save();x.globalCompositeOperation="destination-out";x.beginPath();x.ellipse(1,-140,5.5,13,0.05,0,Math.PI*2);cardFill(x);x.restore();
+    x.beginPath();x.moveTo(-5,-168);x.quadraticCurveTo(-4,-178,1,-182);x.quadraticCurveTo(7,-178,7,-168);x.closePath();cardFill(x);
+    for(const q of [[-1,-180,-2.6],[3,-181,-0.4],[5,-179,0.9]])moLimb(x,q[0],q[1],[[10,q[2]+Math.PI,2.2,1.2],[7,q[2]+Math.PI+(q[2]<0?-0.7:0.7),1.2,0.5]]);
+    const hands=[];[[-s1,-6,-1],[s1,8,1]].forEach((q,i)=>{const sh=[q[1],-164],an=P.arms?P.arms[i]:[q[2]*0.5+q[0]*0.2,q[2]*0.12-q[0]*0.2,q[2]*-0.3],
+      e=moLimb(x,sh[0],sh[1],[[30,an[0],4.4,3.2]]),h=moLimb(x,e[0],e[1],[[34,an[1],3.2,2],[14,an[2],2,1]]);hands.push(h);
+      moLimb(x,h[0],h[1],[[8,an[2]+0.8,1.2,0.5]]);moLimb(x,h[0],h[1],[[9,an[2]-0.4,1.2,0.5]]);moLimb(x,(sh[0]+e[0])/2,(sh[1]+e[1])/2+4,[[10,an[0]+1.1,1.6,0.6]]);});
+    x.restore();
+    return(c,o)=>{c.save();c.scale(1.15,1);c.translate(P.dx||0,low);const h=P.hot||0;
+      c.save();const g=c.createRadialGradient(1,-138,0,1,-140,14+h*4);g.addColorStop(0,"#ffd9a0");g.addColorStop(0.5,MO.ember);g.addColorStop(1,"#5a0c08");
+      c.fillStyle=g;c.shadowColor=MO.glow;c.shadowBlur=FX?8+h*14:0;c.beginPath();c.ellipse(1,-140,5.5,13,0.05,0,Math.PI*2);c.fill();c.restore();moHot(c,1,-140,18+h*22,h*0.9);
+      c.fillStyle=INK;for(let i=0;i<4;i++){const y=-150+i*6;c.beginPath();c.moveTo(-6,y);c.quadraticCurveTo(1,y-2.2,8,y);c.lineTo(8,y+1.6);c.quadraticCurveTo(1,y-0.6,-6,y+1.6);c.closePath();c.fill();}
+      moMouth(c,[[-3,-171.5],[4,-171.5],[3,-170],[-2,-170]],0.5,-171,4);moSeam(c,[[-4,-120],[-2,-126],[-4,-131]],1.1);
+      if(P.slash)moSlash(c,P.slash,5,P.slashA==null?1:P.slashA);
+      for(const hd of hands)moHot(c,hd[0],hd[1],7+h*8,h*0.8);
+      moEyes(c,o,[[-2,-175.5,0.2],[3,-175.5,-0.2]],1.6,1,h);c.restore();};}
+});
+// the walker's hand for given arm angles, in its own (unscaled) frame, for the sweep's trail
+function moWalkerHand(arm,an,crouch){const sh=[arm?8:-6,-164+(crouch||0)*46],e=[sh[0]+Math.sin(an[0])*30,sh[1]+Math.cos(an[0])*30],w=[e[0]+Math.sin(an[1])*34,e[1]+Math.cos(an[1])*34];return[w[0]+Math.sin(an[2])*14,w[1]+Math.cos(an[2])*14];}
+const lerpN=(a,b,u)=>a+(b-a)*u,clamp01=u=>Math.max(0,Math.min(1,u)),ease=u=>u*u*(3-2*u),stepT=(t,r)=>Math.floor(t*(r||8))/(r||8);
+// from mv10.js: the ghoul's swipe (round 7's poses), u seconds after its wind-up begins; the blow lands at about 0.6
+function moSwipe(u){const TAU=Math.PI*2,rest=[-0.4,-0.08],wind=[2.75,3.1],hitA=[-1.55+TAU,-1.35+TAU],fol=[-0.75+TAU,-0.35+TAU],rest2=[-0.4+TAU,-0.08+TAU];
+  if(u<0||u>=1.35)return{P:{},dx:0};
+  if(u<0.45){const v=ease(u/0.45);return{P:{a:[lerpN(rest[0],wind[0],v),lerpN(rest[1],wind[1],v)],hot:v,op:3+5*v,lean:0.08*v,s1:0},dx:0};}
+  if(u<0.7){const w=(u-0.45)/0.25,stp=Math.floor(w*4)/4,v=ease(stp),a=[lerpN(wind[0],hitA[0],v),lerpN(wind[1],hitA[1],v)],tr=[];for(let k=0;k<=8;k++){const q=ease(Math.min(stp,k/8));tr.push([lerpN(wind[0],hitA[0],q),lerpN(wind[1],hitA[1],q)]);}
+    return{P:{a,hot:1,op:8,lean:-0.12*v,s1:0,slash:tr.slice(Math.max(0,Math.round(stp*8)-5),Math.round(stp*8)+1)},dx:-8*v};}
+  if(u<0.95){const v=ease((u-0.7)/0.25);return{P:{a:[lerpN(hitA[0],fol[0],v),lerpN(hitA[1],fol[1],v)],hot:0.5*(1-v),op:6,lean:-0.12*(1-v),s1:0,slashA:1-v,slash:[0,0.25,0.5,0.75,1].map(k=>[lerpN(hitA[0],fol[0],k*v),lerpN(hitA[1],fol[1],k*v)])},dx:-8};}
+  const v=ease((u-0.95)/0.4);return{P:{a:[lerpN(fol[0],rest2[0],v),lerpN(fol[1],rest2[1],v)],s1:0},dx:-8*(1-v)};}
+/* ---------- the kit: each monster's attack as a game plays it, lifted out of the duels (MO_DUEL) word for word and timed from its wind-up ----------
+   u: seconds since the signal began. Each returns the pose P, where the monster has moved (dx, dy, in picture lines from where the attack
+   began; monsters face left, so they attack towards smaller x) and its phase: "signal", "attack", "recover", then "done". */
+const MON_P={crawler:"crawlerP",bat2:"bat2P",hatmaw:"hatmawP",ghoul2:"ghoulP",walker:"walkerP"};     // the game uses the posable ones all the time
+const MON_BASE={crawlerP:"crawler",bat2P:"bat2",hatmawP:"hatmaw",ghoulP:"ghoul2",walkerP:"walker"};  // and their grading is the design system's own monsters'
+const MO_ATTACKS={crawler:["lunge"],bat2:["dive"],hatmaw:["hop","bite"],ghoul2:["swipe"],walker:["high","low"]};
+function moLunge(u){ // the crawler: crouches with its mouth burning (0.35 s), lunges low at the feet and carries on past (0.33 s), recovers (0.2 s)
+  if(u<0.35){const v=u/0.35,e=ease(v);return{P:{t:1.0,sy:1-0.14*e,sx:1+0.06*e,tilt:0.08*e,hot:e,jaw:0.35*v},dx:5*e,dy:0,phase:"signal"};}
+  if(u<0.68){const v=(u-0.35)/0.33;return{P:{t:0.62,sx:1.14,sy:0.9,tilt:-0.12+0.2*v,hot:1-v*0.4,jaw:1},dx:lerpN(5,-162,v),dy:-16*4*v*(1-v),phase:"attack"};}
+  if(u<0.88){const v=clamp01((u-0.68)/0.2);return{P:{t:0.62,sy:1-0.08*(1-v),hot:0.2*(1-v),jaw:0.3*(1-v)},dx:-162-8*ease(v),dy:0,phase:"recover"};}
+  return{P:{},dx:-170,dy:0,phase:"done"};}
+function moDive(u,d,tx,ty){ // the flyer: rises with its wings folding (0.38 s), dives to chest height (0.32 s), climbs away (0.7 s). d: -1 left (as it
+  d=d||-1;tx=tx==null?140*d:tx;ty=ty==null?60:ty; // faces), 1 right; tx, ty: where the dive reaches, from where it began (the duel's first pass: 140 on, 60 down)
+  if(u<0.38){const v=u/0.38,e=ease(v);return{P:{t:0.08,tilt:0.35*d*e,hot:e},dx:-6*d*v,dy:-10*e,phase:"signal"};}
+  if(u<0.7){const v=ease((u-0.38)/0.32);return{P:{t:0.08,tilt:0.7*d,hot:1},dx:lerpN(-6*d,tx,v),dy:lerpN(-10,ty,Math.sin(v*Math.PI/2)),phase:"attack"};}
+  if(u<1.4){const v=(u-0.7)/0.7;return{P:{tilt:-0.3*d*(1-v),hot:0.4*(1-v)},dx:tx+120*d*v,dy:ty-Math.sin(v*Math.PI/2)*80,phase:"recover"};}
+  return{P:{},dx:tx+120*d,dy:ty-80,phase:"done"};}
+function moHop(u){ // the mouth-hat hopping towards you: its own hop frozen, squashing as it lands (a gait, for as long as the game likes)
+  const hop=Math.max(0,Math.sin(u*2.6*2.2));return{P:{t:1.9,sy:1-hop*0.06,sx:1/(1-hop*0.06)},dx:0,dy:-hop*9,phase:"attack"};}
+function moBite(u){ // the mouth-hat: squats with its mouth gaping (0.4 s), hops in and bites (0.35 s), recovers (0.25 s)
+  if(u<0.4){const v=ease(u/0.4);return{P:{t:1.9,sy:1-0.16*v,sx:1+0.1*v,hot:v,bite:0.5*v},dx:4*v,dy:0,phase:"signal"};}
+  if(u<0.75){const v=(u-0.4)/0.35;return{P:{t:1.9,sy:1+0.1*Math.sin(v*Math.PI),sx:1-0.05*Math.sin(v*Math.PI),hot:1-v*0.5,bite:v<0.55?0.5+v:Math.max(0,1-(v-0.55)/0.45*1.2)},dx:lerpN(4,-58,v),dy:-24*4*v*(1-v),phase:"attack"};}
+  if(u<1.0){const v=clamp01((u-0.75)/0.25);return{P:{t:1.9,sy:1-0.1*(1-v)*(1-v),sx:1+0.06*(1-v),hot:0.2*(1-v)},dx:-58,dy:0,phase:"recover"};}
+  return{P:{},dx:-58,dy:0,phase:"done"};}
+const MO_WK=(()=>{const rest=(i)=>i?[0.5,0.12,-0.3]:[-0.5,-0.12,0.3],up=(i)=>i?[2.75,2.7,2.45]:[2.4,2.55,2.35],hi=(i)=>i?[-1.15+6.2832,-1.45+6.2832,-1.5+6.2832]:[-1.25+6.2832,-1.55+6.2832,-1.6+6.2832],
+  rest2=(i)=>rest(i).map(a=>a+6.2832),back=(i)=>i?[1.1,1.3,1.6]:[0.9,1.2,1.5],lo=(i)=>i?[-1.0,-1.25,-1.45]:[-1.1,-1.35,-1.5];
+  return{rest,up,hi,rest2,back,lo,mix:(A,B,v)=>[0,1].map(i=>A(i).map((a,k)=>lerpN(a,B(i)[k],v)))};})();
+function moSweepHigh(u){const W=MO_WK,mix=W.mix; // the walker: arms up (0.5 s), sweeps high in four steps (0.3 s), recovers (0.5 s): roll under it
+  if(u<0.5){const v=ease(u/0.5);return{P:{arms:mix(W.rest,W.up,v),hot:v,s1:0},dx:0,dy:0,phase:"signal"};}
+  if(u<0.8){const w=(u-0.5)/0.3,stp=Math.floor(w*4)/4,v=ease(stp),arms=mix(W.up,W.hi,v),trail=[];for(let k=0;k<=8;k++){const q=ease(Math.min(stp,k/8));trail.push(moWalkerHand(0,mix(W.up,W.hi,q)[0],0));}
+    return{P:{arms,hot:1,s1:0,slash:trail.slice(Math.max(0,Math.round(stp*8)-5),Math.round(stp*8)+1)},dx:0,dy:0,phase:"attack"};}
+  if(u<1.3){const v=ease(clamp01((u-0.8)/0.35));return{P:{arms:mix(W.hi,W.rest2,v),hot:0.3*(1-v),s1:0,slashA:1-v,slash:[0.6,0.8,1].map(k=>moWalkerHand(0,mix(W.up,W.hi,k)[0],0))},dx:0,dy:0,phase:"recover"};}
+  return{P:{},dx:0,dy:0,phase:"done"};}
+function moSweepLow(u){const W=MO_WK,mix=W.mix; // the walker: crouches, arms back (0.5 s), sweeps low in four steps (0.3 s), recovers (0.45 s): jump it
+  if(u<0.5){const v=ease(u/0.5);return{P:{arms:mix(W.rest,W.back,v),crouch:0.75*v,hot:v,s1:0},dx:0,dy:0,phase:"signal"};}
+  if(u<0.8){const w=(u-0.5)/0.3,stp=Math.floor(w*4)/4,v=ease(stp),arms=mix(W.back,W.lo,v),trail=[];for(let k=0;k<=8;k++){const q=ease(Math.min(stp,k/8));trail.push(moWalkerHand(0,mix(W.back,W.lo,q)[0],0.75));}
+    return{P:{arms,crouch:0.75,hot:1,s1:0,slash:trail.slice(Math.max(0,Math.round(stp*8)-5),Math.round(stp*8)+1)},dx:0,dy:0,phase:"attack"};}
+  if(u<1.25){const v=ease(clamp01((u-0.8)/0.45));return{P:{arms:mix(W.lo,W.rest,v),crouch:0.75*(1-v),hot:0.3*(1-v),s1:0,slashA:Math.max(0,1-v*2),slash:[0.6,0.8,1].map(k=>moWalkerHand(0,mix(W.back,W.lo,k)[0],0.75))},dx:0,dy:0,phase:"recover"};}
+  return{P:{},dx:0,dy:0,phase:"done"};}
+function moSwipeKit(u){const r=moSwipe(u),ph=u<0?"signal":u<0.45?"signal":u<0.7?"attack":u<1.35?"recover":"done";return{P:r.P,dx:r.dx,dy:0,phase:ph};} // the ghoul (mv10.js's moSwipe)
+function moAttack(kind,a){const u=a.t||0;
+  switch(kind+":"+a.name){
+    case"crawler:lunge":return moLunge(u);
+    case"bat2:dive":return moDive(u,a.dir,a.dx,a.dy);
+    case"hatmaw:hop":return moHop(u);
+    case"hatmaw:bite":return moBite(u);
+    case"ghoul2:swipe":return moSwipeKit(u);
+    case"walker:high":return moSweepHigh(u);
+    case"walker:low":return moSweepLow(u);}
+  throw new Error('Lantern Box: the '+kind+' has no attack called "'+a.name+'" (it has '+(MO_ATTACKS[kind]||[]).join(", ")+').');}
+
 /* ============================== the tools: what a game calls, as lb.world ==============================
    The tools draw; games decide what happens. A frame is world.begin(ctx, { place, camX, rise }), then the things on the path
    in the order they should overlap, then world.end(). Things on the path are placed by x, along the path, and y, in picture
@@ -3741,14 +3883,22 @@ function makeTools(env){
       const f=frame("spark");cpSpark(f.ctx,[from.x-f.camX,from.y],[to.x-f.camX,to.y],Math.max(0,Math.min(1,u)));
     },
     monster(o){ // o: kind, x, y, ph (its pace, so neighbours differ), id (a monster's own name), defeat (0 to 1, over 1.6 s), seed
+      // version 8 (4c-5a): the posable monsters, always. attack { name, t (seconds since its signal began), dir, dx, dy (the flyer's dive) }: names in
+      // world.ATTACKS; it moves the monster from x (returned as dx, dy) and says its phase. hit: seconds since a blow landed (0.13 s: it jolts back a
+      // puppet step and its ember rim flares once; a one-hit monster then breaks up, which is the game's defeat).
       const f=frame("monster"),s=f.s;
-      if(!MON_BOX[o.kind])throw new Error('Lantern Box: no monster called "'+o.kind+'".');
-      const X=o.x-f.camX,Y=o.y==null?f.gy(o.x)+(STAND[o.kind]||0):o.y,m={kind:o.kind,X,Y,ph:o.ph||0,id:o.id};
-      if(o.defeat==null){scene.monster(f.ctx,s,m,f.t,f.opt);return;}
+      if(!MON_BOX[o.kind]||!MON_P[o.kind])throw new Error('Lantern Box: no monster called "'+o.kind+'".');
+      const at=o.attack?moAttack(o.kind,o.attack):null,hit=o.hit!=null&&o.hit>=0&&o.hit<0.13;
+      let dx=at?at.dx:0,dy=at?at.dy:0;if(hit){dx+=8;if(o.kind==="bat2")dy-=6;}
+      const x=o.x+dx,X=x-f.camX,Y=(o.y==null?f.gy(x)+(STAND[o.kind]||0):o.y)+dy,m={kind:MON_P[o.kind],X,Y,ph:o.ph||0,id:o.id,P:at?at.P:{}};
+      const out=at?{phase:at.phase,dx,dy}:{phase:null,dx,dy};
+      if(o.defeat==null){scene.monster(f.ctx,s,m,f.t,f.opt,hit);return out;}
       const d=defeatCanvas("M",260,250,s);
       scene.monsterInto(d.c,s,m,f.t,f.opt,0,0);
       drawDefeat(f.ctx,d.M,s,X,Y,MON_BOX[o.kind],clamp(o.defeat,0,1),"cardwisp",o.seed||0);
+      return out;
     },
+    ATTACKS:MO_ATTACKS,
     boss(o){ // o: x, y, defeat (0 to 1, over 2.2 s). The boss is the place's own.
       const f=frame("boss"),s=f.s,lv=f.level;
       const X=o.x-f.camX,Y=o.y==null?f.gy(o.x)+2:o.y;
@@ -4848,8 +4998,9 @@ function makeTools(env){
          world.fireball(x, y, { facing, level }), world.fireBurst(x, y, { t, level }), world.loot(kind, x, { y, seed, drop, pick })
          (kinds in world.LOOT), world.checkpoint(x, { y, lit, from }) (returns its glass), world.spark(from, to, u). Times are
          seconds since the moment began. Then:
-         world.monster({ kind, x, y, ph, id, defeat, seed }) (kinds in
-         world.MONSTERS; give each monster its own id; defeat 0 to 1 breaks it into card pieces and a wisp, over 1.6 s),
+         world.monster({ kind, x, y, ph, id, defeat, seed, attack, hit }) (kinds in world.MONSTERS; give each monster its own id;
+         defeat 0 to 1 breaks it into card pieces and a wisp, over 1.6 s; version 8: the posable monsters, attack { name, t } with
+         names in world.ATTACKS, moving it from x and returning dx, dy and its phase; hit, seconds since a blow: 0.13 s of flare),
          world.boss({ x, y, defeat }) (the place's own; defeat over 2.2 s), world.splash(x, { y, seed }), world.candle(x, y),
          world.wallLamp(x, y), world.post(x, y, lit), world.streetLamp(x, y), world.shrine(x, y), world.potion(x, y),
          world.stringLights(ax, ay, qx, qy, bx, by, seed). begin({ sample: true }) adds the directions page's monsters and
