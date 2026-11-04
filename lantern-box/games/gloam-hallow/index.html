@@ -13,9 +13,12 @@
 <script>
 /* GLOAM HALLOW — Lantern Box's pilot game: a hooded wanderer fights through four places in one night and the next day.
    The rules are lantern-box/GAMEPLAY-gloam-hallow.md; the look, the moves and the moments are the design system's, drawn by the kit.
-   Step 4d-1: moving through the four places, with no monsters yet: walking, jumping, climbing banks and pieces, walking off edges,
-   rolling, pits that cost a life, the checkpoints and the return to them, three lives, the place cards, the soundtrack and each
-   place's background sound. Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
+   Step 4d-1: moving through the four places: walking, jumping, climbing banks and pieces, walking off edges, rolling, pits that cost a
+   life, the checkpoints and the return to them, three lives, the place cards, the soundtrack and each place's background sound.
+   Step 4d-2a: the fight, with Night's three monsters (the crawler, the flyer and the mouth-hat) in every place for now: the sword, each
+   monster's way of coming at him, hits, defeats and wisps, being hurt, armour, the second of safety, the roll, health running out, and
+   about 40% of the monsters beaten since the checkpoint coming back after a life lost.
+   Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
 const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
@@ -38,6 +41,35 @@ const ROLL_T = 0.5;              // the roll: 6 puppet steps, 82 lines
 const LIVES = 3;
 const RETURN_AT = 46;            // he forms again this far past the checkpoint that brought him back
 
+// Fighting (4d-2a; starting figures)
+const SWORD_REACH = 83, REACH_UP = 9;   // the kit's blade at its strike, from his feet forward; each reach upgrade adds 9 (measured)
+const SWORD_T = 4 / 12;          // the kit's swing: wind, strike, follow, recover (puppet steps); the blow lands on the strike
+const ATTACK_BUF = 0.15;         // attack pressed this long before he is free (landing, the end of a roll) still swings
+const BODY_W = 13, BODY_H = 88, ROLL_H = 38;   // his body: half its width, its height, and its height rolling (under high attacks)
+const SAFE_T = 1;                // the second of safety after a hit
+const COMEBACK = 0.4;            // the share of the monsters beaten since the checkpoint that come back after a life lost
+// Each kind: the share of health a touch or attack takes (small 10%, medium 15%, large 25%), hits to defeat, wisps, its body (x0, x1 as
+// it faces left, then y0, y1 from its feet; measured from the kit's drawings), and how it comes at him. Ground monsters keep to their
+// own stretch of ground, between the pits, steep banks and pieces either side (Barney: they never climb onto a piece).
+const MON = {
+  crawler: { dmg: 0.10, hp: 1, wisps: 1, box: [-25, 23, -24, 2], ground: true, speed: 140, range: 125, keep: 175, cd: 0.8, atk: 'lunge' },   // the lunge carries it 170 on, so from 125 it ends well past him
+  bat2:    { dmg: 0.10, hp: 1, wisps: 1, box: [-25, 25, -18, 8], speed: 60, range: [90, 210], cd: 1.1, atk: 'dive', hover: 120 },
+  hatmaw:  { dmg: 0.15, hp: 2, wisps: 2, box: [-37, 36, -75, 0], ground: true, speed: 110, range: 75, keep: 100, cd: 0.7, atk: 'bite', push: 10 },
+};
+const ATK_T = { lunge: 0.88, dive: 1.4, bite: 1.0 };   // each attack's length, signal to recovered (the kit's)
+// The encounters: two or three hand-made patterns for each section shape (where along it, 0 to 1, and which role), one picked at
+// random for each section, each run. S a small ground monster, F a flyer, M a medium one.
+const PATTERNS = {
+  A: [[[0.3, 'S'], [0.6, 'S'], [0.8, 'F']], [[0.4, 'M'], [0.75, 'F']], [[0.25, 'F'], [0.55, 'S'], [0.72, 'S']]],   // ripples
+  B: [[[0.3, 'S'], [0.5, 'M'], [0.85, 'F']], [[0.2, 'F'], [0.45, 'S'], [0.9, 'S']]],                               // a long climb, a crag drop
+  C: [[[0.35, 'M'], [0.6, 'F'], [0.8, 'S']], [[0.4, 'S'], [0.55, 'S'], [0.75, 'F']]],                              // a bank and plateau
+  D: [[[0.25, 'S'], [0.5, 'F'], [0.75, 'M']], [[0.3, 'M'], [0.8, 'S']]],                                           // a pit in a dip
+  E: [[[0.25, 'S'], [0.45, 'F'], [0.6, 'M'], [0.8, 'S']], [[0.35, 'M'], [0.65, 'M']], [[0.3, 'F'], [0.5, 'S'], [0.7, 'F']]],   // the big hill
+  F: [[[0.2, 'S'], [0.5, 'F'], [0.7, 'S']], [[0.35, 'M'], [0.6, 'F']]],                                            // terraces
+  G: [[[0.5, 'M'], [0.15, 'F'], [0.85, 'F']], [[0.48, 'S'], [0.58, 'S'], [0.3, 'F']]],                            // a mound between two pits
+};
+const ROLES = { S: 'crawler', F: 'bat2', M: 'hatmaw' };   // 4d-2a: Night's three kinds, everywhere for now
+
 let G = null;                    // the run's state, for the console while testing
 
 LanternBox.game({
@@ -53,17 +85,21 @@ LanternBox.game({
   test: { options: [
     { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
     { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
+    { id: 'mons', name: 'Monsters', choices: [['normal', 'Normal'], ['none', 'None']] },
     { id: 'safe', name: "Can't be hurt", toggle: true, note: 'Nothing takes health, armour or lives.' },
-    { id: 'all', name: 'Every spell and sword upgrade', toggle: true, note: 'All of them from the start (once there are spells).' },
+    { id: 'armour', name: 'Start with 3 armour', toggle: true, note: 'Until armour is found as loot.' },
+    { id: 'all', name: 'Every spell and sword upgrade', toggle: true, note: 'All of them from the start (the spells come later).' },
   ] },
 
   start(lb) {
     const t = lb.test || {};
     const g = { p: Math.max(0, PLACES.indexOf(t.place || 'night')), lives: LIVES, safe: !!t.safe, mode: 'card', facing: 1, x: 60, y: 0, vy: 0,
-      on: null, mt: 0, walkDist: 0, air: null, airT: 0, landT: 9, lantern: null, glass: [], out: false };
+      on: null, mt: 0, walkDist: 0, air: null, airT: 0, landT: 9, lantern: null, glass: [], out: false,
+      health: 1, mana: 1, armour: t.armour ? 3 : 0, sword: { reach: t.all ? 2 : 0, bite: t.all ? 2 : 0 },
+      safeT: 0, hurtT: 9, hurtKind: 'health', atkBuf: 0, swHit: false, mons: [], noMons: t.mons === 'none' };
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
-    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(0); lb.hud.lives(LIVES); lb.hud.spells([], 0, 0);
+    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); lb.hud.spells([], 0, 0);
     lb.fade(1);   // black until the first place card lifts
     lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; });
     return g;
@@ -73,39 +109,57 @@ LanternBox.game({
     const dt = 1 / 60;
     g.mt += dt;
     if (g.mode === 'card') { if (g.out) g.x += WALK * dt; return; }            // play stops for the place card; leaving a place he walks on
-    if (g.mode === 'pit') return pitUpdate(g, lb, dt);
-    if (g.mode === 'return') return returnUpdate(g, lb, dt);
     if (g.mode === 'over') return;
-    const i = lb.input, dir = (i.right ? 1 : 0) - (i.left ? 1 : 0);
-    if (g.mode === 'climb') return climbUpdate(g, lb, dt);
-    if (g.mode === 'roll') return rollUpdate(g, lb, dt);
-    if (g.mode === 'air') return airUpdate(g, lb, dt, dir, i);
-    // on the ground (or a piece's top)
-    if (dir) g.facing = dir;
-    g.landT += dt;
-    const face = faceAhead(g);
-    // jump at the foot of a face too tall to jump climbs it instead (Barney's choice: the phone's jump button "just works")
-    if (i.pressed.jump) return face && face.h > JUMP_CLIMB && face.h <= CLIMB_MAX ? startClimb(g, lb, face) : jump(g, lb);
-    if (i.pressed.roll) { g.mode = 'roll'; g.mt = 0; g.rollX = g.x; lb.sfx('roll'); return; }
-    if (face && i.climb && face.h >= CLIMB_MIN && face.h <= CLIMB_MAX) return startClimb(g, lb, face);
-    if (dir) {
-      const r = stepTo(g, g.x + dir * WALK * dt);
-      g.walkDist += Math.abs(r.moved);
-      if (r.drop) startDrop(g);
-    }
-    checkpoints(g, lb);
-    leavePlace(g, lb);
+    if (g.safeT > 0) g.safeT -= dt;
+    g.hurtT += dt;
+    if (g.atkBuf > 0) g.atkBuf -= dt;
+    if (lb.input.pressed.attack) g.atkBuf = ATTACK_BUF;   // swings at once on the ground; pressed while busy, as soon as he is free
+    moveUpdate(g, lb, dt);
+    monstersUpdate(g, lb, dt);
+    hurtCheck(g, lb);
   },
 
   draw(ctx, g, lb) {
-    const w = lb.world, L = g.L, camX = Math.max(0, Math.min(L.length - lb.W, g.x - lb.W * 0.32));
+    const w = lb.world, L = g.L, camX = camAt(g, lb);
     w.begin(ctx, { level: L, camX });
     g.cps.forEach((cp, k) => { g.glass[k] = w.checkpoint(cp.x, { lit: cp.lit === true ? true : cp.lit != null ? lb.time - cp.lit : undefined, from: g.lantern || undefined }); });
+    drawMonsters(g, lb, w, camX, false);
     const r = drawWanderer(g, lb, w);
     if (r && r.lantern) g.lantern = r.lantern;
+    drawMonsters(g, lb, w, camX, true);   // flyers in front of him
     w.end();
   },
 });
+
+function camAt(g, lb) { return Math.max(0, Math.min(g.L.length - lb.W, g.x - lb.W * 0.32)); }
+
+/* ---------- moving (4d-1) ---------- */
+function moveUpdate(g, lb, dt) {
+  if (g.mode === 'lost') return lostUpdate(g, lb, dt);
+  if (g.mode === 'return') return returnUpdate(g, lb, dt);
+  const i = lb.input, dir = (i.right ? 1 : 0) - (i.left ? 1 : 0);
+  if (g.mode === 'climb') return climbUpdate(g, lb, dt);
+  if (g.mode === 'roll') return rollUpdate(g, lb, dt);
+  if (g.mode === 'air') return airUpdate(g, lb, dt, dir, i);
+  if (g.mode === 'hurt') return hurtUpdate(g, lb, dt);
+  if (g.mode === 'sword') return swordUpdate(g, lb, dt, i);
+  // on the ground (or a piece's top)
+  if (dir) g.facing = dir;
+  g.landT += dt;
+  const face = faceAhead(g);
+  // jump at the foot of a face too tall to jump climbs it instead (Barney's choice: the phone's jump button "just works")
+  if (i.pressed.jump) return face && face.h > JUMP_CLIMB && face.h <= CLIMB_MAX ? startClimb(g, lb, face) : jump(g, lb);
+  if (i.pressed.roll) return startRoll(g, lb);
+  if (g.atkBuf > 0) return startSwing(g, lb);
+  if (face && i.climb && face.h >= CLIMB_MIN && face.h <= CLIMB_MAX) return startClimb(g, lb, face);
+  if (dir) {
+    const r = stepTo(g, g.x + dir * WALK * dt);
+    g.walkDist += Math.abs(r.moved);
+    if (r.drop) startDrop(g);
+  }
+  checkpoints(g, lb);
+  leavePlace(g, lb);
+}
 
 /* ---------- places ---------- */
 function loadPlace(g, lb, p, ci) {   // the place's level and its checkpoints; ci: start at its first, second or third checkpoint (Testing)
@@ -116,6 +170,7 @@ function loadPlace(g, lb, p, ci) {   // the place's level and its checkpoints; c
   g.lastCp = ci;
   g.x = ci > 0 ? g.cps[ci].x + RETURN_AT : 60;
   g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1; g.walkDist = 0;
+  spawnMonsters(g, lb);
 }
 function enterPlace(g, lb) {         // once the place card's black is down: the place's sound and track
   g.out = false;
@@ -212,7 +267,7 @@ function airUpdate(g, lb, dt, dir, i) {
     const gy = groundAt(g, g.x);
     if (gy !== Infinity && g.y >= gy) return land(g, lb, gy, null);
     const pit = g.L.pits.find((q) => g.x > q[0] && g.x < q[1]);
-    if (pit && g.y > g.L.ground(g.x) + 20) return startPit(g, lb, pit);
+    if (pit && g.y > g.L.ground(g.x) + 20) return startLost(g, lb, 'pit', pit);
   }
 }
 function land(g, lb, y, p) {
@@ -233,6 +288,7 @@ function climbUpdate(g, lb, dt) {
   g.x = c.foot + g.facing * c.endDx;   // up: on the top, a little way in
   g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.mode = 'ground'; g.mt = 0; g.landT = 9;
 }
+function startRoll(g, lb) { g.mode = 'roll'; g.mt = 0; g.rollX = g.x; lb.sfx('roll'); }
 function rollUpdate(g, lb, dt) {
   const s = Math.min(g.mt, ROLL_T) * lb.world.stepRate, m = lb.world.move('roll', s);
   const r = stepTo(g, g.rollX + g.facing * m.dx);
@@ -242,14 +298,14 @@ function rollUpdate(g, lb, dt) {
   checkpoints(g, lb);
 }
 
-/* ---------- a fall into a pit, the life lost and the return (the design system's timings: play.js's loopLost) ---------- */
-function startPit(g, lb, pit) {
-  g.mode = 'pit'; g.mt = 0;
-  g.pitFall = { pit, x0: g.x, y0: g.y, lip: g.L.ground(g.x) };
+/* ---------- a life lost (a fall into a pit, or health run out) and the return (the design system's timings: play.js's loopLost) ---------- */
+function startLost(g, lb, kind, pit) {
+  g.mode = 'lost'; g.mt = 0; g.atkBuf = 0;
+  g.lost = { kind, pit, x0: g.x, y0: g.y, lip: pit ? g.L.ground(g.x) : g.y, f: g.facing };
 }
-function pitUpdate(g, lb, dt) {
-  const t = g.mt, P = g.pitFall;
-  if (!P.broke && t >= 0.34) {         // he breaks into card pieces as he falls into the dark
+function lostUpdate(g, lb, dt) {
+  const t = g.mt, P = g.lost;
+  if (!P.broke && t >= 0.34) {         // he breaks into card pieces: as he falls into the dark, or once he has buckled and knelt
     P.broke = true;
     lb.sfx('lifeLost');
     if (!g.safe) { g.lives--; lb.hud.lives(g.lives); }
@@ -260,8 +316,10 @@ function pitUpdate(g, lb, dt) {
   if (t >= tRet) {                     // back at the last lit checkpoint, forming in its light
     const cp = g.cps[g.lastCp];
     g.x = cp.x + RETURN_AT; g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1;
-    g.mode = 'return'; g.mt = 0;
+    g.mode = 'return'; g.mt = 0; g.safeT = 0; g.hurtT = 9;
+    g.armour = 0; lb.hud.armour(0);    // a lost life loses the armour; spells and sword upgrades are kept
     lb.hud.health(0); lb.hud.mana(0);
+    monstersReturn(g, lb);
   }
 }
 function returnUpdate(g, lb, dt) {
@@ -269,40 +327,276 @@ function returnUpdate(g, lb, dt) {
   lb.fade(Math.max(0, 1 - t / 0.35));
   const q = Math.round(Math.max(0, Math.min(1, (t - 0.3) / 0.5)) * 8) / 8;   // health and mana fill in steps
   lb.hud.health(q); lb.hud.mana(q);
-  if (t >= 0.9) { g.mode = 'ground'; g.mt = 0; g.landT = 9; }
+  if (t >= 0.9) { g.mode = 'ground'; g.mt = 0; g.landT = 9; g.health = 1; g.mana = 1; }
+}
+
+/* ---------- the sword (4d-2a) ---------- */
+function startSwing(g, lb) { g.mode = 'sword'; g.mt = 0; g.atkBuf = 0; g.swHit = false; lb.sfx('swing'); }
+function swordUpdate(g, lb, dt, i) {
+  const s = g.mt * lb.world.stepRate;
+  if (!g.swHit && s >= 1) { g.swHit = true; swordHits(g, lb); }   // the blow lands on the strike
+  if (s >= 2 && i.pressed.jump) return jump(g, lb);                // after the strike, a jump or a roll cuts the follow-through short
+  if (s >= 2 && i.pressed.roll) return startRoll(g, lb);
+  if (g.mt >= SWORD_T) { g.mode = 'ground'; g.mt = 0; g.landT = 9; }
+}
+// every monster in front of him, from his feet to above his head, as far as the blade reaches; each takes 1, and half more for each
+// bite upgrade
+function swordHits(g, lb) {
+  const f = g.facing, reach = SWORD_REACH + REACH_UP * g.sword.reach, xa = g.x - 10 * f, xb = g.x + reach * f;
+  const x0 = Math.min(xa, xb), x1 = Math.max(xa, xb), y0 = g.y - 135, y1 = g.y + 4;
+  let hits = 0;
+  for (const m of g.mons) {
+    if (!alive(m)) continue;
+    const b = monBox(m);
+    if (b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1) continue;
+    hits++; m.awake = true;
+    m.hp -= 1 + 0.5 * g.sword.bite; m.hitT = 0;
+    if (m.hp <= 0.01) defeat(g, lb, m);
+    else if (MON[m.kind].push && !m.atk) { m.bx = clampTo(m.bx + f * MON[m.kind].push, m.patch); place(m, g, m.bx, 0); }
+  }
+  if (hits) lb.sfx('hit');
+}
+function defeat(g, lb, m) {            // card pieces and its wisp rising to the score (the kit's, 1.6 s); the wisps count as it arrives
+  m.st = 'defeat'; m.t = 0; m.atk = null; m.wdx = 0; m.ody = 0; m.beatenAt = lb.time;
+  lb.sfx('defeat');
+  const n = MON[m.kind].wisps;
+  lb.after(0.9, () => lb.addWisps(n));
+}
+
+/* ---------- being hurt (4d-2a) ---------- */
+// a monster's body (or its attack, which is its body moving) touching his: the roll keeps him under anything higher than 38 lines
+function hurtCheck(g, lb) {
+  if (g.safe || g.safeT > 0) return;
+  if (g.mode !== 'ground' && g.mode !== 'air' && g.mode !== 'roll' && g.mode !== 'sword') return;
+  const h = g.mode === 'roll' ? ROLL_H : BODY_H, x0 = g.x - BODY_W, x1 = g.x + BODY_W, y0 = g.y - h, y1 = g.y;
+  for (const m of g.mons) {
+    if (!alive(m)) continue;
+    const b = monBox(m);
+    if (b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1) continue;
+    return hurt(g, lb, m);
+  }
+}
+function hurt(g, lb, m) {
+  g.safeT = SAFE_T; g.hurtT = 0; g.atkBuf = 0;
+  if (g.armour > 0) { g.armour--; lb.hud.armour(g.armour); g.hurtKind = 'armour'; lb.sfx('crack'); }   // a pip goes before any health
+  else { g.health = Math.max(0, g.health - MON[m.kind].dmg); lb.hud.health(g.health); g.hurtKind = 'health'; lb.sfx('hurt'); }
+  if (g.health <= 0.001) return startLost(g, lb, 'health', null);
+  if (g.mode === 'air') return;        // in the air: the sparks and the second of safety, and on he goes
+  g.facing = m.px >= g.x ? 1 : -1;     // turned to it and knocked back a step (the kit's hurt move)
+  g.mode = 'hurt'; g.mt = 0; g.hurtX = g.x;
+}
+function hurtUpdate(g, lb, dt) {
+  const R = lb.world.stepRate, steps = lb.world.move('hurt', 0).steps, m = lb.world.move('hurt', Math.min(g.mt * R, steps));
+  const r = stepTo(g, g.hurtX + g.facing * m.dx);
+  if (r.drop) return startDrop(g);
+  if (g.mt * R >= steps) { g.mode = 'ground'; g.mt = 0; g.landT = 9; }
+}
+
+/* ---------- the monsters (4d-2a) ---------- */
+const alive = (m) => m.st === 'live';
+const clampTo = (x, p) => (p ? Math.max(p[0], Math.min(p[1], x)) : x);
+function monBox(m) {                   // its body in the path's lines, facing its way
+  const b = MON[m.kind].box;
+  return m.f === 1 ? [m.px - b[1], m.px - b[0], m.py + b[2], m.py + b[3]] : [m.px + b[0], m.px + b[1], m.py + b[2], m.py + b[3]];
+}
+// where an attack has moved its monster, in its own frame (facing left: dx below 0 is towards him), as the kit moves it (moLunge,
+// moDive, moBite); the kit draws the same movement from the same x
+function atkMove(a) {
+  const u = a.t, E = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v)), L = (p, q, v) => p + (q - p) * v;
+  switch (a.name) {
+    case 'lunge':
+      if (u < 0.35) return { dx: 5 * E(u / 0.35), dy: 0, ph: 'signal' };
+      if (u < 0.68) { const v = (u - 0.35) / 0.33; return { dx: L(5, -162, v), dy: -64 * v * (1 - v), ph: 'attack' }; }
+      if (u < 0.88) return { dx: -162 - 8 * E((u - 0.68) / 0.2), dy: 0, ph: 'recover' };
+      return { dx: -170, dy: 0, ph: 'done' };
+    case 'dive':
+      if (u < 0.38) { const v = u / 0.38; return { dx: 6 * v, dy: -10 * E(v), ph: 'signal' }; }
+      if (u < 0.7) { const v = E((u - 0.38) / 0.32); return { dx: L(6, a.dx, v), dy: L(-10, a.dy, Math.sin(v * Math.PI / 2)), ph: 'attack' }; }
+      if (u < 1.4) { const v = (u - 0.7) / 0.7; return { dx: a.dx - 120 * v, dy: a.dy - Math.sin(v * Math.PI / 2) * 80, ph: 'recover' }; }
+      return { dx: a.dx - 120, dy: a.dy - 80, ph: 'done' };
+    case 'bite':
+      if (u < 0.4) return { dx: 4 * E(u / 0.4), dy: 0, ph: 'signal' };
+      if (u < 0.75) { const v = (u - 0.4) / 0.35; return { dx: L(4, -58, v), dy: -96 * v * (1 - v), ph: 'attack' }; }
+      return { dx: -58, dy: 0, ph: u < 1 ? 'recover' : 'done' };
+  }
+  return { dx: 0, dy: 0, ph: 'done' };
+}
+// a ground monster's stretch: between the pits, steep banks and pieces either side of x, its feet kept clear of their edges
+function patchAt(g, x, K) {
+  let a = 20, b = g.L.arena - 20;
+  for (const [w0, w1] of g.walls) { if (w1 <= x) a = Math.max(a, w1); else if (w0 >= x) b = Math.min(b, w0); else return null; }
+  const half = Math.max(-K.box[0], K.box[1]) + 2;
+  return b - a > 2 * half + 40 ? [a + half, b - half] : null;
+}
+function spawnMonsters(g, lb) {
+  g.mons = [];
+  g.walls = g.L.pits.concat(g.L.banks.filter((b) => Math.abs(bankRise(g, b)) >= BANK_MIN), g.pieces.map((p) => [p.x0, p.x1]));
+  if (g.noMons) return;
+  let n = 0;
+  for (const s of g.L.sections) {
+    const pats = PATTERNS[s.id], pat = pats[Math.floor(lb.rand() * pats.length)];
+    for (const [u, role] of pat) {
+      const m = makeMonster(g, ROLES[role], s.x0 + u * (s.x1 - s.x0), n++);
+      if (m) g.mons.push(m);
+    }
+  }
+}
+function makeMonster(g, kind, x0, n) {
+  const K = MON[kind];
+  if (g.L.checkpoints.some((c) => x0 > c.x - 120 && x0 < c.x + 320)) return null;   // never by a checkpoint, so a return is safe
+  let x = x0, patch = null;
+  if (K.ground) {
+    for (const off of [0, 25, -25, 50, -50, 80, -80]) { const p = patchAt(g, x0 + off, K); if (p) { patch = p; x = clampTo(x0 + off, p); break; } }
+    if (!patch) return null;
+  }
+  const alt = K.ground ? 0 : (n % 2) * 30;   // flyers hang at two heights, so neighbours differ
+  const m = { id: 'm' + n, kind, sx: x, sy: K.ground ? 0 : g.L.ground(x) - K.hover - alt, alt, patch, ph: (n * 0.37) % 1, seed: n * 7 + 3 };
+  resetMonster(g, m);
+  return m;
+}
+function resetMonster(g, m) {          // at its place, whole, waiting to be seen
+  Object.assign(m, { st: 'live', bx: m.sx, by: m.sy, f: -1, hp: MON[m.kind].hp, atk: null, cd: 0.6, hitT: null, awake: false, walkT: 0,
+    moving: false, wdx: 0, ody: 0, beatenAt: null });
+  place(m, g, m.bx, 0);
+}
+// after a life lost: the living go back to their places, and about 40% of those beaten since that checkpoint come back
+function monstersReturn(g, lb) {
+  const lit = g.cps[g.lastCp].lit, since = typeof lit === 'number' ? lit : -Infinity;
+  for (const m of g.mons) {
+    if (alive(m)) resetMonster(g, m);
+    else if (m.beatenAt != null && m.beatenAt > since && lb.rand() < COMEBACK) resetMonster(g, m);
+  }
+}
+function place(m, g, x, dy) {          // where it is now: a ground monster on its stretch, on the ground (dy: an attack's hop)
+  if (MON[m.kind].ground) { m.px = clampTo(x, m.patch); m.py = g.L.ground(m.px) + dy; }
+  else { m.px = x; m.py = m.by + dy; }
+}
+function monstersUpdate(g, lb, dt) {
+  const camX = camAt(g, lb), busy = g.mode === 'lost' || g.mode === 'return';
+  for (const m of g.mons) {
+    if (m.st === 'gone') continue;
+    if (m.st === 'defeat') { m.t += dt; if (m.t >= 1.6) m.st = 'gone'; continue; }
+    if (m.hitT != null) m.hitT += dt;
+    if (!m.awake) { if (m.bx < camX + lb.W + 40 && m.bx > camX - 200) m.awake = true; else continue; }   // it starts once seen
+    if (Math.abs(m.bx - g.x) > lb.W * 1.3) continue;   // left far behind, it waits
+    monsterUpdate(m, g, lb, dt, busy);
+  }
+}
+function startAttack(m, name, extra) { m.atk = Object.assign({ name, t: 0 }, extra || {}); m.moving = false; }
+function monsterUpdate(m, g, lb, dt, busy) {
+  const K = MON[m.kind];
+  if (m.atk) {                         // signal, attack, recover: it moves as the attack moves it, facing the way it began
+    m.atk.t += dt;
+    const mv = atkMove(m.atk);
+    m.wdx = -mv.dx * m.f; m.ody = mv.dy;
+    place(m, g, m.bx + m.wdx, mv.dy);
+    if (mv.ph === 'done' || m.atk.t >= ATK_T[m.atk.name]) {
+      m.bx = m.px; if (!K.ground) m.by = m.py;
+      m.atk = null; m.wdx = 0; m.ody = 0; m.cd = K.cd;
+      place(m, g, m.bx, 0);
+    }
+    return;
+  }
+  m.cd -= dt;
+  const d = g.x - m.bx, ad = Math.abs(d);
+  m.f = d >= 0 ? 1 : -1;               // it faces him
+  if (!K.ground) {                     // the flyer: hangs above the path, drifting nearer, then dives at his chest and climbs away
+    m.by += Math.max(-40 * dt, Math.min(40 * dt, g.L.ground(m.bx) - K.hover - m.alt - m.by));   // back to its height over the ground
+    const chest = g.y - 56;
+    if (!busy && m.cd <= 0 && ad >= K.range[0] && ad <= K.range[1] && Math.abs(chest - m.by) < 220) {
+      startAttack(m, 'dive', { dir: -1, dx: -(ad + 30), dy: chest - m.by });
+      return;
+    }
+    const goal = g.x - m.f * (150 + (m.alt ? 50 : 0));   // the two heights hang at two distances, so flyers don't sit on each other
+    m.bx += Math.max(-K.speed * dt, Math.min(K.speed * dt, goal - m.bx));
+    place(m, g, m.bx, 0);
+    return;
+  }
+  // a ground monster: it comes for him while he is on its stretch of ground, and waits at its edge while he is on a piece or beyond
+  const reach = !busy && !g.on && g.x > m.patch[0] - 60 && g.x < m.patch[1] + 60;
+  let goal;
+  if (reach) {
+    if (m.cd <= 0 && ad <= K.range && ad > 18) { startAttack(m, K.atk); return; }
+    goal = g.x - m.f * (m.cd <= 0 ? K.range * 0.8 : K.keep);   // in to striking range, or holding off while it gathers itself
+  } else goal = clampTo(g.x, m.patch);
+  goal = clampTo(goal, m.patch);
+  const want = Math.abs(goal - m.bx) > 4;
+  let v = 0;
+  if (m.kind === 'crawler') { if (want) { m.walkT += dt; if (m.walkT % 0.7 < 0.35) v = K.speed; } }   // it scuttles in bursts
+  else if (m.kind === 'hatmaw') {      // it hops: moving only while in the air, finishing a hop it has begun
+    const air = Math.sin(m.walkT * 5.72) > 0;
+    if (want || air) { m.walkT += dt; if (air && want) v = K.speed; }
+    else m.walkT = 0;
+  }
+  m.moving = want || (m.kind === 'hatmaw' && m.walkT > 0);
+  const s = Math.sign(goal - m.bx);
+  let nx = m.bx + s * Math.min(Math.abs(goal - m.bx), v * dt);
+  for (const o of g.mons) {            // it keeps a little apart from the next ground monster its way, never walking into it
+    if (o === m || !alive(o) || !MON[o.kind].ground || (o.bx - m.bx) * s <= 0) continue;
+    const gap = halfW(m) + halfW(o) + 8, lim = o.bx - s * gap;
+    if ((nx - lim) * s > 0) nx = (m.bx - lim) * s > 0 ? m.bx : lim;
+  }
+  m.bx = nx;
+  place(m, g, m.bx, 0);
+}
+const halfW = (m) => Math.max(-MON[m.kind].box[0], MON[m.kind].box[1]);
+// drawn where they are, within sight: flyers after the wanderer (in front of him), the ground ones before
+function drawMonsters(g, lb, w, camX, flyers) {
+  for (const m of g.mons) {
+    if (m.st === 'gone' || !MON[m.kind].ground !== flyers) continue;
+    if (m.px < camX - 160 || m.px > camX + lb.W + 160) continue;
+    const o = { kind: m.kind, id: m.id, ph: m.ph, seed: m.seed, facing: m.f, x: m.px - m.wdx };
+    if (!MON[m.kind].ground) o.y = m.by;
+    if (m.st === 'defeat') { o.x = m.px; if (!MON[m.kind].ground) o.y = m.py; o.defeat = Math.min(1, m.t / 1.6); w.monster(o); continue; }
+    if (m.atk) o.attack = m.atk.name === 'dive' ? { name: 'dive', t: m.atk.t, dir: -1, dx: m.atk.dx, dy: m.atk.dy } : { name: m.atk.name, t: m.atk.t };
+    else if (m.kind === 'hatmaw' && m.walkT > 0) o.attack = { name: 'hop', t: m.walkT };
+    if (m.hitT != null && m.hitT < 0.13) o.hit = m.hitT;
+    w.monster(o);
+  }
 }
 
 /* ---------- drawing him ---------- */
 function drawWanderer(g, lb, w) {
   const R = w.stepRate, y = g.y + 1, f = g.facing;
+  // always: his sword's upgrades; after a hit, its sparks or shards (0.5 s) and the second of safety's slow pulse
+  const o = (more) => Object.assign({ y, facing: f, sword: g.sword, hurt: g.hurtT < 0.5 ? { kind: g.hurtKind, t: g.hurtT } : undefined,
+    safe: g.safeT > 0 ? SAFE_T - g.safeT : undefined }, more);
   switch (g.mode) {
-    case 'pit': {
-      const t = g.mt, P = g.pitFall;
-      if (t < 0.34) return w.wanderer(P.x0 + 26 * f * t, { move: 'jump', step: 5, y: P.y0 + 1 + 0.5 * 980 * t * t, pit: P.pit, facing: f });
-      if (t < 0.34 + 1.1) return w.wanderer(P.x0 + 26 * f * t, { pit: P.pit, shatter: t - 0.34, y: P.lip + 1 + 0.5 * 980 * 0.34 * 0.34, facing: f });
+    case 'lost': {
+      const t = g.mt, P = g.lost;
+      if (P.kind === 'pit') {
+        if (t < 0.34) return w.wanderer(P.x0 + 26 * P.f * t, { move: 'jump', step: 5, y: P.y0 + 1 + 0.5 * 980 * t * t, pit: P.pit, facing: P.f, sword: g.sword });
+        if (t < 0.34 + 1.1) return w.wanderer(P.x0 + 26 * P.f * t, { pit: P.pit, shatter: t - 0.34, y: P.lip + 1 + 0.5 * 980 * 0.34 * 0.34, facing: P.f });
+        return null;
+      }
+      // health run out: he buckles and kneels (the kit's lifeLost move, 4 steps), then breaks into his card pieces
+      if (t < 0.34) { const s = Math.min(t * R, 3.99); return w.wanderer(P.x0 + P.f * w.move('lifeLost', s).dx, { move: 'lifeLost', step: s, y: P.y0 + 1, facing: P.f, sword: g.sword, hurt: { kind: g.hurtKind, t: g.hurtT } }); }
+      if (t < 0.34 + 1.1) return w.wanderer(P.x0, { shatter: t - 0.34, y: P.y0 + 1, facing: P.f });
       return null;
     }
     case 'return': {
-      const r = w.wanderer(g.x, { move: 'idle', step: g.mt * R, form: g.mt, y, facing: f });
+      const r = w.wanderer(g.x, { move: 'idle', step: g.mt * R, form: g.mt, y, facing: f, sword: g.sword });
       if (g.mt < 0.3 && g.glass[g.lastCp]) w.spark(g.glass[g.lastCp], r.lantern, g.mt / 0.3);
       return r;
     }
     case 'over': return null;
     case 'climb': {
       const c = g.climb, s = Math.min(g.mt * R, c.steps - 1e-3), m = w.move('climb', s);
-      return w.wanderer(c.foot + f * m.dx, { move: 'climb', step: s, y: c.y0 + 1 + m.dy * c.scale, facing: f });
+      return w.wanderer(c.foot + f * m.dx, o({ move: 'climb', step: s, y: c.y0 + 1 + m.dy * c.scale }));
     }
-    case 'roll': return w.wanderer(g.x, { move: 'roll', step: Math.min(g.mt, ROLL_T) * R, y, facing: f });
+    case 'roll': return w.wanderer(g.x, o({ move: 'roll', step: Math.min(g.mt, ROLL_T) * R }));
+    case 'sword': return w.wanderer(g.x, o({ move: 'sword', step: Math.min(g.mt * R, 3.99) }));
+    case 'hurt': return w.wanderer(g.x, o({ move: 'hurt', step: Math.min(g.mt * R, 2.99) }));
     case 'air': {
-      if (g.air === 'drop') return w.wanderer(g.x, { move: 'drop', step: g.airT < 1 / R ? 0 : 1.5, y, facing: f });
+      if (g.air === 'drop') return w.wanderer(g.x, o({ move: 'drop', step: g.airT < 1 / R ? 0 : 1.5 }));
       const step = g.airT < 1 / R ? 1 : g.vy < -250 ? 2.5 : g.vy <= 250 ? 4 : 5.5;   // launch, rising, the top, falling
-      return w.wanderer(g.x, { move: 'jump', step, y, facing: f });
+      return w.wanderer(g.x, o({ move: 'jump', step }));
     }
     default: {
-      if (g.landT < 2 / R) return w.wanderer(g.x, { move: 'jump', step: 7 + g.landT * R, y, facing: f });   // landing, then recovering
+      if (g.landT < 2 / R) return w.wanderer(g.x, o({ move: 'jump', step: 7 + g.landT * R }));   // landing, then recovering
       const walking = g.mode === 'ground' && (lb.input.left || lb.input.right) || (g.mode === 'card' && g.out);
-      if (walking) return w.wanderer(g.x, { move: 'walk', step: g.out ? g.x / STRIDE : g.walkDist / STRIDE, y, facing: f });
-      return w.wanderer(g.x, { move: 'idle', step: lb.time * R, y, facing: f });
+      if (walking) return w.wanderer(g.x, o({ move: 'walk', step: g.out ? g.x / STRIDE : g.walkDist / STRIDE }));
+      return w.wanderer(g.x, o({ move: 'idle', step: lb.time * R }));
     }
   }
 }
