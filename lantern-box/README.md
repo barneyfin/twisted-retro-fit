@@ -56,7 +56,7 @@ The path's scenery is the directions page's sample strip until levels are laid o
 | Crowd | C | Eight monsters and the place's boss, on or off |
 | Defeat | D | Breaks the crowd and the boss into card pieces and wisps |
 | Hurt | | Lowers the health and mana bars |
-| Parts | V | Each drawing part in turn: the place alone, the monsters, defeats, the boss, the wanderer, the splash, the lights |
+| Parts | V | Each drawing part in turn: the place alone, the monsters, defeats, the boss, the wanderer walking and standing, his moves (jump, sword, roll, fireball, hurt, the life lost), casting, the sword's six looks, climbing the place's first bank and walking off the crag (on a level), the splash, the lights |
 | Screens | | Opens any screen: pause, settings, three kinds of game over, initials, high scores, the rotate notice, the title |
 | Speed check | T | Runs the speed check |
 
@@ -102,8 +102,9 @@ Within a few frames a second of kit 0.6.0 in every place (Dawn 5 better, Mist 1 
 |---|---|---|---|---|---|---|---|---|
 | Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-1, the flat strip | 80 fps / 12.8 ms | 58 / 14.8 ms | 73 / 13.5 ms | 70 / 13.7 ms | 25 / 27 ms | 107 MB |
 | Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-2, up the big hill | 73 fps / 10.3 ms | 57 / 14.3 ms | 75 / 10.7 ms | 66 / 13.0 ms | 25 / 37 ms | 111 MB |
+| Pixel 11 Pro XL, Chrome 156 (PowerVR) | 1972 × 886 at 1.64× | 4c-3, the wanderer, up the big hill | 74 fps / 10.4 ms | 57 / 14.1 ms | 78 / 11.2 ms | 66 / 13.1 ms | 25 / 33 ms | 111 MB |
 
-Both pass in every place. 4c-1 drew frames 1 to 3 ms slower than kit 0.7.0, Night (which has bats, not crows) as much as the others, so it is likely run-to-run variation; its longest frame was shorter. 4c-2's speed check walks up each place's big hill on its level with the camera rising, so it is not quite comparable with the flat-strip runs; the levels cost about what the flat strip did. The computer was not measured again.
+Both pass in every place. 4c-1 drew frames 1 to 3 ms slower than kit 0.7.0, Night (which has bats, not crows) as much as the others, so it is likely run-to-run variation; its longest frame was shorter. 4c-2's speed check walks up each place's big hill on its level with the camera rising, so it is not quite comparable with the flat-strip runs; the levels cost about what the flat strip did. 4c-3's posable wanderer, painted once per pose step, made no difference that shows. The computer was not measured again.
 
 ## Picture: Automatic, Best, Faster, Fastest
 

@@ -55,6 +55,29 @@ function onLevel(g, lb, x) { // the camera on a level, and where the stand-in wa
 
 /* ---------- the parts: each drawing part in turn, with the camera still ---------- */
 function spread(lb, cam, n, i) { return cam + lb.W * (i + 0.7) / (n + 0.4); }
+const SWORDS = [{ reach: 0, bite: 0 }, { reach: 1, bite: 0 }, { reach: 2, bite: 0 }, { reach: 0, bite: 1 }, { reach: 0, bite: 2 }, { reach: 2, bite: 2 }]; // the review page's six looks
+function groundAt(g, lb, x) { return g.ground ? levelOf(g, lb).ground(x) : lb.world.ground(x); }
+function cycle(name, t, pause) { // a move played over and over with a pause between: its step now, or null while pausing
+  const n = LB.world.move(name, 0).steps, T = n / 12 + pause, u = ((t % T) + T) % T;
+  return u * 12 < n ? u * 12 : null;
+}
+function play(w, x, name, t, pause) { // a move in place, moving him as the review loops do (the jump's arc, the roll's distance)
+  const s = cycle(name, t, pause);
+  if (s == null) { w.wanderer(x, { move: 'idle', step: t * 12 }); return; }
+  const m = w.move(name, s);
+  w.wanderer(x + m.dx, { move: name, step: s, y: groundAt(G, LB, x + m.dx) + 1 + m.dy });
+}
+const CLIMBS = {};
+function climbScene(g, lb) { // on the place's level: its first bank that rises (one to climb if it has one), and the long climb's crag
+  const L = levelOf(g, lb);
+  if (CLIMBS[L.place]) return CLIMBS[L.place];
+  const rises = L.banks.map(([a, b]) => ({ foot: a - 3, top: b + 5, h: L.ground(a - 3) - L.ground(b + 5) })).filter((q) => q.h > 20);
+  const B = rises.find((q) => q.h > 72 && q.h <= 135) || rises[0];   // a jump below about 70, a climb up to about 130 (the gameplay note)
+  const stride = 5.5 * 1.32, walkFrom = B.foot - 100, tWalk = Math.round((B.foot - walkFrom) / stride) / 12, n = lb.world.move('climb', 0).steps;
+  const crag = L.sections.find((q) => q.id === 'B').x0 + 660;
+  return CLIMBS[L.place] = { L, foot: B.foot, h: B.h, scale: B.h / (96 * 1.32), top: B.foot + lb.world.move('climb', n).dx, stride, walkFrom,
+    tWalk, tClimb: tWalk + n / 12, total: tWalk + n / 12 + 8 / 12 + 1.2, crag };
+}
 const PARTS = [
   { name: 'The whole scene', crowd: true },
   { name: 'The place alone: its sky, flyers, weather and scenery' },
@@ -76,6 +99,49 @@ const PARTS = [
   { name: 'The wanderer, walking and standing', draw(w, lb, g, cam) {
     w.wanderer(cam + lb.W * 0.3);
     w.wanderer(cam + lb.W * 0.6, { walking: false, facing: -1 });
+  } },
+  { name: "The wanderer's moves: jump, sword, roll, fireball, hurt, the life lost", draw(w, lb, g, cam) {
+    const t = lb.time, at = (i) => spread(lb, cam, 6, i);
+    play(w, at(0), 'jump', t, 0.8);
+    const sw = cycle('sword', t, 0.9), lvl = SWORDS[Math.floor(t / (4 / 12 + 0.9)) % SWORDS.length];
+    w.wanderer(at(1), sw == null ? { move: 'idle', step: t * 12, sword: lvl } : { move: 'sword', step: sw, sword: lvl });
+    play(w, at(2), 'roll', t + 0.3, 0.9);
+    play(w, at(3), 'fire', t + 0.6, 1.0);
+    // hurt: armour takes one blow (card shards), health the next (ember sparks); each followed by the second of safety
+    const hT = 3 / 12 + 1.5, hn = Math.floor(t / hT), hu = t % hT;
+    w.wanderer(at(4) - Math.min(1, hu * 12) * 8 * 1.32, hu * 12 < 3 ? { move: 'hurt', step: hu * 12, hurt: { kind: hn % 2 ? 'health' : 'armour', t: hu }, safe: hu } :
+      { move: 'idle', step: t * 12, hurt: { kind: hn % 2 ? 'health' : 'armour', t: hu }, safe: hu });
+    // the life lost: hit, buckle, kneel, then the card pieces, gold-edged; then he stands again
+    const lT = 4 / 12 + 1.1 + 1.2, lu = t % lT, x5 = at(5);
+    if (lu * 12 < 4) w.wanderer(x5 - Math.min(1, lu * 12) * 6 * 1.32, { move: 'lifeLost', step: lu * 12, hurt: { kind: 'health', t: lu } });
+    else if (lu < 4 / 12 + 1.1) w.wanderer(x5 - 6 * 1.32, { shatter: lu - 4 / 12 });
+    else w.wanderer(x5, { move: 'idle', step: t * 12, safe: lu - 4 / 12 - 1.1 });
+  } },
+  { name: 'The wanderer casting: heal, not enough mana, a fireball in mid-air', draw(w, lb, g, cam) {
+    const t = lb.time, at = (i) => spread(lb, cam, 3, i);
+    play(w, at(0), 'heal', t, 0.9);
+    play(w, at(1), 'fizzle', t + 0.4, 0.9);
+    play(w, at(2), 'jumpCast', t + 0.2, 0.9);
+  } },
+  { name: "The sword's six looks: as found, longer reach 1 and 2, stronger hits 1 and 2, both", draw(w, lb, g, cam) {
+    const t = lb.time, at = (i) => spread(lb, cam, 6, i);   // the kit keeps eight painted figures: a part shows at most eight wanderers
+    SWORDS.forEach((s, i) => { const sw = cycle('sword', t + i * 0.12, 1.2); w.wanderer(at(i), sw == null ? { move: 'idle', step: t * 12, sword: s } : { move: 'sword', step: sw, sword: s }); });
+  } },
+  { name: "The wanderer climbing the place's first bank (on a level)", focus(g, lb) { return climbScene(g, lb).foot; }, draw(w, lb, g, cam) {
+    if (!g.ground) return;
+    const C = climbScene(g, lb), t = lb.time % C.total;
+    if (t < C.tWalk) { w.wanderer(C.walkFrom + t * 12 * C.stride); return; }              // walking up to the bank's foot
+    if (t < C.tClimb) { const s = (t - C.tWalk) * 12, m = w.move('climb', s); w.wanderer(C.foot + m.dx, { move: 'climb', step: s, y: C.L.ground(C.foot) + 1 + m.dy * C.scale }); return; }
+    const on = Math.min(t - C.tClimb, 8 / 12) * 12;                                          // along the top, then standing
+    w.wanderer(C.top + on * C.stride, t - C.tClimb < 8 / 12 ? { move: 'walk', step: on } : { move: 'idle', step: t * 12 });
+  } },
+  { name: 'The wanderer walking off the crag (on a level)', focus(g, lb) { return climbScene(g, lb).crag - 60; }, draw(w, lb, g, cam) {
+    if (!g.ground) return;
+    const C = climbScene(g, lb), L = C.L, x0 = C.crag, t = lb.time % 2.6, ds = t * 12;
+    if (ds < 6) { w.wanderer(x0 - 44 + ds * C.stride, { move: 'walk', step: ds }); return; }  // up to the edge
+    const s = ds - 6, v = Math.min(1, s / 3), y0 = L.ground(x0 - 2), y1 = L.ground(x0 + 44);
+    if (s < 5) w.wanderer(x0 - 2 + 46 * v, { move: 'drop', step: s, y: y0 + (y1 - y0) * v * v + 1 });
+    else w.wanderer(x0 + 44, { move: 'idle', step: lb.time * 12 });
   } },
   { name: "The place's splash of colour", draw(w, lb, g, cam) { w.splash(cam + lb.W * 0.5, { seed: 1 }); } },
   { name: 'The lights', draw(w, lb, g, cam) {
@@ -334,7 +400,8 @@ function nextSection(g, lb) { // on a level: on to the start of the next section
 }
 function drawScene(ctx, g, lb, t, x) {
   const w = lb.world, part = g.check ? PARTS[0] : PARTS[g.part];
-  const lv = g.ground ? onLevel(g, lb, x) : null, camX = lv ? lv.camX : x - lb.W * 0.28;
+  const fx = part.focus && g.ground && !g.check ? part.focus(g, lb) : x;   // a part may hold the camera on its own spot
+  const lv = g.ground ? onLevel(g, lb, fx) : null, camX = lv ? lv.camX : x - lb.W * 0.28;
   if (lv) w.begin(ctx, { level: lv.L, camX, t }); else w.begin(ctx, { place: PLACE_NAMES[g.place], camX, rise: g.rise, t });
   if (part.draw) part.draw(w, lb, g, camX);
   else if (part.crowd && g.crowd) {
@@ -361,9 +428,10 @@ function showReadout(g, lb) {
     : PLACE_LABEL[PLACE_NAMES[g.place]] + ' · ' + PARTS[g.part].name + (g.ground ? ' · ' + whereOnLevel(g, lb) : ' · the flat strip');
 }
 function whereOnLevel(g, lb) {
-  const L = levelOf(g, lb), n = L.sections.findIndex((q) => g.x >= q.x0 && g.x < q.x1), q = L.sections[n];
-  const at = q ? 'section ' + q.id + ' (' + q.name + ', ' + (n + 1) + ' of ' + L.sections.length + ')' : g.x >= L.arena ? "the boss's arena" : 'the start';
-  return at + (L.pit(g.x) ? ', a pit' : '') + ' · ' + Math.round(g.x) + ' of ' + L.length;
+  const part = PARTS[g.part], x = part.focus ? part.focus(g, lb) : g.x;   // a part that holds the camera on its own spot says where that is
+  const L = levelOf(g, lb), n = L.sections.findIndex((q) => x >= q.x0 && x < q.x1), q = L.sections[n];
+  const at = q ? 'section ' + q.id + ' (' + q.name + ', ' + (n + 1) + ' of ' + L.sections.length + ')' : x >= L.arena ? "the boss's arena" : 'the start';
+  return at + (L.pit(x) ? ', a pit' : '') + ' · ' + Math.round(x) + ' of ' + L.length;
 }
 </script>
 </body>

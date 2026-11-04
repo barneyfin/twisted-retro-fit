@@ -3114,6 +3114,318 @@ function lvDress(c,P,cam,W,t,pass,rm){const lv=P.T.lv,G=P.G,st=pass!=="live",lp=
   else if(lv==="dawn"){if(st)drawMenhir(c,X,G(x)+2,1,v%3);}
   else{if(v===5){if(lp)drawShrine(c,X,G(x)+2,t,!!rm);}else if(st)drawFerns(c,X,x,110+v*10,v,G);}}}
 
+/* ---------- the wanderer (4c-3): from wand.js, the lantern and the drawing helpers the posable figure uses ---------- */
+const W_INK="#060508",W_RED="#b3261e";
+function wTaper(x,s){const x1=s[0],y1=s[1],x2=s[2],y2=s[3],w1=s[4],w2=s[5],dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L;
+  x.beginPath();x.moveTo(x1+nx*w1/2,y1+ny*w1/2);x.lineTo(x2+nx*w2/2,y2+ny*w2/2);x.lineTo(x2-nx*w2/2,y2-ny*w2/2);x.lineTo(x1-nx*w1/2,y1-ny*w1/2);x.closePath();x.fill();
+  x.beginPath();x.arc(x2,y2,w2/2,0,Math.PI*2);x.fill();if(w1>3){x.beginPath();x.arc(x1,y1,w1/2,0,Math.PI*2);x.fill();}}
+function wPoly(x,pts){x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();}
+function wLantern(x,hx,hy,ang,fill){ // a lantern hanging from (hx,hy): bail, short chain, hood, glass box, base
+  x.save();x.translate(hx,hy);x.rotate(ang);x.lineWidth=1.1;x.lineCap="round";
+  x.beginPath();x.arc(0,1.2,1.4,0,Math.PI*2);x.stroke();x.beginPath();x.moveTo(0,2.6);x.lineTo(0,5);x.stroke();
+  wPoly(x,[[-3.2,5],[3.2,5],[4.4,7.2],[-4.4,7.2]]);x.lineWidth=1.2;x.strokeRect(-3.8,7.2,7.6,8.8);x.fillRect(-4.4,16,8.8,1.8);
+  if(fill){x.fillStyle=fill;x.fillRect(-2.9,8.1,5.8,7);x.fillStyle="#fff2c4";x.beginPath();x.ellipse(0,12.6,1.1,2.2,0,0,Math.PI*2);x.fill();}
+  x.restore();}
+
+/* ---------- moves.js: the wanderer, posable ---------- */
+/* ======================================== moves.js ======================================== */
+/* ============================== 4b round 2: the wanderer, posable ==============================
+   The chosen wanderer (round 1b, D) as a card puppet with joints. A pose P is plain numbers in local units (feet origin at (0,0),
+   up negative, facing right is +x; drawn at 1.32 as before):
+     hx,hy   the hip, relative to the feet origin (standing: 0,-25)
+     lean    the upper body's tilt about the hip (radians, forward positive)
+     ft      the two ankles [[x,y,angle],[x,y,angle]], back foot first; the knees are worked out (two-bone IK, knees forward)
+     sH,sb   the sword hand (in the upper body's frame, hip at 0,0) and the blade's angle in that frame; sbend flips the elbow
+     fH,fl   the free hand (same frame) and its arm's two lengths; fbend flips the elbow
+     hem,lift,flare,pool  the cloak: length factor, hem lifted towards the hip, back flared out
+     bil,tip the cowl's point (billow back, lift) ; nod the head's tilt ; vx,vy the speed felt by the belt tails (local units a second)
+     lan     the lantern's swing ; ball  when set, the tucked roll at that angle ; hand  a glow at the free hand (0..1)
+   Everything that moves on its own (the hem's flutter, the tails' ripple) reads a stepped time, so the whole figure steps
+   like the monsters' puppets; only where it stands glides. */
+const MV_INK="#060508",MV_RED="#b3261e",MV_GLASS="#ffd27a",MV_GOLD="#ffcf6a",MV_LAMP="#ffdf9a";
+const MV_BASE={hx:0,hy:-25,lean:0,ft:[[-2,-3,0],[2.2,-3,0]],sH:[17,-12.5],sb:0.4636,sbend:-1,fH:[4.5,-16.5],fl:[8.5,5.7],fbend:1,
+  hem:1,lift:0,flare:0,bil:1,tip:2.5,nod:0,vx:0,vy:0,lan:0,ball:null,hand:0,flut:0,sword:true};
+function mvP(o){const P=Object.assign({},MV_BASE,o||{});P.ft=(o&&o.ft)||MV_BASE.ft;return P;}
+function mvMix(A,B,u){const P=Object.assign({},A);for(const k in B){const a=A[k],b=B[k];
+  if(typeof a==="number"&&typeof b==="number")P[k]=a+(b-a)*u;else if(Array.isArray(a)&&Array.isArray(b))P[k]=a.map((q,i)=>Array.isArray(q)?q.map((r,j)=>r+(b[i][j]-r)*u):q+(b[i]-q)*u);else P[k]=u<0.5?a:b;}return P;}
+function mvIK(hx,hy,ax,ay,L1,L2,sg){const dx=ax-hx,dy=ay-hy;let d=Math.hypot(dx,dy)||0.001;const m=L1+L2-0.02;
+  if(d>m){ax=hx+dx/d*m;ay=hy+dy/d*m;d=m;}const b=Math.atan2(dy,dx),c=Math.acos(Math.max(-1,Math.min(1,(L1*L1+d*d-L2*L2)/(2*L1*d))));
+  const a=b-sg*c;return[hx+L1*Math.cos(a),hy+L1*Math.sin(a),ax,ay];}
+// the figure's joints for pose P, in the feet-origin frame; tq is the stepped time
+function mvGeo(P,tq){
+  const c=Math.cos(P.lean),s=Math.sin(P.lean),T=(x,y)=>[P.hx+x*c-y*s,P.hy+x*s+y*c];
+  const legs=[[-2,0],[2.2,0]].map((h,i)=>{const H=T(h[0],h[1]),f=P.ft[i],K=mvIK(H[0],H[1],f[0],f[1],12.8,9.9,1);return{H,K:[K[0],K[1]],A:[K[2],K[3]],a:f[2]||0};});
+  const sA=mvIK(5,-27,P.sH[0],P.sH[1],10.6,8.2,P.sbend),fS=P.fS||[-4,-26],fA=mvIK(fS[0],fS[1],P.fH[0],P.fH[1],P.fl[0],P.fl[1],P.fbend);
+  let sb=P.sb;const B=mvBlade(P),tipY=a=>{const hx=sA[2]+Math.cos(a)*(B.len+1.9),hy=sA[3]+Math.sin(a)*(B.len+1.9);return P.hy+hx*s+hy*c;};
+  if(P.sword&&P.ball==null){const fwd=Math.cos(sb+P.lean)>=0;for(let i=0;i<40&&tipY(sb)>-1;i++)sb+=fwd?-0.04:0.04;}
+  const u=[Math.cos(sb),Math.sin(sb)];
+  return{T,c,s,sb,fS,legs,sE:[sA[0],sA[1]],sHd:[sA[2],sA[3]],fE:[fA[0],fA[1]],fHd:[fA[2],fA[3]],u,hook:T(13.4,-8.5),knot:T(-9.6,-9.5),chest:T(4,-22),head:T(3,-40)};}
+function mvBlade(P){const r=(P.lvl&&P.lvl.r)||0;return{len:34+7*r,w:2.8+0.25*r};}
+function mvSword(x,G,P){ // the sword arm and the sword, in the upper body's frame
+  const h=G.sHd,u=G.u,B=mvBlade(P);x.lineWidth=3.8;x.beginPath();x.moveTo(5,-27);x.lineTo(G.sE[0],G.sE[1]);x.lineTo(h[0],h[1]);x.stroke();
+  if(!P.sword)return;const ga=G.sb+0.55,gx=Math.cos(ga)*5.3,gy=Math.sin(ga)*5.3,gc=[h[0]+u[0]*0.4,h[1]+u[1]*0.4];
+  x.lineWidth=2.4;x.beginPath();x.moveTo(gc[0]-gx,gc[1]-gy);x.lineTo(gc[0]+gx,gc[1]+gy);x.stroke();
+  x.beginPath();x.arc(h[0]-u[0]*3.1,h[1]-u[1]*3.1,1.9,0,Math.PI*2);x.fill();
+  const b0=[h[0]+u[0]*1.9,h[1]+u[1]*1.9];wTaper(x,[b0[0],b0[1],b0[0]+u[0]*B.len,b0[1]+u[1]*B.len,B.w,0.5]);}
+function mvRunes(x,G,P){const n=(P.lvl&&P.lvl.s)||0;if(!n||!P.sword)return;const h=G.sHd,u=G.u,B=mvBlade(P),nx=-u[1],ny=u[0];
+  x.fillStyle=MV_GOLD;for(let i=0;i<n;i++){const d=7+i*(B.len-12)/Math.max(3,n),px=h[0]+u[0]*(1.9+d),py=h[1]+u[1]*(1.9+d),r=1.45;
+    x.beginPath();x.moveTo(px+u[0]*r*1.6,py+u[1]*r*1.6);x.lineTo(px+nx*r,py+ny*r);x.lineTo(px-u[0]*r*1.6,py-u[1]*r*1.6);x.lineTo(px-nx*r,py-ny*r);x.closePath();x.fill();}}
+function mvBoot(x,A,a){x.save();x.translate(A[0],A[1]);x.rotate(a);wPoly(x,[[-2.6,-2.5],[2.2,-2.5],[5.6,1.6],[5.6,3.6],[-3,3.6]]);x.restore();}
+function mvCloak(x,G,P,tq){
+  const sh=G.T(0,-31),dx=(sh[0]-P.hx)*0.5,avail=-1.6-P.hy,want=20*P.hem,pool=Math.max(0,want-avail),dep=Math.min(want,avail),fl=P.flut;
+  const top1=G.T(-8.5,-31),top2=G.T(8.5,-31),fc=G.T(8.6,-11),bc=G.T(-10.5-P.bil*0.8-P.flare*0.3,-11),sw=Math.sin(tq*(MV_RM?1.4:3))*(MV_RM?0.6:1.8); /* the kit: calmer with Reduce motion */
+  const fa=G.legs[1].A,fo=Math.max(0,fa[0]+4-(P.hx+dx+12.5)),ba=G.legs[0].A,bo=Math.max(0,(P.hx+dx-19-P.bil*1.4-P.flare)-(ba[0]-5));
+  let fbx=P.hx+dx+12.5+sw*0.5+pool*0.9+fo,fby=P.hy+dep*0.85-P.lift*0.6,hf=0;
+  if(P.part&&fa[0]>P.hx+5){const kx=G.legs[1].K[0];const nx=Math.min(fbx,kx-0.5);hf=(fbx-nx)*P.part;fbx-=hf;}
+  const fb=[fbx,fby];
+  x.beginPath();x.moveTo(top1[0],top1[1]);x.lineTo(top2[0],top2[1]);x.quadraticCurveTo(fc[0],fc[1],fb[0],fb[1]);
+  for(let i=0;i<=9;i++){const u=i/9,hx=P.hx+dx+10+pool*0.9+(fo-hf)*(1-u)+(-29-P.bil*1.4-P.flare-pool*1.8-bo)*u,hy=P.hy+(i%2?15.5:20)*dep/20-P.lift*(0.3+0.7*u)+Math.sin(tq*9+i)*fl*(MV_RM?0.33:1);x.lineTo(hx,hy);}
+  x.quadraticCurveTo(bc[0],bc[1],top1[0],top1[1]);x.closePath();x.fill();}
+function mvCowl(x,P){const b=P.bil,tp=P.tip;x.save();x.translate(0,-30);x.rotate(P.nod);x.translate(0,30);
+  x.translate(0,-35);x.scale(0.86,0.86);x.translate(0,35);x.beginPath();
+  x.moveTo(-7,-30);x.quadraticCurveTo(-12,-39,-9,-47);x.quadraticCurveTo(-16-b*0.6,-51,-25-b*1.2,-38+tp);x.quadraticCurveTo(-15-b*0.5,-48,-6,-53.5);
+  x.quadraticCurveTo(3,-60,10.5,-52.5);x.quadraticCurveTo(14.5,-47.5,14,-39.5);x.quadraticCurveTo(10.5,-37.5,8,-36);x.quadraticCurveTo(8.6,-33,6.5,-30);
+  x.closePath();x.fill();x.restore();}
+function mvBody(x,G,P){x.save();x.translate(P.hx,P.hy);x.rotate(P.lean);}
+function mvBall(x,P,tq,det){ // the tucked roll: the cloak wrapped round into a ragged ball, the cowl's point and the boots showing
+  const R=12.5;x.save();x.translate(P.hx,-R-0.5);x.rotate(P.ball);
+  if(!det){x.beginPath();for(let i=0;i<18;i++){const a=i/18*Math.PI*2,r=R+(i%2?-1.4:0.6)*(a>2.4&&a<4.6?1.6:0.5);i?x.lineTo(Math.cos(a)*r,Math.sin(a)*r):x.moveTo(Math.cos(a)*r,Math.sin(a)*r);}x.closePath();x.fill();
+    x.beginPath();x.moveTo(-6,-10.5);x.quadraticCurveTo(-14,-15,-21-P.bil,-9+P.tip);x.quadraticCurveTo(-13,-11,-10,-4);x.closePath();x.fill(); // the cowl's point
+    mvBoot(x,[6,9.5],-0.9);mvBoot(x,[1.5,11.5],-0.5);}
+  else{x.save();x.beginPath();x.arc(0,0,R-0.6,0,Math.PI*2);x.clip();x.fillStyle=MV_RED;x.save();x.rotate(0.5);x.fillRect(-R,1.2,R*2,3.4);x.restore();x.restore();
+    x.fillStyle=MV_GLASS;x.fillRect(5.2,-3.4,3.6,4.2);}
+  x.restore();}
+function mvSil(x,P,tq){x.lineCap="round";x.lineJoin="round";
+  if(P.ball!=null){mvBall(x,P,tq,false);return null;}
+  const G=mvGeo(P,tq);
+  for(const L of G.legs){x.lineWidth=4.4;x.beginPath();x.moveTo(L.H[0],L.H[1]);x.lineTo(L.K[0],L.K[1]);x.lineTo(L.A[0],L.A[1]);x.stroke();mvBoot(x,L.A,L.a);}
+  mvCloak(x,G,P,tq);
+  mvBody(x,G,P);
+  wPoly(x,[[-10,-33],[10,-33],[12.5,-23],[9,-20],[6.5,-22.5],[3,-19],[0,-22],[-3.5,-18.5],[-7,-21.5],[-10.5-P.bil*0.3,-19],[-13-P.bil*0.4,-22]]);
+  mvCowl(x,P);mvSword(x,G,P);
+  x.lineWidth=3.4;x.beginPath();x.moveTo(G.fS[0],G.fS[1]);x.lineTo(G.fE[0],G.fE[1]);x.lineTo(G.fHd[0],G.fHd[1]);x.stroke();
+  x.restore();
+  wLantern(x,G.hook[0],G.hook[1],P.lan);return G;}
+function mvTails(x,G,P,tq,origin){const sp=Math.min(1,Math.hypot(P.vx,P.vy)/54);let dx=-0.6-2.6*Math.max(-1.6,Math.min(1.6,P.vx/54))-Math.min(1,Math.abs(P.vy)/90)*1.1,dy=0.9-2.2*Math.max(-1.2,Math.min(1.2,P.vy/54));
+  const d=Math.hypot(dx,dy)||1;dx/=d;dy/=d;const nx=-dy,ny=dx,L=24+10*sp,amp=(1.3+2.3*sp)*(MV_RM?0.4:1),K=origin||G.knot; /* the kit: calmer with Reduce motion */
+  for(let k=0;k<2;k++){const top=[],bot=[];for(let i=0;i<=8;i++){const u=i/8,w=1.6-u*0.75,wv=Math.sin(tq*(MV_RM?2.5:7)+u*5+k*1.3)*u*amp,px=K[0]+dx*u*(L-k*7)+nx*wv,py=K[1]+k*2.2+dy*u*(L-k*7)+ny*wv;top.push([px-nx*w,py-ny*w]);bot.push([px+nx*w,py+ny*w]);}
+    x.beginPath();x.moveTo(top[0][0],top[0][1]);for(const q of top)x.lineTo(q[0],q[1]);for(let i=bot.length-1;i>=0;i--)x.lineTo(bot[i][0],bot[i][1]);x.closePath();x.fill();}}
+function mvDet(x,P,tq,G){
+  if(P.ball!=null){mvBall(x,P,tq,true);const a=P.ball+0.5,K=[P.hx-Math.cos(a)*11,-13-Math.sin(a)*11];x.fillStyle=MV_RED;mvTails(x,null,P,tq,K);return;}
+  mvBody(x,G,P);x.fillStyle=MV_RED;wPoly(x,[[-9.8,-11.3],[10.2,-11.3],[10.4,-7.9],[-9.8,-7.9]]);
+  x.lineWidth=1.3;x.strokeStyle=MV_INK;x.beginPath();x.moveTo(9.2,-9.5);x.lineTo(13.4,-8.5);x.stroke();
+  x.fillStyle=MV_RED;x.beginPath();x.ellipse(-9.6,-9.5,2.3,2,0.3,0,Math.PI*2);x.fill();x.restore();
+  x.fillStyle=MV_RED;mvTails(x,G,P,tq);
+  mvBody(x,G,P);x.fillStyle=x.strokeStyle=MV_INK;mvSword(x,G,P);mvRunes(x,G,P);x.restore();
+  x.fillStyle=x.strokeStyle=MV_INK;wLantern(x,G.hook[0],G.hook[1],P.lan,MV_GLASS);}
+// the wanderer in pose P with its feet origin at (X,Y) picture units; o: {edgeA (the lit edge's strength, 0..1), pool (lantern light, 0..1)}
+function mvDraw(x,X,Y,P,tq,f,edge,k,o){k=k||1.32;f=f||1;o=o||{};const eA=o.edgeA==null?1:o.edgeA,pl=o.pool==null?1:o.pool;
+  // where the lantern hangs, for its pool of light
+  let lx,ly;if(P.ball!=null){lx=X+f*(P.hx+5)*k;ly=Y-13*k;}else{const G0=mvGeo(P,tq);lx=X+f*G0.hook[0]*k;ly=Y+(G0.hook[1]+12)*k;}
+  if(pl>0&&FX){const g=x.createRadialGradient(lx,ly,2,lx,ly,74*k/1.32);g.addColorStop(0,"rgba(255,201,106,"+(0.42*pl)+")");g.addColorStop(1,"rgba(255,201,106,0)");x.fillStyle=g;x.fillRect(lx-80*k,ly-80*k,160*k,160*k);}
+  if(eA>0){x.save();x.globalAlpha=eA;x.translate(X+1.3*k/1.32,Y-1.3*k/1.32);x.scale(f*k,k);x.fillStyle=x.strokeStyle=edge||"rgba(255,231,184,0.9)";mvSil(x,P,tq);x.restore();}
+  if(o.aura&&o.aura.a>0){const A=o.aura,top=Y-A.h*100*k;x.save();x.beginPath();x.rect(X-140*k,top,280*k,Y+30*k-top);x.clip();x.globalAlpha=Math.min(1,A.a);
+    for(let i=0;i<8;i++){const an=i*Math.PI/4;x.save();x.translate(X+Math.cos(an)*A.w*k/1.32,Y+Math.sin(an)*A.w*k/1.32);x.scale(f*k,k);x.fillStyle=x.strokeStyle=A.col;mvSil(x,P,tq);x.restore();}x.restore();}
+  x.save();x.translate(X,Y);x.scale(f*k,k);x.fillStyle=x.strokeStyle=MV_INK;const G=mvSil(x,P,tq);mvDet(x,P,tq,G);x.restore();
+  if(o.feet!==false&&FX){const g=x.createRadialGradient(X,Y+1,1,X,Y+1,30*k/1.32);g.addColorStop(0,"rgba(255,201,106,"+(0.2*pl)+")");g.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=g;x.fillRect(X-32*k,Y-6*k,64*k,14*k);}
+  return G;}
+// a point of the figure (in the upper body's frame) in picture units
+function mvPt(G,P,X,Y,f,k,bx,by){const p=G?G.T(bx,by):[P.hx+bx,P.hy+by];return[X+f*p[0]*k,Y+p[1]*k];}
+
+/* ---------- mvmoves.js: the moves ---------- */
+/* ============================== 4b round 2: the moves ==============================
+   Each move is a run of held poses (card-puppet steps) and a path for where the wanderer stands, which glides.
+   Time is counted in steps: at 8 steps a second (the monsters' rate) or 12. */
+// a pose authored with the hands placed in the feet frame (sW, fW) and the blade's angle on screen (sbw): converted to the body frame
+function mvA(o){const P=mvP(o),c=Math.cos(P.lean),s=Math.sin(P.lean),B=p=>{const x=p[0]-P.hx,y=p[1]-P.hy;return[x*c+y*s,-x*s+y*c];};
+  if(o.sW)P.sH=B(o.sW);if(o.fW)P.fH=B(o.fW);if(o.sbw!=null)P.sb=o.sbw-P.lean;return P;}
+const FT=(a,b,c,d,e,f)=>[[a,b,e||0],[c,d,f||0]];
+// ---------- standing and walking
+function mvIdle(i){const b=[0,0.25,0.4,0.2][i%4];return mvP({hy:-25+b,ft:FT(-2.5,-3,2.6,-3),sH:[17,-12.5+b*0.6],sb:0.4636+b*0.04,lan:[0.04,0,-0.04,0][i%4],tip:2.5-b,bil:1+b*0.5});}
+const WF=[[11,-3,-0.15],[6,-3,0],[0.5,-3,0],[-5,-3.4,0.15],[-10,-4.8,0.5],[-5,-9.5,0.35],[1.5,-10,0.05],[7.5,-6.5,-0.2]],WH=[-23.6,-23.3,-24.8,-25.4];
+function mvWalk(i){i=((i%8)+8)%8;const a=i*Math.PI/4,fb=WF[(i+4)%8],ff=WF[i];
+  return mvP({hy:WH[i%4],hx:0.5,lean:0.07+(i%4===3?0.02:0),ft:[[fb[0]-2,fb[1],fb[2]],[ff[0]+2.2,ff[1],ff[2]]],sH:[17+Math.sin(a)*1.2,-12.5+Math.cos(a)*0.8],sb:0.47+Math.sin(a)*0.04,
+    fH:[4.5-Math.sin(a)*1.6,-16.5],bil:4.5+Math.sin(a*0.5)*1.2,tip:Math.sin(a)*0.8,flare:1.5,flut:0.9,vx:54,part:1,lift:2.5,lan:Math.sin(a)*0.14});}
+// ---------- the jump
+const PJ={
+  crouch:mvP({hy:-18.5,hx:-1,lean:0.28,ft:FT(-5,-3,4.5,-3),sH:[15,-8],sb:0.75,fH:[2,-12],nod:0.1,bil:1.5}),
+  launch:mvP({hy:-26.5,lean:0.12,ft:FT(-4.5,-2,1.5,-1.5,0.7,0.55),sH:[17,-16],sb:0.3,fH:[6,-30],fl:[8.6,7.5],vy:-150,bil:2,tip:4,lift:-2}),
+  rise:mvP({hy:-24,lean:0.05,ft:FT(-2.5,-13.5,3,-15.5,0.45,0.2),sH:[16,-18],sb:0.15,fH:[3,-28],fl:[8.6,7],vy:-90,lift:2,flare:3,bil:3,tip:4}),
+  apex:mvP({hy:-24,lean:0.08,ft:FT(-2,-14,3.5,-14.5,0.35,0.1),sH:[17,-16],sb:0.2,fH:[-1,-30],fl:[8.6,7],vy:0,lift:6,flare:6,bil:4,tip:1,flut:0.8}),
+  fall:mvP({hy:-25,lean:0.02,ft:FT(-4,-5,4.5,-6.5,0.35,0.1),sH:[17,-20],sb:0,fH:[-8,-30],fl:[8.6,7.5],vy:150,lift:9,flare:5,bil:5,tip:-2,flut:1}),
+  land:mvP({hy:-16.5,hx:0.5,lean:0.33,ft:FT(-6.5,-3,6.5,-3),sH:[17,-4],sb:0.85,fH:[3,-6],bil:2,tip:3,nod:0.15}),
+  recover:mvP({hy:-22.5,lean:0.12,ft:FT(-4,-3,4,-3),sH:[16.5,-11],sb:0.55})};
+// ---------- climbing onto a ledge (its top 96 units up, its front edge at x 0) and dropping down through one
+const LEDGE=96;
+const PC={
+  look:mvP({hy:-20,lean:0.1,ft:FT(-4,-3,4,-3),nod:-0.35,sH:[14,-6],sb:0.9,fH:[-3,-10],bil:1.5}),
+  grab:mvA({hy:-25,lean:-0.03,ft:FT(-1.5,-1,2,-1.5,0.6,0.5),sW:[12.5,-66.5],sbw:0,fW:[10,-66],fl:[10,9.6],nod:-0.3,lift:-1,vy:-60,bil:1.5,tip:3.5}),
+  pull:mvA({hy:-25,lean:0.3,ft:FT(-4,-5,0.5,-8,0.4,0.2),sW:[14,-40],sbw:0,fW:[11,-40.5],fl:[10,9.6],nod:0.1,bil:2,tip:3}),
+  knee:mvA({hy:-24,lean:0.45,ft:FT(-3,-2,8,-26,0.4,0),sW:[16,-26],sbw:0,fW:[12,-26.5],fl:[10,9.6],nod:0.15,bil:2,tip:3}),
+  rise:mvP({hy:-18,lean:0.3,ft:FT(-4,-3,5,-3),sH:[15,-6],sb:0.8,fH:[3,-8],bil:1.5}),
+  stand:mvP({ft:FT(-2.5,-3,2.6,-3)})};
+const PD={
+  crouch:mvP({hy:-18,lean:0.2,ft:FT(-4,-3,4,-3),nod:0.25,sH:[15,-7],sb:0.85,fH:[2,-10]}),
+  drop:mvP({hy:-26,ft:FT(-2.5,-1.5,2.5,-2,0.5,0.45),sH:[17,-18],sb:0.15,fH:[-6,-32],fl:[8.6,7.6],lift:5,flare:3,bil:3,tip:-1,vy:100}),
+  fall:mvP({hy:-25,ft:FT(-4,-4,4,-5.5,0.35,0.15),sH:[18,-20],sb:-0.05,fH:[-9,-32],fl:[8.6,7.6],lift:10,flare:5,bil:5,tip:-3,vy:200,flut:1}),
+  land:mvP({hy:-16,lean:0.35,ft:FT(-6.5,-3,6.5,-3),sH:[17,-3],sb:0.9,fH:[3,-5],bil:2,nod:0.2}),
+  recover:mvP({hy:-22.5,lean:0.12,ft:FT(-4,-3,4,-3),sH:[16.5,-11],sb:0.55})};
+// ---------- the sword
+const PS={
+  ready:mvP({hy:-24,ft:FT(-4,-3,4,-3)}),
+  wind:mvP({hy:-23.5,lean:-0.12,ft:FT(-6,-3,5,-3),sH:[2,-43],sb:-1.95,fH:[4,-18],nod:-0.05,bil:1.5}),
+  strike:mvP({part:1,hy:-21.5,hx:1.5,lean:0.2,ft:FT(-8,-3,9,-3,0,-0.05),sH:[19,-21],sb:0.02,fH:[-6,-18],bil:3,flare:2,tip:1,vx:30}),
+  follow:mvP({part:1,hy:-22,lean:0.26,ft:FT(-8,-3,9,-3),sH:[16,-6],sb:1.05,fH:[-5,-16],bil:2.5,tip:2}),
+  recover:mvP({hy:-23.5,lean:0.1,ft:FT(-5,-3,5,-3),sH:[17,-11],sb:0.6})};
+// ---------- the dodge roll
+const PR={
+  dive:mvA({hy:-15.5,hx:2,lean:0.75,ft:FT(-9,-3.5,5,-3,0.5,0),nod:0.35,sW:[12,-16],sbw:2.95,fW:[10,-10],bil:3,tip:3,vx:60}),
+  rise:mvP({hy:-17,lean:0.4,ft:FT(-5,-3,5,-3),nod:0.15,sH:[15,-5],sb:0.85,fH:[3,-7],bil:3,vx:30}),
+  recover:mvP({hy:-23,lean:0.12,ft:FT(-4,-3,4,-3),sH:[16.5,-11],sb:0.55})};
+const mvBallP=a=>mvP({ball:a,vx:90,bil:2,tip:2});
+// ---------- casting: heal and fireball (the free hand casts; the sword is lowered)
+const PH2={
+  raise:mvP({hy:-24.5,lean:-0.06,nod:-0.25,ft:FT(-4,-3,4,-3),sH:[13,-6],sb:1.2,fS:[2,-27],fbend:-1,fH:[19,-40],fl:[10.2,9.8],hand:1}),
+  hold:mvP({hy:-25,lean:-0.04,nod:-0.2,ft:FT(-4,-3,4,-3),sH:[13,-6],sb:1.2,fS:[2,-27],fbend:-1,fH:[19,-42],fl:[10.2,9.8],hand:0.8}),
+  lower:mvP({hy:-24,ft:FT(-4,-3,4,-3),sH:[15,-9],sb:0.8,fH:[3,-20],fl:[8.6,7],hand:0})};
+const PF={
+  back:mvP({hy:-23.5,lean:-0.12,ft:FT(-6,-3,5,-3),fH:[-17,-18],fl:[10.2,9.8],hand:1,sH:[14,-8],sb:1}),
+  thrust:mvP({part:1,hy:-22.5,hx:1,lean:0.18,ft:FT(-7,-3,8,-3),fS:[2,-27],fH:[24,-27],fl:[10.2,9.8],hand:0.7,sH:[12,-6],sb:1.2,bil:2.5,tip:1.5}),
+  hold:mvP({hy:-23,hx:0.5,lean:0.12,ft:FT(-7,-3,8,-3),fS:[2,-27],fH:[23,-25],fl:[10.2,9.8],hand:0.25,sH:[12,-6],sb:1.2,bil:2}),
+  recover:mvP({hy:-24,lean:0.05,ft:FT(-4,-3,4,-3),fH:[4,-17],sH:[16,-11],sb:0.6})};
+// ---------- hurt, and the life lost
+const PU={
+  hit:mvP({hy:-23.5,hx:-1,lean:-0.32,nod:-0.25,ft:FT(-7,-3,5,-6,0,-0.3),sH:[13,-20],sb:-0.2,fH:[-11,-27],fl:[9,8],bil:4,tip:-2,flare:3,vx:-40}),
+  stagger:mvP({hy:-21.5,lean:-0.1,ft:FT(-6,-3,4,-3),sH:[15,-10],sb:0.7,fH:[-2,-14]}),
+  recover:mvP({hy:-24,ft:FT(-4,-3,4,-3)})};
+const PL={
+  buckle:mvP({hy:-16.5,lean:0.3,nod:0.4,ft:FT(-5,-3,5,-3),sH:[12,-2],sb:1.35,fH:[2,-3]}),
+  kneel:mvA({hy:-14,hx:-1,lean:0.38,nod:0.55,ft:FT(-13,-2.5,7,-3,1.3,0),sW:[14,-20],sbw:0.45,fW:[6,-12]})};
+// ---------- sequences: [pose or function(step), steps]
+function mvSeq(keys){let t=0;const ks=keys.map(k=>{const o={P:k[0],n:k[1],s0:t,tag:k[2]||""};t+=k[1];return o;});
+  return{total:t,keys:ks,at(s){s=((s%t)+t)%t;for(const k of ks)if(s<k.s0+k.n){const st=Math.floor(s-k.s0),P=typeof k.P==="function"?k.P(st,Math.floor(s)):k.P;return{P,k,st,u:(s-k.s0)/k.n,s};}const k=ks[ks.length-1];return{P:typeof k.P==="function"?k.P(0,0):k.P,k,st:0,u:1,s};},
+    start(tag){const k=ks.find(q=>q.tag===tag);return k?k.s0:0;}};}
+// a path through points [step, x, y, ease]: ease on the way into that point: "in" falls (speeds up), "out" slows, else even
+function mvPath(pts,s){if(s<=pts[0][0])return[pts[0][1],pts[0][2]];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];if(s<=b[0]){let u=(s-a[0])/((b[0]-a[0])||1);const e=b[3];
+  const uy=e==="in"?u*u:e==="out"?1-(1-u)*(1-u):u;return[a[1]+(b[1]-a[1])*u,a[2]+(b[2]-a[2])*uy];}}const z=pts[pts.length-1];return[z[1],z[2]];}
+const STEP=5.5; // how far a walking step carries the wanderer (local units): a stride of 44 in eight steps
+
+/* ---------- from mvscene.js: the moves' effects, and the life lost (the review page's provisional heal and fireball of round 2 are left out: round 3's are the spells) ---------- */
+const K132=1.32,rgbaS=(h,a)=>rgba(h,a);
+// ---------- effects (picture units)
+function fxSlash(c,X,Y,f,k,P,a0,a1,al,col,lvl){ // the sword's sweep: a crescent round the shoulder, thickest where the blade is now
+  if(al<=0)return;const G=mvGeo(P,0),sh=G.T(5,-27),B=mvBlade(P),r=Math.hypot(G.sHd[0]-5+G.u[0]*(B.len+1.9),G.sHd[1]+27+G.u[1]*(B.len+1.9))+1,n=22,w=7+((lvl&&lvl.r)||0)*1.2;
+  c.save();c.translate(X,Y);c.scale(f*k,k);const pts=[],inn=[];
+  for(let i=0;i<=n;i++){const u=i/n,a=a0+(a1-a0)*u,ww=w*Math.pow(u,1.4);pts.push([sh[0]+Math.cos(a)*r,sh[1]+Math.sin(a)*r]);inn.push([sh[0]+Math.cos(a)*(r-ww),sh[1]+Math.sin(a)*(r-ww)]);}
+  c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));for(let i=inn.length-1;i>=0;i--)c.lineTo(inn[i][0],inn[i][1]);c.closePath();
+  c.globalAlpha=al;c.fillStyle=col;c.fill();
+  const sN=(lvl&&lvl.s)||0;if(sN){c.strokeStyle=MV_GOLD;c.lineWidth=0.8+sN*0.7;c.beginPath();pts.slice(Math.floor(n*0.25)).forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();}
+  c.restore();}
+function fxGlowAt(c,x,y,r,a,col){if(a<=0||!FX)return; /* the kit: Effects off, no glow */c.save();c.globalCompositeOperation="screen";const g=c.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,rgbaS(col,a));g.addColorStop(0.4,rgbaS(col,a*0.55));g.addColorStop(1,rgbaS(col,0));c.fillStyle=g;c.fillRect(x-r,y-r,r*2,r*2);c.restore();}
+function fxMote(c,x,y,r,a,col){if(a<=0)return;c.save();c.globalAlpha=a;c.fillStyle=col;c.beginPath();c.moveTo(x,y-r*1.6);c.lineTo(x+r*0.6,y);c.lineTo(x,y+r*1.6);c.lineTo(x-r*0.6,y);c.closePath();c.fill();c.restore();}
+function fxHand(c,X,Y,f,k,P,G){if(!P.hand||!G)return;const p=G.T(G.fHd[0],G.fHd[1]),x=X+f*p[0]*k,y=Y+p[1]*k;fxGlowAt(c,x,y,14*P.hand+4,0.85*P.hand,MV_GOLD);fxMote(c,x,y,1.6*P.hand,P.hand,MV_LAMP);}
+function fxEmber(c,x,y,f,k,u){ // hurt: a hot ember glow where the blow lands and a spray of ember streaks thrown off it (one burst, nothing repeats)
+  if(u<0||u>1)return;fxGlowAt(c,x,y,(16+u*12)*k,0.9*(1-u)*(1-u),"#ff5a1f");fxGlowAt(c,x,y,(7+u*4)*k,0.8*(1-u)*(1-u)*(1-u),"#ffc27a");
+  const r=mvRng(31);for(let i=0;i<18;i++){const a=(r()-0.5)*Math.PI*1.8-0.55,sp=24+r()*30,d=(2+u*sp)*k,dx=f*Math.cos(a),dy=Math.sin(a)+u*0.9,dl=Math.hypot(dx,dy)||1,
+    px=x+f*Math.cos(a)*d,py=y+Math.sin(a)*d+u*u*16*k,L=(3+(1-u)*6+r()*2)*k,tx=dx/dl,ty=dy/dl,w=(1.9+r()*0.6-u*0.8)*k;
+    c.save();c.globalAlpha=Math.min(1,(1-u)*1.5);c.lineCap="round";c.strokeStyle="#ff7a3a";c.shadowColor="#ff5a1f";c.shadowBlur=FX?7:0;c.lineWidth=w;
+    c.beginPath();c.moveTo(px,py);c.lineTo(px-tx*L,py-ty*L);c.stroke();c.shadowBlur=0;c.strokeStyle="#ffd9a0";c.lineWidth=w*0.45;
+    c.beginPath();c.moveTo(px,py);c.lineTo(px-tx*L*0.45,py-ty*L*0.45);c.stroke();c.restore();}}
+function fxShards(c,x,y,f,k,u,edge){ // armour takes the hit: a few card shards fall away
+  if(u<0||u>1)return;const r=mvRng(12);for(let i=0;i<5;i++){const vx=(r()-0.3)*26,px=x+f*vx*u*k,py=y+(-4+r()*20)*k+u*u*44*k,rot=(r()-0.5)*7*u,sz=(2.5+r()*2)*k;
+  c.save();c.globalAlpha=u<0.6?1:(1-u)/0.4;c.translate(px,py);c.rotate(rot);c.fillStyle=edge;c.beginPath();c.moveTo(-sz+0.9,-sz*0.6-0.9);c.lineTo(sz+0.9,-sz*0.2-0.9);c.lineTo(0.9,sz-0.9);c.closePath();c.fill();
+  c.fillStyle=MV_INK;c.beginPath();c.moveTo(-sz,-sz*0.6);c.lineTo(sz,-sz*0.2);c.lineTo(0,sz);c.closePath();c.fill();c.restore();}}
+// ---------- the life lost: the kneeling figure cut into card pieces, each lit along its edges in gold
+function mvPieces(s,P,edge){const k=K132,W=Math.ceil(110*k*s),H=Math.ceil(110*k*s),ox=50*k,oy=96*k;
+  const fig=mk(W,H),fc=fig.getContext("2d");fc.setTransform(s,0,0,s,0,0);
+  fc.save();fc.translate(ox+1.3,oy-1.3);fc.scale(k,k);fc.fillStyle=fc.strokeStyle=MV_GOLD;mvSil(fc,P,0);fc.restore();
+  fc.save();fc.translate(ox,oy);fc.scale(k,k);fc.fillStyle=fc.strokeStyle=MV_INK;const G=mvSil(fc,P,0);mvDet(fc,P,0,G);fc.restore();
+  const r=mvRng(404),cols=4,rows=5,gx=[],x0=-26,x1=48,y0=-74,y1=2,pts=[];
+  for(let j=0;j<=rows;j++){pts.push([]);for(let i=0;i<=cols;i++){const jx=(i>0&&i<cols)?(r()-0.5)*9:0,jy=(j>0&&j<rows)?(r()-0.5)*7:0;pts[j].push([x0+(x1-x0)*i/cols+jx,y0+(y1-y0)*j/rows+jy]);}}
+  const out=[];for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const q=[pts[j][i],pts[j][i+1],pts[j+1][i+1],pts[j+1][i]];const tri=r()<0.5?[[q[0],q[1],q[2]],[q[0],q[2],q[3]]]:[[q[0],q[1],q[3]],[q[1],q[2],q[3]]];
+    for(const poly of tri){const xs=poly.map(p=>(ox+p[0]*k)*s),ys=poly.map(p=>(oy+p[1]*k)*s),bx0=Math.max(0,Math.floor(Math.min(...xs))-2),by0=Math.max(0,Math.floor(Math.min(...ys))-2),bx1=Math.min(W,Math.ceil(Math.max(...xs))+2),by1=Math.min(H,Math.ceil(Math.max(...ys))+2); /* the kit: each piece its own small canvas */
+      const pc=mk(bx1-bx0,by1-by0),pcx=pc.getContext("2d");pcx.setTransform(s,0,0,s,-bx0,-by0);pcx.save();pcx.beginPath();poly.forEach((p,i)=>{const X=ox+p[0]*k,Y=oy+p[1]*k;i?pcx.lineTo(X,Y):pcx.moveTo(X,Y);});pcx.closePath();pcx.clip();
+      pcx.setTransform(1,0,0,1,0,0);pcx.drawImage(fig,-bx0,-by0);pcx.setTransform(s,0,0,s,-bx0,-by0);pcx.restore();
+      pcx.globalCompositeOperation="source-atop";pcx.strokeStyle=MV_GOLD;pcx.lineWidth=1.6;pcx.beginPath();poly.forEach((p,i)=>{const X=ox+p[0]*k,Y=oy+p[1]*k;i?pcx.lineTo(X,Y):pcx.moveTo(X,Y);});pcx.closePath();pcx.stroke();
+      const cx=(poly[0][0]+poly[1][0]+poly[2][0])/3,cy=(poly[0][1]+poly[1][1]+poly[2][1])/3;
+      out.push({cv:pc,bx:bx0/s,by:by0/s,bw:(bx1-bx0)/s,bh:(by1-by0)/s,cx:cx*k,cy:cy*k,vx:(cx-8)/30+(r()-0.5)*0.8,vy:-0.6-r()*1.1,spin:(r()-0.5)*6});}}
+  return{fig,out,ox,oy,W,H,s};}
+function mvShatter(c,K,X,Y,f,u,edge){ // u 0..1 over the second the pieces tumble
+  const s=c.getTransform().a;if(!K.pc||K.pcS!==s){K.pc=mvPieces(s,PL.kneel,edge);K.pcS=s;}const S=K.pc;
+  for(const p of S.out){const al=u<0.45?1:Math.max(0,1-(u-0.45)/0.55),tx=p.vx*u*46,ty=p.vy*u*34+u*u*80;if(al<=0)continue;
+    c.save();c.globalAlpha=al;c.translate(X+f*(p.cx+tx),Y+p.cy+ty);c.rotate(p.spin*u*f);c.scale(f,1);c.translate(-p.cx,-p.cy);c.drawImage(p.cv,-S.ox+p.bx,-S.oy+p.by,p.bw,p.bh);c.restore();}}
+
+/* ---------- from mvloops.js and mvspells.js: the moves' sequences, as the review loops play them (with their pauses), and the sword's levels ---------- */
+const IDLE=(st,g)=>mvIdle(g),WALK=(st)=>mvWalk(st);
+function tipAng(P){const G=mvGeo(P,0),B=mvBlade(P),h=G.sHd,sh=G.T(5,-27),tp=G.T(h[0]+G.u[0]*(B.len+1.9),h[1]+G.u[1]*(B.len+1.9));return Math.atan2(tp[1]-sh[1],tp[0]-sh[0]);}
+function withLvl(P,l){const Q=Object.assign({},P);Q.lvl=l;return Q;}
+const SQ_JUMP1=[[IDLE,3],[PJ.crouch,1],[PJ.launch,1],[PJ.rise,2],[PJ.apex,1],[PJ.fall,2],[PJ.land,1],[PJ.recover,1],[IDLE,3]];
+const LVLS=[{r:0,s:0,n:"the sword as found"},{r:1,s:0,n:"longer reach, 1"},{r:2,s:0,n:"longer reach, 2"},{r:0,s:1,n:"stronger hits, 1"},{r:0,s:2,n:"stronger hits, 2"},{r:2,s:2,n:"both, 2 each"}];
+const SQ_SW1=[[PS.ready,2],[PS.wind,1],[PS.strike,1,"strike"],[PS.follow,1,"follow"],[PS.recover,1],[PS.ready,3]];
+const SQ_SWORD=mvSeq(SQ_SW1);
+function swordAt(st,lvl){const q=SQ_SWORD.at(st),P=withLvl(q.P,lvl);let arc=null;
+  if(q.k.tag==="strike")arc=[tipAng(withLvl(PS.wind,lvl)),tipAng(P),0.85];else if(q.k.tag==="follow")arc=[tipAng(withLvl(PS.strike,lvl))-0.5,tipAng(P),0.4];return{P,arc,hit:q.k.tag==="strike"||q.k.tag==="follow"};}
+const SQ_ROLL1=[[IDLE,3],[PR.dive,1],[st=>mvBallP([0,1.95,3.9][st]),3,"ball"],[PR.rise,1],[PR.recover,1],[IDLE,3]];
+const SQ_FIRE1=[[IDLE,3],[PF.back,1],[PF.thrust,1,"thr"],[PF.hold,1],[PF.recover,1],[IDLE,6]];
+const PJC=Object.assign({},PJ.apex,{fS:[2,-27],fH:[24,-29],fl:[10.2,9.8],hand:0.8,fbend:1});
+const PJB=Object.assign({},PJ.rise,{fS:[0,-27],fH:[-15,-20],fl:[10.2,9.8],hand:1});
+const PFZ1=Object.assign({},PF.hold,{hand:0,lean:-0.06,nod:0.1,hx:-0.5,fH:[16,-33],fl:[10.2,9.8],fS:[2,-27]}),PFZ2=Object.assign({},PF.recover,{lean:-0.02,nod:0.18,fS:[2,-27],fH:[14,-17],fl:[10.2,9.8]});
+
+/* ---------- the kit: the moves as a game plays them, and the wanderer painted the kit's way (4c-3) ---------- */
+const moPulse=tau=>tau>=0&&tau<1?0.2+0.8*(0.5+0.5*Math.cos(Math.PI*2*1.5*tau)):1; // from mv10.js: the second of safety, his lit edge pulsing slowly
+// Each move without the review loops' pauses, its poses in puppet steps at 12 a second (Moves). Where he stands as it plays (path, arc,
+// stride) is in his own units, as the review loops move him: mvMove gives it in picture lines (dx, dy); a game may use it or its own.
+const MV_RATE=12;
+const MOVES={
+  idle:{keys:[[IDLE,4]],loop:true},
+  walk:{keys:[[WALK,8]],loop:true,stride:STEP},
+  jump:{keys:SQ_JUMP1.slice(1,-1),arc:[1,7,58,44]},                                         // [from step, to step, height, forward]
+  drop:{keys:[[PD.drop,1],[PD.fall,2],[PD.land,1],[PD.recover,1]]},                          // walking off an edge or a piece, as round 5c's run does
+  climb:{keys:[[PC.look,1],[PC.grab,1],[PC.pull,2],[PC.knee,1],[PC.rise,1],[PC.stand,1]],     // up a bank's face or a tall piece: round 5c's run, for a
+    path:[[0,0,0],[1,0,0],[1.5,-2,-30,"out"],[2,-2,-30],[3.5,-1,-56,"out"],[4,-1,-56],[4.5,4,-70,"out"],[5,4,-70],[5.5,16,-96,"out"],[6,16,-96],[7,18,-96]]}, // face LEDGE (96) high: scale dy by its height
+  roll:{keys:SQ_ROLL1.slice(1,-1),path:[[0,0,0],[1,6,0],[4,54,0],[5,60,0],[6,62,0]]},
+  sword:{keys:SQ_SW1.slice(1,-1)},                                                          // wind, strike, follow, recover: the arc on strike and follow
+  heal:{keys:[[PH2.raise,1,"go"],[PH2.hold,3],[PH2.lower,1]]},
+  fire:{keys:SQ_FIRE1.slice(1,-1)},                                                         // the fireball leaves on "thr"
+  jumpCast:{keys:[[PJ.crouch,1],[PJ.launch,1],[PJB,2],[PJC,2,"thr"],[PJ.fall,2],[PJ.land,1],[PJ.recover,1]],arc:[1,8,58,0]},
+  fizzle:{keys:[[PF.back,1],[Object.assign({},PF.thrust,{hand:0.5}),1,"fiz"],[PFZ1,2],[PFZ2,2],[PF.recover,1]]},
+  hurt:{keys:[[PU.hit,1,"hit"],[PU.stagger,1],[PU.recover,1]],path:[[0,0,0],[1,-8,0,"out"]]}, // knocked back a step
+  lifeLost:{keys:[[PU.hit,1,"hit"],[PL.buckle,1],[PL.kneel,2]],path:[[0,0,0],[1,-6,0,"out"]]}}; // then he breaks into his card pieces (1.1 s)
+function mvMove(name,step){const M=MOVES[name];if(!M)throw new Error('Lantern Box: no move called "'+name+'".');
+  if(!M.seq)M.seq=mvSeq(M.keys);const T=M.seq.total,S=M.loop?step:Math.max(0,Math.min(T-1e-6,step)),q=M.seq.at(S);let dx=0,dy=0;
+  if(M.path){const p=mvPath(M.path,S);dx=p[0];dy=p[1];}
+  else if(M.arc){const a=M.arc,v=Math.max(0,Math.min(1,(S-a[0])/(a[1]-a[0])));dx=a[3]*v;dy=-a[2]*4*v*(1-v);}
+  else if(M.stride)dx=step*M.stride;
+  return{P:q.P,tag:q.k.tag,steps:T,done:!M.loop&&step>=T,dx:dx*K132,dy:dy*K132};}
+// The kit's way: the figure painted once per pose step into cached canvases, its lit edge in one and its ink and colours in the other,
+// so the second of safety's pulse is only the edge's strength; his lantern's pool of light and the glow at his feet drawn every frame.
+let MV_RM=false;                                   // Reduce motion while a figure is painted: his belt tails and cloak ripple less (Barney, 4 November 2026)
+const MV_BOX=[-62,-122,98,14];                     // the figure's box in his own units, feet at (0, 0), with the sword at its longest
+const MVC=[];                                      // the painted figures, the most recent last
+function mvFigure(s,P,tq,k,edge,rm,f){ // painted facing its way, its feet on a whole pixel and its lit edge's offset painted in, so a blit is pixel for pixel
+  const key=s.toFixed(3)+"|"+k+"|"+f+"|"+edge+"|"+(rm?1:0)+"|"+tq.toFixed(4)+"|"+JSON.stringify(P);
+  for(let i=MVC.length-1;i>=0;i--)if(MVC[i].key===key){const F=MVC[i];if(i!==MVC.length-1){MVC.splice(i,1);MVC.push(F);}return F;}
+  const b=MV_BOX,R=k*s,x0=f>0?b[0]:-b[2],x1=f>0?b[2]:-b[0],ox=Math.ceil(-x0*R)+4,oy=Math.ceil(-b[1]*R)+4,w=ox+Math.ceil(x1*R)+4,h=oy+Math.ceil(b[3]*R)+2,e=1.3*k/1.32*s;
+  let F=MVC.length>=8?MVC.shift():null;
+  if(!F||F.E.width!==w||F.E.height!==h)F={E:mk(w,h),I:mk(w,h)};
+  F.key=key;F.ox=ox;F.oy=oy;F.w=w;F.h=h;MV_RM=!!rm;
+  try{for(const ink of [false,true]){const x=(ink?F.I:F.E).getContext("2d");x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.clearRect(0,0,w,h);
+    if(ink){x.setTransform(R*f,0,0,R,ox,oy);x.fillStyle=x.strokeStyle=MV_INK;F.G=mvSil(x,P,tq);mvDet(x,P,tq,F.G);}
+    else{x.setTransform(R*f,0,0,R,ox+e,oy-e);x.fillStyle=x.strokeStyle=edge;mvSil(x,P,tq);}}}
+  finally{MV_RM=false;}
+  MVC.push(F);KIT.poses++;return F;}
+// as mvDraw (moves.js), from the painted figure: the pool of light, the lit edge (at its strength), the figure, the glow at the feet
+function mvDrawKit(x,s,X,Y,P,tq,f,edge,k,o){k=k||K132;f=f||1;o=o||{};const eA=o.edgeA==null?1:o.edgeA,pl=o.pool==null?1:o.pool,F=mvFigure(s,P,tq,k,edge,o.rm,f),G=F.G;
+  let lx,ly;if(P.ball!=null){lx=X+f*(P.hx+5)*k;ly=Y-13*k;}else{lx=X+f*G.hook[0]*k;ly=Y+(G.hook[1]+12)*k;}
+  if(pl>0&&FX){const g=x.createRadialGradient(lx,ly,2,lx,ly,74*k/1.32);g.addColorStop(0,"rgba(255,201,106,"+(0.42*pl)+")");g.addColorStop(1,"rgba(255,201,106,0)");x.fillStyle=g;x.fillRect(lx-80*k,ly-80*k,160*k,160*k);}
+  const m=x.getTransform(),px=Math.round(X*m.a+m.e-F.ox),py=Math.round(Y*m.d+m.f-F.oy); // whole device pixels, as the kit places its bosses
+  const put=cv=>{x.save();x.setTransform(1,0,0,1,0,0);x.drawImage(cv,px,py);x.restore();};
+  if(eA>0){x.save();x.globalAlpha=eA;put(F.E);x.restore();}
+  put(F.I);
+  if(o.feet!==false&&FX){const g=x.createRadialGradient(X,Y+1,1,X,Y+1,30*k/1.32);g.addColorStop(0,"rgba(255,201,106,"+(0.2*pl)+")");g.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=g;x.fillRect(X-32*k,Y-6*k,64*k,14*k);}
+  return G;}
+const MV_SH={};                                    // the life lost's card pieces, cut once for each sharpness
+
 /* ============================== the tools: what a game calls, as lb.world ==============================
    The tools draw; games decide what happens. A frame is world.begin(ctx, { place, camX, rise }), then the things on the path
    in the order they should overlap, then world.end(). Things on the path are placed by x, along the path, and y, in picture
@@ -3184,9 +3496,33 @@ function makeTools(env){
       F.ctx.setTransform(1,0,0,1,0,0);
       F=null;
     },
-    wanderer(x,o){ // o: y, walking (true), facing (1 or -1)
+    // version 8 (4c-3): the moves, as a game plays them. world.move(name, step) gives the pose's tag, the move's length in steps, done,
+    // and where the review loops have him stand (dx, dy, picture lines from where the move began). Steps are puppet steps, 12 a second.
+    moves:Object.keys(MOVES),
+    stepRate:MV_RATE,
+    move(name,step){const m=mvMove(name,step||0);return{tag:m.tag,steps:m.steps,done:m.done,dx:m.dx,dy:m.dy};},
+    wanderer(x,o){ // version 8 (4c-3): the posable wanderer (Moves). o: y; move and step, or walking (true) or standing, in time; facing (1 or -1);
+      // sword {reach, bite}: its upgrades; safe: seconds into the second of safety (his lit edge pulses slowly for 1 s); hurt {kind: "armour" or
+      // "health", t: seconds since the blow}; shatter: seconds since he broke into his card pieces (1.1 s); pit [x0, x1]: falling into that pit,
+      // so drawn only above the ground and in the gap. Returns where his chest, hand and lantern are (x along the path, y in picture lines).
       const f=frame("wanderer");o=o||{};
-      drawWanderer(f.ctx,x-f.camX,o.y==null?f.gy(x)+1:o.y,f.t,o.walking!==false,o.facing||1,f.rm,LV[f.level].edge);
+      const name=o.move||(o.walking===false?"idle":"walk"),step=o.step==null?f.t*MV_RATE:o.step,mv=mvMove(name,step);
+      const lvl=o.sword?{r:o.sword.reach||0,s:o.sword.bite||0}:null,P=lvl?withLvl(mv.P,lvl):mv.P,tq=Math.floor(f.t*MV_RATE)/MV_RATE;
+      const c=f.ctx,X=x-f.camX,Y=o.y==null?f.gy(x)+1:o.y,fc=o.facing||1,e=LV[f.level].edge;
+      if(o.pit){const p0=o.pit[0],p1=o.pit[1];c.save();c.beginPath();c.rect(-200,-2000,f.W+400,2000+f.gy(p0)-1);c.rect(p0+3-f.camX,-2000,p1-p0-6,4000);c.clip("nonzero");}
+      let G=null;
+      if(o.shatter!=null)mvShatter(c,MV_SH,X-fc*6*K132,Y,fc,Math.min(1,Math.max(0,o.shatter/1.1)),e);
+      else{
+        G=mvDrawKit(c,f.s,X,Y,P,tq,fc,e,K132,{edgeA:o.safe!=null?moPulse(o.safe):1,rm:f.rm,feet:o.feet});
+        fxHand(c,X,Y,fc,K132,P,G);
+        if(name==="sword"&&(mv.tag==="strike"||mv.tag==="follow")){const L=lvl||{r:0,s:0},a=mv.tag==="strike"?[tipAng(withLvl(PS.wind,L)),tipAng(P),0.85]:[tipAng(withLvl(PS.strike,L))-0.5,tipAng(P),0.4];
+          fxSlash(c,X,Y,fc,K132,P,a[0],a[1],a[2],e,L);}
+        if(o.hurt){const ch=mvPt(G,P,X,Y,fc,K132,12,-21),u=o.hurt.t||0;if(o.hurt.kind==="armour")fxShards(c,ch[0],ch[1],fc,K132,u/0.5,e);else fxEmber(c,ch[0],ch[1],fc,K132,u/0.45);}
+      }
+      if(o.pit)c.restore();
+      const pt=(bx,by)=>{const p=mvPt(G,P,X,Y,fc,K132,bx,by);return{x:p[0]+f.camX,y:p[1]};};
+      const hd=G?G.T(G.fHd[0],G.fHd[1]):[P.hx+4,P.hy-16];
+      return{tag:mv.tag,done:mv.done,chest:pt(4,-22),hit:pt(12,-21),lantern:pt(13.4,3.5),hand:{x:x+fc*hd[0]*K132,y:Y+hd[1]*K132}};
     },
     monster(o){ // o: kind, x, y, ph (its pace, so neighbours differ), id (a monster's own name), defeat (0 to 1, over 1.6 s), seed
       const f=frame("monster"),s=f.s;
@@ -4286,13 +4622,19 @@ function makeTools(env){
        lb.world draws the World. A frame: world.begin(ctx, { place: 'night', 'storm', 'dawn' or 'mist', camX, rise }), then the
          things on the path in the order they overlap, then world.end(). camX is the path's position at the picture's left
          edge; rise lifts the camera, in lines, above the place's own lift, and each layer rises by its own rate. Things are placed by x along the path;
-         y left out stands them on the ground (world.ground(x)):
-         world.wanderer(x, { y, walking, facing }), world.monster({ kind, x, y, ph, id, defeat, seed }) (kinds in
+         y left out stands them on the ground (world.ground(x)). A level (version 8): L = world.level(place, order) gives the place's
+         whole level (L.length, L.arena, L.sections, L.checkpoints, L.pits, L.banks, L.ground(x), L.rise(x), L.pit(x), L.pieces());
+         world.begin(ctx, { level: L, camX }) draws it in place of the flat strip, rising with its ground, and y left out stands
+         things on its ground. The wanderer (version 8): world.wanderer(x, { y, move, step, facing, sword: { reach, bite }, safe,
+         hurt: { kind, t }, shatter, pit }) draws him in one of world.moves at a puppet step (12 a second; walking or standing
+         in time if move is left out) and returns his chest, hand and lantern; world.move(name, step) gives a move's length, tag
+         and where the review loops have him stand. Then:
+         world.monster({ kind, x, y, ph, id, defeat, seed }) (kinds in
          world.MONSTERS; give each monster its own id; defeat 0 to 1 breaks it into card pieces and a wisp, over 1.6 s),
          world.boss({ x, y, defeat }) (the place's own; defeat over 2.2 s), world.splash(x, { y, seed }), world.candle(x, y),
          world.wallLamp(x, y), world.post(x, y, lit), world.streetLamp(x, y), world.shrine(x, y), world.potion(x, y),
          world.stringLights(ax, ay, qx, qy, bx, by, seed). begin({ sample: true }) adds the directions page's monsters and
-         wanderer to the path. The path's scenery is the directions page's sample strip until levels are laid out.
+         wanderer to the path. Without a level, the path's scenery is the directions page's sample strip.
        In the game's config: id, title (a string, or its two lines), start, update, draw(ctx, g, lb), place (the place behind
        the title, 'night' if left out), drawTitle(ctx, lb) (to draw the title's picture itself), mana, music, init(lb), onPause(g, lb). */
     const api = {
