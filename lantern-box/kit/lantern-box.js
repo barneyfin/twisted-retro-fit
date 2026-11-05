@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.8.1';
+  const VERSION = '0.8.2';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -4678,8 +4678,12 @@ return{build,set,stickShow,ICON,oct};
     Object.keys(ACTIONS).forEach((a) => { input[a] = false; input.pressed[a] = false; });
     /* version 8 (4c-6b): the touch controls (TouchControls), in the full HUD on any touch device. The stick shows where the left thumb lands,
        anywhere in the left half, and goes when it lifts; its knob travels 31 px; left, right and up as its chevrons light (up also climbs); a
-       quick flick sideways rolls. The three buttons press jump, attack and cast; a tap on the spell's socket presses switch. */
+       quick flick sideways rolls, and (kit 0.8.2, Barney's trial, 5 November 2026) so does a double tap of the left thumb: two short, still taps
+       close together within 0.3 s; the game rolls him the way he faces. The three buttons press jump, attack and cast; a tap on the spell's
+       socket presses switch. */
     const FLICK_PX = 40, FLICK_MS = 120, FLICK_REST = 350;   // a flick: the thumb 40 px sideways within 0.12 s (starting figures, to tune in play)
+    const TAP_MS = 250, TAP_PX = 14, DTAP_MS = 300, DTAP_PX = 70;   // kit 0.8.2: a tap is shorter than 0.25 s and moves under 14 px; a double tap is
+                                                              // a second touch within 0.3 s of the first tap's end and within 70 px of it
     const tc = { on: false, held: new Set(), just: new Set(), dirs: { left: false, right: false, up: false },
       stick: { id: null, x: 0, y: 0, dx: 0, dy: 0, hist: [], rest: 0 } };
     function prepareInput() {
@@ -4742,6 +4746,10 @@ return{build,set,stickShow,ICON,oct};
       s.x = Math.max(60, Math.min(W * 0.5 - 60, x));
       s.y = Math.max(70, Math.min(H - 60, y));
       s.hist = [];
+      // kit 0.8.2: the second touch of a double tap rolls (as a flick does, and not again within its rest)
+      const now = performance.now(), lt = s.lastTap;
+      if (lt && now - lt.t < DTAP_MS && Math.hypot(x - lt.x, y - lt.y) < DTAP_PX && now >= s.rest) { tc.just.add('roll'); s.rest = now + FLICK_REST; s.lastTap = null; }
+      s.down = { t: now, x, y };
       stickMove(e);
       return true;
     }
@@ -4765,6 +4773,8 @@ return{build,set,stickShow,ICON,oct};
       if (s.id == null || e.pointerId !== s.id) return false;
       s.id = null; s.dx = 0; s.dy = 0; s.hist = [];
       const h = hudNodes && hudNodes.full;
+      // kit 0.8.2: a short, still touch is a tap, remembered for a double tap
+      if (h && s.down) { const [x, y] = hudAt(h, e), now = performance.now(); s.lastTap = now - s.down.t < TAP_MS && Math.hypot(x - s.down.x, y - s.down.y) < TAP_PX ? { t: now, x: s.down.x, y: s.down.y } : null; }
       if (h) HUD8.stickShow(h, s.x, s.y, 0, 0, 0, 0);   // nothing shows at rest
       return true;
     }
@@ -5909,7 +5919,8 @@ return{build,set,stickShow,ICON,oct};
          input.keyPressed(code), and two fingers: input.pointer and input.pointer2 (x, y in lines; down, pressed, released, dx, dy).
          Version 8's named controls: input.jump (Space), attack (J), cast (K), switch (L), roll (Shift), climb (W or up), held and
          in input.pressed. With the full HUD on a touch device the touch controls press them: the stick (left, right, up and climb;
-         a quick flick sideways presses roll), the jump, attack and cast buttons, and a tap on the spell's socket (switch).
+         a quick flick sideways presses roll, and kit 0.8.2 a double tap of the left thumb), the jump, attack and cast buttons, and a tap on
+         the spell's socket (switch).
        lb.addWisps(n), lb.wisps, lb.best: the score, in whole wisps. lb.gameOver(delay): ends the run (game over, then the
          initials if it makes the top ten). lb.hud.health(0..1), lb.hud.mana(0..1): the bars; mana: false in the config leaves
          the mana bar out. lb.sfx('name'), sfx.tone(o), sfx.noise(o). lb.music(0 or 1): the soundtrack to play.
