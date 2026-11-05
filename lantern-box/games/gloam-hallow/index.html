@@ -24,6 +24,7 @@
    loot: potions, armour, scrolls and sword upgrades dropped by monsters and picked up by touch, and health potions on pieces and hills.
    Step 4d-4: the four bosses, each in its arena at the place's end: the camera locking, its arrival, name and bar, its three attacks
    and their answers, blows and fireballs, its defeat, 25 wisps and its sure drop; a life lost restarts at its door.
+   Step 4d-5: the whole run, Night to the win, checked end to end; a boss's sure drop lands on the way out.
    Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
@@ -61,7 +62,9 @@ const COMEBACK = 0.4;            // the share of the monsters beaten since the c
 // up onto a piece, and can be rolled through (through: the roll passes their bodies, as it passes under a flyer).
 const MON = {
   crawler: { dmg: 0.10, hp: 1, wisps: 1, box: [-25, 23, -24, 2], ground: true, speed: 140, range: 125, keep: 175, cd: 0.8, atk: 'lunge' },   // the lunge carries it 170 on, so from 125 it ends well past him
-  bat2:    { dmg: 0.10, hp: 1, wisps: 1, box: [-25, 25, -18, 8], speed: 60, range: [90, 210], cd: 1.1, atk: 'dive', hover: 120, through: true },
+  // the flyer hangs 100 or 122 above the ground, 80 or 100 from him: low and near enough that a blow reaches it as it hangs between
+  // dives (Barney, 5 November 2026: striking it only in its dive was too hard)
+  bat2:    { dmg: 0.10, hp: 1, wisps: 1, box: [-25, 25, -18, 8], speed: 70, range: [70, 210], cd: 1.3, atk: 'dive', hover: 100, near: [80, 100], through: true },
   hatmaw:  { dmg: 0.15, hp: 2, wisps: 2, box: [-37, 36, -75, 0], ground: true, speed: 110, range: 75, keep: 100, cd: 0.7, atk: 'bite', push: 10 },
   // the ghoul lurches in, holds off just beyond the sword's reach while it gathers itself, then swipes over and down at head height
   // (its claw reaches 84 from its middle and comes no lower than 46 above the ground; counted from 56, so a roll gets under it on a
@@ -684,7 +687,8 @@ function bossDamage(g, lb, n) {
   for (const sp of ['heal', 'fire']) if (g.spells[sp] === 0) can.push(sp);
   if (!can.length) { if (g.spells.heal < 3) can.push('heal'); if (g.spells.fire < 3) can.push('fire'); if (g.sword.reach < 2) can.push('reach'); if (g.sword.bite < 2) can.push('rune'); }
   const kind = can.length ? (can.length > 1 && g.spells.heal === 0 && g.spells.fire === 0 ? 'heal' : lb.pick(can)) : 'health';
-  const x = Math.max(g.L.length - lb.W + 60, Math.min(g.L.length - 60, b.bx - 60 * b.f));
+  // it lands ahead of him, towards the way out, so walking on picks it up (dropped under him, it was still falling as he passed)
+  const x = Math.min(g.L.length - 50, Math.max(g.x + 80, b.bx));
   g.loot.push({ kind, x, y: g.L.ground(x), drop: 0, from: { x: b.bx, y: g.L.ground(b.bx) - 120 }, seed: 77 });
 }
 function callCrawlers(g, lb, b) {      // the skull's call: crawlers rise out of the cracked warnings (the kit's rise, 0.35 s)
@@ -890,7 +894,7 @@ function makeMonster(g, kind, x0, n, near) {
     for (const off of [0, 25, -25, 50, -50, 80, -80]) { const p = patchAt(g, x0 + off, K); if (p) { patch = p; x = clampTo(x0 + off, p); break; } }
     if (!patch) return null;
   }
-  const alt = K.ground ? 0 : (n % 2) * 30;   // flyers hang at two heights, so neighbours differ
+  const alt = K.ground ? 0 : (n % 2) * 22;   // flyers hang at two heights, so neighbours differ
   const m = { id: 'm' + n, kind, sx: x, sy: K.ground ? 0 : g.L.ground(x) - K.hover - alt, alt, patch, ph: (n * 0.37) % 1, seed: n * 7 + 3 };
   resetMonster(g, m);
   return m;
@@ -949,16 +953,18 @@ function monsterUpdate(m, g, lb, dt, busy) {
       startAttack(m, 'dive', { dir: -1, dx: -(ad + 30), dy: chest - m.by });
       return;
     }
-    const goal = g.x - m.f * (150 + (m.alt ? 50 : 0));   // the two heights hang at two distances, so flyers don't sit on each other
+    const goal = g.x - m.f * K.near[m.alt ? 1 : 0];      // the two heights hang at two distances, so flyers don't sit on each other
     m.bx += Math.max(-K.speed * dt, Math.min(K.speed * dt, goal - m.bx));
     place(m, g, m.bx, 0);
     return;
   }
-  // a ground monster: it comes for him while he is on its stretch of ground, and waits at its edge while he is on a piece or beyond;
-  // the ghoul and the walker reach up onto a piece beside their stretch
-  const near = g.x > m.patch[0] - 60 && g.x < m.patch[1] + 60;
-  const reach = !busy && near && (!g.on || K.up);
+  // a ground monster: it comes for him while he is on its stretch of ground; the ghoul and the walker also when he is up on a piece (or
+  // past a pit or bank) within their reach of their stretch's end. Otherwise it can't get at him, so it walks up and down its stretch,
+  // turning at its ends and before it comes within his sword's reach (Barney, 5 November 2026: no longer waiting at the edge to be struck)
+  const off = g.x < m.patch[0] ? m.patch[0] - g.x : g.x > m.patch[1] ? g.x - m.patch[1] : 0;
+  const reach = !busy && ((!g.on && off < 30) || (K.up && off <= K.range - 10));
   let goal;
+  m.patrol = !reach;
   if (reach) {
     if (m.cd <= 0 && ad <= K.range && ad > 18) {
       // the walker: a high sweep at him up on a piece, otherwise high or low, half and half
@@ -966,7 +972,16 @@ function monsterUpdate(m, g, lb, dt, busy) {
       return;
     }
     goal = g.x - m.f * (m.cd <= 0 ? K.range * 0.8 : K.keep);   // in to striking range, or holding off while it gathers itself
-  } else goal = clampTo(g.x, m.patch);
+  } else {
+    const keep = SWORD_REACH + REACH_UP * g.sword.reach + halfW(m) + 14, away = m.bx >= g.x ? 1 : -1;
+    if (!m.pdir) m.pdir = away;
+    if (m.bx <= m.patch[0] + 6) m.pdir = 1;                    // (6: more than the 4 lines that count as arrived)
+    if (m.bx >= m.patch[1] - 6) m.pdir = -1;
+    if (ad < keep + 6 && m.pdir !== away) m.pdir = away;      // never walking on into his reach
+    goal = m.bx + m.pdir * 30;
+    if (ad < keep && ((away > 0 && m.bx >= m.patch[1] - 6) || (away < 0 && m.bx <= m.patch[0] + 6))) goal = m.bx;   // cornered: it stands
+    m.f = goal === m.bx ? m.f : m.pdir;   // it faces the way it walks
+  }
   goal = clampTo(goal, m.patch);
   const want = Math.abs(goal - m.bx) > 4;
   let v = 0;
@@ -979,13 +994,16 @@ function monsterUpdate(m, g, lb, dt, busy) {
   else if (m.kind === 'ghoul2') { if (want) { m.walkT += dt; v = K.speed * Math.max(0, Math.sin(m.walkT * 4.5)) ** 2; } }   // it lurches
   else if (want) v = K.speed;          // the walker stalks, slow and steady
   m.moving = want || (m.kind === 'hatmaw' && m.walkT > 0);
+  if (m.patrol) v *= 0.6;              // walking its stretch, it goes slower than it comes at him
   const s = Math.sign(goal - m.bx);
   let nx = m.bx + s * Math.min(Math.abs(goal - m.bx), v * dt);
+  let bumped = false;
   for (const o of g.mons) {            // it keeps a little apart from the next ground monster its way, never walking into it
     if (o === m || !alive(o) || !MON[o.kind].ground || (o.bx - m.bx) * s <= 0) continue;
     const gap = halfW(m) + halfW(o) + 8, lim = o.bx - s * gap;
-    if ((nx - lim) * s > 0) nx = (m.bx - lim) * s > 0 ? m.bx : lim;
+    if ((nx - lim) * s > 0) { nx = (m.bx - lim) * s > 0 ? m.bx : lim; bumped = true; }
   }
+  if (m.patrol && bumped && Math.abs(nx - m.bx) < 0.5) m.pdir = -s;   // walking its stretch and meeting another, it turns round
   m.bx = nx;
   place(m, g, m.bx, 0);
 }
