@@ -39,6 +39,8 @@
    device the stick walks (a flick rolls) and the three buttons jump, swing and cast. The readout names the last control pressed.
    Since 4c-7 the moves make their sounds, each place plays its background sound (off during the speed check), and the Sounds
    button plays any of the kit's sounds.
+   Kit 0.9.0 (design system version 11): the potion sockets (potions: true). Both start kept; Q and E (or a tap on a socket) drink them
+   while their bars are short, and the HUD button keeps either kind again (its flight to the socket) or fills and empties the bars.
    It uses the kit's test hook (lb._debug) to open any screen; games do not. */
 const PLACE_NAMES = ['night', 'storm', 'dawn', 'mist'];
 const PLACE_LABEL = { night: 'Night', storm: 'Blood Red Rain', dawn: 'Dawn', mist: 'Mist' };
@@ -57,9 +59,10 @@ function checkStart(lb, i) { const L = lb.world.level(PLACE_NAMES[i]); return L.
 // the speed check's legs: each place up its big hill, then (since 4c-8) the Mist at its boss, as the design system's speed target asks
 const LEGS = [0, 1, 2, 3].map((i) => ({ place: i, label: PLACE_LABEL[PLACE_NAMES[i]], short: PLACE_LABEL[PLACE_NAMES[i]].replace('Blood Red Rain', 'Rain') }))
   .concat([{ place: 3, boss: true, label: 'Mist, at its boss', short: 'Mist boss' }]);
-// the cloud check (design system version 10): Night and Blood Red Rain up the big hill (the places with clouds), each before version 10's
-// lit-through-a-cloud and with it, so one run of one build gives the before and after (set Picture to Best first, so it cannot step down)
-const CLOUD_MODES = [[false, 'before version 10', 'before'], [true, 'version 10', 'v10']];
+// the cloud check (design system version 10; since kit 0.9.0 version 11's softer lit-through-a-cloud): Night and Blood Red Rain up the big
+// hill (the places with clouds), each without lit-through-a-cloud and with it, so one run of one build gives its cost (set Picture to Best
+// first, so it cannot step down)
+const CLOUD_MODES = [[false, 'without lit-through-a-cloud', 'off'], [true, 'with lit-through-a-cloud (version 11)', 'v11']];
 const CLOUD_LEGS = [0, 1].flatMap((i) => CLOUD_MODES.map(([thru, what, short]) => ({ place: i, thru, label: PLACE_LABEL[PLACE_NAMES[i]] + ', ' + what,
   short: PLACE_LABEL[PLACE_NAMES[i]].replace('Blood Red Rain', 'Rain') + ' ' + short })));
 function legStart(lb, leg) { return leg.boss ? lb.world.level(PLACE_NAMES[leg.place]).arena + 120 : checkStart(lb, leg.place); }
@@ -338,7 +341,7 @@ function finishCheck(g, lb) {
   const ms = (c) => (c.keptUp ? 'under ' : '') + c.drawn.toFixed(1) + ' ms';
   const phone = R.every((r) => r.fps >= 29.5 && r.drawn <= 25), computer = R.every((r) => r.fps >= 58);
   const line = 'Lantern Box ' + (cloud ? 'cloud check' : 'speed check') + ', kit ' + lb.version + ' (test page ' + TEST_PAGE + ') · ' + device() + ' · ' + p.width + ' × ' + p.height + ' at ' + p.sharpness.toFixed(2) + '× · Picture ' + lb.settings.picture + ' (' + p.level + ')' +
-    (lb.settings.reduceMotion ? ' · reduce motion' : '') + (lb.settings.effects ? '' : ' · effects off') + (cloud ? ' · before and with version 10, up the big hill · ' : ' · up the big hill, then the Mist at its boss · ') +
+    (lb.settings.reduceMotion ? ' · reduce motion' : '') + (lb.settings.effects ? '' : ' · effects off') + (cloud ? ' · without and with lit-through-a-cloud (version 11), up the big hill · ' : ' · up the big hill, then the Mist at its boss · ') +
     R.map((r) => r.short + ' ' + Math.round(r.fps) + ' fps / ' + ms(r)).join(' · ') +
     ' · slowest 5% ' + Math.round(Math.max(...R.map((r) => r.slow))) + ' ms · longest ' + Math.round(Math.max(...R.map((r) => r.max))) + ' ms · layers ' + Math.round(lb.world.stats.tileBytes / 1048576) + ' MB';
   openPanel((face, close) => {
@@ -447,6 +450,18 @@ const MOVE_OF = { jump: 'jump', attack: 'sword', roll: 'roll' };
 const SOUND_OF = { jump: 'jump', sword: 'swing', roll: 'roll', heal: 'heal', fire: 'fireball', fizzle: 'fizzle' };   // each move's sound (4c-7)
 const BOSS_NAMES = { night: 'The Veiled Ghost', storm: 'The Tentacled Skull', dawn: 'The Moor Mother', mist: 'The Gaping Tree' };   // play.js's BS_NAME
 function showHud(g, lb) { lb.hud.armour(g.pips); lb.hud.lives(g.lives); lb.hud.spells(g.spells, g.sel, 0.3); lb.hud.mana(g.mana); }
+// kit 0.9.0: the potions. A kept one lies a step in front of him and flies up to its socket; a drink fills its bar and lights him
+function keepPot(g, lb, k) {
+  if (g.pots[k]) { g.pots[k] = false; lb.hud.potions(g.pots.health, g.pots.mana); }   // kept already: empty it first, to see the moment again
+  g.keep = { k, x: g.x + g.facing * 70, t0: lb.time }; g.pots[k] = true;
+  lb.hud.keep(k, { line: !g.keptOnce[k] }); g.keptOnce[k] = true; lb.sfx('pickup');
+}
+function drinkPot(g, lb, k) {
+  const bar = k === 'health' ? g.health : g.mana;
+  if (!g.pots[k] || bar >= 0.999) return;   // nothing kept, or its bar is full: nothing happens
+  lb.hud.drink(k); g.pots[k] = false; g.drink = { k, t0: lb.time };
+  g.fill = { k, from: bar, to: Math.min(1, bar + (k === 'health' ? 0.35 : 0.5)), t0: lb.time };
+}
 function switchSpell(g, lb) { if (g.spells.length > 1) { g.sel = (g.sel + 1) % g.spells.length; showHud(g, lb); } }
 function bossFight(g, lb) { // the arrival (name and bar), three hits, the fall
   const name = BOSS_NAMES[PLACE_NAMES[g.place]];
@@ -495,6 +510,12 @@ function hudPanel(g, lb) {
     ['Two lines', () => { lb.hud.line(...LINES[4]); lb.hud.line(...LINES[5]); }],
     ['Boss fight', () => bossFight(g, lb)],
     ['Place card', () => placeCard(g, lb)],
+    ['Keep: health', () => keepPot(g, lb, 'health')],   // kit 0.9.0: the potions
+    ['Keep: mana', () => keepPot(g, lb, 'mana')],
+    ['Drink: health', () => drinkPot(g, lb, 'health')],
+    ['Drink: mana', () => drinkPot(g, lb, 'mana')],
+    ['Bars full', () => { g.health = 1; g.mana = 1; g.fill = null; lb.hud.health(1); lb.hud.mana(1); showHud(g, lb); }],
+    ['Bars low', () => { g.health = 0.3; g.mana = 0.3; g.fill = null; lb.hud.health(0.3); lb.hud.mana(0.3); showHud(g, lb); }],
   ];
   openPanel((face, close) => {
     const h = document.createElement('h2');
@@ -554,6 +575,7 @@ LanternBox.game({
   id: 'lb-sampler',
   title: ['Test', 'Page'],
   hud: 'full',   // version 8's HUD (4c-6a)
+  potions: true,   // kit 0.9.0: the potion sockets
   howTo: { goal: ['Cut your path through four blighted lands, felling the terror bound to each. Sever the roots of The Gaping Tree to break the night.',
     'Three chances to break the dark. Fall, and return to the glow of your last lit lantern.'] },
   win: { heading: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.', lifeBonus: 10 },
@@ -571,10 +593,12 @@ LanternBox.game({
       pips: 1, lives: 3, spells: ['heal', 'fire'], sel: 0, mana: 1, lineN: 0,   // the HUD's state (4c-6a)
       move: null, lastPress: null,   // the move the controls asked for, and the last control pressed (4c-6b)
       amb: true,   // the place's background sound (4c-7)
+      pots: { health: true, mana: true }, keptOnce: {}, keep: null, drink: null, fill: null,   // the potions kept, and their moments (kit 0.9.0)
       last: 0, fpsN: 0, fpsT: 0, cpuSum: 0, fps: 0, cpu: 0 };
     G = g;
     buildPieces(g, lb);
     showHud(g, lb);
+    lb.hud.potions(g.pots.health, g.pots.mana);
     return g;
   },
 
@@ -591,6 +615,13 @@ LanternBox.game({
     // since 4c-6b: the named controls (keys, or the touch controls on a touch device) play the wanderer's moves
     CONTROLS.forEach((a) => { if (i.pressed[a]) g.lastPress = a; });
     if (i.pressed.switch) switchSpell(g, lb);
+    if (i.pressed.drinkHealth) drinkPot(g, lb, 'health');   // kit 0.9.0: Q, E or a tap on a socket
+    if (i.pressed.drinkMana) drinkPot(g, lb, 'mana');
+    if (g.fill) {   // the bar fills over 0.4 s
+      const f = g.fill, u = Math.min(1, (lb.time - f.t0) / 0.4), e = u * u * (3 - 2 * u), v = f.from + (f.to - f.from) * e;
+      if (f.k === 'health') { g.health = v; lb.hud.health(v); } else { g.mana = v; lb.hud.mana(v); }
+      if (u >= 1) g.fill = null;
+    }
     if (g.move) {   // he travels as the move moves him, so the camera follows him through it (a fix after 4c-8: it jumped at the end)
       const m = lb.world.move(g.move.name, (lb.time - g.move.t0) * lb.world.stepRate);
       g.x = moveX(g, lb, m);
@@ -674,9 +705,11 @@ function drawScene(ctx, g, lb, t, x) {
     const y0 = lv ? lv.y + 1 : undefined;
     // a jump's ground blends from where he left to where he lands under its arc; a roll keeps to the ground under him
     const base = m && g.move.name === 'jump' ? g.move.y0 + (g.move.y1 - g.move.y0) * Math.min(1, step / m.steps) : (y0 != null ? y0 : w.ground(x) + 1);
-    if (m) w.wanderer(x, { y: base + m.dy, move: g.move.name, step, facing: g.facing });
-    else w.wanderer(x, { y: y0, walking: g.walking, facing: g.facing });
+    const dk = g.drink && t - g.drink.t0 < 0.9 ? { kind: g.drink.k, t: t - g.drink.t0 } : undefined;   // kit 0.9.0: a potion drunk
+    if (m) w.wanderer(x, { y: base + m.dy, move: g.move.name, step, facing: g.facing, drink: dk });
+    else w.wanderer(x, { y: y0, walking: g.walking, facing: g.facing, drink: dk });
   }
+  if (g.keep && t - g.keep.t0 < 0.45) w.loot(g.keep.k, g.keep.x, { keep: t - g.keep.t0 });   // kit 0.9.0: a potion kept, flying to its socket
   w.end();
 }
 function showReadout(g, lb) {

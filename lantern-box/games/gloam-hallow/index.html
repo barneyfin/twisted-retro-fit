@@ -25,6 +25,9 @@
    Step 4d-4: the four bosses, each in its arena at the place's end: the camera locking, its arrival, name and bar, its three attacks
    and their answers, blows and fireballs, its defeat, 25 wisps and its sure drop; a life lost restarts at its door.
    Step 4d-5: the whole run, Night to the win, checked end to end; a boss's sure drop lands on the way out.
+   Design system version 11 (kit 0.9.0, from Barney's second play): one health and one mana potion kept for later, in the HUD's two
+   sockets, drunk with a tap, Q or E (kept through a lost life; the line saying how to drink one once per kind each run); the ghoul
+   lurches about 30 forward as it swipes, so it outreaches the sword; the Gaping Tree's branch sweeps at head height all the way out.
    Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
@@ -71,8 +74,9 @@ const MON = {
   hatmaw:  { dmg: 0.15, hp: 3, wisps: 2, box: [-37, 36, -75, 0], ground: true, speed: 110, range: 75, keep: 100, cd: 0.7, atk: 'bite', answer: true },
   // the ghoul lurches in, holds off just beyond the sword's reach while it gathers itself, then swipes over and down at head height
   // (its claw reaches 84 from its middle and comes no lower than 46 above the ground; counted from 56, so a roll gets under it on a
-  // slope): roll through under it, then strike
-  ghoul2:  { dmg: 0.15, hp: 4, wisps: 2, box: [-41, 18, -92, 0], ground: true, speed: 90, range: 92, keep: 135, cd: 1.0, atk: 'swipe', answer: true,
+  // slope): roll through under it, then strike while it recovers. Version 11: it lurches about 30 forward as it swipes and stays there,
+  // so the claw reaches about 114 from where it stood, against the sword's 84; it swipes from 105, beyond the sword's reach
+  ghoul2:  { dmg: 0.15, hp: 4, wisps: 2, box: [-41, 18, -92, 0], ground: true, speed: 90, range: 105, keep: 135, cd: 1.0, atk: 'swipe', answer: true,
     up: true, through: true, zone: { swipe: [0.58, 0.8, -86, -35, -130, -56] } },
   // the walker stalks and sweeps its branch arms: arms up, a high sweep 112 to 200 above the ground (it passes over him standing, but
   // not jumping or up on a piece); a crouch, a low sweep at his knees (jump it)
@@ -138,6 +142,7 @@ LanternBox.game({
   id: 'gloam-hallow',
   title: ['Gloam', 'Hallow'],
   hud: 'full',
+  potions: true,   // kit 0.9.0: the potion sockets
   howTo: { goal: ['Cut your path through four blighted lands, felling the terror bound to each. Sever the roots of The Gaping Tree to break the night.',
     'Three chances to break the dark. Fall, and return to the glow of your last lit lantern.'] },
   win: { heading: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.', lifeBonus: 10 },
@@ -160,10 +165,11 @@ LanternBox.game({
       health: 1, mana: 1, armour: t.armour ? 3 : 0, sword: { reach: t.all ? 2 : 0, bite: t.all ? 2 : 0 },
       safeT: 0, hurtT: 9, hurtKind: 'health', atkBuf: 0, swHit: false, mons: [], monsTest: t.mons || 'normal',
       spells: { heal: t.all ? 3 : 0, fire: t.all ? 3 : 0 }, spellList: t.all ? ['heal', 'fire'] : [], sel: 0, castBuf: 0, cast: null, healT: 9,
-      manaShown: 1, loot: [], shots: [], chest: null, hand: null };
+      manaShown: 1, loot: [], shots: [], chest: null, hand: null,
+      pots: { health: false, mana: false }, potLine: {}, drinkT: 9, drinkKind: 'health', fills: [] };   // version 11: the potions kept
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
-    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); hudSpells(g, lb);
+    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); hudSpells(g, lb); lb.hud.potions(false, false);
     lb.fade(1);   // black until the first place card lifts
     lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; });
     return g;
@@ -182,6 +188,9 @@ LanternBox.game({
     if (lb.input.pressed.attack) g.atkBuf = ATTACK_BUF;   // swings at once on the ground; pressed while busy, as soon as he is free
     if (lb.input.pressed.cast) g.castBuf = CAST_BUF;      // the same for a cast
     if (lb.input.pressed.switch) switchSpell(g, lb);
+    if (lb.input.pressed.drinkHealth) drink(g, lb, 'health');   // version 11: a kept potion (a tap on its socket, Q or E)
+    if (lb.input.pressed.drinkMana) drink(g, lb, 'mana');
+    g.drinkT += dt; fillsUpdate(g, lb, dt);
     if (g.mode !== 'lost' && g.mode !== 'return' && g.mana < 1) { g.mana = Math.min(1, g.mana + MANA_RATE * dt); hudMana(g, lb, false); }
     if (!(g.boss && g.boss.st === 'arrive')) moveUpdate(g, lb, dt);   // play stops while the boss comes in
     bossUpdate(g, lb, dt);
@@ -391,6 +400,7 @@ function overlapsBody(g, m) { const r = halfW(m) + BODY_W + 10; return Math.abs(
 /* ---------- a life lost (a fall into a pit, or health run out) and the return (the design system's timings: play.js's loopLost) ---------- */
 function startLost(g, lb, kind, pit) {
   g.mode = 'lost'; g.mt = 0; g.atkBuf = 0;
+  g.fills = []; g.drinkT = 9;            // version 11: a drink's fill stops (kept potions stay kept, as Barney chose)
   g.lost = { kind, pit, x0: g.x, y0: g.y, lip: pit ? g.L.ground(g.x) : g.y, f: g.facing };
 }
 function lostUpdate(g, lb, dt) {
@@ -407,7 +417,7 @@ function lostUpdate(g, lb, dt) {
     const cp = g.cps[g.lastCp];
     g.x = cp.x + RETURN_AT; g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1;
     g.mode = 'return'; g.mt = 0; g.safeT = 0; g.hurtT = 9;
-    g.armour = 0; lb.hud.armour(0);    // a lost life loses the armour; spells and sword upgrades are kept, and loot picked up stays picked up
+    g.armour = 0; lb.hud.armour(0);    // a lost life loses the armour; spells, sword upgrades and kept potions are kept, and loot picked up stays picked up
     g.shots = []; g.cast = null; g.castBuf = 0;
     if (g.boss && g.boss.st !== 'done') {   // a life lost in a boss fight: back at its door, the boss whole again, its crawlers gone
       g.boss = newBoss(g); lb.hud.boss(null);
@@ -660,9 +670,9 @@ function bossAttackHits(g, b, rolling) {
       if (up > 0.3) for (const t of m.targets) { const p = mir ? 2 * b.bx - t : t, G = Gd(p); if (box(p - 15, p + 19, G - 96 * up, G)) return { dmg, x: M(p) }; }
     }
     if (m.name === 'branch' && u >= 0.55 && u < 0.95) {   // the long branch sweeping across (the kit's bsBranchPts), its pieces as circles
-      const v = ease3(Math.min(1, (u - 0.55) / 0.35)), grow = lerp3(0.3, 1, v), ang0 = lerp3(-1.75, -3.05, v), tilt = 0.035 - 0.06 * v, c = Math.cos(tilt), s = Math.sin(tilt);
-      const L = 296 * grow, G = Gd(b.bx) + 4, pts = [[4, -96]]; let p = pts[0], a = ang0;
-      [[0.42, 0], [0.31, 0.42], [0.27, -0.36]].forEach(([f, da]) => { a += da; p = [p[0] + Math.cos(a) * L * f, p[1] + Math.sin(a) * L * f]; pts.push(p); });
+      const v = ease3(Math.min(1, (u - 0.55) / 0.35)), grow = lerp3(0.3, 1, v), ang0 = lerp3(-1.75, -3.20, v), tilt = 0.035 - 0.06 * v, c = Math.cos(tilt), s = Math.sin(tilt);
+      const L = 296 * grow, G = Gd(b.bx) + 4, pts = [[4, -84]]; let p = pts[0], a = ang0;   // version 11: at head height all the way out
+      [[0.42, 0], [0.31, 0.18], [0.27, -0.28]].forEach(([f, da]) => { a += da; p = [p[0] + Math.cos(a) * L * f, p[1] + Math.sin(a) * L * f]; pts.push(p); });
       const R = [13, 7, 4, 2];
       for (let i = 0; i < 3; i++) for (let k = 0; k <= 6; k++) {
         const q = k / 6, lx = lerp3(pts[i][0], pts[i + 1][0], q), ly = lerp3(pts[i][1], pts[i + 1][1], q), r = lerp3(R[i], R[i + 1], q) + 4;
@@ -747,13 +757,19 @@ function lootUpdate(g, lb, dt) {
   for (const it of g.loot) {
     if (it.drop != null) { it.drop += dt; if (it.drop >= 0.45) it.drop = null; continue; }   // out of the fallen monster (0.45 s)
     if (it.pick != null) { it.pick += dt; if (it.pick >= 0.5) it.gone = true; continue; }   // lifting into him (0.5 s)
+    if (it.keep != null) { it.keep += dt; if (it.keep >= 0.45) it.gone = true; continue; }   // version 11: flying up to its socket (0.45 s)
     if (it.x < camX - 200) { it.gone = true; continue; }   // left behind off the screen
     // touched: it hovers a little above the ground (or a piece) at his feet
-    if (free && Math.abs(it.x - g.x) < BODY_W + 12 && it.y > g.y - BODY_H && it.y - 34 < g.y + 2 && take(g, lb, it)) it.pick = 0;
+    if (free && Math.abs(it.x - g.x) < BODY_W + 12 && it.y > g.y - BODY_H && it.y - 34 < g.y + 2) { const r = take(g, lb, it); if (r === 'keep') it.keep = 0; else if (r) it.pick = 0; }
   }
   if (g.loot.some((it) => it.gone)) g.loot = g.loot.filter((it) => !it.gone);
 }
-function take(g, lb, it) {             // false: not needed now (health, mana or armour full), so it stays for later
+function take(g, lb, it) {             // false: not needed now (health, mana or armour full), so it stays for later; 'keep': into its socket
+  if ((it.kind === 'health' || it.kind === 'mana') && !g.pots[it.kind]) {   // version 11: a potion with its socket empty is kept
+    g.pots[it.kind] = true; lb.hud.keep(it.kind, { line: !g.potLine[it.kind] }); g.potLine[it.kind] = true;   // the line once per kind each run
+    lb.sfx('pickup');
+    return 'keep';
+  }
   switch (it.kind) {
     case 'health': if (g.health >= 0.999) return false; g.health = Math.min(1, g.health + POTION.health); lb.hud.health(g.health); break;
     case 'mana': if (g.mana >= 0.999) return false; g.mana = Math.min(1, g.mana + POTION.mana); hudMana(g, lb, true); break;
@@ -771,12 +787,31 @@ function take(g, lb, it) {             // false: not needed now (health, mana or
   lb.sfx('pickup');
   return true;
 }
+// version 11: a kept potion drunk: instant, with no pose, so it works mid-fight; not with its bar full, nor while a life is lost or he
+// comes back. The socket drains and the drink sounds (the kit's), motes rise round him (0.9 s), and the bar fills by a potion's worth
+// over 0.4 s (added a frame at a time, so a blow meanwhile still counts)
+function drink(g, lb, k) {
+  const bar = k === 'health' ? g.health : g.mana;
+  if (!g.pots[k] || bar >= 0.999 || g.mode === 'lost' || g.mode === 'return' || g.mode === 'over') return;
+  g.pots[k] = false; lb.hud.drink(k);
+  g.drinkT = 0; g.drinkKind = k;
+  g.fills.push({ k, t: 0, done: 0 });
+}
+function fillsUpdate(g, lb, dt) {
+  if (!g.fills.length) return;
+  for (const f of g.fills) {
+    f.t += dt; const e = ease3(Math.min(1, f.t / 0.4)), add = POTION[f.k] * (e - f.done); f.done = e;
+    if (f.k === 'health') { g.health = Math.min(1, g.health + add); lb.hud.health(g.health); } else { g.mana = Math.min(1, g.mana + add); hudMana(g, lb, true); }
+  }
+  g.fills = g.fills.filter((f) => f.t < 0.4);
+}
 function drawLoot(g, lb, w, camX) {
   for (const it of g.loot) {
     if (it.x < camX - 60 || it.x > camX + lb.W + 60) continue;
     const o = { y: it.y + 1, seed: it.seed };
     if (it.drop != null) o.drop = { x: it.from.x, y: it.from.y, t: it.drop };
     else if (it.pick != null) o.pick = { x: (g.chest || { x: g.x }).x, y: (g.chest || { y: g.y - 56 }).y, t: it.pick };
+    else if (it.keep != null) o.keep = it.keep;   // version 11: up to its socket
     w.loot(it.kind, it.x, o);
   }
 }
@@ -844,11 +879,10 @@ function atkMove(a) {
       if (u < 0.4) return { dx: 4 * E(u / 0.4), dy: 0, ph: 'signal' };
       if (u < 0.75) { const v = (u - 0.4) / 0.35; return { dx: L(4, -58, v), dy: -96 * v * (1 - v), ph: 'attack' }; }
       return { dx: -58, dy: 0, ph: u < 1 ? 'recover' : 'done' };
-    case 'swipe':                      // the ghoul leans 8 into its swipe (moSwipe), in four steps, and back
+    case 'swipe':                      // version 11: the ghoul lurches 30 into its swipe, in four steps, and stays there (the kit's moSwipeKit)
       if (u < 0.45) return { dx: 0, dy: 0, ph: 'signal' };
-      if (u < 0.7) return { dx: -8 * E(Math.floor((u - 0.45) / 0.25 * 4) / 4), dy: 0, ph: 'attack' };
-      if (u < 0.95) return { dx: -8, dy: 0, ph: 'recover' };
-      return { dx: -8 * (1 - E((u - 0.95) / 0.4)), dy: 0, ph: u < 1.35 ? 'recover' : 'done' };
+      if (u < 0.7) return { dx: -30 * E(Math.floor((u - 0.45) / 0.25 * 4) / 4), dy: 0, ph: 'attack' };
+      return { dx: -30, dy: 0, ph: u < 1.35 ? 'recover' : 'done' };
     case 'high': case 'low':           // the walker sweeps where it stands
       return { dx: 0, dy: 0, ph: u < 0.5 ? 'signal' : u < 0.8 ? 'attack' : u < ATK_T[a.name] ? 'recover' : 'done' };
   }
@@ -1036,7 +1070,8 @@ function drawWanderer(g, lb, w) {
   // always: his sword's upgrades; after a hit, its sparks or shards (0.5 s) and the second of safety's slow pulse; after a heal, its glow
   // (0.6 s, on past the move)
   const o = (more) => Object.assign({ y, facing: f, sword: g.sword, hurt: g.hurtT < 0.5 ? { kind: g.hurtKind, t: g.hurtT } : undefined,
-    safe: g.safeT > 0 ? SAFE_T - g.safeT : undefined, heal: g.healT < 0.6 ? { t: g.healT, level: g.spells.heal } : undefined }, more);
+    safe: g.safeT > 0 ? SAFE_T - g.safeT : undefined, heal: g.healT < 0.6 ? { t: g.healT, level: g.spells.heal } : undefined,
+    drink: g.drinkT < 0.9 ? { kind: g.drinkKind, t: g.drinkT } : undefined }, more);   // version 11: a potion drunk (0.9 s)
   switch (g.mode) {
     case 'lost': {
       const t = g.mt, P = g.lost;

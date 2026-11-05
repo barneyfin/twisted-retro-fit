@@ -1,4 +1,4 @@
-/* Lantern Box 0.8 — runtime
+/* Lantern Box 0.9 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.8.2';
+  const VERSION = '0.9.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -198,6 +198,9 @@ let brown=null;function BROWN(){if(!brown){brown=ctx.createBuffer(1,ctx.sampleRa
 function ring(o){const f=o.f,P=o.partials;P.forEach(([r,amp,d])=>tone({f:f*r,dur:d,vol:(o.vol||0.1)*amp,a:0.001,wet:o.wet==null?0.3:o.wet,at:o.at||0}));}
 function bell(o){const f=o.f||220,P=o.partials||[[1,1,1],[2.0,0.5,0.7],[2.76,0.45,0.55],[5.4,0.25,0.35],[8.93,0.12,0.22]];P.forEach(([r,amp,ds])=>tone({f:f*r,dur:(o.dur||2.5)*ds,vol:(o.vol||0.18)*amp,a:0.003,wet:o.wet==null?0.5:o.wet,at:o.at||0}));}
 // ---- the effects ----
+function DRINK(ch){noise({ft:"bandpass",from:1900,to:1100,q:3,dur:0.035,vol:0.22,wet:0.1});
+  tone({f:190,to:125,dur:0.09,lp:700,vol:0.16,wet:0.05,at:0.07});tone({f:165,to:110,dur:0.08,lp:700,vol:0.12,wet:0.05,at:0.18});
+  ch.forEach((f,i)=>tone({f,dur:0.55-i*0.08,a:0.1,vol:0.06,wet:0.6,at:0.27+i*0.05}));}
 const FX={
   swing:()=>noise({ft:"bandpass",from:700,to:3200,q:1.4,dur:0.16,a:0.03,vol:0.42,wet:0.1}),
   // a blade striking: a bright crack, a short metal ring, a little weight underneath
@@ -213,6 +216,9 @@ const FX={
   defeat:()=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});tone({f:660,to:990,glide:0.7,dur:0.9,a:0.12,vol:0.09,vib:[5,6],wet:0.7,at:0.18});},
   pickup:()=>{tone({f:1320,dur:0.12,vol:0.14,wet:0.5});tone({f:1760,dur:0.3,vol:0.12,wet:0.6,at:0.07});tone({f:2640,dur:0.25,vol:0.03,wet:0.7,at:0.12});},
   heal:()=>{[392,494,587,784].forEach((f,i)=>tone({f,dur:0.9-i*0.1,a:0.25,vol:0.07,wet:0.7,at:i*0.08}));},
+  // round 13: a potion drunk: the cork, two quick swallows, then a short warm chord rising (lower and redder for health, brighter for mana)
+  drinkHealth:()=>DRINK([349,440,523]),
+  drinkMana:()=>DRINK([587,740,880]),
   // fire: an ignition, then a fluttering roar with crackles in it
   fireball:()=>{tone({f:110,to:60,dur:0.12,vol:0.2,wet:0.1});noise({from:700,to:1700,dur:0.5,a:0.05,tear:16,vol:0.34,wet:0.25});noise({from:260,dur:0.45,a:0.05,vol:0.22,wet:0.2});
     for(let i=0;i<10;i++)noise({ft:"bandpass",from:1800+R()*3500,q:5,dur:0.02,vol:0.09,at:0.04+R()*0.45,wet:0.2});},
@@ -235,7 +241,7 @@ const FX={
 };
 // each effect's level, set by measuring how loud it sounds (K-weighted, its loudest 0.4 s) against a target for its kind:
 // the big moments loudest, the main actions next, light touches and the menus quieter. GAIN is filled from that measure.
-const GAIN={swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83};
+const GAIN={swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */
 // ---- the places' background sound: wind, rain, thunder, bats, crows, creaking trees ----
 function loopNoise(ft,f,q,vol,lfoRate,lfoDepth){const s=ctx.createBufferSource();s.buffer=nb;s.loop=true;const fl=ctx.createBiquadFilter();fl.type=ft;fl.frequency.value=f;fl.Q.value=q;
   const g=ctx.createGain();g.gain.value=vol;s.connect(fl);fl.connect(g);g.connect(amb);s.start(0,R()*1.5);const nodes=[s];
@@ -1242,7 +1248,7 @@ class Scene{
     const key=Math.round(W)+"@"+s.toFixed(3)+lv;
     if(this.cache.key===key)return;
     this.cache={key};const cs=Math.min(s,1.25),L=LV[lv];
-    if(lv!=="mist"){this.cache.cl0=renderCutClouds(W*2,cs,lv,0,hsh(91,1));this.cache.cl1=renderCutClouds(W*2,cs,lv,1,hsh(91,2));this.cache.clB=cloudFoot([this.cache.cl0,this.cache.cl1],cs);} /* version 10: clB */
+    if(lv!=="mist"){this.cache.cl0=renderCutClouds(W*2,cs,lv,0,hsh(91,1));this.cache.cl1=renderCutClouds(W*2,cs,lv,1,hsh(91,2));this.cache.clB=cloudFoot([this.cache.cl0,this.cache.cl1],cs);this.cache.cl0b=blurCopy(this.cache.cl0,CLOUD_SOFT*cs);this.cache.cl1b=blurCopy(this.cache.cl1,CLOUD_SOFT*cs); /* version 11 */} /* version 10: clB */
     if(L.light!=="sun")this.cache.moon=this.ver===3?moonSprite(Math.min(2,s),lv==="storm"):moonSprite4(Math.min(2,s),lv);
     if(L.mist)this.cache.mist=L.mist.bands.map((b,i)=>renderMist(W*2,cs,L.mist.col,hsh(93,i,lv.length)));
   }
@@ -1266,15 +1272,15 @@ class Scene{
     /* version 10: the clouds are also drawn into CF, a picture of the clouds' band (the top of the picture down to the clouds'
        foot); thr(paint, mix) then paints a part into OV, keeps it only where a cloud is (source-in), takes it from the cloud's
        colour towards ink (source-atop) and lays it over the part already drawn: lit through the cloud */
-    const cbH=this.cache.clB?Math.min(ctx.canvas.height,Math.ceil(this.cache.clB*s)+2):0,CF=cbH?(this._cf=fitCanvas(this._cf,ctx.canvas.width,cbH)):null,cf=CF&&CF.getContext("2d");
+    const cbH=this.cache.clB?Math.min(ctx.canvas.height,Math.ceil((this.cache.clB+CLOUD_SOFT*2)*s)+2):0,CF=cbH?(this._cf=fitCanvas(this._cf,ctx.canvas.width,cbH)):null,cf=CF&&CF.getContext("2d");
     if(cf){cf.setTransform(1,0,0,1,0,0);cf.clearRect(0,0,CF.width,CF.height);}
     if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);at(k);ctx.drawImage(cv,-ox,0,W2,LH);ctx.drawImage(cv,-ox+W2,0,W2,LH);
-      if(cf){cf.setTransform(ctx.getTransform());cf.drawImage(cv,-ox,0,W2,LH);cf.drawImage(cv,-ox+W2,0,W2,LH);}}
-    const thr=(paint,mix)=>{if(!cf)return;const OV=this._ov=fitCanvas(this._ov,CF.width,CF.height),v=OV.getContext("2d");
+      if(cf){const cb=this.cache["cl"+d+"b"];cf.setTransform(ctx.getTransform());for(let n=0;n<2;n++){cf.drawImage(cb,-ox,0,W2,LH);cf.drawImage(cb,-ox+W2,0,W2,LH);}} /* version 11: the blurred copies, twice, so a thin tail still darkens */}
+    const thr=(paint,mix,al)=>{if(!cf)return;const OV=this._ov=fitCanvas(this._ov,CF.width,CF.height),v=OV.getContext("2d");
       v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-over";v.globalAlpha=1;v.clearRect(0,0,OV.width,OV.height);paint(v);
       v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-in";v.drawImage(CF,0,0);
       v.globalCompositeOperation="source-atop";v.globalAlpha=1-mix;v.fillStyle=INK;v.fillRect(0,0,OV.width,OV.height);v.globalAlpha=1;v.globalCompositeOperation="source-over";
-      ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(OV,0,0);ctx.restore();};
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);if(al!=null)ctx.globalAlpha=al;ctx.drawImage(OV,0,0);ctx.restore();};
     at(0);
     if(lv==="storm"){
       const st=lightning(t);
@@ -1284,9 +1290,9 @@ class Scene{
     mb(0);
     if(this.ver>=5&&L.light==="sun"){at(0.05);drawFarRanges(ctx,W,camX,rm,lv);}
     const f=k=>rm?k*0.4:k;
-    at(0.12);this.layer(ctx,off,s,W,t,camX*f(0.12),1,tn[0],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[0]*THRU_CLOUD);} /* version 10 */mb(1);
+    at(0.12);this.layer(ctx,off,s,W,t,camX*f(0.12),1,tn[0],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[0]*THRU_CLOUD,FAR_THRU);} /* version 10 */mb(1);
     if(lv==="storm"){at(1);drawRain(ctx,W,t,0,rm);}
-    at(0.28);this.layer(ctx,off,s,W,t,camX*f(0.28),2,tn[1],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[1]*THRU_CLOUD);} /* version 10 */mb(2);
+    at(0.28);this.layer(ctx,off,s,W,t,camX*f(0.28),2,tn[1],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[1]*THRU_CLOUD,FAR_THRU);} /* version 10 */mb(2);
     if(L.light==="sun"){at(0);drawRays(ctx,W,t,rm);}
     at(0.34);
     if(L.fly==="bats"){drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));{const M=ctx.getTransform();thr(v=>{v.setTransform(M);drawSwarm(v,W,t,camX*f(0.34),rm,INK);},tn[1]*0.9*THRU_CLOUD);}} /* version 10 */
@@ -1598,7 +1604,7 @@ Object.assign(Scene.prototype,{
     // glow and the hazes) down to the clouds' foot, and the highest line it reaches, for the composite in front of the clouds (16 rows
     // spare: under Reduce motion the camera's rise can carry the clouds a few lines further down than layer 1)
     let thru=null;
-    if(L<=2&&this.cache.clB){const rows=Math.min(sc.h,Math.ceil(this.cache.clB*s)+16);thru=mk(TWP,rows);thru.getContext("2d").drawImage(sc.a,TMP,0,TWP,rows,0,0,TWP,rows);
+    if(L<=2&&this.cache.clB){const rows=Math.min(sc.h,Math.ceil((this.cache.clB+CLOUD_SOFT*2)*s)+16); /* version 11: down to the soft edge's foot */thru=mk(TWP,rows);thru.getContext("2d").drawImage(sc.a,TMP,0,TWP,rows,0,0,TWP,rows);
       thru.tops=thruTops(thru);thru.top=Math.min(...thru.tops);if(thru.top>=rows)thru=null;}
     const x0=i*TW,x1=x0+TW; // the lights and eyes this tile owns, kept in world positions
     const fairies=col.fairies.map(f=>[f[0]+lx,f[1],f[2]+lx,f[3],f[4]+lx,f[5],f[6]]).filter(f=>f[0]>=x0&&f[0]<x1);
@@ -1671,10 +1677,12 @@ Object.assign(Scene.prototype,{
     // reach above the clouds' foot (runs of side-by-side strips, each from its highest strip down to the foot, runs close together merged)
     // and a box round the far swarm's flocks on screen; the band's picture CF is made once, over the area they share, and each part is
     // composited, as Scene.render's thr does, only inside its rectangles, where outside them it has nothing in front of a cloud: the same
-    // picture as the whole band (Barney's choice after the Pixel's figures)
+    // picture as the whole band (Barney's choice after the Pixel's figures). Version 11 (kit 0.9.0): the band's picture is drawn from the
+    // clouds' blurred copies (made once, in ensure), twice and 2 x CLOUD_SOFT lines deeper, for a soft edge, and layers 1 and 2 are laid on at
+    // FAR_THRU (0.55); the swarm still goes all the way
     const clp=[];KIT.thruN=0;
-    if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);clp.push([cv,ox,k]);}
-    const cbH=this.cache.clB&&KIT.thru?Math.max(0,Math.min(ctx.canvas.height,Math.ceil(Math.max(...clp.map(q=>this.cache.clB*s+off(q[2]))))+2)):0;
+    if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);clp.push([cv,ox,k,this.cache["cl"+d+"b"]]);}   // version 11: and its blurred copy
+    const cbH=this.cache.clB&&KIT.thru?Math.max(0,Math.min(ctx.canvas.height,Math.ceil(Math.max(...clp.map(q=>(this.cache.clB+CLOUD_SOFT*2)*s+off(q[2]))))+2)):0;   // version 11: 18 lines deeper, so the blur's lower edge is kept
     const L1x=camX*f(0.12),L1y=off(f(0.12),0.12),L2x=camX*f(0.28),L2y=off(f(0.28),0.28),SWy=off(f(0.34),0.34);
     const lit={L1:null,L2:null,sw:null};
     if(cbH){
@@ -1698,7 +1706,7 @@ Object.assign(Scene.prototype,{
       if(all.length){
         const CF=this._cf=fitCanvas(this._cf,ctx.canvas.width,cbH),cf=CF.getContext("2d"),U=bound(all);
         cf.save();cf.setTransform(1,0,0,1,0,0);cf.beginPath();cf.rect(U[0],U[1],U[2],U[3]);cf.clip();cf.clearRect(U[0],U[1],U[2],U[3]);
-        for(const [cv,ox,k] of clp){cf.setTransform(s,0,0,s,0,off(k));cf.drawImage(cv,-ox,0,W2,LH);cf.drawImage(cv,-ox+W2,0,W2,LH);}cf.restore();
+        for(const [,ox,k,cb] of clp){cf.setTransform(s,0,0,s,0,off(k));for(let n=0;n<2;n++){cf.drawImage(cb,-ox,0,W2,LH);cf.drawImage(cb,-ox+W2,0,W2,LH);}}cf.restore(); // version 11: the blurred copies, twice
         // one part into its own picture: painted, kept only where a cloud is (source-in, in one step over the part's area, since source-in clears
         // whatever its own drawing doesn't cover), taken from the cloud's colour towards ink by 1 - mix (source-atop), all inside its rectangles
         const comp=(key,R,paint,mix)=>{if(!R.length)return null;const OV=this[key]=fitCanvas(this[key],CF.width,CF.height),v=OV.getContext("2d"),B=bound(R);
@@ -1713,7 +1721,7 @@ Object.assign(Scene.prototype,{
         lit.sw=comp("_ov3",RS,v=>{v.setTransform(s,0,0,s,0,SWy);const kf=KIT.fly;KIT.fly=s;drawSwarm(v,W,t,camX*f(0.34),rm,INK);KIT.fly=kf;},tn[1]*0.9*THRU_CLOUD);
       }
     }
-    const layOn=p=>{if(!p)return;ctx.save();ctx.setTransform(1,0,0,1,0,0);for(const r of p.R)ctx.drawImage(p.OV,r[0],r[1],r[2],r[3],r[0],r[1],r[2],r[3]);ctx.restore();};
+    const layOn=(p,al)=>{if(!p)return;ctx.save();ctx.setTransform(1,0,0,1,0,0);if(al!=null)ctx.globalAlpha=al;for(const r of p.R)ctx.drawImage(p.OV,r[0],r[1],r[2],r[3],r[0],r[1],r[2],r[3]);ctx.restore();};
     ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";ctx.drawImage(this.sky,0,off(0));
     const mb=after=>{if(!L.mist)return;L.mist.bands.forEach((b,i)=>{if(b[0]!==after)return;const cv=this.cache.mist[i],k=[0.03,0.12,0.28,0.5][after]*(rm?0.4:1),ox=posmod(t*b[3]*(rm?0.4:1)+camX*k,W2);
       at(k,[0.03,0.12,0.28,0.5][after]);ctx.save();ctx.globalAlpha=b[2];ctx.drawImage(cv,-ox,b[1]-100,W2,200);ctx.drawImage(cv,-ox+W2,b[1]-100,W2,200);ctx.restore();});};
@@ -1726,9 +1734,9 @@ Object.assign(Scene.prototype,{
     }
     mb(0);
     if(L.light==="sun"){at(f(0.05),0.05);drawFarRanges(ctx,W,camX,rm,lv);}
-    this.kitLayer(ctx,s,W,t,L1x,1,tn[0],o,L1y);layOn(lit.L1); /* version 10 */mb(1);
+    this.kitLayer(ctx,s,W,t,L1x,1,tn[0],o,L1y);layOn(lit.L1,FAR_THRU); /* version 10; version 11: at 0.55 */mb(1);
     if(lv==="storm"){at(0,1);drawRain(ctx,W,t,0,rm);}   // the rain stays put
-    this.kitLayer(ctx,s,W,t,L2x,2,tn[1],o,L2y);layOn(lit.L2); /* version 10 */mb(2);
+    this.kitLayer(ctx,s,W,t,L2x,2,tn[1],o,L2y);layOn(lit.L2,FAR_THRU); /* version 10; version 11: at 0.55 */mb(2);
     if(L.light==="sun"){at(0);drawRays(ctx,W,t,rm);}
     at(f(0.34),0.34);KIT.fly=s;
     if(L.fly==="bats"){drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));   // version 10: the far swarm too, when it is on screen
@@ -2004,7 +2012,12 @@ function streakPts(r,w,h){ // a long lens of cloud: a wavering top, a flatter to
 function streakPath(x,pts,X,Y){x.beginPath();pts.forEach((p,i)=>i?x.lineTo(X+p[0],Y+p[1]):x.moveTo(X+p[0],Y+p[1]));x.closePath();}
 /* version 10: lit through a cloud. THRU_CLOUD is the share of a part's tint used when it is mixed towards the cloud behind it
    (token thru-cloud); cloudFoot finds, once, the lowest line any cloud reaches; fitCanvas keeps an offscreen picture sized */
-const THRU_CLOUD=0.75;
+const THRU_CLOUD=0.75,CLOUD_SOFT=9,FAR_THRU=0.55; /* version 11: the soft edge's blur in picture lines, the far layers' share (tokens thru-cloud-soft, thru-cloud-far) */
+function blurCopy(c,r){const b=mk(c.width,c.height),x=b.getContext("2d");
+  if(typeof x.filter==="string"){x.filter="blur("+r+"px)";x.drawImage(c,0,0);x.filter="none";return b;}
+  // no canvas filter (older Safari): a softer copy by shrinking it and growing it again
+  const k=Math.max(2,Math.round(r)),s=mk(Math.max(1,Math.ceil(c.width/k)),Math.max(1,Math.ceil(c.height/k))),sx=s.getContext("2d");sx.imageSmoothingEnabled=true;sx.imageSmoothingQuality="high";sx.drawImage(c,0,0,s.width,s.height);
+  x.imageSmoothingEnabled=true;x.imageSmoothingQuality="high";x.drawImage(s,0,0,b.width,b.height);return b;}
 function cloudFoot(cvs,cs){let foot=0;for(const c of cvs){const w=c.width,h=c.height,d=c.getContext("2d").getImageData(0,0,w,h).data; // the kit: one read per cloud picture, the same rows and samples (row by row, Chrome warns)
     for(let r=h-1;r>=0;r-=2){let hit=false;for(let i=r*w*4+3,e=i+w*4;i<e;i+=16)if(d[i]>6){hit=true;break;}
       if(hit){foot=Math.max(foot,(r+3)/cs);break;}}}
@@ -3742,6 +3755,19 @@ function drawLootPick(c,k,X,Y,cx,cy,u,t){if(u<0||u>1)return;const col=lootCol(k)
     c.beginPath();c.moveTo(0,-s*1.6);c.lineTo(s*0.3,-s*0.3);c.lineTo(s*1.6,0);c.lineTo(s*0.3,s*0.3);c.lineTo(0,s*1.6);c.lineTo(-s*0.3,s*0.3);c.lineTo(-s*1.6,0);c.lineTo(-s*0.3,-s*0.3);c.closePath();c.fill();c.restore();
     for(let i=0;i<8;i++){const a=i/8*Math.PI*2,d=4+g*14;fxMote(c,cx+Math.cos(a)*d,cy+Math.sin(a)*d,1.2*(1-g),1-g,col);}}}
 
+/* ---------- kit 0.9.0: pot13.js (design system version 11), the potions' moments, the world's side (its review loop left out; the
+   socket's place comes from the shell, env.socket) ---------- */
+const POT_COL={health:"#e0473c",mana:"#5fdcca"};
+// the flight, in screen picture units: from (gx, gy) on the ground to the socket (tx, ty), u 0..1 over 0.45 s; drawn over everything, as the HUD is
+function potFlight(c,k,gx,gy,tx,ty,u,t,fxOn){const e2=u*u,px=gx+(tx-gx)*e2,py=gy+(ty+4-gy)*e2-Math.sin(u*Math.PI)*34;
+  if(fxOn)fxGlowAt(c,px,py-8,18*(1-u*0.4),0.5*(1-u*0.6),POT_COL[k]);
+  c.save();c.translate(px,py);const s2=1.25-u*0.5;c.scale(s2,s2);c.globalAlpha=u>0.85?Math.max(0,1-(u-0.85)/0.15):1;lootShape(c,k,t);c.restore();}
+// the drink's light on him: u 0..1 over 0.9 s, at his chest (from mvPt)
+function potDrinkFx(x,chest,u,k,rm,fxOn){const col=POT_COL[k];
+  if(fxOn)fxGlowAt(x,chest[0],chest[1],32+12*u,0.36*Math.sin(Math.min(1,u*1.4)*Math.PI),col);
+  for(let i=0;i<10;i++){const ph=Math.max(0,u-i*0.03),a=Math.sin(Math.min(1,ph*1.25)*Math.PI)*0.95,ang=i/10*Math.PI*2+0.4,rr=16+(i%3)*5;
+    const mx=chest[0]+Math.cos(ang)*rr*0.85,my=rm?chest[1]+Math.sin(ang)*rr*0.7:chest[1]+20-ph*64+Math.sin(ang)*7;fxMote(x,mx,my,2.1,a,col);}}
+
 /* ---------- from mvlevel.js: an edge colour at another strength ---------- */
 // the place's edge colours are rgba strings: the same colour at another strength
 const lvA=(e,a)=>/^rgba/.test(e)?e.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/,"rgba($1,$2,$3,"+a+")"):rgba(e,a);
@@ -3956,7 +3982,10 @@ function moSweepLow(u){const W=MO_WK,mix=W.mix; // the walker: crouches, arms ba
     return{P:{arms,crouch:0.75,hot:1,s1:0,slash:trail.slice(Math.max(0,Math.round(stp*8)-5),Math.round(stp*8)+1)},dx:0,dy:0,phase:"attack"};}
   if(u<1.25){const v=ease(clamp01((u-0.8)/0.45));return{P:{arms:mix(W.lo,W.rest,v),crouch:0.75*(1-v),hot:0.3*(1-v),s1:0,slashA:Math.max(0,1-v*2),slash:[0.6,0.8,1].map(k=>moWalkerHand(0,mix(W.back,W.lo,k)[0],0.75))},dx:0,dy:0,phase:"recover"};}
   return{P:{},dx:0,dy:0,phase:"done"};}
-function moSwipeKit(u){const r=moSwipe(u),ph=u<0?"signal":u<0.45?"signal":u<0.7?"attack":u<1.35?"recover":"done";return{P:r.P,dx:r.dx,dy:0,phase:ph};} // the ghoul (mv10.js's moSwipe)
+// version 11 (kit 0.9.0): the ghoul lurches about 30 forward as it swipes (MO_DUEL.ghoul: X = wx + 168 - 30v, in the swipe's four steps)
+// and stays there through its recovery, so its swipe outreaches the sword; the arm is moSwipe's, unchanged
+function moSwipeKit(u){const r=moSwipe(u),ph=u<0?"signal":u<0.45?"signal":u<0.7?"attack":u<1.35?"recover":"done",
+    dx=u<0.45?0:u<0.7?-30*ease(Math.floor((u-0.45)/0.25*4)/4):-30;return{P:r.P,dx,dy:0,phase:ph};} // the ghoul (mv10.js's moSwipe)
 function moAttack(kind,a){const u=a.t||0;
   switch(kind+":"+a.name){
     case"crawler:lunge":return moLunge(u);
@@ -4011,12 +4040,12 @@ function bsGradedTaper(x,p0,p1,p2,w0,w1){const dx=p2[0]-p0[0],dy=p2[1]-p0[1],L=M
   g.addColorStop(0,BS_CH[2]);g.addColorStop(0.3,hi);g.addColorStop(0.68,BS_CH[2]);g.addColorStop(1,BS_CH[0]);x.save();x.fillStyle=g;rlTaper(x,p0,p1,p2,w0*0.7,w1*0.7,16);x.restore();}
 // the tree's long branch, in the tree's own picture: rooted inside the trunk and drawn before the tree's pieces, so the trunk covers its
 // root and the rim goes round tree and branch as one shape; each length graded across its width like the tree's limbs
-function bsBranchPts(br){const o=[4,-96],L=(250+46)*br.grow;const P=[o];let p=o,ang=br.ang;[[0.42,0],[0.31,0.42],[0.27,-0.36]].forEach(([f,da])=>{ang+=da;const q=[p[0]+Math.cos(ang)*L*f,p[1]+Math.sin(ang)*L*f];P.push(q);p=q;});return P;}
+function bsBranchPts(br){const o=[4,-84],L=(250+46)*br.grow;const P=[o];let p=o,ang=br.ang;[[0.42,0],[0.31,0.18],[0.27,-0.28]].forEach( /* version 11: at head height (was from -96, bends +0.42, -0.36) */([f,da])=>{ang+=da;const q=[p[0]+Math.cos(ang)*L*f,p[1]+Math.sin(ang)*L*f];P.push(q);p=q;});return P;}
 function bsBranchLocal(br){return uc=>{const P=bsBranchPts(br),W=[26,13,7,2],segs=[0,1,2].map(i=>{const a=P[i],b=P[i+1];return[a,[(a[0]+b[0])/2+(b[1]-a[1])*0.06,(a[1]+b[1])/2-(b[0]-a[0])*0.06],b,W[i],W[i+1]+1];}),
     twigs=[[1,22,-0.9],[2,16,0.8],[2,12,-0.7],[3,10,0.6]].map(([i,dl,dd])=>{const p=P[i],a0=Math.atan2(P[i][1]-P[i-1][1],P[i][0]-P[i-1][0])+dd;return[p,[p[0]+Math.cos(a0)*dl*0.5,p[1]+Math.sin(a0)*dl*0.5],[p[0]+Math.cos(a0+0.3)*dl,p[1]+Math.sin(a0+0.3)*dl],2.6,0.6];});
   for(const q of segs)bsTaper(uc,...q);for(const q of twigs)bsTaper(uc,...q);for(const q of segs)bsGradedTaper(uc,...q);uc.fillStyle=INK;};}
 function bsBranchFx(x,X,Y,st,br){const P=bsBranchPts(br),tip=bsPt(X,Y,st,P[3][0],P[3][1]);moHot(x,tip[0],tip[1],14+12*br.hot,br.hot);
-  if(br.sw!=null){const pts=[];for(let k=6;k>=0;k--){const aa=lerpN(-1.75,-3.05,Math.max(0,br.sw-k*0.1)),q=bsBranchPts({grow:br.grow,ang:aa})[3];pts.push(bsPt(X,Y,st,q[0],q[1]));}moSlash(x,pts,6,1);}}
+  if(br.sw!=null){const pts=[];for(let k=6;k>=0;k--){const aa=lerpN(-1.75,-3.20,Math.max(0,br.sw-k*0.1)),q=bsBranchPts({grow:br.grow,ang:aa})[3];pts.push(bsPt(X,Y,st,q[0],q[1]));}moSlash(x,pts,6,1);}}
 /* ---------- the kit: each boss's arrival and three attacks as a game plays them, lifted out of the fights (BS_FIGHT) word for word ----------
    u: seconds since the move began. A: bx, where the boss stands; wx, the wanderer (where he is as the move begins); G, the ground; t, the
    time; targets, where a slam, roots or crawlers come (the fights' own places round the wanderer if left out). Each move is drawn as the
@@ -4098,8 +4127,8 @@ function bsMove(lv,name,u,A){const bx=A.bx,wx=A.wx,G=A.G,t=A.t,fx=[],r={X:bx,st:
       if((w=W(0.75,1.45))!=null){const up=w<0.3?ease(w/0.3):w<0.65?1:1-ease((w-0.65)/0.35);fx.push(x=>{bsRim(x,_S0,c=>{const r2=mvRng(9);for(const p of cr)for(let k=0;k<2;k++){const bx2=p+(k?14:-10),h=(60+r2()*36)*up,lean=(r2()-0.5)*0.5;bsTaper(c,[bx2,G(bx2)+6],[bx2+lean*h*0.4,G(bx2)-h*0.5],[bx2+lean*h,G(bx2)-h],9,1.5);}});});}}
     else if(name==="branch"){ // a side branch burns, then a long crooked branch grows out and sweeps across at head height (roll under): 3.25 s to 4.6 s
       if((w=W(0,0.55))!=null){const v=ease(w);st.tilt=0.035*v;r.hot=v*0.6;r.br={grow:0.3*v,ang:-1.75,hot:v};}
-      if((w=W(0.55,0.9))!=null){const v=ease(w);r.br={grow:lerpN(0.3,1,v),ang:lerpN(-1.75,-3.05,v),hot:1,sw:v};st.tilt=0.035-0.06*v;}
-      if((w=W(0.9,1.35))!=null){const v=ease(w);r.br={grow:1-v,ang:-3.05,hot:1-v};st.tilt=-0.025*(1-v);}}
+      if((w=W(0.55,0.9))!=null){const v=ease(w);r.br={grow:lerpN(0.3,1,v),ang:lerpN(-1.75,-3.20,v),hot:1,sw:v}; /* version 11: -3.20 */st.tilt=0.035-0.06*v;}
+      if((w=W(0.9,1.35))!=null){const v=ease(w);r.br={grow:1-v,ang:-3.20,hot:1-v};st.tilt=-0.025*(1-v);}}
     else if(name==="splinters"){ // its maw burns, then spits a fan of splinters (roll through to the trunk): the fight's 4.9 s to 6.1 s
       if((w=W(0,0.5))!=null){r.hot=ease(w);}
       if((w=W(0.5,1.2))!=null){const o=bsPt(bx,G(bx)+4,{},0,-52);fx.push(x=>{for(let k=0;k<5;k++){const d=(u-0.5)*470,a=Math.PI+(k-2)*0.11,px=o[0]+Math.cos(a)*d,py=o[1]+Math.sin(a)*d;if(d<600)bsSplinter(x,px,py,a);}});r.hot=1-w;}}
@@ -4212,7 +4241,8 @@ function makeTools(env){
     wanderer(x,o){ // version 8 (4c-3): the posable wanderer (Moves). o: y; move and step, or walking (true) or standing, in time; facing (1 or -1);
       // sword {reach, bite}: its upgrades; safe: seconds into the second of safety (his lit edge pulses slowly for 1 s); hurt {kind: "armour" or
       // "health", t: seconds since the blow}; shatter: seconds since he broke into his card pieces (1.1 s); pit [x0, x1]: falling into that pit,
-      // so drawn only above the ground and in the gap. Returns where his chest, hand and lantern are (x along the path, y in picture lines).
+      // so drawn only above the ground and in the gap; drink {kind: "health" or "mana", t: seconds since it was drunk} (kit 0.9.0: motes in the
+      // potion's colour rise round him, 0.9 s). Returns where his chest, hand and lantern are (x along the path, y in picture lines).
       const f=frame("wanderer");o=o||{};
       const name=o.move||(o.walking===false?"idle":"walk"),step=o.step==null?f.t*MV_RATE:o.step,mv=mvMove(name,step);
       const lvl=o.sword?{r:o.sword.reach||0,s:o.sword.bite||0}:null,P=lvl?withLvl(mv.P,lvl):mv.P,tq=Math.floor(f.t*MV_RATE)/MV_RATE;
@@ -4233,6 +4263,7 @@ function makeTools(env){
         if(fa<1)c.restore();
         fxHand(c,X,Y,fc,K132,P,G);
         if(heal){healRings(c,X,Y,K132,hu,hl,true);healMotes(c,X,Y,K132,hu,hl,tq);}
+        if(o.drink){const u=(o.drink.t||0)/0.9;if(u>=0&&u<1)potDrinkFx(c,mvPt(G,P,X,Y,fc,K132,4,-22),u,o.drink.kind==="mana"?"mana":"health",f.rm,FX);} // kit 0.9.0: a potion drunk (0.9 s)
         if(o.fizzle!=null){const G2=mvGeo(PF.thrust,0),hp=G2.T(G2.fHd[0],G2.fHd[1]);fxFizzle(c,X+fc*(hp[0]*K132+3),Y+hp[1]*K132,K132,o.fizzle/0.6);}
         if(name==="sword"&&(mv.tag==="strike"||mv.tag==="follow")){const L=lvl||{r:0,s:0},a=mv.tag==="strike"?[tipAng(withLvl(PS.wind,L)),tipAng(P),0.85]:[tipAng(withLvl(PS.strike,L))-0.5,tipAng(P),0.4];
           fxSlash(c,X,Y,fc,K132,P,a[0],a[1],a[2],e,L);}
@@ -4253,11 +4284,17 @@ function makeTools(env){
     },
     LOOT:LOOT.map(q=>q.k),
     loot(kind,x,o){ // kind: one of world.LOOT; o: y, seed (so neighbours glint apart), drop { x, y, t } (out of a monster that fell at x, y: 0.45 s),
-      // pick { x, y, t } (into the wanderer's chest at x, y: 0.5 s). It stays until picked up; it never times out or blinks.
+      // pick { x, y, t } (into the wanderer's chest at x, y: 0.5 s); keep: t (kit 0.9.0: a potion kept, flying up to its socket: 0.45 s). It stays
+      // until picked up; it never times out or blinks.
       const f=frame("loot");o=o||{};if(!LOOT.some(q=>q.k===kind))throw new Error('Lantern Box: no loot called "'+kind+'".');
       const c=f.ctx,X=x-f.camX,Y=o.y==null?f.gy(x)+1:o.y; // drawn as play.js draws it: a handful of shapes, every frame
       if(o.pick)drawLootPick(c,kind,X,Y,o.pick.x-f.camX,o.pick.y,(o.pick.t||0)/0.5,f.t);
       else if(o.drop)drawLootDrop(c,kind,X,Y,o.drop.x-f.camX,o.drop.y,(o.drop.t||0)/0.45,f.t);
+      else if(o.keep!=null){ // kit 0.9.0: a potion kept: it lifts and flies up to its socket, shrinking (0.45 s), over everything (drawn at
+        // world.end()); under Reduce motion it fades where it lay (0.3 s) as its socket fades in
+        const u=Math.max(0,o.keep)/0.45;if(u>=1)return;
+        if(f.rm){const a=1-o.keep/0.3;if(a>0)drawLoot(c,kind,X,Y,f.t,{seed:o.seed||0,a,pool:0,glint:false});return;}
+        const fr=f;f.late.push(x=>{const tg=env.socket&&env.socket(kind),tx=tg?tg[0]:44,ty=(tg?tg[1]:110)-fr.camY;potFlight(x,kind,X,Y-14,tx,ty,u,fr.t,FX);});}
       else drawLoot(c,kind,X,Y,f.t,{seed:o.seed||0});
     },
     checkpoint(x,o){ // the place's checkpoint lantern on its post. o: y; lit: seconds since it began to light (true: lit; left out: unlit); from: the
@@ -4346,11 +4383,17 @@ function makeTools(env){
   })();
 
   /* ---------- The game shell ---------- */
-  /* ----- 4c-6a. hud10.js: the HUD of design system version 8 (HUD, PlaqueLine, PlaceCard, BossBar), word for word: build writes its markup,
+  /* ----- 4c-6a. hud10.js: the HUD of design system version 8 (HUD, PlaqueLine, PlaceCard, BossBar), word for word (kit 0.9.0: hud13.js, design system version 11's potion sockets): build writes its markup,
      set shows a state. The review page's stages, close-ups and clock are left out; the shell below builds it, wires its tiles and runs
      its moments on the kit's own clock. ----- */
   const HUD8 = (() => {
 const SH="M0.8 1.7 Q5 0.1 9.2 1.7 L9.2 5.6 Q9.2 9.5 5 11.5 Q0.8 9.5 0.8 5.6 Z";
+// round 13: the two potions in a 24-unit box: the glass's outline (neck, lip, body), the liquid's top when full, and the mark
+const POT={health:{glass:"M8.8 2.4 H15.2 V4.4 H13.7 V8.62 A6.6 6.6 0 1 1 10.3 8.62 V4.4 H8.8 Z",body:"M12 9.1 A5.9 5.9 0 1 1 11.99 9.1 Z",top:11.2,
+    mark:"M12 18.9 C9.2 17 8.2 15.6 8.2 14.3 A1.9 1.9 0 0 1 12 13.5 A1.9 1.9 0 0 1 15.8 14.3 C15.8 15.6 14.8 17 12 18.9 Z"},
+  mana:{glass:"M9.8 2.4 H14.2 V4.4 H13.4 V7 Q15.6 8.3 15.6 10.6 V19.4 Q15.6 21.6 13.4 21.6 H10.6 Q8.4 21.6 8.4 19.4 V10.6 Q8.4 8.3 10.6 7 V4.4 H9.8 Z",
+    body:"M9.1 10.6 Q9.1 8.9 10.9 7.9 H13.1 Q14.9 8.9 14.9 10.6 V19.3 Q14.9 20.9 13.3 20.9 H10.7 Q9.1 20.9 9.1 19.3 Z",top:11.6,
+    mark:"M12 11.9 C13.8 14 14.3 15.3 14.3 16.6 A2.3 2.3 0 0 1 9.7 16.6 C9.7 15.6 10.3 14.6 11.1 13.9 C11.2 14.8 11.6 15.3 12.1 15.4 C12 14.3 11.7 13.2 12 11.9 Z"}};
 const ICON={
   heart:(w,h)=>`<svg width="${w}" height="${h}" viewBox="0 0 14 13" aria-hidden="true"><path d="M7 12.5 C2 9 0 6.5 0 4 A3.6 3.6 0 0 1 7 2.4 A3.6 3.6 0 0 1 14 4 C14 6.5 12 9 7 12.5 Z"/></svg>`,
   flame:(w,h)=>`<svg width="${w}" height="${h}" viewBox="0 0 12 18" aria-hidden="true"><path d="M6 1 C9 6 11 8 11 12 A5 5 0 0 1 1 12 C1 8 3 6 6 1 Z"/></svg>`,
@@ -4365,27 +4408,38 @@ const ICON={
   help:`<path d="M9.2 9.3 A2.85 2.85 0 1 1 13.4 11.8 C12.4 12.4 12 13 12 14.3"/><circle cx="12" cy="18" r="1.3" style="fill:var(--heading);stroke:none"/>`,
   jump:`<path d="M12 16.5 V4.5 M7 9.5 L12 4.5 L17 9.5 M6 20.5 H18"/>`,
   attack:`<path d="M19.2 4.8 L9.4 14.6 M6.8 12 L12 17.2 M9.4 14.6 L5.4 18.6"/><circle class="solid" cx="4.6" cy="19.4" r="1.5"/>`,
-  stick:`<path class="l" d="M23 45 L14 56 L23 67"/><path class="r" d="M89 45 L98 56 L89 67"/><path class="u" d="M45 23 L56 14 L67 23"/>`
+  stick:`<path class="l" d="M23 45 L14 56 L23 67"/><path class="r" d="M89 45 L98 56 L89 67"/><path class="u" d="M45 23 L56 14 L67 23"/>`,
+  // round 13: the potions, as on the ground (a round flask with a heart, a tall vial with a flame), for the plaque line and How to play
+  potH:`<path d="${POT.health.glass}"/><path class="solid" d="${POT.health.mark}"/>`,
+  potM:`<path d="${POT.mana.glass}"/><path class="solid" d="${POT.mana.mark}"/>`
 };
 const NAME={heal:"heal",fire:"fireball"};
-const defs=`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><clipPath id="lbPipL" clipPathUnits="userSpaceOnUse"><path d="M-1 -1 H5 V0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4 V13 H-1 Z"/></clipPath><clipPath id="lbPipR" clipPathUnits="userSpaceOnUse"><path d="M11 -1 H5 V0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4 V13 H11 Z"/></clipPath></defs></svg>`;
+const defs=`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><clipPath id="lbPotH" clipPathUnits="userSpaceOnUse"><path d="${POT.health.body}"/></clipPath><clipPath id="lbPotM" clipPathUnits="userSpaceOnUse"><path d="${POT.mana.body}"/></clipPath><linearGradient id="lbLiqH" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--health-top)"/><stop offset="1" stop-color="var(--health-low)"/></linearGradient><linearGradient id="lbLiqM" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--mana-top)"/><stop offset="1" stop-color="var(--mana-low)"/></linearGradient><clipPath id="lbPipL" clipPathUnits="userSpaceOnUse"><path d="M-1 -1 H5 V0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4 V13 H-1 Z"/></clipPath><clipPath id="lbPipR" clipPathUnits="userSpaceOnUse"><path d="M11 -1 H5 V0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4 V13 H11 Z"/></clipPath></defs></svg>`;
 let defsDone=false;
 function oct(w,cls){const c=w*0.293,a=0.75,b=w-0.75,p=[[c,a],[w-c,a],[b,c],[b,w-c],[w-c,b],[c,b],[a,w-c],[a,c]].map(q=>q.map(v=>v.toFixed(2)).join(",")).join(" ");
   return `<svg class="oct ${cls||""}" viewBox="0 0 ${w} ${w}" aria-hidden="true"><polygon points="${p}"/></svg>`;}
 function tile(icon,label,phone){return `<button class="lb-tile${phone?" is-phone":""}" type="button" aria-label="${label}"><span><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[icon]}</svg></span></button>`;}
-function vitals(phone,extra){const iw=phone?13:14;
+function vitals(phone,extra,pots){const iw=phone?13:14;
   return `<div class="lb-plaque is-hud lb-vitals is-full${phone?" is-phone":""}${extra||""}" role="group" aria-label=""><div class="lb-face">
     <div class="lb-vitals-rows">
       <div class="lb-bar-row">${ICON.heart(iw,phone?12:13)}<div class="lb-bar hp"><i></i></div><span class="lb-pips">${ICON.pip()}${ICON.pip()}${ICON.pip()}</span></div>
       <div class="lb-bar-row">${ICON.flame(iw,iw)}<div class="lb-bar is-mana mp"><i></i></div></div>
       <div class="lb-lives" aria-hidden="true">${ICON.life()}${ICON.life()}${ICON.life()}</div>
     </div>
-    <button class="lb-spell" type="button" aria-label=""><span><svg class="pic" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="lb-spell-marks" aria-hidden="true"></span></span></button>
+    <button class="lb-spell" type="button" aria-label=""><span><svg class="pic" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="lb-spell-marks" aria-hidden="true"></span></span></button>${pots||""}
   </div></div>`;}
+// round 13: a potion socket (the button is clipped to its chamfer, so the key sits beside it in the wrapper) and the pair
+// the kit: phone is the touch size (44px, on a phone or any touch device); keys, the keycaps, only where there is a keyboard (no touch)
+function potion(k,phone,keys){const P=POT[k],kk=k==="health"?"Q":"E",C=k==="health"?"H":"M";
+  return `<span class="lb-potion-wrap${phone?" is-phone":""}"><button class="lb-potion is-${k}${phone?" is-phone":""}" type="button" data-k="${k}" aria-label="No ${k} potion"><span>
+    <svg class="pot" viewBox="0 0 24 24" aria-hidden="true"><path class="glass-back" d="${P.glass}"/><g class="liq-g" clip-path="url(#lbPot${C})"><rect class="liq" x="3" y="${P.top}" width="18" height="12" fill="url(#lbLiq${C})"/><path class="shine" d="M${k==="health"?"8.4 13.4 Q8.6 11.4 10.2 10.4":"10.2 11.6 V18.4"}"/></g>
+      <path class="glass" d="${P.glass}"/><path class="mark" d="${P.mark}"/><path class="glint" d="M5 22 L9 22 L20 3 L16 3 Z"/></svg></span></button>${keys?`<span class="lb-pkey" aria-hidden="true">${kk}</span>`:""}</span>`;}
+function potions(phone,beside,keys){return `<div class="lb-potions${beside?" is-beside":""}${phone?" is-phone":""}" role="group" aria-label="Potions kept">${potion("health",phone,keys)}${potion("mana",phone,keys)}</div>`;}
 function counter(phone,label,num){return `<div class="lb-plaque is-hud lb-counter${phone?" is-phone":""}" role="status" aria-label="${num} ${label.toLowerCase()}"><div class="lb-face"><span class="lb-counter-label" aria-hidden="true">${label}</span><span class="lb-counter-num" aria-hidden="true">${num}</span></div></div>`;}
 function build(el,phone,o){o=o||{};if(!defsDone){document.body.insertAdjacentHTML("afterbegin",defs);defsDone=true;}
+  const pot=o.pot||null,big=phone||!!o.touch,keys=!o.touch; // kit 0.9.0: o.pot "under" (the design's choice) or "beside" adds the potion sockets
   el.insertAdjacentHTML("beforeend",`<div class="lb-ui lb-hud${phone?" is-phone":""}">
-    <div class="lb-hud-left">${vitals(phone)}</div>
+    <div class="lb-hud-left">${pot==="beside"?vitals(phone,"",potions(big,true,keys)):vitals(phone)}${pot==="under"?potions(big,false,keys):""}</div>
     <div class="lb-hud-right">${o.full?tile("full","Full screen"):""}${tile("help","How to play",phone)}${tile("pause","Pause",phone)}${counter(phone,"Wisps","0000")}</div>
     <div class="lb-bossbar" role="meter" aria-valuemin="0" aria-valuemax="100" hidden><p class="lb-bossbar-name"></p><div class="lb-bossbar-edge"><div class="lb-bossbar-track"><i class="trace"></i><i class="fill"></i></div></div></div>
     <div class="lb-plaque is-hud lb-line" hidden><div class="lb-face"><svg class="pic" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="lb-line-text"></span></div></div>
@@ -4411,6 +4465,21 @@ function setLine(ln,line){const on=!!line;if(ln.hidden===on)ln.hidden=!on;if(!on
   const u=line.u,long=ln.classList.contains("is-name"),T=long?2.6:2,a=u<0.22?u/0.22:u>T-0.4?Math.max(0,(T-u)/0.4):1,dy=-8*(1-ease(Math.min(1,u/0.25)));ln.style.opacity=String(a);ln.style.transform=`translate(-50%,${dy.toFixed(2)}px)`;}
 function setCard(cd,card){const on=!!(card&&card.a>0);if(cd.hidden===on)cd.hidden=!on;if(!on)return;
   setOnce(cd,"lv",card.lv,v=>{cd.querySelector(".lb-heading").textContent=CARDS[v][0];cd.querySelector(".lb-card-sub").textContent=CARDS[v][1];cd.setAttribute("aria-label",CARDS[v][0]+", "+CARDS[v][1]);});cd.style.opacity=String(card.a);}
+// round 13: one socket. Kept: the flask grows in from 0.6 with one glint passing over it (0.4 s); Reduce motion fades it in, Effects off
+// leaves out the glint's light. Drunk: the liquid drains in 0.35 s, then the faint outline; Reduce motion fades the liquid out instead.
+const OPTS={rm:false,fxOff:false};
+function setPotion(b,st){const k=b.dataset.k,has=!!(st.potions&&st.potions[k]),topped=(k==="health"?st.hp:st.mp)>=0.999,fx=st.potFx?(st.potFx.k===k?st.potFx:st.potFx[k]||null):null, /* the kit: potFx may hold one for each kind */
+    svg=b.querySelector(".pot"),liq=b.querySelector(".liq"),gl=b.querySelector(".glint"),mk=b.querySelector(".mark"),top=POT[k].top,rm=OPTS.rm;
+  const showFull=has||(fx&&fx.kind==="drink");b.classList.toggle("has-potion",showFull);b.classList.toggle("is-topped",has&&topped&&!fx);b.classList.toggle("fx-off",OPTS.fxOff);
+  let sc=1,op=1,ly=top,la=1,ga=0,gx=0;
+  if(fx&&fx.kind==="keep"){const u=Math.min(1,fx.u);if(rm){op=Math.min(1,u/0.75);}else{sc=0.6+0.4*ease(Math.min(1,u/0.7));op=Math.min(1,u/0.35);if(u>0.35){const g=(u-0.35)/0.65;ga=Math.sin(Math.min(1,g)*Math.PI)*0.85;gx=-14+28*g;}}}
+  if(fx&&fx.kind==="drink"){const u=Math.min(1,fx.u);if(rm){la=1-u;}else{ly=top+(22-top)*ease(u);}if(u>=1){b.classList.remove("has-potion");}}
+  svg.style.transform=sc!==1?`scale(${sc.toFixed(3)})`:"";svg.style.opacity=op!==1?op.toFixed(3):"";
+  liq.setAttribute("y",ly.toFixed(2));liq.style.opacity=la!==1?la.toFixed(3):"";mk.style.opacity=fx&&fx.kind==="drink"?String(rm?la:Math.max(0,1-fx.u*1.6)):"";
+  gl.style.opacity=ga>0.01?ga.toFixed(3):"0";gl.setAttribute("transform",`translate(${gx.toFixed(2)} 0)`);
+  const keyTxt=b.parentElement.querySelector(".lb-pkey");if(keyTxt)keyTxt.classList.toggle("is-on",!!(fx&&fx.kind==="drink"&&fx.u<0.5));
+  const name=k==="health"?"Health potion":"Mana potion",how=keyTxt?(k==="health"?"Q to drink":"E to drink"):"Tap to drink"; /* the kit: by the keycap, not the size */
+  setOnce(b,"lab",has?(topped?`${name}, kept. ${k==="health"?"Health":"Mana"} is full`:`${name}, kept. ${how}`):`No ${k} potion kept`,v=>b.setAttribute("aria-label",v));}
 function set(hud,st){const q=s=>hud.querySelector(s);
   const hp=Math.round(st.hp*100),mp=Math.round(st.mp*100);
   setOnce(hud,"hp",hp,v=>q(".hp").style.setProperty("--v",v+"%"));setOnce(hud,"mp",mp,v=>q(".mp").style.setProperty("--v",v+"%"));
@@ -4432,6 +4501,7 @@ function set(hud,st){const q=s=>hud.querySelector(s);
   setOnce(sp,"lab",kind?`Spell: ${NAME[kind]}${n>1?". Tap to switch":""}${short?". Not enough mana":""}`:"No spell yet",v=>sp.setAttribute("aria-label",v));
   const cast=q(".b-cast");if(cast){cast.classList.toggle("is-empty",!n);cast.classList.toggle("is-short",!!short);picFor(cast.querySelector(".ic"),kind);}
   setOnce(q(".lb-vitals"),"lab",`Health ${hp} per cent, armour ${st.pips} of 3, mana ${mp} per cent, ${st.lives} ${st.lives===1?"life":"lives"} left`,v=>q(".lb-vitals").setAttribute("aria-label",v));
+  hud.querySelectorAll(".lb-potion").forEach(b=>setPotion(b,st));
   const ctr=q(".lb-counter");if(ctr&&st.wisps!=null)setOnce(ctr,"w",st.wisps,v=>{const s=String(v).padStart(4,"0");ctr.querySelector(".lb-counter-num").textContent=s;ctr.setAttribute("aria-label",v+" wisps");});
   const ha=st.hudA==null?1:st.hudA;[".lb-hud-left",".lb-hud-right",".lb-touch"].forEach(sl=>{const e=q(sl);if(e)setOnce(e,"ha",ha.toFixed(2),v=>e.style.opacity=v);});
   const ln=q(".lb-line:not(.is-name)");if(ln)setLine(ln,st.line);const nm=q(".lb-line.is-name");if(nm)setLine(nm,st.name&&st.name.u<2.6?{kind:null,text:st.name.name,u:st.name.u}:null);const cd=q(".lb-card");if(cd)setCard(cd,st.card);
@@ -4444,7 +4514,7 @@ function stickShow(hud,x,y,dx,dy,a,thumb){const s=hud.querySelector(".lb-stick")
   const k=s.querySelector(".lb-knob");k.style.transform=`translate(${dx}px,${dy}px)`;const sv=s.querySelector(".chev");
   sv.querySelector(".l").classList.toggle("is-lit",dx<-12&&Math.abs(dx)>Math.abs(dy)*0.8);sv.querySelector(".r").classList.toggle("is-lit",dx>12&&Math.abs(dx)>Math.abs(dy)*0.8);sv.querySelector(".u").classList.toggle("is-lit",dy<-12&&-dy>Math.abs(dx)*0.8);
   const th=hud.querySelector(".lb-thumb");if(th){th.style.opacity=String(thumb||0);th.style.left=(x+dx)+"px";th.style.top=(y+dy)+"px";}}
-return{build,set,stickShow,ICON,oct};
+return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
   })();
 
   function createGame(cfg) {
@@ -4459,6 +4529,7 @@ return{build,set,stickShow,ICON,oct};
     // lines, the place card); howTo: { goal: [two lines], keys, touchKeys } adds How to play to the title and the '?' tile; win: { heading, line,
     // lifeBonus } words the win screen (lb.win())
     const fullHud = cfg.hud === 'full', howTo = cfg.howTo || null, winWords = cfg.win || { heading: 'The end', line: '', lifeBonus: 10 };
+    const potionsOn = fullHud && !!cfg.potions;   // kit 0.9.0 (design system version 11): potions: true adds the two potion sockets under the plaque
     const touch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     const mqPortrait = window.matchMedia('(orientation: portrait)');
     const upright = () => touch && mqPortrait.matches;
@@ -4567,7 +4638,7 @@ return{build,set,stickShow,ICON,oct};
       shakeAmt: 0,
       shakeT: 0,
       errored: false,
-      h8: { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0 }
+      h8: { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0, potions: { health: false, mana: false }, potFx: { health: null, mana: null } }
     };
     function after(seconds, fn) { state.timers.push({ at: state.time + seconds, fn: fn }); }
     function shake(amount, seconds) {   // the picture only, in its lines; the HUD never moves
@@ -4654,7 +4725,8 @@ return{build,set,stickShow,ICON,oct};
       alt: ['ShiftLeft', 'ShiftRight', 'KeyX', 'KeyK']
     };
     // version 8 (4c-6b): the named controls (the gameplay note's keys); in the full HUD on a touch device the stick and buttons press them too
-    const ACTIONS = { jump: ['Space'], attack: ['KeyJ'], cast: ['KeyK'], switch: ['KeyL'], roll: ['ShiftLeft', 'ShiftRight'], climb: ['ArrowUp', 'KeyW'] };
+    const ACTIONS = { jump: ['Space'], attack: ['KeyJ'], cast: ['KeyK'], switch: ['KeyL'], roll: ['ShiftLeft', 'ShiftRight'], climb: ['ArrowUp', 'KeyW'],
+      drinkHealth: ['KeyQ'], drinkMana: ['KeyE'] };   // kit 0.9.0: Q and E drink the kept potions (a tap on a socket presses them too)
     const GAME_CODES = new Set([].concat.apply([], Object.keys(KEYMAP).map((k) => KEYMAP[k]).concat(Object.keys(ACTIONS).map((k) => ACTIONS[k]))));
     const keys = new Set();
     const justKeys = new Set();
@@ -4680,7 +4752,8 @@ return{build,set,stickShow,ICON,oct};
        anywhere in the left half, and goes when it lifts; its knob travels 31 px; left, right and up as its chevrons light (up also climbs); a
        quick flick sideways rolls, and (kit 0.8.2, Barney's trial, 5 November 2026) so does a double tap of the left thumb: two short, still taps
        close together within 0.3 s; the game rolls him the way he faces. The three buttons press jump, attack and cast; a tap on the spell's
-       socket presses switch. */
+       socket presses switch, and (kit 0.9.0) a tap on a potion's socket drinkHealth or drinkMana. A tap on a socket is the socket's own:
+       it never reaches the canvas, so it never starts the stick or counts towards a double tap. */
     const FLICK_PX = 40, FLICK_MS = 120, FLICK_REST = 350;   // a flick: the thumb 40 px sideways within 0.12 s (starting figures, to tune in play)
     const TAP_MS = 250, TAP_PX = 14, DTAP_MS = 300, DTAP_PX = 70;   // kit 0.8.2: a tap is shorter than 0.25 s and moves under 14 px; a double tap is
                                                               // a second touch within 0.3 s of the first tap's end and within 70 px of it
@@ -4908,7 +4981,7 @@ return{build,set,stickShow,ICON,oct};
       if (!state.inGame) return;
       if (fullHud) {   // version 8: design system version 8's HUD, its tiles wired to the shell
         tc.on = touch;   // version 8 (4c-6b): the touch controls on any touch device, at the design system's one size
-        const node = HUD8.build(hudLayer, V.phone, { full: !touch && !V.phone, touch: touch });
+        const node = HUD8.build(hudLayer, V.phone, { full: !touch && !V.phone, touch: touch, pot: potionsOn ? 'under' : null });
         tc.stick.id = null; tc.held.clear(); tc.dirs = { left: false, right: false, up: false };   // a new HUD: nothing held over
         const full = node.querySelector('.lb-tile[aria-label="Full screen"]');
         if (full) full.replaceWith(fullscreenTile('lb-tile', '<span>' + ICON.fullscreen + '</span>'));
@@ -4918,6 +4991,9 @@ return{build,set,stickShow,ICON,oct};
         ps.addEventListener('click', () => { ps.blur(); pause(); });
         const sp = node.querySelector('.lb-spell');
         sp.addEventListener('click', () => { sp.blur(); if (state.screen === 'play') tc.just.add('switch'); });   // a tap on the socket presses switch, as L does
+        node.querySelectorAll('.lb-potion').forEach((b) => b.addEventListener('click', () => {   // kit 0.9.0: a tap on a potion's socket, as Q or E
+          b.blur(); if (state.screen === 'play') tc.just.add(b.dataset.k === 'health' ? 'drinkHealth' : 'drinkMana');
+        }));
         node.querySelectorAll('.lb-touch-btn').forEach((b) => {   // jump, attack and cast: held while the finger stays down
           const a = b.classList.contains('b-jump') ? 'jump' : b.classList.contains('b-attack') ? 'attack' : 'cast';
           b.addEventListener('pointerdown', (e) => {
@@ -4963,7 +5039,7 @@ return{build,set,stickShow,ICON,oct};
     }
     function syncHud() {
       if (!hudNodes) return;
-      if (hudNodes.full) { HUD8.set(hudNodes.full, h8State()); return; }
+      if (hudNodes.full) { HUD8.OPTS.rm = !!settings.reduceMotion; HUD8.OPTS.fxOff = !(settings.effects && pictureLevel() !== 'fastest'); HUD8.set(hudNodes.full, h8State()); return; }
       const pc = (f) => Math.round(clamp(f, 0, 1) * 100);
       hudNodes.health.style.setProperty('--v', pc(state.health) + '%');
       if (hudNodes.mana) hudNodes.mana.style.setProperty('--v', pc(state.mana) + '%');
@@ -4980,6 +5056,13 @@ return{build,set,stickShow,ICON,oct};
       const pf = fx(h8.pipFx); if (pf) st.pipFx = { i: pf.i, kind: pf.kind, u: (T - pf.t0) / pf.len };
       const lf = fx(h8.lifeFx); if (lf) st.lifeFx = { i: lf.i, u: T - lf.t0 };
       const ff = fx(h8.flipFx); if (ff) { st.flip = (T - ff.t0) / ff.len; if (st.flip < 0.5) st.flipKind = ff.from; }
+      // kit 0.9.0: the potion sockets: a kept one shows once its flight has landed; each kind's moment (kept 0.4 s, drunk 0.35 s) as potFx[kind]
+      st.potions = {}; st.potFx = {};
+      for (const k of ['health', 'mana']) {
+        const p = h8.potFx[k], on = p && T >= p.t0 && T - p.t0 < p.len;
+        st.potions[k] = h8.potions[k] && !(p && p.kind === 'keep' && T < p.t0);
+        if (on) st.potFx[k] = { k: k, kind: p.kind, u: (T - p.t0) / p.len };
+      }
       // the name and the lines share the top middle: a line waits while the boss's name shows
       const naming = !!(h8.name && T - h8.name.t0 < 2.6);
       if (h8.line && T - h8.line.t0 >= 2) h8.line = null;
@@ -5033,14 +5116,28 @@ return{build,set,stickShow,ICON,oct};
         else if (hp < b.hp) { const shown = b.hitT == null ? b.hp : b.hp + (b.trace - b.hp) * (1 - clamp((state.time - b.hitT - 0.35) / 0.6, 0, 1)); b.trace = Math.max(shown, b.hp); b.hitT = state.time; b.hp = hp; }
         else b.hp = hp;
       },
-      fade(a) { h8.hudA = clamp(+a, 0, 1); syncHud(); }                                 // the HUD's own fade (a tap on the spell's socket presses input.pressed.switch)
+      fade(a) { h8.hudA = clamp(+a, 0, 1); syncHud(); },                                // the HUD's own fade (a tap on the spell's socket presses input.pressed.switch)
+      // kit 0.9.0 (design system version 11; potions: true in the config): one health and one mana potion kept, in two sockets under the plaque
+      potions(health, mana) { h8.potions = { health: !!health, mana: !!mana }; h8.potFx = { health: null, mana: null }; syncHud(); },   // which are kept, at once
+      keep(kind, o) {   // a potion kept: its socket fills as world.loot's flight lands (0.45 s; at once under Reduce motion), in 0.4 s;
+        // o.line: true the first time, for the plaque line saying how to drink it (tap on a touch device, Q or E on a computer)
+        const k = kind === 'mana' ? 'mana' : 'health', d = settings.reduceMotion ? 0 : 0.45;
+        h8.potions[k] = true; h8.potFx[k] = { kind: 'keep', t0: state.time + d, len: 0.4 };
+        if (o && o.line) after(d + 0.35, () => hud.line(k === 'health' ? 'potH' : 'potM', 'Kept for later. ' + (touch ? 'Tap' : k === 'health' ? 'Q' : 'E') + ' to drink'));
+        syncHud();
+      },
+      drink(kind) {   // a potion drunk: its socket drains (0.35 s; its key lights on a computer) and the drink's sound plays. The game fills the bar
+        // (0.4 s) and draws world.wanderer's drink (0.9 s)
+        const k = kind === 'mana' ? 'mana' : 'health';
+        h8.potions[k] = false; h8.potFx[k] = { kind: 'drink', t0: state.time, len: 0.35 }; sfx(k === 'health' ? 'drinkHealth' : 'drinkMana'); syncHud();
+      }
     };
     function fade(a) { h8.fade = clamp(+a || 0, 0, 1); if (!h8.card) fadeEl.style.opacity = String(h8.fade); }   // black over the picture
     // the place card (3 s, play stopped: the game holds its play until onDone): onBlack once it is dark (0.9 s), to move the world to the next place
     function placeCard(place, onBlack, onDone) { h8.card = { place: place, t0: state.time, onBlack: onBlack || null, onDone: onDone || null, called: false }; sfx('placeCard'); syncHud(); }   // with its low toll
     const placing = () => !!h8.card;
-    function resetH8() {   // a new run (or the title): three lives, no armour, no spells, nothing showing
-      Object.assign(h8, { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0 });
+    function resetH8() {   // a new run (or the title): three lives, no armour, no spells, no potions kept, nothing showing
+      Object.assign(h8, { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0, potions: { health: false, mana: false }, potFx: { health: null, mana: null } });
       fadeEl.style.opacity = '0';
     }
 
@@ -5423,8 +5520,14 @@ return{build,set,stickShow,ICON,oct};
     const HOWTO_KEYS = [[['A', 'D', ' or ', 'left', 'right'], 'walk'], [['J'], 'attack'], [['W', ' or ', 'up'], 'climb a bank'], [['K'], 'cast'],
       [['Space'], 'jump'], [['L'], 'switch spell'], [['Shift'], 'roll'], [['Esc', ' or ', 'P'], 'pause']];
     const OCT34 = '<polygon class="oct" points="10.0,0.7 24.0,0.7 33.3,10.0 33.3,24.0 24.0,33.3 10.0,33.3 0.7,24.0 0.7,10.0"/>';
+    // kit 0.9.0 (version 11): with potions, Q and E on a computer and the two sockets drawn small on a touch device
+    const HOWTO_POT_KEYS = [[['Q'], 'drink a health potion'], [['E'], 'drink a mana potion']];
+    const HOWTO_POT_TOUCH = ['<g class="pk"><path d="M2.5 9 H15 L16.5 10.5 V23 L15 24.5 H2.5 L1 23 V10.5 Z"/><path d="M19 9 H31.5 L33 10.5 V23 L31.5 24.5 H19 L17.5 23 V10.5 Z"/></g>' +
+      '<g transform="translate(1.6 9.6) scale(0.62)" class="pf h"><path d="M8.8 2.4 H15.2 V4.4 H13.7 V8.62 A6.6 6.6 0 1 1 10.3 8.62 V4.4 H8.8 Z"/></g>' +
+      '<g transform="translate(18.1 9.6) scale(0.62)" class="pf m"><path d="M9.8 2.4 H14.2 V4.4 H13.4 V7 Q15.6 8.3 15.6 10.6 V19.4 Q15.6 21.6 13.4 21.6 H10.6 Q8.4 21.6 8.4 19.4 V10.6 Q8.4 8.3 10.6 7 V4.4 H9.8 Z"/></g>',
+      '<b>Tap a potion</b>, top left, to drink it'];
     const HOWTO_TOUCH = [
-      ['<polygon class="oct dim" points="10.0,0.7 24.0,0.7 33.3,10.0 33.3,24.0 24.0,33.3 10.0,33.3 0.7,24.0 0.7,10.0"/><path class="chev" d="M7 13.5 L4 17 L7 20.5 M27 13.5 L30 17 L27 20.5 M13.5 7 L17 4 L20.5 7"/><path class="dia" d="M17 12.5 L21.5 17 L17 21.5 L12.5 17 Z"/>', '<b>Left thumb</b>, anywhere on the left: walk, climb up a bank, flick to roll'],
+      ['<polygon class="oct dim" points="10.0,0.7 24.0,0.7 33.3,10.0 33.3,24.0 24.0,33.3 10.0,33.3 0.7,24.0 0.7,10.0"/><path class="chev" d="M7 13.5 L4 17 L7 20.5 M27 13.5 L30 17 L27 20.5 M13.5 7 L17 4 L20.5 7"/><path class="dia" d="M17 12.5 L21.5 17 L17 21.5 L12.5 17 Z"/>', '<b>Left thumb</b>, anywhere on the left: walk, climb up a bank; flick or double tap to roll'],
       [OCT34 + '<g class="ic" transform="translate(5,5)"><path d="M12 16.5 V4.5 M7 9.5 L12 4.5 L17 9.5 M6 20.5 H18"/></g>', '<b>Jump</b>'],
       [OCT34 + '<g class="ic" transform="translate(5,5)"><path d="M19.2 4.8 L9.4 14.6 M6.8 12 L12 17.2 M9.4 14.6 L5.4 18.6"/><circle class="solid" cx="4.6" cy="19.4" r="1.5"/></g>', '<b>Attack</b>'],
       [OCT34 + '<g class="ic" transform="translate(5,5)"><circle class="solid" cx="16" cy="12" r="4.8"/><path class="solid" d="M13.8 8.2 L3.6 4.4 L11.2 10.6 Z M12.4 10.8 L0.8 12.4 L12.4 13.8 Z M13.8 15.8 L4.2 18.8 L11.2 13.6 Z"/></g>', '<b>Cast</b> the chosen spell'],
@@ -5432,7 +5535,7 @@ return{build,set,stickShow,ICON,oct};
     function howToDialog(from) {
       const phone = V.phone, label = from === 'play' ? 'Resume' : 'Back';
       const close = () => { if (from === 'play') resume(); else { sfx('back'); state.screen = 'title'; closeDialog(); } };
-      const { panel, face } = plaque('lb-ht-t', 560, 700, phone ? 'display:grid;grid-template-columns:minmax(0,0.92fr) minmax(0,1fr);column-gap:24px;align-items:center;padding:18px 20px' : 'gap:12px;padding:22px 24px 20px');
+      const { panel, face } = plaque('lb-ht-t', 650, 720, phone ? 'display:grid;grid-template-columns:minmax(0,0.92fr) minmax(0,1fr);column-gap:24px;align-items:center;padding:18px 20px' : 'gap:12px;padding:22px 24px 20px');
       const goals = (howTo.goal || []).map((line, i) => { const g = txt('p', 'lb-howto-goal', line); if (phone) g.style.fontSize = '15px'; else if (i) g.style.marginTop = '-6px'; return g; });
       const btn = button(label, true);
       btn.style.width = '100%';
@@ -5441,12 +5544,12 @@ return{build,set,stickShow,ICON,oct};
       const controls = () => {
         if (touch) {
           const keys = el('div', 'lb-touchkeys');
-          (howTo.touchKeys || HOWTO_TOUCH).forEach((q) => keys.append(el('div', 'lb-touchkey', '<svg viewBox="0 0 34 34" aria-hidden="true">' + q[0] + '</svg><span>' + q[1] + '</span>')));
+          (howTo.touchKeys || HOWTO_TOUCH.concat(potionsOn ? [HOWTO_POT_TOUCH] : [])).forEach((q) => keys.append(el('div', 'lb-touchkey', '<svg viewBox="0 0 34 34" aria-hidden="true">' + q[0] + '</svg><span>' + q[1] + '</span>')));
           return keys;
         }
         const keys = el('div', 'lb-keys');
         if (phone) keys.style.cssText = 'grid-template-columns:minmax(0,1fr);gap:6px';   // a computer's window at a phone's size: one column beside the goal
-        (howTo.keys || HOWTO_KEYS).forEach((q) => keys.append(el('div', 'lb-key', '<span class="caps">' + q[0].map((c) => (c.charAt(0) === ' ' ? c : kbd(c))).join('') + '</span>' + q[1])));
+        (howTo.keys || HOWTO_KEYS.concat(potionsOn ? HOWTO_POT_KEYS : [])).forEach((q) => keys.append(el('div', 'lb-key', '<span class="caps">' + q[0].map((c) => (c.charAt(0) === ' ' ? c : kbd(c))).join('') + '</span>' + q[1])));
         return keys;
       };
       if (phone) {
@@ -5910,7 +6013,13 @@ return{build,set,stickShow,ICON,oct};
       W: () => V.W,
       t: () => (state.inGame ? state.time : state.t),
       rm: () => !!settings.reduceMotion,
-      fx: () => !!settings.effects && pictureLevel() !== 'fastest'
+      fx: () => !!settings.effects && pictureLevel() !== 'fastest',
+      socket: (k) => {   // kit 0.9.0: a potion socket's centre in picture lines, or null without one
+        const b = hudNodes && hudNodes.full && hudNodes.full.querySelector('.lb-potion.is-' + k);
+        if (!b) return null;
+        const r = b.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+        return [((r.left + r.right) / 2 - c.left) / (c.width || 1) * V.W, ((r.top + r.bottom) / 2 - c.top) / (c.height || 1) * H];
+      }
     });
 
     /* ----- Public API handed to the game -----
@@ -5920,12 +6029,12 @@ return{build,set,stickShow,ICON,oct};
          Version 8's named controls: input.jump (Space), attack (J), cast (K), switch (L), roll (Shift), climb (W or up), held and
          in input.pressed. With the full HUD on a touch device the touch controls press them: the stick (left, right, up and climb;
          a quick flick sideways presses roll, and kit 0.8.2 a double tap of the left thumb), the jump, attack and cast buttons, and a tap on
-         the spell's socket (switch).
+         the spell's socket (switch). Kit 0.9.0: input.drinkHealth (Q) and drinkMana (E), pressed too by a tap or click on a potion's socket.
        lb.addWisps(n), lb.wisps, lb.best: the score, in whole wisps. lb.gameOver(delay): ends the run (game over, then the
          initials if it makes the top ten). lb.hud.health(0..1), lb.hud.mana(0..1): the bars; mana: false in the config leaves
          the mana bar out. lb.sfx('name'), sfx.tone(o), sfx.noise(o). lb.music(0 or 1): the soundtrack to play.
        Sound (version 8): lb.sfx(name) plays one of design system version 8's sounds, named in lb.sounds (swing, hit, jump, land, roll,
-         hurt, crack, defeat, pickup, heal, fireball, burst, fizzle, checkpoint, line, lifeLost, bossArrives, bossDefeated, placeCard,
+         hurt, crack, defeat, pickup, heal, drinkHealth, drinkMana (kit 0.9.0), fireball, burst, fizzle, checkpoint, line, lifeLost, bossArrives, bossDefeated, placeCard,
          win, select, confirm, back); the kit plays the menus', each plaque line's chime, the place card's toll and the win's bells
          itself. lb.ambient(place) sets the place's background sound ('night', 'storm', 'dawn' or 'mist'; null for none), heard only
          in play: it fades in over 1.2 s and out over 0.6 s. The first Blood Red Rain makes its rain, a moment's work, so set it while
@@ -5935,7 +6044,11 @@ return{build,set,stickShow,ICON,oct};
          picture dims while mana is short; a new choice turns it over; a tap on the socket presses input.pressed.switch),
          lb.hud.line(kind, text) (a plaque line, 2 s; lines take turns; kind a loot picture or none), lb.hud.bossName(name) (2.6 s),
          lb.hud.boss({ name, hp 0..1 }) (the boss bar: it fills as the boss arrives, a hit leaves a trace that drains) and
-         lb.hud.boss(null) (it goes), lb.hud.fade(0..1) (the HUD's own fade). lb.placeCard(place, onBlack, onDone): the place card
+         lb.hud.boss(null) (it goes), lb.hud.fade(0..1) (the HUD's own fade). Kit 0.9.0 (design system version 11; potions: true in the
+         config): two potion sockets under the plaque, health and mana. lb.hud.potions(health, mana) sets which are kept (a kept one dims
+         while its bar is full); lb.hud.keep(kind, { line }) keeps one (its socket fills as world.loot's keep flight lands; line: the first
+         time, the plaque line saying how to drink it); lb.hud.drink(kind) drinks one (its socket drains, its key lights, its sound plays;
+         the game fills the bar and draws world.wanderer's drink). lb.placeCard(place, onBlack, onDone): the place card
          (3 s; onBlack at 0.9 s, once the picture is black, onDone at the end; lb.placing() while it shows). lb.fade(0..1): black over
          the picture, under the HUD. lb.win(): the win (the lives still lit counted into the score). lb.howTo(): How to play.
          howTo: { goal: [two lines], keys, touchKeys } in the config adds How to play to the title and the '?' tile; win: { heading,
@@ -5951,10 +6064,10 @@ return{build,set,stickShow,ICON,oct};
          whole level (L.length, L.arena, L.sections, L.checkpoints, L.pits, L.banks, L.ground(x), L.rise(x), L.pit(x), L.pieces());
          world.begin(ctx, { level: L, camX }) draws it in place of the flat strip, rising with its ground, and y left out stands
          things on its ground. The wanderer (version 8): world.wanderer(x, { y, move, step, facing, sword: { reach, bite }, safe,
-         hurt: { kind, t }, shatter, pit, heal: { t, level }, fizzle, form }) draws him in one of world.moves at a puppet step (12 a
+         hurt: { kind, t }, shatter, pit, heal: { t, level }, fizzle, form, drink: { kind, t } }) draws him in one of world.moves at a puppet step (12 a
          second; walking or standing in time if move is left out) and returns his chest, hand and lantern; world.move(name, step)
          gives a move's length, tag and where the review loops have him stand. The spells, loot and checkpoints (version 8):
-         world.fireball(x, y, { facing, level }), world.fireBurst(x, y, { t, level }), world.loot(kind, x, { y, seed, drop, pick })
+         world.fireball(x, y, { facing, level }), world.fireBurst(x, y, { t, level }), world.loot(kind, x, { y, seed, drop, pick, keep })
          (kinds in world.LOOT), world.checkpoint(x, { y, lit, from }) (returns its glass), world.spark(from, to, u). Times are
          seconds since the moment began. Then:
          world.monster({ kind, x, y, ph, id, defeat, seed, attack, hit }) (kinds in world.MONSTERS; give each monster its own id;
@@ -5967,7 +6080,8 @@ return{build,set,stickShow,ICON,oct};
          wanderer to the path. Without a level, the path's scenery is the directions page's sample strip.
        In the game's config: id, title (a string, or its two lines), start, update, draw(ctx, g, lb), place (the place behind
        the title, 'night' if left out), drawTitle(ctx, lb) (to draw the title's picture itself), mana, music, init(lb), onPause(g, lb),
-       and (version 8) hud: 'full', howTo, win, and (kit 0.8.1) test: { options } for the Testing panel (Settings), its values in lb.test.
+       and (version 8) hud: 'full', howTo, win, and (kit 0.8.1) test: { options } for the Testing panel (Settings), its values in lb.test,
+       and (kit 0.9.0) potions: true for the potion sockets (with How to play's rows for them).
        world.monster takes facing (kit 0.8.1): 1 mirrors it to face right. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
