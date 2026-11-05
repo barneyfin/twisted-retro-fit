@@ -53,7 +53,7 @@ Since kit 0.8 (design system version 8, step 4c) the tools draw Gloam Hallow's p
 | Button | Key | What it does |
 |---|---|---|
 | Place | 1 2 3 4 | The next place, or a place by number |
-| Ground | G | The place's whole level (its rolling ground, banks, pits and pieces, the camera rising with it; the default), or the flat strip |
+| Ground | G | The place's whole level (its rolling ground, banks, pits and pieces, the camera rising with it; the default), or the flat strip. Kit 0.9.1: no pit from 120 before a checkpoint to 320 after it |
 | Section | N | On a level: on to the next hill section, then the boss's arena, then back to the start |
 | Walk | arrows | Walks on its own, or by the left and right arrows |
 | Rise | up and down arrows | On the flat strip: raises and lowers the camera, up to half a picture (a level rises with its ground) |

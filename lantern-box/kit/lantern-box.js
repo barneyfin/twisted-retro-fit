@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.9.0';
+  const VERSION = '0.9.1';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -1506,7 +1506,9 @@ class Scene{
     const bb=MON_BOX[m.kind]||[-128,-228,128,18],G=18,id=m.id||(m.kind+"|"+m.ph),bk=(typeof MON_BASE!=="undefined"&&MON_BASE[m.kind])||m.kind,moving=flare||(m.P&&Object.keys(m.P).length>0),r=moving?0:POSE_RATE[bk];
     const step=(r&&!o.rm)?Math.floor((r*t+m.ph)*8):-KIT.frame;
     let E=this.poses.get(id);
-    if(!E){E={cv:mk((bb[2]-bb[0]+2*G)*s,(bb[3]-bb[1]+2*G)*s),step:null};this.poses.set(id,E);}
+    // kit 0.9.1: a fresh canvas when the name now belongs to another kind (a new run in the same place names its monsters afresh; a
+    // walker drawn into a flyer's smaller canvas showed only its head and chest, floating)
+    if(!E||E.kind!==m.kind){E={cv:mk((bb[2]-bb[0]+2*G)*s,(bb[3]-bb[1]+2*G)*s),step:null,kind:m.kind};this.poses.set(id,E);}
     if(E.step!==step){const c=E.cv.getContext("2d");c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,E.cv.width,E.cv.height);
       into(c,Math.round((G-130-bb[0])*s),Math.round((G-230-bb[1])*s));E.step=step;KIT.poses++;}
     E.used=KIT.frame;
@@ -3299,7 +3301,7 @@ function rlPath(c,T,cam,W,G){const lv=T.lv,A=AIR[lv],ink=C2_INK,pits=T.pits.filt
    Seven section shapes, each starting and ending on the floor, their heights a share of the place's maximum (so the same section is a
    mound in the old town and a hill on the moor). Each place strings ten of them in its own order, never the same one twice running, with a
    flat lead-in at the start and the flat boss arena at the end. The checkpoints sit at the start, after the fifth section, and at the boss
-   door. The fly-through shows a place's whole level at about seven times walking pace, with a map of the level along the bottom. */
+   door (kit 0.9.1: with no pit near one). The fly-through shows a place's whole level at about seven times walking pace, with a map of the level along the bottom. */
 const LV_SEC={
   A:{name:"Ripples",L:820,pts:[[0,0,"s"],[210,0.14,"s"],[420,0.05,"s"],[630,0.17,"s"]],spots:[210,630]},
   B:{name:"Long climb, crag drop",L:980,pts:[[0,0,"s"],[520,0.68,"s"],[660,0.78,"b"],[688,0.36,"s"],[900,0,"f"]],spots:[590]},
@@ -3310,6 +3312,7 @@ const LV_SEC={
   G:{name:"Mound between pits",L:900,pts:[[0,0,"f"],[130,0,"s"],[310,0.32,"s"],[480,0.27,"s"],[680,0,"f"]],pits:[[64,108],[740,784]],spots:[390]}};
 const LV_ORDER={night:"ACDBFGEDAF",storm:"AFDCBGEADC",dawn:"ABDEFGCDEA",mist:"ACGFEDBADF"};
 const LV_LEAD=300,LV_ARENA=1300;
+const LV_CP_CLEAR=[120,320];   // kit 0.9.1: the stretch round each checkpoint kept clear of pits (the same as Gloam Hallow keeps clear of monsters)
 // the level's terrain, in the same form as round 5d's stretches (rlT), so the same ground, banks, pits and camera rise draw it
 // the kit: a game may pass its own order of sections (the second loop shuffles them); the place's own order otherwise
 const _lvT={};
@@ -3319,7 +3322,10 @@ function lvTerrain(lv,order){const ord=order||LV_ORDER[lv],id=lv+(ord===LV_ORDER
   for(let i=0;i<ord.length;i++){const S=LV_SEC[ord[i]];secs.push({id:ord[i],x0:x,x1:x+S.L});for(const p of S.pts)if(p[0]<S.L)pts.push([x+p[0],p[1],p[2]]);for(const q of S.pits||[])pits.push([x+q[0],x+q[1]]);x+=S.L;}
   const arena=x;pts.push([arena,0,"f"]);const len=arena+LV_ARENA;pts.push([len,0,"f"],[len+4000,0,"f"]);
   const cps=[{x:120,name:"start"},{x:secs[Math.min(4,secs.length-1)].x1,name:"middle"},{x:arena+60,name:"boss door"}];
-  return _lvT[id]={key:"level-"+id,lv,order:ord,pts,pits,max:RL_MAX[lv],seed:RL_SEED[lv]+100,rough:RL_ROUGH[lv],len,arena,secs,cps};}
+  // kit 0.9.1 (Barney, 5 November 2026): no pit near a checkpoint, from LV_CP_CLEAR[0] before it to [1] after it, so a return is never
+  // straight into one (the middle checkpoint of Night, Blood Red Rain and Dawn had the mound-between-pits section's first pit 64 past it)
+  const kept=pits.filter(q=>!cps.some(c=>q[1]>c.x-LV_CP_CLEAR[0]&&q[0]<c.x+LV_CP_CLEAR[1]));
+  return _lvT[id]={key:"level-"+id,lv,order:ord,pts,pits:kept,max:RL_MAX[lv],seed:RL_SEED[lv]+100,rough:RL_ROUGH[lv],len,arena,secs,cps};}
 // each place's pieces (the same as round 5d's), one on each section's crest or plateau in turn, and its scenery scattered
 const _lvP={};
 function lvBuild(T,S){const key=T.key+"@"+S.toFixed(3);if(_lvP[key])return _lvP[key];const lv=T.lv,G=x=>tGround(T,x); // the kit: built from a level (lvTerrain), at the picture's sharpness S
@@ -4205,7 +4211,7 @@ function makeTools(env){
           place,order:T.order,length:T.len,arena:T.arena,
           sections:T.secs.map(q=>({id:q.id,name:LV_SEC[q.id].name,x0:q.x0,x1:q.x1})),   // in play order; the flat start before them is LV_LEAD (300) long
           checkpoints:T.cps.map(q=>({x:q.x,name:q.name})),                               // the start, after the fifth section, the boss's door
-          pits:T.pits.map(q=>q.slice()),                                                  // [x0, x1]: a gap in the path
+          pits:T.pits.map(q=>q.slice()),                                                  // [x0, x1]: a gap in the path (kit 0.9.1: none from 120 before a checkpoint to 320 after it)
           banks,                                                                          // [x0, x1]: a steep face, up or down
           ground:x=>tGround(T,x),                                                         // the ground's line at x, in picture lines (bigger is lower)
           rise:x=>tRise(T,x),                                                             // how far the camera rises with the ground at x
