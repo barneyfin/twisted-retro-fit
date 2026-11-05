@@ -1,0 +1,72 @@
+<!-- @dsCard group="In play" height=1363 width=960 subtitle="One health and one mana potion kept for later: the sockets, their looks and moments" -->
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Potions</title>
+<style>
+body{margin:0;background:var(--ink);color:var(--text-2);font:400 15px/1.4 var(--font-text)}
+.cap{margin:0;padding:8px 2px 6px;font:500 13px/16px var(--font-text);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+figure{margin:0}figcaption{padding:4px 2px 8px;font-size:13px;color:var(--text-3)}
+canvas{display:block;width:100%;background:var(--ink)}canvas.w2{aspect-ratio:2/1}canvas.w52{aspect-ratio:5/2}canvas.w169{aspect-ratio:16/9}canvas.w94{aspect-ratio:9/4}canvas.sq{aspect-ratio:1}
+canvas.sig{aspect-ratio:45/14}canvas.cpsheet{aspect-ratio:640/472}canvas.secs{aspect-ratio:16/7}
+.stagebox{position:relative;width:100%;overflow:hidden;background:var(--ink)}
+.stage{position:absolute;left:0;top:0;transform-origin:0 0;transform:scale(var(--k,1));overflow:hidden;background:var(--ink)}
+.stage>canvas{position:absolute;inset:0;width:100%;height:100%}
+.ov{position:absolute;inset:0}.center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.lb-thumb{position:absolute;width:46px;height:56px;margin:-30px 0 0 -23px;border-radius:50%;background:rgba(255,236,214,0.16);opacity:0;pointer-events:none}
+.zoombox{position:relative;padding:14px;overflow:hidden;background:linear-gradient(180deg,var(--night-sky-1),var(--night-sky-2))}.zoombox.black{background:var(--ink)}
+.zin{transform-origin:0 0;width:max-content}.cu{position:relative}
+.step{color:var(--text-2)}
+.sgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.sbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:52px;padding:8px 10px;border:1.5px solid var(--brass-dim);background:transparent;color:var(--text);text-align:left;cursor:pointer;font:inherit}
+body .w-later,body .w-unlock{display:none}
+.sbtn b{font-weight:500}.sbtn i{font-style:normal;font-size:13px;color:var(--text-3)}.sbtn[aria-pressed=true]{border-color:var(--brass);background:#2a2016}
+.zin .lb-hud-left{position:static}.zin .lb-ui{position:relative}
+.opts{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.opts .sbtn{min-height:40px;flex-direction:row;align-items:center}
+.cus{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+</style>
+</head>
+<body>
+<p class="cap">The sockets: empty, kept, kept with the bar full (computer, then phone)</p><div class="cus"><figure><div class="zoombox" data-zoom="2" data-phone="0" data-cu="{&quot;hp&quot;: 0.5, &quot;mp&quot;: 0.6, &quot;potions&quot;: {&quot;health&quot;: false, &quot;mana&quot;: false}}"><div class="zin"></div></div><figcaption>Empty: a faint outline, as the empty armour slots</figcaption></figure><figure><div class="zoombox" data-zoom="2" data-phone="0" data-cu="{&quot;hp&quot;: 0.5, &quot;mp&quot;: 0.6, &quot;potions&quot;: {&quot;health&quot;: true, &quot;mana&quot;: true}}"><div class="zin"></div></div><figcaption>Kept: the potion in its own colours; Q and E</figcaption></figure><figure><div class="zoombox" data-zoom="2" data-phone="0" data-cu="{&quot;hp&quot;: 1, &quot;mp&quot;: 1, &quot;potions&quot;: {&quot;health&quot;: true, &quot;mana&quot;: true}}"><div class="zin"></div></div><figcaption>Kept, bar full: dimmed; it can't be drunk</figcaption></figure><figure><div class="zoombox" data-zoom="2" data-phone="1" data-cu="{&quot;hp&quot;: 0.5, &quot;mp&quot;: 0.6, &quot;potions&quot;: {&quot;health&quot;: false, &quot;mana&quot;: false}}"><div class="zin"></div></div><figcaption>On a phone: 44px, no keys</figcaption></figure><figure><div class="zoombox" data-zoom="2" data-phone="1" data-cu="{&quot;hp&quot;: 0.5, &quot;mp&quot;: 0.6, &quot;potions&quot;: {&quot;health&quot;: true, &quot;mana&quot;: true}}"><div class="zin"></div></div><figcaption>Kept</figcaption></figure><figure><div class="zoombox" data-zoom="2" data-phone="1" data-cu="{&quot;hp&quot;: 1, &quot;mp&quot;: 1, &quot;potions&quot;: {&quot;health&quot;: true, &quot;mana&quot;: true}}"><div class="zin"></div></div><figcaption>Kept, bar full</figcaption></figure></div><p class="cap">The sockets' moments, close up</p><div class="zoombox" data-zoom="2.2" data-pots="1" data-close="potions"><div class="zin"></div></div><p class="step"></p><p class="cap">The moments in play</p><div class="opts"><button class="sbtn" type="button" data-opt="rm" aria-pressed="false"><b>Reduce motion</b></button><button class="sbtn" type="button" data-opt="fxoff" aria-pressed="false"><b>Effects off</b></button><button class="sbtn" type="button" data-opt="snd" aria-pressed="false"><b>Sound</b></button></div><div class="g2"><div class="stagebox" data-w="960" data-h="540" style="aspect-ratio:960/540"><div class="stage" data-hud="pc" style="width:960px;height:540px"><canvas data-loop="pot" data-lv="night" data-arg="keep" aria-label="A potion kept: it flies to its socket, which fills, then the plaque line"></canvas></div></div><div class="stagebox" data-w="960" data-h="540" style="aspect-ratio:960/540"><div class="stage" data-hud="pc" style="width:960px;height:540px"><canvas data-loop="pot" data-lv="night" data-arg="drinkH" aria-label="Q: the health potion drunk"></canvas></div></div></div><div class="g2" style="margin-top:10px"><div class="stagebox" data-w="844" data-h="390" style="aspect-ratio:844/390"><div class="stage" data-hud="phone" style="width:844px;height:390px"><canvas data-loop="pot" data-lv="night" data-arg="keep" aria-label="A potion kept on a phone"></canvas></div></div><div class="stagebox" data-w="844" data-h="390" style="aspect-ratio:844/390"><div class="stage" data-hud="phone" style="width:844px;height:390px"><canvas data-loop="pot" data-lv="night" data-arg="drinkM" aria-label="A tap on the mana socket"></canvas></div></div></div>
+<script src="../../components/play.js"></script>
+<script>
+/* the previews' runner (version 11, for Potions): runner8's, plus the potions' moments (loopPot), close-ups with the potion sockets
+   (data-pots), fixed states (data-cu) and the Reduce motion, Effects off and Sound buttons (data-opt). */
+(()=>{const L=n=>typeof window[n]==="function"?window[n]:null;
+const back=(cv,t,lv,R,K,arg)=>{const a=(arg||"run").split(":");if(a[0]==="run"){loopRoll(cv,t,lv,R,K,lv);return;}const key=lv+cv.width+"x"+cv.height;if(K.key===key)return;loopRoll(cv,+a[1]||5,lv,R,K,lv);K.key=key;};
+const LOOPS={walk:L("loopWalk"),jump:L("loopJump"),climb:L("loopClimb"),dodge:L("loopDodge"),sword:L("loopSword"),cast:L("loopCast"),hurt:L("loopHurt"),life:L("loopLife"),play:L("loopPlay"),
+  heal:L("loopHeal"),fire:L("loopFire"),fizzle:L("loopFizzle"),play3:L("loopPlay3"),drop:L("loopDrop"),ground:L("loopGround"),play4:L("loopPlay4"),roll:L("loopRoll"),level:L("loopLevel"),secs:L("loopSecs"),
+  cp:L("loopCp"),cpsheet:L("loopCpSheet"),duel:L("loopDuel"),signals:L("loopSignals"),fight:L("loopFight"),lost:(cv,t,lv,R,K,arg)=>{LOST_MODE=arg||"hits";loopLost(cv,t,lv,R,K);},end:L("loopEnd"),hud:HUD.loopHud,back,pot:L("loopPot")};
+document.querySelectorAll(".stage[data-hud]").forEach(s=>{s.__hud=HUD.build(s,s.dataset.hud==="phone");});
+document.querySelectorAll("[data-close],[data-cu]").forEach(b=>{const ph=b.dataset.phone==="1";b.querySelector(".zin").insertAdjacentHTML("beforeend",`<div class="lb-ui${ph?" lb-hud is-phone":""}"><div class="lb-hud-left">${HUD.vitals(ph)}${b.dataset.pots||b.dataset.cu?HUD.potions(ph,false):""}</div></div>`);b.__hud=b.querySelector(".zin>.lb-ui");
+  if(b.dataset.cu)HUD.set(b.__hud,Object.assign({},HUD.BASE,JSON.parse(b.dataset.cu)));});
+document.querySelectorAll("[data-opt]").forEach(b=>b.addEventListener("click",()=>{const on=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",String(on));const o=b.dataset.opt;
+  if(o==="rm")HUD.OPTS.rm=on;else if(o==="fxoff")HUD.OPTS.fxOff=on;else{potSound(on);if(on)SND.unlock();}}));
+const anims=[...document.querySelectorAll("canvas[data-loop]")].map(cv=>({cv,K:{},on:true,fn:LOOPS[cv.dataset.loop]}));
+const sheets=[...document.querySelectorAll("canvas[data-sheet]")].map(cv=>({cv,spec:SHEETS[cv.dataset.sheet]}));
+const dpr=()=>Math.min(2,window.devicePixelRatio||1);let t=0.6,last=0;
+const RM=(()=>{try{return matchMedia("(prefers-reduced-motion: reduce)").matches;}catch(e){return false;}})();
+function fitA(it){const r=it.cv.getBoundingClientRect(),d=dpr(),w=Math.max(60,Math.round(r.width*d)),h=Math.max(30,Math.round(r.height*d));if(it.cv.width!==w||it.cv.height!==h){it.cv.width=w;it.cv.height=h;it.K={};}}
+function fitS(it){const sp=it.spec,L2=sheetLayout(it.cv,sp);it.cv.style.aspectRatio=String(L2.aspect);const r=it.cv.getBoundingClientRect(),d=dpr(),w=Math.max(60,Math.round(r.width*d)),h=Math.max(30,Math.round(w/L2.aspect));
+  if(it.cv.width!==w||it.cv.height!==h){it.cv.width=w;it.cv.height=h;}try{drawSheet(it.cv,it.cv.dataset.lv||"night",sp);}catch(e){console.error(e);}}
+function scale(){document.querySelectorAll(".stagebox").forEach(b=>b.style.setProperty("--k",String(b.clientWidth/(+b.dataset.w))));
+  document.querySelectorAll("[data-zoom]").forEach(b=>{const z=b.querySelector(".zin");z.style.transform="none";const w=z.offsetWidth,h=z.offsetHeight,k=Math.min(+b.dataset.zoom,(b.clientWidth-30)/w);z.style.transform=`scale(${k})`;b.style.height=Math.ceil(h*k)+"px";});}
+function fit(){scale();anims.forEach(fitA);sheets.forEach(fitS);}
+try{new ResizeObserver(()=>requestAnimationFrame(fit)).observe(document.body);}catch(e){}
+document.querySelectorAll("[data-fx]").forEach(b=>b.addEventListener("click",()=>{SND.unlock();setTimeout(()=>SND.play(b.dataset.fx),30);}));
+document.querySelectorAll("[data-amb]").forEach(b=>b.addEventListener("click",()=>{SND.unlock();const lv=b.dataset.amb,was=SND.ambLv===lv;document.querySelectorAll("[data-amb]").forEach(x=>x.setAttribute("aria-pressed","false"));
+  if(was)SND.stopAmb();else{setTimeout(()=>SND.ambient(lv),30);b.setAttribute("aria-pressed","true");}}));
+function frame(n){const dt=last?Math.min(0.05,(n-last)/1000):0;last=n;if(!RM)t+=dt;
+  for(const it of anims){if(!it.fn)continue;try{it.fn(it.cv,t,it.cv.dataset.lv||"night",12,it.K,it.cv.dataset.arg);}catch(e){console.error(e);}}
+  try{HUD.tick(t,"night",anims,true);}catch(e){console.error(e);}
+  {const u=t%5,n=(u>=1?1:0)+(u>=1.5?1:0);document.querySelectorAll("[data-win-score]").forEach(e=>{const v=String(1166+10*n);if(e.textContent!==v)e.textContent=v;});document.querySelectorAll("[data-win-plus]").forEach(e=>{const v="+"+10*n;if(e.textContent!==v)e.textContent=v;});}
+  requestAnimationFrame(frame);}
+window.__go=s=>{t=s;return "ok";};
+const go=()=>{fit();requestAnimationFrame(frame);};
+if(document.fonts&&document.fonts.load){Promise.all([document.fonts.load('12px "Alegreya Sans"'),document.fonts.load('700 12px "Alegreya Sans"'),document.fonts.load('24px "IM Fell English"')]).catch(()=>{}).then(go);}else go();
+})();
+</script>
+</body>
+</html>

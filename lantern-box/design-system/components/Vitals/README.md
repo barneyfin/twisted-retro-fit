@@ -26,3 +26,6 @@ Add `is-phone` for 206px wide.
 
 ## Version 8
 - Grown into three rows (`lb-vitals is-full`): health with three armour slots continuing its line, mana, a lantern per life, and the spell's socket at the right. See HUD for the whole plaque, its moments and its rules.
+
+## Version 11
+- The two potion sockets sit 8px under the plaque's left end, each potion under its own bar (the heart above the health potion, the flame above the mana potion). The plaque itself is unchanged. See Potions.

@@ -1,4 +1,4 @@
-/* Lantern Box: the World's drawing code, design system version 10 (4 November 2026).
+/* Lantern Box: the World's drawing code, design system version 11 (5 November 2026).
    Everything from "helpers" to "the sample strip" below is the drawing code of the signed-off look, the Gloam Hallow
    directions page at round 12 (1 November 2026), with the places' changes of versions 2 to 5 (made in Claude Code and
    chosen by Barney: among them each place's lift, the layer tints, the moor's stone circles and backdrop doors ending at
@@ -20,6 +20,10 @@
    behind them, backdrop layers 1 and 2 and the far bat swarm are ink mixed towards the cloud's own colour, by THRU_CLOUD of
    their tint, instead of towards the air, so they read a step darker than the cloud rather than lighter (Scene.render,
    cloudFoot). Only the clouds' band is composited.
+   Version 11 (5 November 2026, round 13, agreed by Barney): a far silhouette only partly in front of a cloud was two-toned, dark above the
+   cloud's edge and pale below. Now the change has a soft edge (the clouds' band is drawn from blurred copies of the clouds, made once:
+   CLOUD_SOFT, blurCopy) and the far layers go only FAR_THRU (0.55) of the way to version 10's darker colour, so a tower reads as one tower,
+   a little darker where a cloud is behind it. The bat swarm stays fully lit through the cloud, with the same soft edge.
    Only the page's own controls are left out. It draws the mock-up way: every layer redrawn every frame. Games draw the same
    shapes the kit's way (layers painted once in tiles and slid, poses painted once per puppet step), as the speed test proved.
    The door at the bottom (LanternBox.world) chooses the approved settings and names the parts. */
@@ -798,7 +802,7 @@ class Scene{
     const key=Math.round(W)+"@"+s.toFixed(3)+lv;
     if(this.cache.key===key)return;
     this.cache={key};const cs=Math.min(s,1.25),L=LV[lv];
-    if(lv!=="mist"){this.cache.cl0=renderCutClouds(W*2,cs,lv,0,hsh(91,1));this.cache.cl1=renderCutClouds(W*2,cs,lv,1,hsh(91,2));this.cache.clB=cloudFoot([this.cache.cl0,this.cache.cl1],cs);} /* version 10: clB */
+    if(lv!=="mist"){this.cache.cl0=renderCutClouds(W*2,cs,lv,0,hsh(91,1));this.cache.cl1=renderCutClouds(W*2,cs,lv,1,hsh(91,2));this.cache.clB=cloudFoot([this.cache.cl0,this.cache.cl1],cs);this.cache.cl0b=blurCopy(this.cache.cl0,CLOUD_SOFT*cs);this.cache.cl1b=blurCopy(this.cache.cl1,CLOUD_SOFT*cs); /* version 11 */} /* version 10: clB */
     if(L.light!=="sun")this.cache.moon=this.ver===3?moonSprite(Math.min(2,s),lv==="storm"):moonSprite4(Math.min(2,s),lv);
     if(L.mist)this.cache.mist=L.mist.bands.map((b,i)=>renderMist(W*2,cs,L.mist.col,hsh(93,i,lv.length)));
   }
@@ -822,15 +826,15 @@ class Scene{
     /* version 10: the clouds are also drawn into CF, a picture of the clouds' band (the top of the picture down to the clouds'
        foot); thr(paint, mix) then paints a part into OV, keeps it only where a cloud is (source-in), takes it from the cloud's
        colour towards ink (source-atop) and lays it over the part already drawn: lit through the cloud */
-    const cbH=this.cache.clB?Math.min(ctx.canvas.height,Math.ceil(this.cache.clB*s)+2):0,CF=cbH?(this._cf=fitCanvas(this._cf,ctx.canvas.width,cbH)):null,cf=CF&&CF.getContext("2d");
+    const cbH=this.cache.clB?Math.min(ctx.canvas.height,Math.ceil((this.cache.clB+CLOUD_SOFT*2)*s)+2):0,CF=cbH?(this._cf=fitCanvas(this._cf,ctx.canvas.width,cbH)):null,cf=CF&&CF.getContext("2d");
     if(cf){cf.setTransform(1,0,0,1,0,0);cf.clearRect(0,0,CF.width,CF.height);}
     if(this.cache.cl0)for(const d of [0,1]){const cv=this.cache["cl"+d],sp=(d?11:5)*(rm?0.4:1),k=d?0.06:0.03,ox=posmod(t*sp+camX*k,W2);at(k);ctx.drawImage(cv,-ox,0,W2,LH);ctx.drawImage(cv,-ox+W2,0,W2,LH);
-      if(cf){cf.setTransform(ctx.getTransform());cf.drawImage(cv,-ox,0,W2,LH);cf.drawImage(cv,-ox+W2,0,W2,LH);}}
-    const thr=(paint,mix)=>{if(!cf)return;const OV=this._ov=fitCanvas(this._ov,CF.width,CF.height),v=OV.getContext("2d");
+      if(cf){const cb=this.cache["cl"+d+"b"];cf.setTransform(ctx.getTransform());for(let n=0;n<2;n++){cf.drawImage(cb,-ox,0,W2,LH);cf.drawImage(cb,-ox+W2,0,W2,LH);}} /* version 11: the blurred copies, twice, so a thin tail still darkens */}
+    const thr=(paint,mix,al)=>{if(!cf)return;const OV=this._ov=fitCanvas(this._ov,CF.width,CF.height),v=OV.getContext("2d");
       v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-over";v.globalAlpha=1;v.clearRect(0,0,OV.width,OV.height);paint(v);
       v.setTransform(1,0,0,1,0,0);v.globalCompositeOperation="source-in";v.drawImage(CF,0,0);
       v.globalCompositeOperation="source-atop";v.globalAlpha=1-mix;v.fillStyle=INK;v.fillRect(0,0,OV.width,OV.height);v.globalAlpha=1;v.globalCompositeOperation="source-over";
-      ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(OV,0,0);ctx.restore();};
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);if(al!=null)ctx.globalAlpha=al;ctx.drawImage(OV,0,0);ctx.restore();};
     at(0);
     if(lv==="storm"){
       const st=lightning(t);
@@ -840,9 +844,9 @@ class Scene{
     mb(0);
     if(this.ver>=5&&L.light==="sun"){at(0.05);drawFarRanges(ctx,W,camX,rm,lv);}
     const f=k=>rm?k*0.4:k;
-    at(0.12);this.layer(ctx,off,s,W,t,camX*f(0.12),1,tn[0],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[0]*THRU_CLOUD);} /* version 10 */mb(1);
+    at(0.12);this.layer(ctx,off,s,W,t,camX*f(0.12),1,tn[0],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[0]*THRU_CLOUD,FAR_THRU);} /* version 10 */mb(1);
     if(lv==="storm"){at(1);drawRain(ctx,W,t,0,rm);}
-    at(0.28);this.layer(ctx,off,s,W,t,camX*f(0.28),2,tn[1],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[1]*THRU_CLOUD);} /* version 10 */mb(2);
+    at(0.28);this.layer(ctx,off,s,W,t,camX*f(0.28),2,tn[1],o);{const ty=ctx.getTransform().f;thr(v=>{v.setTransform(1,0,0,1,0,ty);v.drawImage(off,0,0);},tn[1]*THRU_CLOUD,FAR_THRU);} /* version 10 */mb(2);
     if(L.light==="sun"){at(0);drawRays(ctx,W,t,rm);}
     at(0.34);
     if(L.fly==="bats"){drawSwarm(ctx,W,t,camX*f(0.34),rm,mixc(INK,AIR[lv],tn[1]*0.9));{const M=ctx.getTransform();thr(v=>{v.setTransform(M);drawSwarm(v,W,t,camX*f(0.34),rm,INK);},tn[1]*0.9*THRU_CLOUD);}} /* version 10 */
@@ -1293,7 +1297,12 @@ function streakPts(r,w,h){ // a long lens of cloud: a wavering top, a flatter to
 function streakPath(x,pts,X,Y){x.beginPath();pts.forEach((p,i)=>i?x.lineTo(X+p[0],Y+p[1]):x.moveTo(X+p[0],Y+p[1]));x.closePath();}
 /* version 10: lit through a cloud. THRU_CLOUD is the share of a part's tint used when it is mixed towards the cloud behind it
    (token thru-cloud); cloudFoot finds, once, the lowest line any cloud reaches; fitCanvas keeps an offscreen picture sized */
-const THRU_CLOUD=0.75;
+const THRU_CLOUD=0.75,CLOUD_SOFT=9,FAR_THRU=0.55; /* version 11: the soft edge's blur in picture lines, the far layers' share (tokens thru-cloud-soft, thru-cloud-far) */
+function blurCopy(c,r){const b=mk(c.width,c.height),x=b.getContext("2d");
+  if(typeof x.filter==="string"){x.filter="blur("+r+"px)";x.drawImage(c,0,0);x.filter="none";return b;}
+  // no canvas filter (older Safari): a softer copy by shrinking it and growing it again
+  const k=Math.max(2,Math.round(r)),s=mk(Math.max(1,Math.ceil(c.width/k)),Math.max(1,Math.ceil(c.height/k))),sx=s.getContext("2d");sx.imageSmoothingEnabled=true;sx.imageSmoothingQuality="high";sx.drawImage(c,0,0,s.width,s.height);
+  x.imageSmoothingEnabled=true;x.imageSmoothingQuality="high";x.drawImage(s,0,0,b.width,b.height);return b;}
 function cloudFoot(cvs,cs){let foot=0;for(const c of cvs){const x=c.getContext("2d"),w=c.width;
     for(let r=c.height-1;r>=0;r-=2){const d=x.getImageData(0,r,w,1).data;let hit=false;for(let i=3;i<d.length;i+=16)if(d[i]>6){hit=true;break;}
       if(hit){foot=Math.max(foot,(r+3)/cs);break;}}}
@@ -2436,7 +2445,7 @@ function splash(ctx, place, X, Y, t, rm, seed) { // the place's splash of colour
   drawSplash(ctx, PLACE_SET[place] || "village5", "on", X, Y, t || 0, !!rm, seed || 0, "green", "intense");
 }
 return {
-  version: "10.0.0",
+  version: "11.0.0",
   world: {
     LH: LH, GROUND: gY, PLACES: ["night", "storm", "dawn", "mist"], places: LV, bossNames: BOSS_NAME,
     pal: { INK: INK, SKY: SKY, AIR: AIR, HAZE: HAZE, MOON: MOON, MOONPAL: MOONPAL, CLOUD_PAL: CLOUD_PAL, EMBER: EMBER, WITCH: WITCH,
@@ -2452,7 +2461,7 @@ return {
       drawStumpProp: drawStumpProp, drawFerns: drawFerns, drawLog: drawLog,
       drawCandle: drawCandle, drawWallLamp: drawWallLamp, drawStreetLamp: drawStreetLamp, drawPost: drawPost, drawShrine: drawShrine,
       drawPotion: drawPotion, drawFairy: drawFairy,
-      drawBat: drawBat, drawCrow: drawCrow, THRU_CLOUD: THRU_CLOUD, cloudFoot: cloudFoot, crowSide: crowSide, drawCrowFlocks: drawCrowFlocks, drawCrowsAlone: drawCrowsAlone, drawLeaves: drawLeaves, leafShape: leafShape, drawSwarm: drawSwarm, drawBigBats: drawBigBats, drawCrows: drawCrows,
+      drawBat: drawBat, drawCrow: drawCrow, THRU_CLOUD: THRU_CLOUD, CLOUD_SOFT: CLOUD_SOFT, FAR_THRU: FAR_THRU, cloudFoot: cloudFoot, blurCopy: blurCopy, crowSide: crowSide, drawCrowFlocks: drawCrowFlocks, drawCrowsAlone: drawCrowsAlone, drawLeaves: drawLeaves, leafShape: leafShape, drawSwarm: drawSwarm, drawBigBats: drawBigBats, drawCrows: drawCrows,
       drawMoon: drawMoon, moonSprite4: moonSprite4, drawStars: drawStars, drawDaybreak: drawDaybreak, drawSetMoon: drawSetMoon,
       drawSun: drawSun, drawRays: drawRays, drawRain: drawRain, drawBolt: drawBolt, lightning: lightning,
       renderCutClouds: renderCutClouds, renderMist: renderMist,

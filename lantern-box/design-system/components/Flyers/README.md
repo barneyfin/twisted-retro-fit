@@ -27,3 +27,6 @@ p.drawBat(ctx, X, Y, scale, wingPhase, colour);   p.drawCrow(ctx, X, Y, scale, w
 
 ## Version 10
 - The far bat swarm, where it crosses in front of a cloud, takes the cloud's own colour a step darker (lit through the cloud: see Places), so the bats read as dark shapes in front of Night's violet clouds instead of copper ones. Elsewhere they are unchanged. The big near bats, the crows and the leaves are unchanged.
+
+## Version 11
+- The far bat swarm in front of a cloud keeps version 10's full darkening, now with the soft edge the far layers have (see Places).
