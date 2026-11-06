@@ -4,7 +4,8 @@ Written 6 November 2026, from the repo as it stands (kit 0.9.1, the first playab
 - the SDK game module (the mute setting, focus loss, loading events);
 - the FAQ on AI tools;
 - the kit's own code, which already has three of the build items;
-- the PRD's answer on the soundtracks and its twelve questions.
+- the PRD's answer on the soundtracks and its twelve questions;
+- a second check of the SDK docs (local testing, the environment check, the loading events, the mute setting) and of the AI tools wording.
 
 This is the repo copy. Barney's own copy, in his Claude app project, also has his personal admin; this one leaves it out because the repo is public.
 
@@ -77,7 +78,7 @@ These come first because the design and code depend on them. Each is a numbered 
     - keep each track's creation date, prompts and the account used, plus a saved copy of Google's terms as of that day;
     - regenerate any track whose prompt named a real artist, song or film score;
     - optionally, play each to Shazam to check it matches no known recording.
-- [ ] **AI tools.** CrazyGames' FAQ welcomes games made with AI tools, for code, art, sound and music, with no extra conditions. The tests are the same as for any game: originality and distribution rights (below and above).
+- [ ] **AI tools.** CrazyGames' FAQ describes using AI tools for code, art, sound and music as normal practice and sets no conditions there. The developer terms (section 7) are the place to check. The tests for any game still apply: originality and distribution rights (below and above).
 - [ ] The two Pixabay sound effects: the licence allows use in a game (checked 4 November 2026). Keep the source notes beside the kit.
 - [ ] Fonts: IM Fell English and Alegreya Sans are SIL Open Font Licence, fine for commercial use, with licences in the kit.
 - [ ] PEGI 12: fantasy combat with no blood (already an arcade rule); text only for anything grim.
@@ -118,17 +119,18 @@ A separate PRD when it happens, since the ad placements change the run's end. Th
 
 ### The SDK and its events (C)
 - [ ] The CrazyGames SDK (HTML5 v3, one script tag) in the CrazyGames build only. The arcade build stays offline and ad-free. The game must still run if the script is blocked.
+- [ ] The game checks `window.CrazyGames.SDK.environment` and calls the SDK only when it is `local` or `crazygames`. Anywhere else every SDK call throws an error.
 - [ ] `gameplayStart` whenever play begins or carries on: a new run, a resume, after a lost life, each new place.
 - [ ] `gameplayStop` at every break: the player's pause, menus, place cards, the run's end.
 - [ ] Never `gameplayStop` when the window loses focus or the tab is hidden: CrazyGames handles that itself. The kit pauses play by itself at those moments (`lantern-box/kit/lantern-box.js`, the `blur` and `visibilitychange` listeners), so that automatic pause must not send it.
 - [ ] CrazyGames' mute setting (`muteAudio`), required for an HTML5 game:
     - the game is silent while it is on;
-    - it listens for changes during play;
-    - it comes before the game's own sound settings, so Volume can't turn the sound back on.
-- [ ] The loading events around the first load. One CrazyGames page says they have to be called and another marks them optional; they cost little, so add them.
+    - it takes priority over the game's own sound settings, so Volume can't turn the sound back on;
+    - optionally, the game listens for changes during play.
+- [ ] The loading events around the first load: the SDK game module page says they have to be called (Unity and Godot excepted).
 - [ ] Optional: `happytime` for a rare celebration, such as a boss defeated or the win. CrazyGames asks for it to be used sparingly, and not for every level or item.
 - [ ] The initial download is then measured up to the first `gameplayStart`; keep it at or under 20 MB for the mobile homepage.
-- [ ] Tested here before any upload: the SDK runs in a local test mode on `localhost` (or with `?useLocalSdk=true`), with demo ads, so the pausing, muting and ad breaks can be checked in the browser.
+- [ ] Tested here before any upload, in the SDK's local mode on `localhost` (or with `?useLocalSdk=true`). There are no demo ads: each ad is replaced by an overlay text, and the other SDK events are logged to the console. `?muteAudio=true` forces the mute setting on. So the pausing, muting and ad breaks can be checked in the browser.
 
 ### Gameplay (D and C)
 - [ ] New players land in gameplay. CrazyGames' wording is "immediately", with at most one click "if this is not feasible". The title's Start game would be that one click, and QA decides whether it is accepted. Either way, nothing else may come before play for a first-time player.
@@ -160,7 +162,7 @@ A separate PRD when it happens, since the ad placements change the run's end. Th
 - [ ] Hands-on SDK and ad-placement advice from CrazyGames starts at 50,000 combined plays.
 
 ## Sources
-- CrazyGames docs, read 6 November 2026: [Introduction](https://docs.crazygames.com) · [Requirements](https://docs.crazygames.com/requirements/intro/) · [Technical](https://docs.crazygames.com/requirements/technical/) · [Gameplay](https://docs.crazygames.com/requirements/gameplay/) · [Advertisement](https://docs.crazygames.com/requirements/ads/) · [Account integration](https://docs.crazygames.com/requirements/account-integration/) · [Game covers](https://docs.crazygames.com/requirements/game-covers/) · [Quality guidelines](https://docs.crazygames.com/requirements/quality/) · [Basic Launch guide](https://docs.crazygames.com/resources/basic-launch-metrics/) · [FAQ](https://docs.crazygames.com/faq/) · [HTML5 v3 SDK](https://docs.crazygames.com/sdk/html5-v3/intro)
-- Added later the same day: [SDK game module](https://docs.crazygames.com/sdk/game/) (the gameplay events, the mute setting, loading events, happytime) · [FAQ: Do I need to learn to code to make web games?](https://docs.crazygames.com/faq/#do-i-need-to-learn-to-code-to-make-web-games) (AI tools)
+- CrazyGames docs, read 6 November 2026: [Introduction](https://docs.crazygames.com) · [Requirements](https://docs.crazygames.com/requirements/intro/) · [Technical](https://docs.crazygames.com/requirements/technical/) · [Gameplay](https://docs.crazygames.com/requirements/gameplay/) · [Advertisement](https://docs.crazygames.com/requirements/ads/) · [Account integration](https://docs.crazygames.com/requirements/account-integration/) · [Game covers](https://docs.crazygames.com/requirements/game-covers/) · [Quality guidelines](https://docs.crazygames.com/requirements/quality/) · [Basic Launch guide](https://docs.crazygames.com/resources/basic-launch-metrics/) · [FAQ](https://docs.crazygames.com/faq/) · [HTML5 v3 SDK](https://docs.crazygames.com/sdk/intro/)
+- Added later the same day: [SDK game module](https://docs.crazygames.com/sdk/game/) (the gameplay events, the mute setting, loading events, happytime) · [FAQ: Do I need to learn to code to make web games?](https://docs.crazygames.com/faq/#do-i-need-to-learn-to-code-to-make-web-games) (AI tools) · [HTML5 v3 SDK intro](https://docs.crazygames.com/sdk/intro/) (its Development section: local testing and the environment check)
 - The repo: `lantern-box/HANDOVER.md` (4d to kit 0.9.1), `lantern-box/GAMEPLAY-gloam-hallow.md`, `ARCADE.md`, `dist/gloam-hallow.html` (11.3 MB), `lantern-box/kit/lantern-box.js` and `lantern-box.css` (storage, iPhone sound, text selection, the automatic pause).
 - Alongside it: *Gloam Hallow: portal readiness PRD* and *Twisted Retro Fit: changes for portals and the wisp shop* (both updated the same evening to match).
