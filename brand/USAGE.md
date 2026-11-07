@@ -56,7 +56,7 @@ These are Lantern Box design system tokens (version 11).
 
 ## On CrazyGames
 - **Not on the game covers.** CrazyGames covers carry the game's name only, with no icons or logos (checklist, section 6).
-- **In the game's credits:** still to decide. The arcade rules allow no image files and no hex colours in a game, so `lbg-credit.svg` can't be built in as it stands (ARCADE.md, open decisions). Whatever form the credit takes, the music credit "Music made with Google Gemini" stays on a line of its own; the studio credit doesn't replace it.
+- **In the game's credits:** `lbg-credit.svg`, built into every game, whichever kit it uses: the one exception to the arcade rules on image files and hex colours (ARCADE.md, decided 7 November 2026). The music credit "Music made with Google Gemini" stays on a line of its own; the studio credit doesn't replace it.
 
 ## Where the files live
 `brand\` at the root of the Retro Games repo (decided 7 November 2026). It sits at the root, beside ARCADE.md, because the studio covers games from every kit.

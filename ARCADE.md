@@ -22,11 +22,11 @@ Retro Kit's split between World (the playfield) and Interface (glass panels arou
 
 ## Arcade rules (every kit, every game)
 
-- Every game is one self-contained HTML file that works offline. The kit, fonts and code are copied in. No network requests, no outside libraries and no image files. The only extras allowed are a soundtrack MP3 that Barney supplies, built into the file (a City Nights or Lantern Box game may have two), and short sound effects that Barney supplies from a royalty-free library, built into the file, with their source and licence noted beside the kit, under 100 KB in all (Barney, 2026-11-04). A soundtrack comes with the right to distribute it commercially, from a licence or from the terms of the tool that made it, noted beside the game; music made with AI is credited as such. A portal build (a game's copy for a site such as CrazyGames) may also load that portal's own SDK from the portal's address, and nothing else, and must still play if it fails to load (Barney, 2026-11-07).
+- Every game is one self-contained HTML file that works offline. The kit, fonts and code are copied in. No network requests, no outside libraries and no image files. The only extras allowed are a soundtrack MP3 that Barney supplies, built into the file (a City Nights or Lantern Box game may have two), and short sound effects that Barney supplies from a royalty-free library, built into the file, with their source and licence noted beside the kit, under 100 KB in all (Barney, 2026-11-04). A soundtrack comes with the right to distribute it commercially, from a licence or from the terms of the tool that made it, noted beside the game; music made with AI is credited as such. A portal build (a game's copy for a site such as CrazyGames) may also load that portal's own SDK from the portal's address, and nothing else, and must still play if it fails to load (Barney, 2026-11-07). Every game also carries the studio credit, the same outlined Lantern Box Games credit from `brand/`, built in like a soundtrack (Barney, 2026-11-07).
 - Controls are desktop keyboard and phone touch (phone held sideways). No gamepad. Players are adults and teens, and every game stays within PEGI 12 (Barney, 2026-11-07).
 - Names and art are invented. Mechanics may be borrowed from classic games; titles, characters, logos, music and recognisable looks may not. If a design starts to resemble a famous character, change it.
 - Each kit has its own identity. It must not look like another kit in the arcade, nor like a style that is everywhere today.
-- Games use their kit and never edit it. Colours come only from the kit's named colours (no hex values in games). Changing a kit is its own job, done only when Barney asks. Afterwards, rebuild every game in that kit and check its test page.
+- Games use their kit and never edit it. Colours come only from the kit's named colours (no hex values in games, apart from the studio credit from `brand/`). Changing a kit is its own job, done only when Barney asks. Afterwards, rebuild every game in that kit and check its test page.
 - Saved progress and shops: any game may save progress from run to run and have a shop of permanent unlocks, bought only with currency earned by playing. Never real money, random rewards, waiting timers, streaks that punish a missed day, or anything only an ad can get. Score tables and speed runs use a fixed loadout, so upgrades can't buy a better score, unless Barney decides otherwise for a game (Barney, 2026-11-07).
 - Ads only in a portal build, only through that portal's SDK, only at natural breaks, and the game plays the same with ads blocked. The arcade build never has ads (Barney, 2026-11-07).
 - Safety and accessibility:
@@ -50,7 +50,7 @@ Retro Kit's split between World (the playfield) and Interface (glass panels arou
 
 These are Barney's to decide. Raise them when they become relevant; don't settle them alone.
 
-- **The studio credit inside games** (raised 2026-11-07): every game goes out as Lantern Box Games, but these rules allow no image files and no hex colours in a game, so the logo in `brand/` can't be built in as it stands. Either each kit draws the credit with its own fonts and colours, or one exception lets every game carry the same outlined credit from `brand/`.
+None are open at the moment.
 
 ## Decided
 
@@ -62,5 +62,6 @@ These are Barney's to decide. Raise them when they become relevant; don't settle
 - **Settings and high scores**: settings are shared across the whole arcade; high scores are kept per game, in Retro Kit's format, so the website shows every game's best (Barney, 2026-10-28).
 - **Soundtracks**: a City Nights game may have two soundtrack MP3s instead of one, switched as the street changes district. Each adds about 5.5 MB to the game's file (Barney, 2026-10-29). A Lantern Box game may also have two, switched as its gameplay decides (Barney, 2026-11-01).
 - **The studio**: every game in the arcade goes out as Lantern Box Games, whichever kit it's built on. Its logo and usage note are in `brand/` (Barney, 2026-11-07).
+- **The studio credit**: one exception to these rules, so every game carries the same credit from `brand/` rather than each kit drawing its own (Barney, 2026-11-07).
 - **Portal layer**: built in Lantern Box first and proven by Gloam Hallow's Basic Launch, then the first piece of the shared core (Barney, 2026-11-07).
 - **Poki**: not for now. Its default deal is web-exclusive for five years, which clashes with the arcade website and CrazyGames (Barney, 2026-11-07).
