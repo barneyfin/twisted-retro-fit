@@ -1,4 +1,4 @@
-/* Lantern Box 0.15 — runtime
+/* Lantern Box 0.16 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.15.0';
+  const VERSION = '0.16.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -63,7 +63,7 @@
     fullscreen: SVG24('<path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15"/>'),
     fullscreenExit: SVG24('<path d="M9 4 V9 H4 M15 4 V9 H20 M15 20 V15 H20 M9 20 V15 H4"/>'),
     pause: SVG24('<path d="M9 5 V19 M15 5 V19"/>'),
-    scores: SVG24('<path d="M3 20 H21 M4 20 V14 H9 V20 M9 20 V8 H15 V20 M15 20 V11 H20 V20"/>'),   // kit 0.10.2: High scores' arch tile, a podium (a stand-in until the design system draws it)
+    scores: SVG24('<path d="M6.5 21 V13.2 A5.5 5.5 0 0 1 17.5 13.2 V21"/><path d="M4.5 21 H19.5"/><path d="M9.6 14 H14.4 M9.6 17.4 H14.4"/><path d="M8.6 6.4 L8.7 2.3 L12 4.8 L15.3 2.3 L15.4 6.4 Z"/>'),   // kit 0.16.0: High scores' arch tile, version 13's crowned headstone (ArchTile)
     heart: (s) => '<svg width="' + s + '" height="' + (s - 1) + '" viewBox="0 0 14 13" aria-hidden="true"><path d="M7 12.5 C2 9 0 6.5 0 4 A3.6 3.6 0 0 1 7 2.4 A3.6 3.6 0 0 1 14 4 C14 6.5 12 9 7 12.5 Z"/></svg>',
     flame: (s) => '<svg width="' + s + '" height="' + s + '" viewBox="0 0 12 18" aria-hidden="true"><path d="M6 1 C9 6 11 8 11 12 A5 5 0 0 1 1 12 C1 8 3 6 6 1 Z"/></svg>',
     chevUp: '<svg class="lb-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11 L8 5 L13 11"/></svg>',
@@ -220,8 +220,11 @@ function bell(o){const f=o.f||220,P=o.partials||[[1,1,1],[2.0,0.5,0.7],[2.76,0.4
 // version 12: the wisp's rising note as a short echo: the note (660 to 990 Hz, a boss's golden wisp a fifth lower), then two to four
 // repeats 0.16 s apart, each half as loud, darker and further into the room; louder and longer the more echo it gives (1, 2, 5, 25).
 // Starting levels, to measure at step 5d as the rest were.
+// version 13: at its own level, louder than the card tear (ECHO_VOL; the kit's version 12 echo was too quiet to hear), and in a defeat it
+// starts as the tear ends (0.28 s). Starting figures.
+const ECHO_VOL=0.2;
 function ECHO(v,at){v=Math.max(1,v||1);const s=0.75*(1+0.2*Math.log2(v)),n=v>=25?4:v>=5?3:2,f=v>=25?440:660,lp=[5000,2600,1600,1000,700];
-  for(let i=0;i<=n;i++)tone({f,to:f*1.5,glide:0.32,dur:0.4,a:0.03,vol:0.09*s*Math.pow(0.5,i),vib:[5,6],lp:lp[i],wet:0.5+0.1*i,at:(at||0)+i*0.16});}
+  for(let i=0;i<=n;i++)tone({f,to:f*1.5,glide:0.32,dur:0.4,a:0.03,vol:ECHO_VOL*s*Math.pow(0.5,i),vib:[5,6],lp:lp[i],wet:0.5+0.1*i,at:(at||0)+i*0.16});}
 function DRINK(ch){noise({ft:"bandpass",from:1900,to:1100,q:3,dur:0.035,vol:0.22,wet:0.1});
   tone({f:190,to:125,dur:0.09,lp:700,vol:0.16,wet:0.05,at:0.07});tone({f:165,to:110,dur:0.08,lp:700,vol:0.12,wet:0.05,at:0.18});
   ch.forEach((f,i)=>tone({f,dur:0.55-i*0.08,a:0.1,vol:0.06,wet:0.6,at:0.27+i*0.05}));}
@@ -238,9 +241,8 @@ const FX={
   crack:()=>{ring({f:620,vol:0.12,wet:0.4,partials:[[1,1,0.5],[1.63,0.8,0.38],[2.37,0.7,0.3],[3.12,0.5,0.22],[4.05,0.4,0.16],[5.3,0.3,0.12]]});noise({ft:"bandpass",from:3200,q:1.5,dur:0.14,tear:90,vol:0.3,wet:0.25});noise({ft:"highpass",from:3000,dur:0.03,vol:0.3,wet:0.2});
     for(let i=0;i<3;i++)tone({type:"triangle",f:3000+R()*2000,dur:0.03,vol:0.05,at:0.08+i*0.07,wet:0.4});},
   // a monster defeated: the card tearing, then its wisp's echo (version 12: the rising note became a short echo; v is the echo it gives)
-  // kit 0.10.1 (Barney, 7 November 2026): the echo at its own level (GAIN.echo), the tear at defeat's, so the echo can stand out over
-  // the tear as the old rising note did; the notes are play.js 1.2.0's, unchanged
-  defeat:v=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});const g=curGain;curGain=GAIN.echo;try{ECHO(v||1,0.18);}finally{curGain=g;}},
+  // kit 0.16.0 (play.js 1.3.0): the echo at its own level (ECHO_VOL) after the tear, in place of kit 0.10.1's GAIN.echo under it
+  defeat:v=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});ECHO(v||1,0.28);},   // version 13: after the tear
   // version 12: the echo alone, as a boss's golden wisp rises (25), after bossDefeated's bell
   echo:v=>ECHO(v||25,0),
   pickup:()=>{tone({f:1320,dur:0.12,vol:0.14,wet:0.5});tone({f:1760,dur:0.3,vol:0.12,wet:0.6,at:0.07});tone({f:2640,dur:0.25,vol:0.03,wet:0.7,at:0.12});},
@@ -266,11 +268,26 @@ const FX={
   win:()=>{bell({f:196,dur:4,vol:0.16});bell({f:247,dur:4,vol:0.12,at:0.7});bell({f:294,dur:4.5,vol:0.12,at:1.4});tone({f:392,dur:3,a:1.2,vol:0.05,wet:0.8,at:1.4});},
   select:()=>tone({type:"triangle",f:620,dur:0.05,lp:2000,vol:0.15,wet:0.15}),
   confirm:()=>bell({f:523,dur:0.6,vol:0.1,partials:[[1,1,1],[2,0.3,0.5]]}),
+  // version 13: the run's end's own tone, as its plaque appears (0.8 s after the last life falls): one low, muted toll
+  gameOver:()=>{bell({f:110,dur:3.2,vol:0.2,wet:0.6,partials:[[1,1,1],[2.0,0.22,0.5],[2.76,0.12,0.35]]});noise({from:260,to:90,dur:0.35,a:0.01,vol:0.12,wet:0.3});},
+  // version 13: the lightning bolt: a sharp crack, a buzzing zap as it strikes, and a smaller crack as it forks (0.06 s later)
+  bolt:()=>{noise({ft:"highpass",from:3500,dur:0.04,vol:0.34,wet:0.3});tone({type:"sawtooth",f:180,to:90,dur:0.22,a:0.003,lp:2600,vib:[55,40],vol:0.13,wet:0.3});
+    noise({ft:"bandpass",from:4200,to:1800,q:2,dur:0.2,tear:60,vol:0.22,wet:0.35});noise({ft:"highpass",from:3000,dur:0.03,vol:0.22,wet:0.3,at:0.06});
+    tone({type:"sawtooth",f:150,to:80,dur:0.16,a:0.003,lp:2200,vib:[60,35],vol:0.08,wet:0.35,at:0.06});},
+  // version 13: the acid spray: a wet hissing spray, then its patch's quiet bubbling hiss (acidHiss, the patch's 1.5 s)
+  acid:()=>{noise({ft:"bandpass",from:2800,to:1300,q:1.1,dur:0.38,a:0.02,tear:22,vol:0.36,wet:0.2});noise({from:600,to:300,dur:0.3,a:0.02,vol:0.16,wet:0.15});
+    for(let i=0;i<6;i++)tone({type:"triangle",f:700+R()*900,to:300,dur:0.05,vol:0.04,at:0.08+R()*0.3,wet:0.2});},
+  acidHiss:()=>{noise({ft:"highpass",from:2400,to:3200,dur:1.5,a:0.1,vol:0.07,wet:0.3});for(let i=0;i<12;i++)tone({type:"sine",f:300+R()*500,to:900+R()*400,glide:0.05,dur:0.05,vol:0.035,at:0.1+R()*1.3,wet:0.35});},
+  // version 13: a hit Lantern Ward ignores: a glassy chime, bright and short, as the lantern flares
+  ward:()=>{bell({f:1568,dur:0.9,vol:0.1,wet:0.6,partials:[[1,1,1],[2.4,0.4,0.5],[3.9,0.2,0.3]]});tone({f:2093,dur:0.5,a:0.01,vol:0.04,wet:0.7,at:0.04});},
   back:()=>tone({type:"triangle",f:440,to:330,dur:0.09,lp:1800,vol:0.15,wet:0.15}),
 };
 // each effect's level, set by measuring how loud it sounds (K-weighted, its loudest 0.4 s) against a target for its kind:
+// kit 0.16.0: play.js 1.3.0's gameOver, acidHiss and echo as given; bolt, acid and ward measured by this measure (bolt and acid over twelve
+// random draws: the acid's tear varies by up to 8 dB) to stand as version 13 says: the bolt 0.7 dB under the fireball, the acid 1 dB over it,
+// the ward as loud as the plaque line (play.js's 3.5, 4.8 and 1.84 came out 3.3, 3.1 and 1 dB louder here)
 // the big moments loudest, the main actions next, light touches and the menus quieter. GAIN is filled from that measure.
-const GAIN={echo: 5.86,swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */ /* kit 0.10.1 (starting figures; Barney could hardly hear 0.10.0's echo under the tear): the tear back at the old defeat's level, and the echo, a defeat's and a boss's, at its own, measured K-weighted in 100 ms windows: its first note about 5 dB over the tear (-24 against -29), as the old rising note was; tune by ear */
+const GAIN={gameOver: 1.0,bolt: 2.21,acid: 3.77,acidHiss: 1.3,ward: 1.64,echo: 2.96,swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */ /* kit 0.10.1 (starting figures; Barney could hardly hear 0.10.0's echo under the tear): the tear back at the old defeat's level, and the echo, a defeat's and a boss's, at its own, measured K-weighted in 100 ms windows: its first note about 5 dB over the tear (-24 against -29), as the old rising note was; tune by ear */
 // ---- the places' background sound: wind, rain, thunder, bats, crows, creaking trees ----
 function loopNoise(ft,f,q,vol,lfoRate,lfoDepth){const s=ctx.createBufferSource();s.buffer=nb;s.loop=true;const fl=ctx.createBiquadFilter();fl.type=ft;fl.frequency.value=f;fl.Q.value=q;
   const g=ctx.createGain();g.gain.value=vol;s.connect(fl);fl.connect(g);g.connect(amb);s.start(0,R()*1.5);const nodes=[s];
@@ -3775,11 +3792,13 @@ function fxAcid(c,x,y,f,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||AC
     fxGlowAt(c,x+dx,y+dy,8*k,0.5*al,L.core);fxMote(c,x+dx,y+dy,2.1*k,al,i%3?L.lit:L.hot);}}
 // the patch it leaves on the ground from x0 to x1 at ground y: it hisses for 1.5 s (u 0 to 1), bubbles popping and wisps of steam rising,
 // hurting whatever walks through
-function fxAcidPatch(c,x0,x1,y,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,al=u<0.1?u/0.1:u>0.75?(1-u)/0.25:1,r=mvRng(33);
-  for(let x=x0;x<=x1;x+=12*k)fxGlowAt(c,x,y-2,14*k,0.5*al,L.core);
-  c.save();c.globalAlpha=0.9*al;c.fillStyle=L.core;c.beginPath();c.ellipse((x0+x1)/2,y,(x1-x0)/2,3*k,0,0,Math.PI*2);c.fill();c.restore();
-  for(let i=0;i<7;i++){const bx=x0+(x1-x0)*r(),ph=(u*4+r())%1,br=(1.2+ph*2.6)*k;c.save();c.globalAlpha=al*(1-ph);c.strokeStyle=L.lit;c.lineWidth=1*k;c.beginPath();c.arc(bx,y-2*k-ph*2.4*k,br,0,Math.PI*2);c.stroke();c.restore();}
-  for(let i=0;i<5;i++){const mx=x0+(x1-x0)*r(),ph=(u*3+r())%1;fxMote(c,mx,y-ph*20*k,(1.5-ph)*k,al*(1-ph)*0.85,L.lit);}}
+// version 13 (kit 0.16.0): gy(x), when given, is the ground's height at x, so the patch lies along a slope instead of flat across it
+function fxAcidPatch(c,x0,x1,y,k,u,look,gy){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,al=u<0.1?u/0.1:u>0.75?(1-u)/0.25:1,r=mvRng(33),Y=gy||(()=>y);
+  for(let x=x0;x<=x1;x+=12*k)fxGlowAt(c,x,Y(x)-2,14*k,0.5*al,L.core);
+  c.save();c.globalAlpha=0.9*al;c.fillStyle=L.core;c.beginPath();const n=16,th=x=>3*k*Math.sqrt(Math.max(0,1-Math.pow(2*(x-x0)/(x1-x0)-1,2)));
+  for(let i=0;i<=n;i++){const x=x0+(x1-x0)*i/n;c.lineTo(x,Y(x)-th(x));}for(let i=n;i>=0;i--){const x=x0+(x1-x0)*i/n;c.lineTo(x,Y(x)+th(x));}c.closePath();c.fill();c.restore();
+  for(let i=0;i<7;i++){const bx=x0+(x1-x0)*r(),ph=(u*4+r())%1,br=(1.2+ph*2.6)*k;c.save();c.globalAlpha=al*(1-ph);c.strokeStyle=L.lit;c.lineWidth=1*k;c.beginPath();c.arc(bx,Y(bx)-2*k-ph*2.4*k,br,0,Math.PI*2);c.stroke();c.restore();}
+  for(let i=0;i<5;i++){const mx=x0+(x1-x0)*r(),ph=(u*3+r())%1;fxMote(c,mx,Y(mx)-ph*20*k,(1.5-ph)*k,al*(1-ph)*0.85,L.lit);}}
 // the cast for both: the fireball's throw, then a longer rest so the acid's patch can be seen out
 
 const LOOT=[{k:"health",n:"health potion"},{k:"mana",n:"mana potion"},{k:"heal",n:"heal scroll"},{k:"fire",n:"fireball scroll"},{k:"bolt",n:"lightning bolt scroll"},{k:"acid",n:"acid spray scroll"},{k:"reach",n:"sword: longer reach"},{k:"rune",n:"sword: stronger hits"},{k:"shield",n:"armour"}];
@@ -3790,10 +3809,10 @@ function lDiamond(c,x,y,rx,ry){c.beginPath();c.moveTo(x,y-ry);c.lineTo(x+rx,y);c
 function lSpellPic(c,kind,x,y,s,col){c.save();c.fillStyle=c.strokeStyle=col;c.lineCap="round";c.lineJoin="round";
   if(kind==="heal"){c.lineWidth=1.1*s;c.beginPath();c.ellipse(x,y+1.6*s,3.6*s,1.25*s,0,0,Math.PI*2);c.stroke();c.lineWidth=1.3*s;c.beginPath();c.moveTo(x,y+1.2*s);c.lineTo(x,y-3.2*s);c.stroke();
     c.beginPath();c.moveTo(x-2*s,y-1.6*s);c.lineTo(x,y-3.6*s);c.lineTo(x+2*s,y-1.6*s);c.stroke();}
-  else if(kind==="bolt"||kind==="acid"){ // kit 0.12.0: the spell's picture as the Echo Shrine and the HUD draw it, at the fireball's size
-    c.translate(x,y);c.scale(0.42*s,0.42*s);c.translate(-12,-12);c.lineWidth=2.2;
-    if(kind==="bolt")c.stroke(new Path2D("M13.5 2.5 L5.5 13.5 H11.5 L9.5 21.5 L18.5 9.5 H12.5 Z"));
-    else{c.stroke(new Path2D("M4 12 H9 M9 12 L20 5.5 M9 12 H21 M9 12 L20 18.5"));for(const q of [[15,9.4,1.3],[17.6,13.6,1.3],[13.2,14.6,1.1]]){c.beginPath();c.arc(q[0],q[1],q[2],0,Math.PI*2);c.fill();}}}
+  // version 13 (kit 0.16.0): the lightning bolt's and the acid spray's scrolls, drawn for the scroll's size (play.js 1.3.0)
+  else if(kind==="bolt"){c.beginPath();[[0.6,-4.2],[-2.9,0.6],[-0.2,0.6],[-1.1,4.2],[2.9,-1.1],[0.2,-1.1]].forEach(([a,b],i)=>i?c.lineTo(x+a*s,y+b*s):c.moveTo(x+a*s,y+b*s));c.closePath();c.fill();}
+  else if(kind==="acid"){c.lineWidth=1.05*s;c.beginPath();c.moveTo(x-5.2*s,y);c.lineTo(x-1.8*s,y);c.moveTo(x-1.8*s,y);c.lineTo(x+4*s,y-2.9*s);c.moveTo(x-1.8*s,y);c.lineTo(x+4.6*s,y);c.moveTo(x-1.8*s,y);c.lineTo(x+4*s,y+2.9*s);c.stroke();
+    for(const [a,b,r] of [[1.9,-1.25,0.62],[3.2,1.05,0.62],[1,1.6,0.5]]){c.beginPath();c.arc(x+a*s,y+b*s,r*s,0,Math.PI*2);c.fill();}}
   else{c.beginPath();c.arc(x+2*s,y,2.4*s,0,Math.PI*2);c.fill();
     for(const q of [[0.9,-1.9,-4.2,-3.8,-0.4,-0.7],[0.2,-0.6,-5.8,0.2,0.2,0.9],[0.9,1.9,-3.9,3.4,-0.4,0.8]]){c.beginPath();c.moveTo(x+q[0]*s,y+q[1]*s);c.lineTo(x+q[2]*s,y+q[3]*s);c.lineTo(x+q[4]*s,y+q[5]*s);c.closePath();c.fill();}}
   c.restore();}
@@ -4368,12 +4387,12 @@ function makeTools(env){
       const f=frame("bolt");o=o||{};fxBolt(f.ctx,x1-f.camX,y1,x2-f.camX,y2,K132,(o.t||0)/0.2,o.seed||3,o.fork?0.7:1);
     },
     // the acid spray from the hand at (x, y) into a short cone, over 0.35 s (o: facing, t), and the patch it leaves on the ground from x0 to x1,
-    // hissing for 1.5 s (o: y, the ground under its middle if left out; t)
+    // hissing for 1.5 s (o: y, flat at that height; left out, kit 0.16.0: along the ground, slopes too; t)
     acid(x,y,o){
       const f=frame("acid");o=o||{};fxAcid(f.ctx,x-f.camX,y,o.facing||1,K132,(o.t||0)/0.35);
     },
     acidPatch(x0,x1,o){
-      const f=frame("acidPatch");o=o||{};const y=o.y==null?f.gy((x0+x1)/2):o.y;fxAcidPatch(f.ctx,x0-f.camX,x1-f.camX,y,K132,(o.t||0)/1.5);
+      const f=frame("acidPatch");o=o||{};const y=o.y==null?f.gy((x0+x1)/2):o.y,gy=o.y==null?(X=>f.gy(X+f.camX)):null;fxAcidPatch(f.ctx,x0-f.camX,x1-f.camX,y,K132,(o.t||0)/1.5,undefined,gy);
     },
     LOOT:LOOT.map(q=>q.k),
     loot(kind,x,o){ // kind: one of world.LOOT; o: y, seed (so neighbours glint apart), drop { x, y, t } (out of a monster that fell at x, y: 0.45 s),
@@ -4591,6 +4610,7 @@ function set(hud,st){const q=s=>hud.querySelector(s);
       hl.setAttribute("transform",`translate(${-1.6*a} ${3.2*a*a}) rotate(${-16*a} 5 11)`);hr.setAttribute("transform",`translate(${1.6*a} ${3.6*a*a}) rotate(${18*a} 5 11)`);hl.style.opacity=hr.style.opacity=String(1-a);gl.style.opacity=0;}
     else if(fx&&fx.kind==="gain"){const u=fx.u,s=0.35+0.65*ease(Math.min(1,u/0.6));hl.setAttribute("transform",`translate(5 6) scale(${s}) translate(-5 -6)`);hr.setAttribute("transform",`translate(5 6) scale(${s}) translate(-5 -6)`);
       hl.style.opacity=hr.style.opacity=String(Math.min(1,u/0.35));gl.style.opacity=u>0.45?Math.max(0,1-Math.abs(u-0.7)/0.25):0;ck.style.opacity=0;}
+    else if(fx&&fx.kind==="glint"){if(hl.getAttribute("transform")){hl.removeAttribute("transform");hr.removeAttribute("transform");}hl.style.opacity=hr.style.opacity="";ck.style.opacity=0;gl.style.opacity=String(Math.sin(Math.PI*fx.u));}   /* kit 0.16.0: version 13's glint across the pips held, as each takes its share of a hit */
     else{if(hl.getAttribute("transform")){hl.removeAttribute("transform");hr.removeAttribute("transform");}hl.style.opacity=hr.style.opacity="";ck.style.opacity=0;gl.style.opacity=0;}});
   const lives=hud.querySelectorAll(".lb-life");lives.forEach((l,i)=>{const fx=st.lifeFx&&st.lifeFx.i===i?st.lifeFx:null,g=l.querySelector(".glass"),f=l.querySelector(".flame"),pf=l.querySelectorAll(".puff");
     if(fx){l.classList.remove("is-out");const u=fx.u,a=Math.min(1,u/0.5);g.style.fill=mixHex("#ffcf6a","#1a1218",ease(a));f.style.opacity=String(Math.max(0,1-a*1.4));f.setAttribute("transform",`translate(5 9.8) scale(${Math.max(0.01,1-a)}) translate(-5 -9.8)`);
@@ -4701,8 +4721,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     const audio = makeAudio(settings);
     // version 8 (4c-7): every named sound is design system version 8's (lb.sounds lists them); the shell's moments as Barney chose: the menus'
     // muted tick, soft chime and falling tick (select, confirm, back), pause the soft chime, game over the life lost's falling tones, new best
-    // the plaque line's chime
-    const SHELL_SOUND = { blip: 'select', pause: 'confirm', gameOver: 'lifeLost', newBest: 'line' };
+    // the plaque line's chime (kit 0.16.0: the shell's game over plays lifeLost by that name, as 'gameOver' is now version 13's toll)
+    const SHELL_SOUND = { blip: 'select', pause: 'confirm', newBest: 'line' };
     const soundOn = () => !settings.muted && settings.volume > 0;
     function sfx(name, v) {   // kit 0.10.0: v, the echo a defeat gives (lb.sfx('defeat', 5), lb.sfx('echo', 25))
       const k = SHELL_SOUND[name] || name;
@@ -5239,6 +5259,10 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         if (n < h8.pips) { h8.pipFx = []; for (let i = h8.pips - 1; i >= n; i--) h8.pipFx.push({ i: i, kind: 'crack', t0: state.time + (h8.pips - 1 - i) * gap, len: 0.4 }); }
         else if (n > h8.pips) h8.pipFx = [{ i: n - 1, kind: 'gain', t0: state.time, len: 0.5 }];
         h8.pips = n; syncHud(); },
+      // kit 0.16.0 (version 13, HUD): a hit with armour: one brass glint passing across the pips held, 0.06 s apart, 0.3 s each (no pip is lost)
+      armourGlint() { if (!h8.pips) return; const keep = (h8.pipFx || []).filter((f) => f.kind !== 'glint' && state.time - f.t0 < f.len);
+        for (let i = 0; i < h8.pips; i++) keep.push({ i: i, kind: 'glint', t0: state.time + i * 0.06, len: 0.3 });
+        h8.pipFx = keep; syncHud(); },
       lives(n) { n = clamp(n | 0, 0, 9); if (n < h8.lives) h8.lifeFx = { i: n, t0: state.time, len: 0.8 }; h8.lives = n; syncHud(); },
       spells(list, sel, cost) { // the spells known (in world.LOOT's names: 'heal', 'fire'), the chosen one, and what it costs (so its picture dims when mana is short)
         list = (list || []).slice(); sel = sel | 0;
@@ -5829,7 +5853,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         opts = { back: toMenu };
       } else {
         const back = button('Back', true);
-        const close = () => { sfx('back'); state.screen = 'title'; closeDialog(); };
+        const close = () => { sfx('back'); state.screen = 'title'; closeDialog();
+          if (scoresFromTile) { scoresFromTile = false; const t = titleScreen.querySelector('.lb-arch-tile[data-act="scores"]'); if (t) t.focus(); } };   // kit 0.16.0: back to the tile
         if (phone) back.style.padding = '0 24px';
         buttons = [back];
         items = [{ el: back, activate: close }];
@@ -5856,7 +5881,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       }
       return { panel: panel, items: items, opts: opts };
     }
+    let scoresFromTile = false;   // kit 0.16.0: High scores opened from its arch tile, so Back focuses the tile again
     function openScores(highlight, afterGame) {
+      if (afterGame) scoresFromTile = false;
       state.screen = 'scores';
       showDialog(() => scoresDialog(highlight, afterGame));
     }
@@ -6148,7 +6175,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       }
       if (typeof kind === 'string' && kind.indexOf('belt-') === 0) {   // kit 0.11.0: a belt, its band as the Echo Shrine draws it
         const b = { 'belt-nightBlue': ' is-night-blue', 'belt-mulberry': ' is-mulberry', 'belt-ash': ' is-ash' }[kind] || '';
-        return '<span class="lb-belt" aria-hidden="true" style="flex:none;width:44px;padding:6px 4px;cursor:default"><span class="band' + b + '"></span></span>';
+        const nm = { 'belt-nightBlue': 'night blue', 'belt-mulberry': 'mulberry', 'belt-ash': 'ash' }[kind] || 'red';   // kit 0.16.0: version 13's lb-next-belt
+        return '<span class="lb-next-belt" role="img" aria-label="The ' + nm + ' belt"><span class="band' + b + '"></span></span>';
       }
       const pic = UNLOCK_PIC[kind] || HUD8.ICON[kind];
       return pic ? '<span class="lb-spell" aria-hidden="true"><span><svg class="pic" viewBox="0 0 24 24">' + pic + '</svg></span></span>' : '';
@@ -6175,6 +6203,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       const newBest = scored && score > 0 && score > prevBest;
       const qualifies = scored && score > 0 && (table.length < 10 || score > table[table.length - 1].s);
       if (newBest) setTimeout(() => sfx('newBest'), 650);
+      sfx('gameOver');   // kit 0.16.0 (version 13): one low, muted toll as the plaque appears
       runEndInfo = { o: o, newBest: newBest, qualifies: qualifies, t0: performance.now(), chimed: false, timer: 0 };
       showDialog(runEndDialog);
     }
@@ -6195,8 +6224,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       const near = asObject(o.near);
       if (near.boss) {
         const pc = Math.round(clamp(Math.ceil((+near.left || 0) * 100), 1, 100));   // up, so a boss still standing never reads 0%
-        const p = el('p', 'lb-near');
+        const p = el('p', 'lb-near' + (phone ? ' is-two' : ''));   // kit 0.16.0: on a phone always two lines, a break after the name
         p.append(document.createTextNode('Fell to '), txt('span', 'lb-near-name', String(near.boss)));
+        if (phone) { const br = el('span', 'br'); br.setAttribute('aria-hidden', 'true'); p.append(br); }
         const bar = el('span', 'lb-near-bar', '<i></i>');
         bar.setAttribute('aria-hidden', 'true');
         bar.firstChild.style.width = pc + '%';
@@ -6370,7 +6400,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       state.screen = 'over';
       state.over = true;
       state.ending = false;
-      sfx('gameOver');
+      sfx('lifeLost');   // the life lost's falling tones (Barney's choice for the shell's game over)
       const table = readScores();
       const prevBest = table.length ? table[0].s : 0;
       const score = state.score;
@@ -6545,8 +6575,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       if (shrineCfg) {   // kit 0.10.2: High scores' own arch tile, beside sound
         const sc = el('button', 'lb-arch-tile', ICON.scores);
         sc.type = 'button';
+        sc.dataset.act = 'scores';
         sc.setAttribute('aria-label', 'High scores');
-        sc.addEventListener('click', () => { sc.blur(); sfx('confirm'); openScores(-1, false); });
+        sc.addEventListener('click', () => { sc.blur(); sfx('confirm'); scoresFromTile = true; openScores(-1, false); });
         tiles.append(sc);
       }
       tiles.append(sound, fullscreenTile('lb-arch-tile'));
@@ -6858,7 +6889,11 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
        Kit 0.14.0: lb.teach.show(id, { later }) (walk, jump, attack, cast, roll, drink) teaches a control in play as Teaching draws it; the kit
          sees it used, dims it and drops it; lb.teach.hide() (or H, or Hide hints) hides them all, and onHintsHidden(lb) in the config hears it.
        Kit 0.15.0: win: { heading, lead, line, loop } in the config and lb.win({ offer, scored, shrine, again, finish }) show version 12's win
-         (WinCard): three lines with three bells, the lanterns counted in, the second loop's offer, Finish as game over. */
+         (WinCard): three lines with three bells, the lanterns counted in, the second loop's offer, Finish as game over.
+       Kit 0.16.0 (design system version 13): lb.hud.armourGlint() for a hit with armour (a brass glint across the pips held); the sounds
+         'bolt', 'acid', 'acidHiss', 'ward' and 'gameOver' (the run's end plays it); the wisp's echo after the card tear at its own level;
+         the bolt's and the acid's own scrolls; world.acidPatch along the ground; High scores' crowned headstone; the run's end's two-line
+         near miss on a phone and a belt's box as the next unlock. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },

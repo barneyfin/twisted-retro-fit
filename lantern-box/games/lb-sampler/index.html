@@ -248,6 +248,12 @@ const PARTS = [
     if (s < 5) w.wanderer(x0 - 2 + 46 * v, { move: 'drop', step: s, y: y0 + (y1 - y0) * v * v + 1 });
     else w.wanderer(x0 + 44, { move: 'idle', step: lb.time * 12 });
   } },
+  // kit 0.16.0 (version 13, Spells): the acid's patch lies along the ground: three on the long climb, one on the flat after its crag
+  { name: "The acid's patch along a slope (on a level)", focus(g, lb) { return climbScene(g, lb).crag - 260; }, draw(w, lb, g, cam) {
+    if (!g.ground) return;
+    const C = climbScene(g, lb), x0 = C.crag, t = lb.time % 1.8;
+    [[-520, -400], [-330, -210], [-150, -40], [120, 230]].forEach(([a, b], i) => w.acidPatch(x0 + a, x0 + b, { t: (t + i * 0.3) % 1.8 }));
+  } },
   { name: 'The wanderer falling into a pit (on a level)', focus(g, lb) { const P = pitScene(g, lb); return P ? P.pl - 40 : g.x; }, draw(w, lb, g, cam) {
     // play.js's fall: he walks on a step too far, drops into the gap drifting on, drawn only above the ground and in the gap,
     // and breaks into his card pieces in the dark 0.34 s into the fall (since 4c-8, after Barney asked)
@@ -409,6 +415,11 @@ const RUN_ENDS = {
   first: [38, { near: { boss: 'The Veiled Ghost', left: 0.64 }, next: { kind: 'health', name: 'A second health potion', towards: 'a second health potion', price: 25, was: 0, now: 38 }, first: true, shrine: { bank: 0 } }],
   top: [296, { near: { boss: 'The Gaping Tree', left: 0.31 }, next: { kind: 'mana', name: 'A third mana potion', towards: 'a third mana potion', price: 400, was: 20, now: 296 }, shrine: { bank: 20 } }],
   furthest: [64, { near: { furthest: 'The Old Town' }, next: { kind: 'bolt', name: 'Lightning bolt', towards: 'the lightning bolt', price: 75, was: 0, now: 64 }, shrine: { bank: 0 } }],
+  // kit 0.16.0 (version 13), as RunEnd's preview draws them: the phone's usual (the near miss on two lines); the longest name at 100% with
+  // the day's ×2 and a belt next (the phone's); Furthest yet with a belt next (the computer's). Both Echo Infusion runs, never on the high scores
+  phone: [44, { near: { boss: 'The Veiled Ghost', left: 0.18 }, next: { kind: 'bolt', name: 'Lightning bolt', towards: 'the lightning bolt', price: 75, was: 13, now: 44 }, shrine: { bank: 13 } }],
+  belt: [60, { near: { boss: 'The Tentacled Skull', left: 1 }, daily: 120, next: { kind: 'belt-ash', name: 'Ash belt', towards: 'the ash belt', price: 250, was: 50, now: 130 }, shrine: { bank: 50 }, scored: false }],
+  beltFar: [212, { near: { furthest: 'Dawn' }, next: { kind: 'belt-mulberry', name: 'Mulberry belt', towards: 'the mulberry belt', price: 250, was: 130, now: 82 }, shrine: { bank: 130 }, scored: false }],
 };
 function runEndScreen(D, k) {
   const [score, o] = RUN_ENDS[k];
@@ -446,6 +457,9 @@ function screensPanel(g, lb) {
     ["Run's end: first run", () => runEndScreen(D, 'first')],
     ["Run's end: top ten", () => runEndScreen(D, 'top')],
     ["Run's end: furthest", () => runEndScreen(D, 'furthest')],
+    ["Run's end: phone's usual", () => runEndScreen(D, 'phone')],   // kit 0.16.0
+    ["Run's end: ×2, a belt", () => runEndScreen(D, 'belt')],
+    ["Run's end: furthest, a belt", () => runEndScreen(D, 'beltFar')],
     ['Credits', () => { D.quit(); D.openSettings('title'); D.openCredits('title'); }],
     ['Clear saved progress?', () => { D.quit(); D.openSettings('title'); D.openClear('title'); }],
   ];
@@ -530,6 +544,8 @@ function hudPanel(g, lb) {
   const list = [
     ['Armour: gain', () => { g.pips = Math.min(3, g.pips + 1); showHud(g, lb); }],
     ['Armour: crack', () => { g.pips = Math.max(0, g.pips - 1); showHud(g, lb); }],
+    ['Armour: a hit', () => { if (!g.pips) { g.pips = 3; showHud(g, lb); } lb.hud.armourGlint(); lb.sfx('hurt'); }],   // kit 0.16.0: the glint across the pips held
+    ['Armour: the end', () => { const n = g.pips || 3; g.pips = 0; lb.hud.armour(n); lb.hud.armour(0, { stagger: 0.12 }); for (let i = 0; i < n; i++) lb.after(i * 0.12, () => lb.sfx('crack')); }],
     ['Lose a life', () => { g.lives = g.lives > 0 ? g.lives - 1 : 3; showHud(g, lb); }],
     ['Learn a spell', () => { if (g.spells.length < 2) { g.spells = g.spells.concat([g.spells.length ? 'fire' : 'heal']); lb.hud.line(...LINES[g.spells.length - 1]); } else { g.spells = []; g.sel = 0; } showHud(g, lb); }],
     ['Switch spell', () => switchSpell(g, lb)],

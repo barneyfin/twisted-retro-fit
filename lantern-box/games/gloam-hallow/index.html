@@ -44,7 +44,9 @@
    Step 5e-4 (kit 0.14.0): teaching in play on a first run, and again after Clear saved progress: walk, jump and attack as Night's card
    lifts; cast, roll and drink the first time each matters; H or Hide hints hides them for good.
    Step 5e-5 (kit 0.15.0): the win's three lines and the second loop: Go round again carries the run on at Night, harder, its hill sections
-   shuffled, echo doubled; the run's echo banks at Finish or at the run's end. */
+   shuffled, echo doubled; the run's echo banks at Finish or at the run's end.
+   Step 5e-6a (kit 0.16.0; design system version 13): a hit with armour glints across the pips; the bolt and the acid have their own
+   sounds (the acid's patch its hiss) and the patch lies along a slope. */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
 const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
@@ -900,9 +902,9 @@ function boltTargets(g) {
   return list;
 }
 function boltHit(g, lb, q, dmg, f) {
-  if (q.boss) { if (g.boss && g.boss.st === 'fight') { lb.sfx('burst'); bossDamage(g, lb, dmg); } return; }
+  if (q.boss) { if (g.boss && g.boss.st === 'fight') bossDamage(g, lb, dmg); return; }   // step 5e-6a: the bolt's own sound has the strike in it
   if (!alive(q.m)) return;
-  lb.sfx('burst'); damage(g, lb, q.m, dmg, f);
+  damage(g, lb, q.m, dmg, f);
 }
 // the bolt strikes at once: the nearest ahead within its reach, then forks to one more near it; with nothing ahead it strikes the air
 function castBolt(g, lb) {
@@ -917,7 +919,7 @@ function castBolt(g, lb) {
     if (second) { z.fork = { x2: second.x, y2: second.y }; lb.after(BOLT_FORK_AT, () => boltHit(g, lb, second, dmg, f)); }
   }
   g.zaps.push(z);
-  lb.sfx('fireball');
+  lb.sfx('bolt');                      // step 5e-6a (version 13): a crack, a buzzing zap, a smaller crack as it forks
 }
 // the spray: everything in the short cone, crawlers too, takes half its damage as it lands; the patch it leaves the other half, a little each
 // quarter second, to whatever stands in it
@@ -925,8 +927,9 @@ function castAcid(g, lb) {
   const f = g.facing, dmg = SPELL.acid.dmg[Math.max(1, g.spells.acid)];
   g.sprays.push({ x: g.x + f * 28, y: g.y - 52, gx: g.x, gy: g.y, f, t: 0, hit: false, dmg });
   const a = g.x + f * ACID_PATCH[0], b = g.x + f * ACID_PATCH[1], x0 = Math.min(a, b), x1 = Math.max(a, b);
-  g.patches.push({ x0, x1, y: g.on ? g.y : g.L.ground((x0 + x1) / 2), t: -ACID_PATCH_AT, tick: 0, dmg: dmg * 0.5 * ACID_TICK / ACID_PATCH_T, f });
-  lb.sfx('fireball');
+  // step 5e-6a (version 13): on the ground the patch lies along it, slopes too (on a piece it lies flat on the piece's top)
+  g.patches.push({ x0, x1, y: g.on ? g.y : g.L.ground((x0 + x1) / 2), slope: !g.on, t: -ACID_PATCH_AT, tick: 0, dmg: dmg * 0.5 * ACID_TICK / ACID_PATCH_T, f });
+  lb.sfx('acid');                      // step 5e-6a: a wet hissing spray
 }
 function acidHit(g, lb, s) {
   const x0 = Math.min(s.gx, s.gx + s.f * ACID_CONE), x1 = Math.max(s.gx, s.gx + s.f * ACID_CONE), y0 = s.gy - ACID_UP, y1 = s.gy + 10;
@@ -934,13 +937,12 @@ function acidHit(g, lb, s) {
   let any = false;
   for (const m of g.mons) if (alive(m) && meets(monBox(m))) { any = true; damage(g, lb, m, s.dmg * 0.5, s.f); }
   if (meets(bossBody(g))) { any = true; bossDamage(g, lb, s.dmg * 0.5); }
-  if (any) lb.sfx('burst');
 }
 function patchHit(g, lb, p) {
   for (const m of g.mons) {
     if (!alive(m) || !MON[m.kind].ground) continue;
-    const b = monBox(m);
-    if (b[1] >= p.x0 && b[0] <= p.x1 && Math.abs(b[3] - p.y) < 24) damage(g, lb, m, p.dmg, p.f);
+    const b = monBox(m), py = p.slope ? g.L.ground(Math.max(p.x0, Math.min(p.x1, (b[0] + b[1]) / 2))) : p.y;   // step 5e-6a: along a slope
+    if (b[1] >= p.x0 && b[0] <= p.x1 && Math.abs(b[3] - py) < 24) damage(g, lb, m, p.dmg, p.f);
   }
   const bb = bossBody(g);
   if (bb && bb[1] >= p.x0 && bb[0] <= p.x1 && Math.abs(bb[3] - p.y) < 40) bossDamage(g, lb, p.dmg);
@@ -948,12 +950,13 @@ function patchHit(g, lb, p) {
 function spellsUpdate(g, lb, dt) {
   for (const z of g.zaps) z.t += dt;
   for (const sp of g.sprays) { sp.t += dt; if (!sp.hit && sp.t >= ACID_HIT_AT) { sp.hit = true; acidHit(g, lb, sp); } }
-  for (const p of g.patches) { p.t += dt; if (p.t < 0) continue; p.tick += dt; while (p.tick >= ACID_TICK) { p.tick -= ACID_TICK; patchHit(g, lb, p); } }
+  for (const p of g.patches) { p.t += dt; if (p.t < 0) continue; if (!p.hiss) { p.hiss = true; lb.sfx('acidHiss'); }   // step 5e-6a: its 1.5 s of hiss
+    p.tick += dt; while (p.tick >= ACID_TICK) { p.tick -= ACID_TICK; patchHit(g, lb, p); } }
   if (g.zaps.length) g.zaps = g.zaps.filter((z) => z.t < BOLT_FORK_AT + BOLT_T);
   if (g.sprays.length) g.sprays = g.sprays.filter((sp) => sp.t < ACID_T);
   if (g.patches.length) g.patches = g.patches.filter((p) => p.t < ACID_PATCH_T);
 }
-function drawPatches(g, lb, w) { for (const p of g.patches) if (p.t >= 0) w.acidPatch(p.x0, p.x1, { y: p.y, t: p.t }); }
+function drawPatches(g, lb, w) { for (const p of g.patches) if (p.t >= 0) w.acidPatch(p.x0, p.x1, p.slope ? { t: p.t } : { y: p.y, t: p.t }); }   // 5e-6a: along the ground
 
 /* ---------- the bosses (4d-4) ---------- */
 // The fight: walking into the arena's end locks the camera and brings the boss in its own way (its name on the plaque, the bar filling;
@@ -1289,6 +1292,7 @@ function hurt(g, lb, dmg, fromX) {
   g.hurtT = 0; g.atkBuf = 0;
   // armour (Barney, 7 November 2026): each pip held takes ARMOUR_CUT off the hit, and no pip is lost; they last until the run ends
   g.health = Math.max(0, g.health - dmg * (1 - ARMOUR_CUT * Math.min(3, g.armour))); lb.hud.health(g.health); g.hurtKind = 'health'; lb.sfx('hurt');
+  if (g.armour > 0) lb.hud.armourGlint();   // step 5e-6a (version 13): one brass glint across the pips held, as each takes its share
   if (g.health <= 0.001) return startLost(g, lb, 'health', null);
   if (g.mode === 'air') return;        // in the air: the sparks and the second of safety, and on he goes
   g.facing = fromX >= g.x ? 1 : -1;    // turned to it and knocked back a step (the kit's hurt move)
