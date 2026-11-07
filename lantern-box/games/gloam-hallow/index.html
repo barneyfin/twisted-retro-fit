@@ -36,7 +36,9 @@
    step 5e builds it; Credits; P pauses and Backspace goes back.
    Step 5e-1 (kit 0.11.0): the Echo Shrine (from the title and the run's end), the choice of run once anything is bought, and what each run
    takes: The Bare Reckoning the chosen spell and belt and one potion of each, The Echo Infusion every socket bought; up to three potions of
-   each kind, and the belts. */
+   each kind, and the belts.
+   Step 5e-2 (kit 0.12.0): the lightning bolt and the acid spray, chosen at the Echo Shrine in place of the fireball; that run's scrolls teach
+   the chosen one. */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
 const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
@@ -122,7 +124,18 @@ const MANA_RATE = 0.04;          // mana refills 4% a second on its own
 const SPELL = {                  // three levels each, from scrolls: heal 40% of health for 30% of mana, a fireball 2 blows for 25%
   heal: { cost: 0.30, amount: [0, 0.40, 0.55, 0.70] },
   fire: { cost: 0.25, dmg: [0, 2, 3, 4] },
+  // step 5e-2 (design system version 12, Spells): a different effect, not more power, each for the fireball's mana (starting figures)
+  bolt: { cost: 0.25, dmg: [0, 4 / 3, 2, 8 / 3] },   // each hit about two-thirds of a fireball's
+  acid: { cost: 0.25, dmg: [0, 2, 3, 4] },           // about a fireball's in all: half as it sprays, half from its patch
 };
+// the bolt and the acid (step 5e-2; all starting figures, to judge in play): a body-length is his height
+const BODY_LEN = 88;
+const BOLT_RANGE = 5 * BODY_LEN, BOLT_FORK = 2 * BODY_LEN;   // strikes the nearest ahead within 5 body-lengths at once, then forks to one more within 2
+const BOLT_T = 0.2, BOLT_FORK_AT = 0.06;                     // the bolt's line lasts 0.2 s; the fork strikes 0.06 s after it (as loopBolt)
+const ACID_CONE = 2 * BODY_LEN, ACID_UP = 120;               // the spray hits everything within 2 body-lengths ahead, from his feet to above his head
+const ACID_T = 0.35, ACID_HIT_AT = 0.15;                     // its 0.35 s, landing at 0.15 s
+const ACID_PATCH = [0.5 * BODY_LEN, 2 * BODY_LEN];           // the patch on the ground, from half a body-length ahead to two
+const ACID_PATCH_AT = 0.25, ACID_PATCH_T = 1.5, ACID_TICK = 0.25;   // from 0.25 s, hissing for 1.5 s, hurting what stands in it every 0.25 s
 const FIRE_SPEED = 420;          // the fireball, lines a second, straight at chest height until it hits a monster or leaves the screen
 const CAST_BUF = 0.15;           // cast pressed this long before he is free still casts
 const POTION = { health: 0.35, mana: 0.5 };   // what a potion refills
@@ -131,6 +144,7 @@ const POTION = { health: 0.35, mana: 0.5 };   // what a potion refills
 const DROP = { health: 1 / 9, mana: 1 / 12, shield: 1 / 20, upgrade: 1 / 4 };   // potions halved from 1 in 6, then health back up to 1 in 9 (Barney, 5 November 2026)
 const PIECE_POTION = 0.35;       // the scenery potions made real: about one piece in three holds a health potion, and each big hill's crest
 const LINES = { heal: ['Heal mastered', 'Heal: restores deeper'], fire: ['Fireball mastered', 'Fireball: glows brighter'],
+  bolt: ['Lightning bolt mastered', 'Lightning bolt: strikes harder'], acid: ['Acid spray mastered', 'Acid spray: burns deeper'],   // step 5e-2 (Barney)
   reach: 'Sword: reaches beyond', rune: 'Sword: bites deeper' };
 
 // The bosses (4d-4; starting figures): health in blows (a fight of about a minute), each attack's share of health (Barney: 20 to 30%),
@@ -391,6 +405,7 @@ LanternBox.game({
   chooseRun,   // step 5e-1: the choice of run, once anything is bought
   // Testing (delete for the finished game): where a run starts, and help for trying it out
   test: { options: [
+    { id: 'spell', name: 'Attack spell', choices: [['shrine', 'As chosen'], ['fire', 'Fireball'], ['bolt', 'Lightning bolt'], ['acid', 'Acid spray']] },   // step 5e-2
     { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
     { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
     { id: 'mons', name: 'Monsters', choices: [['normal', 'Normal'], ['none', 'None'], ['crowd', 'A crowd']] },
@@ -413,7 +428,9 @@ LanternBox.game({
     // spell (its scrolls teach it from step 5e-2; until then the fireball's) and the belt worn
     const rec = lb.progress;
     g.potCap = g.run === 'infusion' ? { health: rec.sockets.health, mana: rec.sockets.mana } : { health: 1, mana: 1 };
-    g.attack = rec.spell;
+    g.attack = ['fire', 'bolt', 'acid'].indexOf(t.spell) >= 0 ? t.spell : rec.spell;   // Testing can try any (step 5e-2)
+    g.spells = { heal: t.all ? 3 : 0 }; g.spells[g.attack] = t.all ? 3 : 0; g.spellList = t.all ? ['heal', g.attack] : [];
+    g.zaps = []; g.sprays = []; g.patches = [];   // step 5e-2: the bolts, the sprays and the patches on the ground
     lb.world.belt(rec.belt);
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
@@ -444,6 +461,7 @@ LanternBox.game({
     bossUpdate(g, lb, dt);
     monstersUpdate(g, lb, dt);
     shotsUpdate(g, lb, dt);
+    spellsUpdate(g, lb, dt);   // step 5e-2: the bolt, the spray and its patch
     lootUpdate(g, lb, dt);
     hurtCheck(g, lb);
   },
@@ -453,6 +471,7 @@ LanternBox.game({
     w.begin(ctx, { level: L, camX });
     g.cps.forEach((cp, k) => { g.glass[k] = w.checkpoint(cp.x, { lit: cp.lit === true ? true : cp.lit != null ? lb.time - cp.lit : undefined, from: g.lantern || undefined }); });
     drawLoot(g, lb, w, camX);
+    drawPatches(g, lb, w);   // step 5e-2: the acid's patches, on the ground under everything
     drawBoss(g, lb, w);
     drawMonsters(g, lb, w, camX, false);
     const r = drawWanderer(g, lb, w);
@@ -675,7 +694,7 @@ function lostUpdate(g, lb, dt) {
     g.mode = 'return'; g.mt = 0; g.safeT = 0; g.hurtT = 9;
     // a lost life keeps the armour (Barney, 7 November 2026: pips last until the run ends), and the spells, sword upgrades and kept potions;
     // loot picked up stays picked up
-    g.shots = []; g.cast = null; g.castBuf = 0;
+    g.shots = []; g.cast = null; g.castBuf = 0; g.zaps = []; g.sprays = []; g.patches = [];
     if (g.boss && g.boss.st !== 'done') {   // a life lost in a boss fight: back at its door, the boss whole again, its crawlers gone
       g.boss = newBoss(g); lb.hud.boss(null);
       g.mons = g.mons.filter((m) => !m.summoned);
@@ -754,6 +773,8 @@ function castUpdate(g, lb, dt) {
   if (!c.done && s >= 1) {             // the throw (the fireball leaves on its "thr" step), or the fizzle's spark
     c.done = true;
     if (c.move === 'fizzle') lb.sfx('fizzle');
+    else if (c.spell === 'bolt') castBolt(g, lb);   // step 5e-2
+    else if (c.spell === 'acid') castAcid(g, lb);
     else {
       // from just in front of him at chest height (the hand drawn last frame was still back in the wind-up)
       g.shots.push({ x: g.x + g.facing * 28, y: g.y - 52, f: g.facing, level: g.spells.fire, burst: null });
@@ -775,6 +796,71 @@ function shotsUpdate(g, lb, dt) {     // each fireball flies on until it hits a 
   }
   if (g.shots.some((s) => s.gone)) g.shots = g.shots.filter((s) => !s.gone);
 }
+
+/* ---------- the lightning bolt and the acid spray (step 5e-2; design system version 12, Spells; the review loops are the timing) ---------- */
+// targets: every monster alive and the boss's body while it can be struck, each with its box and its middle
+function boltTargets(g) {
+  const list = [];
+  for (const m of g.mons) if (alive(m)) { const b = monBox(m); list.push({ m, b, x: (b[0] + b[1]) / 2, y: (b[2] + b[3]) / 2 }); }
+  const bb = bossBody(g);
+  if (bb) list.push({ boss: true, b: bb, x: (bb[0] + bb[1]) / 2, y: Math.max(bb[2] + 20, (bb[2] + bb[3]) / 2) });
+  return list;
+}
+function boltHit(g, lb, q, dmg, f) {
+  if (q.boss) { if (g.boss && g.boss.st === 'fight') { lb.sfx('burst'); bossDamage(g, lb, dmg); } return; }
+  if (!alive(q.m)) return;
+  lb.sfx('burst'); damage(g, lb, q.m, dmg, f);
+}
+// the bolt strikes at once: the nearest ahead within its reach, then forks to one more near it; with nothing ahead it strikes the air
+function castBolt(g, lb) {
+  const f = g.facing, hx = g.x + f * 28, hy = g.y - 52, dmg = SPELL.bolt.dmg[Math.max(1, g.spells.bolt)];
+  const ahead = (q) => (f > 0 ? q.b[0] - g.x : g.x - q.b[1]), all = boltTargets(g);
+  const first = all.filter((q) => ahead(q) > -BODY_W && ahead(q) <= BOLT_RANGE).sort((a, b) => ahead(a) - ahead(b))[0] || null;
+  g.zapN = (g.zapN || 0) + 1;
+  const z = { t: 0, x1: hx, y1: hy, x2: hx + f * BOLT_RANGE * 0.5, y2: hy + 10, seed: 3 + g.zapN * 7, fork: null };
+  if (first) {
+    z.x2 = first.x; z.y2 = first.y; boltHit(g, lb, first, dmg, f);
+    const second = all.filter((q) => q !== first && Math.hypot(q.x - first.x, q.y - first.y) <= BOLT_FORK).sort((a, b) => Math.hypot(a.x - first.x, a.y - first.y) - Math.hypot(b.x - first.x, b.y - first.y))[0];
+    if (second) { z.fork = { x2: second.x, y2: second.y }; lb.after(BOLT_FORK_AT, () => boltHit(g, lb, second, dmg, f)); }
+  }
+  g.zaps.push(z);
+  lb.sfx('fireball');
+}
+// the spray: everything in the short cone, crawlers too, takes half its damage as it lands; the patch it leaves the other half, a little each
+// quarter second, to whatever stands in it
+function castAcid(g, lb) {
+  const f = g.facing, dmg = SPELL.acid.dmg[Math.max(1, g.spells.acid)];
+  g.sprays.push({ x: g.x + f * 28, y: g.y - 52, gx: g.x, gy: g.y, f, t: 0, hit: false, dmg });
+  const a = g.x + f * ACID_PATCH[0], b = g.x + f * ACID_PATCH[1], x0 = Math.min(a, b), x1 = Math.max(a, b);
+  g.patches.push({ x0, x1, y: g.on ? g.y : g.L.ground((x0 + x1) / 2), t: -ACID_PATCH_AT, tick: 0, dmg: dmg * 0.5 * ACID_TICK / ACID_PATCH_T, f });
+  lb.sfx('fireball');
+}
+function acidHit(g, lb, s) {
+  const x0 = Math.min(s.gx, s.gx + s.f * ACID_CONE), x1 = Math.max(s.gx, s.gx + s.f * ACID_CONE), y0 = s.gy - ACID_UP, y1 = s.gy + 10;
+  const meets = (b) => b && !(b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1);
+  let any = false;
+  for (const m of g.mons) if (alive(m) && meets(monBox(m))) { any = true; damage(g, lb, m, s.dmg * 0.5, s.f); }
+  if (meets(bossBody(g))) { any = true; bossDamage(g, lb, s.dmg * 0.5); }
+  if (any) lb.sfx('burst');
+}
+function patchHit(g, lb, p) {
+  for (const m of g.mons) {
+    if (!alive(m) || !MON[m.kind].ground) continue;
+    const b = monBox(m);
+    if (b[1] >= p.x0 && b[0] <= p.x1 && Math.abs(b[3] - p.y) < 24) damage(g, lb, m, p.dmg, p.f);
+  }
+  const bb = bossBody(g);
+  if (bb && bb[1] >= p.x0 && bb[0] <= p.x1 && Math.abs(bb[3] - p.y) < 40) bossDamage(g, lb, p.dmg);
+}
+function spellsUpdate(g, lb, dt) {
+  for (const z of g.zaps) z.t += dt;
+  for (const sp of g.sprays) { sp.t += dt; if (!sp.hit && sp.t >= ACID_HIT_AT) { sp.hit = true; acidHit(g, lb, sp); } }
+  for (const p of g.patches) { p.t += dt; if (p.t < 0) continue; p.tick += dt; while (p.tick >= ACID_TICK) { p.tick -= ACID_TICK; patchHit(g, lb, p); } }
+  if (g.zaps.length) g.zaps = g.zaps.filter((z) => z.t < BOLT_FORK_AT + BOLT_T);
+  if (g.sprays.length) g.sprays = g.sprays.filter((sp) => sp.t < ACID_T);
+  if (g.patches.length) g.patches = g.patches.filter((p) => p.t < ACID_PATCH_T);
+}
+function drawPatches(g, lb, w) { for (const p of g.patches) if (p.t >= 0) w.acidPatch(p.x0, p.x1, { y: p.y, t: p.t }); }
 
 /* ---------- the bosses (4d-4) ---------- */
 // The fight: walking into the arena's end locks the camera and brings the boss in its own way (its name on the plaque, the bar filling;
@@ -958,9 +1044,10 @@ function bossDamage(g, lb, n) {
   lb.after(1.2, () => { if (g.banked) return; g.echoDue -= BOSS_WISPS; lb.addWisps(BOSS_WISPS); lb.sfx('echo', BOSS_WISPS); });   // step 5d: its golden wisp's echo
   g.mons.forEach((m) => { if (m.summoned && alive(m)) { m.st = 'defeat'; m.t = 0; m.atk = null; m.beatenAt = lb.time; } });
   const can = [];
-  for (const sp of ['heal', 'fire']) if (g.spells[sp] === 0) can.push(sp);
-  if (!can.length) { if (g.spells.heal < 3) can.push('heal'); if (g.spells.fire < 3) can.push('fire'); if (g.sword.reach < 2) can.push('reach'); if (g.sword.bite < 2) can.push('rune'); }
-  const kind = can.length ? (can.length > 1 && g.spells.heal === 0 && g.spells.fire === 0 ? 'heal' : lb.pick(can)) : 'health';
+  const atk = g.attack;   // step 5e-2: the run's attack spell
+  for (const sp of ['heal', atk]) if (g.spells[sp] === 0) can.push(sp);
+  if (!can.length) { if (g.spells.heal < 3) can.push('heal'); if (g.spells[atk] < 3) can.push(atk); if (g.sword.reach < 2) can.push('reach'); if (g.sword.bite < 2) can.push('rune'); }
+  const kind = can.length ? (can.length > 1 && g.spells.heal === 0 && g.spells[atk] === 0 ? 'heal' : lb.pick(can)) : 'health';
   // it lands ahead of him, towards the way out, so walking on picks it up (dropped under him, it was still falling as he passed)
   const x = Math.min(g.L.length - 50, Math.max(g.x + 80, b.bx));
   g.loot.push({ kind, x, y: g.L.ground(x), drop: 0, from: { x: b.bx, y: g.L.ground(b.bx) - 120 }, seed: 77 });
@@ -988,7 +1075,7 @@ function dropLoot(g, lb, m) {
   let kind = null;
   if (m.kind === 'walker' && lb.rand() < DROP.upgrade) {
     const can = [];
-    if (g.spells.heal < 3) can.push('heal'); if (g.spells.fire < 3) can.push('fire');
+    if (g.spells.heal < 3) can.push('heal'); if (g.spells[g.attack] < 3) can.push(g.attack);   // step 5e-2: the run's attack spell
     if (g.sword.reach < 2) can.push('reach'); if (g.sword.bite < 2) can.push('rune');
     if (can.length) kind = lb.pick(can);
   }
@@ -1000,7 +1087,7 @@ function dropLoot(g, lb, m) {
   g.loot.push({ kind, x, y: surfaceAt(g, x), drop: 0, from: { x: m.px, y: m.py + (MON[m.kind].ground ? -30 : 0) }, seed: g.loot.length + 1 });
 }
 function placeLoot(g, lb) {            // the scenery potions made real: on about one piece in three, and on each big hill's crest
-  g.loot = []; g.shots = [];
+  g.loot = []; g.shots = []; g.zaps = []; g.sprays = []; g.patches = [];
   g.pieces.forEach((p, k) => {
     if (lb.rand() >= PIECE_POTION || p.x0 > g.L.arena) return;
     const x = (p.x0 + p.x1) / 2; g.loot.push({ kind: 'health', x, y: p.y(x), seed: 100 + k });
@@ -1033,7 +1120,7 @@ function take(g, lb, it) {             // false: not needed now (health, mana or
     case 'health': if (g.health >= 0.999) return false; g.health = Math.min(1, g.health + POTION.health); lb.hud.health(g.health); break;
     case 'mana': if (g.mana >= 0.999) return false; g.mana = Math.min(1, g.mana + POTION.mana); hudMana(g, lb, true); break;
     case 'shield': if (g.armour >= 3) return false; g.armour++; lb.hud.armour(g.armour); break;
-    case 'heal': case 'fire': {        // the first scroll teaches the spell (and chooses it); later ones make it stronger
+    case 'heal': case 'fire': case 'bolt': case 'acid': {   // the first scroll teaches the spell (and chooses it); later ones make it stronger
       const first = g.spells[it.kind] === 0;
       g.spells[it.kind] = Math.min(3, g.spells[it.kind] + 1);
       if (first) { g.spellList.push(it.kind); g.sel = g.spellList.length - 1; }
@@ -1079,6 +1166,11 @@ function drawShots(g, lb, w) {
     if (s.burst == null) w.fireball(s.x, s.y, { facing: s.f, level: s.level });
     else w.fireBurst(s.x, s.y, { t: s.burst, level: s.level });
   }
+  for (const z of g.zaps) {   // step 5e-2: the bolt, and its fork a moment later
+    w.bolt(z.x1, z.y1, z.x2, z.y2, { t: z.t, seed: z.seed });
+    if (z.fork) w.bolt(z.x2, z.y2, z.fork.x2, z.fork.y2, { t: z.t - BOLT_FORK_AT, seed: z.seed + 8, fork: true });
+  }
+  for (const sp of g.sprays) w.acid(sp.x, sp.y, { facing: sp.f, t: sp.t });
 }
 
 /* ---------- being hurt (4d-2a) ---------- */

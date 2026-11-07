@@ -1,4 +1,4 @@
-/* Lantern Box 0.11 — runtime
+/* Lantern Box 0.12 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.11.0';
+  const VERSION = '0.12.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -3752,7 +3752,37 @@ function fxFizzle(c,x,y,k,u){if(u<0||u>1)return; // not enough mana, over 0.6 s:
    (the heart on the health potion, the flame on the mana potion, the spell's picture on a scroll, the rune on the stone).
    Origin (X, Y) is the ground point under the item; sizes in picture pixels (play size). */
 const L_RED="#e0473c",L_TEAL="#5fdcca",L_TEAL2="#2a9f8f";
-const LOOT=[{k:"health",n:"health potion"},{k:"mana",n:"mana potion"},{k:"heal",n:"heal scroll"},{k:"fire",n:"fireball scroll"},{k:"reach",n:"sword: longer reach"},{k:"rune",n:"sword: stronger hits"},{k:"shield",n:"armour"}];
+/* ---------- kit 0.12.0: play.js 1.2.0's lightning bolt and acid spray, word for word (the review loops are left out) ---------- */
+// ---------- version 12 (design round 3 of step 5b, 7 November 2026; approved with design system 12): the lightning bolt and the acid spray,
+// each chosen in the Echo Shrine before a run in place of the fireball. A different effect, not more power. Starting figures, as the
+// fireball's: Claude Code tunes them. The acid's colour is one switch (ACID_LOOK, or a loop's option) so gold and green can be compared.
+const ACID_LOOKS={gold:{core:MV_GOLD,lit:MV_LAMP,hot:"#fff6dc"},green:{core:"#46c06e",lit:"#a8eec0",hot:"#e8ffee"}};
+let ACID_LOOK="gold";   // gold chosen by Barney, 7 November 2026 (green, #46c06e, was the alternative)
+// the bolt: a jagged line of gold from (x1, y1) to (x2, y2) that strikes at once and fades over its 0.2 s (u 0 to 1); one flash, on
+// the bolt only, never the screen (the arcade's flash rule). Its corners zig and zag in turn, as sharply on the fork as on the strike
+// (Barney, 7 November 2026); w only thins the fork's line (0.7).
+function fxBolt(c,x1,y1,x2,y2,k,u,seed,w){if(u<0||u>1)return;w=w||1;const a=(1-u)*(1-u*0.5),r=mvRng(seed||3),n=8,pts=[[x1,y1]],nx=-(y2-y1),ny=x2-x1,L=Math.hypot(nx,ny)||1;
+  for(let i=1;i<n;i++){const v=(i+(r()-0.5)*0.5)/n,j=(i%2?1:-1)*(0.35+0.65*r())*12*k;pts.push([x1+(x2-x1)*v+nx/L*j,y1+(y2-y1)*v+ny/L*j]);}pts.push([x2,y2]);
+  const line=(col,lw,al)=>{c.save();c.globalAlpha=al;c.strokeStyle=col;c.lineWidth=lw;c.lineJoin="round";c.lineCap="round";c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();c.restore();};
+  line(MV_GOLD,6*k*w,0.35*a);line(MV_LAMP,2.2*k*w,a);line("#fff8e6",0.9*k*w,a);fxGlowAt(c,x2,y2,16*k*w,0.8*a,MV_GOLD);fxGlowAt(c,x1,y1,10*k,0.6*a,MV_GOLD);}
+// the spray: a stream of droplets from the hand fanning into a short cone (about two body-lengths), falling a little, with a faint mist
+// along it, over 0.35 s (u 0 to 1); each droplet leaves the hand in turn, so the stream stays joined to him
+function fxAcid(c,x,y,f,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,r=mvRng(21),R=130*k;
+  fxGlowAt(c,x,y,(16-u*6)*k,0.85*(1-u*0.7),L.core);
+  for(let j=1;j<=4;j++){const v=j/4*Math.min(1,u*1.6);fxGlowAt(c,x+f*R*0.8*v,y+v*12*k,(10+18*v)*k,0.24*(1-u),L.core);}
+  for(let i=0;i<22;i++){const a=-0.3+r()*0.75,sp=0.6+r()*0.4,li=(i/22)*0.55,ui=(u-li)/0.45;if(ui<0||ui>1)continue;
+    const d=ui*R*sp,dx=Math.cos(a)*d*f,dy=Math.sin(a)*d+ui*ui*30*k,al=ui<0.85?1:(1-ui)/0.15;
+    fxGlowAt(c,x+dx,y+dy,8*k,0.5*al,L.core);fxMote(c,x+dx,y+dy,2.1*k,al,i%3?L.lit:L.hot);}}
+// the patch it leaves on the ground from x0 to x1 at ground y: it hisses for 1.5 s (u 0 to 1), bubbles popping and wisps of steam rising,
+// hurting whatever walks through
+function fxAcidPatch(c,x0,x1,y,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,al=u<0.1?u/0.1:u>0.75?(1-u)/0.25:1,r=mvRng(33);
+  for(let x=x0;x<=x1;x+=12*k)fxGlowAt(c,x,y-2,14*k,0.5*al,L.core);
+  c.save();c.globalAlpha=0.9*al;c.fillStyle=L.core;c.beginPath();c.ellipse((x0+x1)/2,y,(x1-x0)/2,3*k,0,0,Math.PI*2);c.fill();c.restore();
+  for(let i=0;i<7;i++){const bx=x0+(x1-x0)*r(),ph=(u*4+r())%1,br=(1.2+ph*2.6)*k;c.save();c.globalAlpha=al*(1-ph);c.strokeStyle=L.lit;c.lineWidth=1*k;c.beginPath();c.arc(bx,y-2*k-ph*2.4*k,br,0,Math.PI*2);c.stroke();c.restore();}
+  for(let i=0;i<5;i++){const mx=x0+(x1-x0)*r(),ph=(u*3+r())%1;fxMote(c,mx,y-ph*20*k,(1.5-ph)*k,al*(1-ph)*0.85,L.lit);}}
+// the cast for both: the fireball's throw, then a longer rest so the acid's patch can be seen out
+
+const LOOT=[{k:"health",n:"health potion"},{k:"mana",n:"mana potion"},{k:"heal",n:"heal scroll"},{k:"fire",n:"fireball scroll"},{k:"bolt",n:"lightning bolt scroll"},{k:"acid",n:"acid spray scroll"},{k:"reach",n:"sword: longer reach"},{k:"rune",n:"sword: stronger hits"},{k:"shield",n:"armour"}];
 const lootCol=k=>k==="health"?L_RED:k==="mana"?L_TEAL:MV_GOLD;
 function lHeart(c,x,y,s){c.beginPath();c.moveTo(x,y+s*0.9);c.bezierCurveTo(x-s*1.4,y-s*0.1,x-s*0.7,y-s*1.05,x,y-s*0.35);c.bezierCurveTo(x+s*0.7,y-s*1.05,x+s*1.4,y-s*0.1,x,y+s*0.9);c.fill();}
 function lFlame(c,x,y,s){c.beginPath();c.moveTo(x,y-s*1.25);c.quadraticCurveTo(x+s*0.95,y-s*0.2,x+s*0.6,y+s*0.55);c.quadraticCurveTo(x,y+s*1.05,x-s*0.6,y+s*0.55);c.quadraticCurveTo(x-s*0.85,y-s*0.1,x-s*0.15,y-s*0.55);c.quadraticCurveTo(x-s*0.05,y-s*0.15,x+s*0.1,y-s*0.1);c.quadraticCurveTo(x+s*0.25,y-s*0.6,x,y-s*1.25);c.fill();}
@@ -3760,6 +3790,10 @@ function lDiamond(c,x,y,rx,ry){c.beginPath();c.moveTo(x,y-ry);c.lineTo(x+rx,y);c
 function lSpellPic(c,kind,x,y,s,col){c.save();c.fillStyle=c.strokeStyle=col;c.lineCap="round";c.lineJoin="round";
   if(kind==="heal"){c.lineWidth=1.1*s;c.beginPath();c.ellipse(x,y+1.6*s,3.6*s,1.25*s,0,0,Math.PI*2);c.stroke();c.lineWidth=1.3*s;c.beginPath();c.moveTo(x,y+1.2*s);c.lineTo(x,y-3.2*s);c.stroke();
     c.beginPath();c.moveTo(x-2*s,y-1.6*s);c.lineTo(x,y-3.6*s);c.lineTo(x+2*s,y-1.6*s);c.stroke();}
+  else if(kind==="bolt"||kind==="acid"){ // kit 0.12.0: the spell's picture as the Echo Shrine and the HUD draw it, at the fireball's size
+    c.translate(x,y);c.scale(0.42*s,0.42*s);c.translate(-12,-12);c.lineWidth=2.2;
+    if(kind==="bolt")c.stroke(new Path2D("M13.5 2.5 L5.5 13.5 H11.5 L9.5 21.5 L18.5 9.5 H12.5 Z"));
+    else{c.stroke(new Path2D("M4 12 H9 M9 12 L20 5.5 M9 12 H21 M9 12 L20 18.5"));for(const q of [[15,9.4,1.3],[17.6,13.6,1.3],[13.2,14.6,1.1]]){c.beginPath();c.arc(q[0],q[1],q[2],0,Math.PI*2);c.fill();}}}
   else{c.beginPath();c.arc(x+2*s,y,2.4*s,0,Math.PI*2);c.fill();
     for(const q of [[0.9,-1.9,-4.2,-3.8,-0.4,-0.7],[0.2,-0.6,-5.8,0.2,0.2,0.9],[0.9,1.9,-3.9,3.4,-0.4,0.8]]){c.beginPath();c.moveTo(x+q[0]*s,y+q[1]*s);c.lineTo(x+q[2]*s,y+q[3]*s);c.lineTo(x+q[4]*s,y+q[5]*s);c.closePath();c.fill();}}
   c.restore();}
@@ -3771,7 +3805,7 @@ function lootShape(c,k,t,rm){const col=lootCol(k);c.lineJoin="round";c.lineCap="
   else if(k==="mana"){c.beginPath();c.moveTo(-4.8,-1.5);c.lineTo(-4.8,-16);c.quadraticCurveTo(-4.8,-19,-2.2,-21.5);c.lineTo(-2.2,-26.5);c.lineTo(-3.4,-26.5);c.lineTo(-3.4,-29);c.lineTo(3.4,-29);c.lineTo(3.4,-26.5);c.lineTo(2.2,-26.5);c.lineTo(2.2,-21.5);c.quadraticCurveTo(4.8,-19,4.8,-16);c.lineTo(4.8,-1.5);c.quadraticCurveTo(4.8,0.5,2.8,0.5);c.lineTo(-2.8,0.5);c.quadraticCurveTo(-4.8,0.5,-4.8,-1.5);c.closePath();edge();
     c.save();c.beginPath();c.rect(-3.4,-15.5,6.8,14.6);c.clip();c.fillStyle=L_TEAL;c.fillRect(-4,-15.5,8,15);c.fillStyle=L_TEAL2;c.fillRect(-4,-4,8,4);c.restore();
     c.fillStyle=MV_INK;lFlame(c,0,-8,3.1);c.fillStyle="rgba(255,255,255,0.55)";c.fillRect(-2.6,-14.5,1,8);}
-  else if(k==="heal"||k==="fire"){c.save();c.shadowColor=MV_GOLD;c.shadowBlur=FX?6:0;c.fillStyle="#fff0c0";c.beginPath();c.moveTo(-6,-23);c.lineTo(6,-23);c.lineTo(6,-7.5);for(let i=0;i<=4;i++)c.lineTo(6-i*3,-7.5+(i%2?1.2:0));c.closePath();c.fill();c.restore();
+  else if(k==="heal"||k==="fire"||k==="bolt"||k==="acid"){c.save();c.shadowColor=MV_GOLD;c.shadowBlur=FX?6:0;c.fillStyle="#fff0c0";c.beginPath();c.moveTo(-6,-23);c.lineTo(6,-23);c.lineTo(6,-7.5);for(let i=0;i<=4;i++)c.lineTo(6-i*3,-7.5+(i%2?1.2:0));c.closePath();c.fill();c.restore();
     c.fillStyle=MV_LAMP;c.fillRect(-6,-23,12,2);lSpellPic(c,k,0,-15,1,MV_INK);
     for(const y of [-25.5,-8]){c.beginPath();c.rect(-8,y,16,3.2);c.arc(-8.6,y+1.6,1.9,0,Math.PI*2);c.arc(8.6,y+1.6,1.9,0,Math.PI*2);edge();}}
   else if(k==="reach"){c.beginPath();c.moveTo(-2.4,-28);c.lineTo(2.4,-28);c.lineTo(0.5,-2);c.lineTo(-0.5,-2);c.closePath();c.rect(-6.5,-30.2,13,2.4);c.rect(-1.3,-35.5,2.6,5.5);c.moveTo(1.9,-37.2);c.arc(0,-37.2,1.9,0,Math.PI*2);edge();
@@ -4328,6 +4362,19 @@ function makeTools(env){
     fireBurst(x,y,o){ // o: t (0.4 s), level: the fireball bursting where it hits
       const f=frame("fireBurst");o=o||{};fxBurstL(f.ctx,x-f.camX,y,K132,(o.t||0)/0.4,Math.max(1,o.level||1));
     },
+    // kit 0.12.0 (design system version 12, Spells): the lightning bolt, a jagged gold line from (x1, y1) to (x2, y2) struck at once and fading
+    // over 0.2 s (o: t, seed, fork: true for the fork's thinner line); one flash, on the bolt only, never the screen
+    bolt(x1,y1,x2,y2,o){
+      const f=frame("bolt");o=o||{};fxBolt(f.ctx,x1-f.camX,y1,x2-f.camX,y2,K132,(o.t||0)/0.2,o.seed||3,o.fork?0.7:1);
+    },
+    // the acid spray from the hand at (x, y) into a short cone, over 0.35 s (o: facing, t), and the patch it leaves on the ground from x0 to x1,
+    // hissing for 1.5 s (o: y, the ground under its middle if left out; t)
+    acid(x,y,o){
+      const f=frame("acid");o=o||{};fxAcid(f.ctx,x-f.camX,y,o.facing||1,K132,(o.t||0)/0.35);
+    },
+    acidPatch(x0,x1,o){
+      const f=frame("acidPatch");o=o||{};const y=o.y==null?f.gy((x0+x1)/2):o.y;fxAcidPatch(f.ctx,x0-f.camX,x1-f.camX,y,K132,(o.t||0)/1.5);
+    },
     LOOT:LOOT.map(q=>q.k),
     loot(kind,x,o){ // kind: one of world.LOOT; o: y, seed (so neighbours glint apart), drop { x, y, t } (out of a monster that fell at x, y: 0.45 s),
       // pick { x, y, t } (into the wanderer's chest at x, y: 0.5 s); keep: t (kit 0.9.0: a potion kept, flying up to its socket: 0.45 s). It stays
@@ -4462,7 +4509,7 @@ const ICON={
   potH:`<path d="${POT.health.glass}"/><path class="solid" d="${POT.health.mark}"/>`,
   potM:`<path d="${POT.mana.glass}"/><path class="solid" d="${POT.mana.mark}"/>`
 };
-const NAME={heal:"heal",fire:"fireball"};
+const NAME={heal:"heal",fire:"fireball",bolt:"lightning bolt",acid:"acid spray"};   /* kit 0.12.0: version 12's spells */
 const defs=`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><clipPath id="lbPotH" clipPathUnits="userSpaceOnUse"><path d="${POT.health.body}"/></clipPath><clipPath id="lbPotM" clipPathUnits="userSpaceOnUse"><path d="${POT.mana.body}"/></clipPath><linearGradient id="lbLiqH" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--health-top)"/><stop offset="1" stop-color="var(--health-low)"/></linearGradient><linearGradient id="lbLiqM" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--mana-top)"/><stop offset="1" stop-color="var(--mana-low)"/></linearGradient><clipPath id="lbPipL" clipPathUnits="userSpaceOnUse"><path d="M-1 -1 H5 V0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4 V13 H-1 Z"/></clipPath><clipPath id="lbPipR" clipPathUnits="userSpaceOnUse"><path d="M11 -1 H5 V0.9 L4 3.6 L6 6.2 L4.6 8.6 L5 11.4 V13 H11 Z"/></clipPath></defs></svg>`;
 let defsDone=false;
 function oct(w,cls){const c=w*0.293,a=0.75,b=w-0.75,p=[[c,a],[w-c,a],[b,c],[b,w-c],[w-c,b],[c,b],[a,w-c],[a,c]].map(q=>q.map(v=>v.toFixed(2)).join(",")).join(" ");
@@ -6567,7 +6614,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
        Kit 0.11.0: lb.ui (see ui) opens a game's own plaques; shrine: { bank(lb), open(lb, back) } opens the game's Echo Shrine (from the
          title and the run's end; back returns there, and the run's end asks its info again); chooseRun(lb, start) hears Start game first and
          lb.run is the run being played; lb.hud.potions(health, mana) takes counts and lb.hud.potCap(health, mana) the sockets bought (a pip
-         under each socket once there are two); world.belt(name) chooses the wanderer's belt. */
+         under each socket once there are two); world.belt(name) chooses the wanderer's belt.
+       Kit 0.12.0: world.bolt(x1, y1, x2, y2, { t, seed, fork }), world.acid(x, y, { facing, t }) and world.acidPatch(x0, x1, { y, t }): version 12's
+         lightning bolt and acid spray (play.js 1.2.0); world.LOOT has their scrolls ('bolt', 'acid'), and the HUD's spell socket takes them. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
