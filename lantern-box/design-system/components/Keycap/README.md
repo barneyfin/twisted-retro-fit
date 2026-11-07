@@ -15,9 +15,13 @@ A small key label in a keyboard hint, always followed by what it does.
 Down: `M5 1.5 V8.5 M2 5.5 L5 8.5 L8 5.5`. Left: `M8.5 5 H1.5 M4.5 2 L1.5 5 L4.5 8`. Right: `M1.5 5 H8.5 M5.5 2 L8.5 5 L5.5 8`.
 
 ## The game provides
-- The keys it binds, as printed on a keyboard (Enter, Esc, Space, letters, arrows), and the action word for each, lower case after the key.
+- The keys it binds, as printed on a keyboard (Enter, Backspace, Space, letters, arrows), and the action word for each, lower case after the key.
 
 ## Rules
 - `hint` type in `text-3`; keycaps 20px tall with a 1px `brass-dim` border, `radius-key` corners and `text` letters. On the arch: `title-hint`, `title-key-line` and `title-key`, 13px.
 - Arrows are drawn as 10px strokes, because the kit's Alegreya Sans has ↑ and ↓ but not ← and →; drawn, all four match.
 - Groups are separated by a middle dot. Never a keycap without its action.
+
+## Version 12
+- **No Esc in a hint**: P pauses and resumes, Backspace goes back (CrazyGames' quality guidelines keep Escape for leaving full screen). The arcade's own build may still answer Esc, unshown.
+- **The player's own letters**: where the browser can tell the keyboard's layout (the Keyboard API's layout map), a letter keycap shows the key in that place on the player's keyboard (an AZERTY player sees Q, Z, S, D for walking and climbing); otherwise the letters as printed here. The game binds keys by place, not by letter.

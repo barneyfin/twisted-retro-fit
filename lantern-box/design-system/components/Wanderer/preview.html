@@ -1,4 +1,4 @@
-<!-- @dsCard group="World" height=300 width=760 subtitle="Standing and walking, edged in each place's light" -->
+<!-- @dsCard group="World" height=540 width=760 subtitle="The game's wanderer walking in each place's light; version 12, his four belts" -->
 <!doctype html>
 <html lang="en-GB">
 <head>
@@ -16,13 +16,16 @@ canvas{display:block;width:100%;background:var(--ink)}
 .cap{margin:0;font:400 13px/16px var(--font-text);color:var(--text-3)}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .grid figure{margin:0;display:flex;flex-direction:column;gap:4px}
+.belts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.belts figure{margin:0}.belts canvas{height:200px}.belts figcaption{padding:4px 2px 0;font:400 13px/16px var(--font-text);color:var(--text-3);text-align:center}
 
 </style>
 </head>
 <body>
 <div class="lb-ui wrap">
-<div class="bar"><span class="cap">LanternBox.world.drawWanderer</span><span class="sp"></span><button class="lb-btn" type="button" id="play" aria-pressed="false">Play</button></div><canvas id="cv" style="height:240px" aria-label="The wanderer in the four places"></canvas>
+<div class="bar"><span class="cap">The game's wanderer (play.js, Moves), walking in each place's light</span><span class="sp"></span><button class="lb-btn" type="button" id="play" aria-pressed="false">Play</button></div><div class="belts"><figure><canvas data-place="night" aria-label="The wanderer at Night"></canvas><figcaption>Night</figcaption></figure><figure><canvas data-place="storm" aria-label="The wanderer in Blood Red Rain"></canvas><figcaption>Blood Red Rain</figcaption></figure><figure><canvas data-place="dawn" aria-label="The wanderer at Dawn"></canvas><figcaption>Dawn</figcaption></figure><figure><canvas data-place="mist" aria-label="The wanderer in the Mist"></canvas><figcaption>Mist</figcaption></figure></div>
+<span class="cap">Version 12 · his belts, at Night: red to start, then night blue, mulberry and ash from the Echo Shrine</span><div class="belts"><figure><canvas data-belt="red" aria-label="The red belt"></canvas><figcaption>Red</figcaption></figure><figure><canvas data-belt="nightBlue" aria-label="The night blue belt"></canvas><figcaption>Night blue</figcaption></figure><figure><canvas data-belt="mulberry" aria-label="The mulberry belt"></canvas><figcaption>Mulberry</figcaption></figure><figure><canvas data-belt="ash" aria-label="The ash belt"></canvas><figcaption>Ash</figcaption></figure></div>
 </div>
+<script src="../../components/play.js"></script>
 <script>
 
 const L=window.LanternBox&&window.LanternBox.world,RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -37,12 +40,11 @@ function player(btn,draw){let on=false,t0=0,id=0;const loop=n=>{draw((n-t0)/1000
   btn.addEventListener('click',()=>{on=!on;btn.setAttribute('aria-pressed',String(on));btn.textContent=on?'Pause':'Play';if(on){t0=performance.now()-btn._t*1000;id=requestAnimationFrame(loop);}else{cancelAnimationFrame(id);}});btn._t=0;return t=>{btn._t=t;};}
 function places(bar,cb){const names={night:'Night',storm:'Blood Red Rain',dawn:'Dawn',mist:'Mist'};bar.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{bar.querySelectorAll('[data-lv]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));cb(b.dataset.lv);}));}
 
-const cv=document.getElementById('cv');
-function draw(t){const c=cv.getContext('2d'),W=pic(cv,330,500),n=4,cw=W/n;
-  L.PLACES.forEach((k,i)=>{c.save();c.beginPath();c.rect(i*cw,330,cw,170);c.clip();sky(c,k,W,330,500);c.translate(i*cw,0);ground(c,cw,i*400,500);
-    const X=cw*0.5,Y=L.GROUND(i*400+X)+1;L.drawWanderer(c,X,Y,t,i%2===1,1,RM,L.places[k].edge);c.restore();
-    label(c,L.places[k].name+(i%2?' · walking':' · standing'),i*cw+cw/2,483);});}
-ready(()=>{fit(cv);draw(0.37);const tick=player(document.getElementById('play'),t=>{draw(0.37+t);tick(t);});});
+const walks=[...document.querySelectorAll("canvas[data-place]")],WK=walks.map(()=>({}));
+function draw(t){if(typeof loopWalk!=="function")return;walks.forEach((b,i)=>{try{loopWalk(b,t,b.dataset.place,12,WK[i]);}catch(e){console.error(e);}});}
+const belts=[...document.querySelectorAll("canvas[data-belt]")],BK=belts.map(()=>({}));
+function drawBelts(t){if(typeof loopBelt!=="function")return;belts.forEach((b,i)=>{try{loopBelt(b,t,"night",12,BK[i],b.dataset.belt);}catch(e){console.error(e);}});}
+ready(()=>{walks.forEach(fit);belts.forEach(fit);draw(0.9);drawBelts(0.9);const tick=player(document.getElementById('play'),t=>{draw(0.9+t);drawBelts(0.9+t);tick(t);});});
 </script>
 </body>
 </html>

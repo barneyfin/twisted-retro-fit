@@ -9,3 +9,6 @@ A lantern on a post that lights as the wanderer passes, and stays lit: his own l
 - At the start of each place, after its fifth section, and at the boss's door.
 - Posts: Night a wrought-iron crook on a stone plinth; Blood Red Rain a timber post with an iron sign bracket; Dawn a gnarled stake in a cairn; Mist a sapling pole bent over.
 - Lighting (0.5 s): a gold spark leaps from his lantern to its glass (0 to 0.18 s), the glass flares with a ring of motes, then glows gold. After a life lost, its spark comes back down to his lantern and he forms again in its light (Moments).
+
+## Version 12
+- **No pit near a checkpoint** (Barney, 5 November 2026, from his play of kit 0.9.1; carried into the design in version 12): no pit from 120 before a checkpoint to 320 after it (`LV_CP_CLEAR` in `play.js`, as in the kit), so a life lost never brings him back just short of a pit. Night, Blood Red Rain and Dawn each lose the pit 64 past their middle checkpoint; the Mist keeps its four. The second loop's shuffled orders follow the same rule.

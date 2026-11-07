@@ -13,3 +13,7 @@ Every sound in the game: effects made in code as the kit makes its sounds, two o
 
 ## Version 11
 - `drinkHealth` and `drinkMana` (`DRINK` in play.js): the cork (a short filtered noise), two quick swallows (low falling tones), then a short warm chord rising (349, 440, 523 Hz for health; 587, 740, 880 for mana). A new sound rather than the heal's chord, so a potion and the heal spell sound different. Measured as the heal and the pick-up are, a light touch (GAIN 2.37 and 2.36).
+
+## Version 12
+- **The wisp's echo** (PRD question 12, Barney, 7 November 2026): the soft rising note as a defeated monster's wisp rises becomes a short echo: the same note, then two to four repeats 0.16 s apart, each half as loud, darker and further into the room. Louder and longer the more echo it gives: 1, 2 or 5 from a monster, 25 from a boss's golden wisp (a fifth lower, after the boss's bell). `SND.play("defeat", v)` plays the card tear and the echo; `SND.play("echo", 25)` the echo alone. Starting levels (`GAIN.echo` as `defeat`), to measure at step 5d as the rest were.
+- The run's end's READY uses the menus' soft chime (`confirm`); the win's three lines each come with one of the `win` sound's three bells.

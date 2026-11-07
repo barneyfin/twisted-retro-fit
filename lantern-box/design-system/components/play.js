@@ -1,4 +1,10 @@
-/* Lantern Box: the play parts, design system version 11 (5 November 2026). Version 1.1.0 of this file.
+/* Lantern Box: the play parts, design system version 12 (7 November 2026, approved by Barney). Version 1.2.0 of this file.
+   Version 1.2.0 (design system 12, step 5b's design rounds 1 to 3, 7 November 2026; approved by Barney at step 5c): the lightning
+   bolt and the acid spray, chosen in the Echo Shrine in place of the fireball (fxBolt, fxAcid, fxAcidPatch, loopBolt, loopAcid), the acid
+   in gold as every spell (the green alternative stays one switch away, ACID_LOOK); the belt's colour chosen in the Echo Shrine (BELTS,
+   setBelt, loopBelt); the HUD counter counts echo, not wisps (only the words change: the wisp still rises, and the state keeps its
+   key, wisps); no pit near a checkpoint, as kit 0.9.1 (LV_CP_CLEAR); up to three potions of each kind, a pip under each socket for each one bought (HUD.set's potCap); the wisp's rising note
+   becomes a short echo, louder the more echo it gives (ECHO; SND.play takes the value: SND.play("defeat", 5), SND.play("echo", 25)).
    Everything designed and agreed for Gloam Hallow in step 4b, the play-parts rounds 1 to 12 (3 and 4 November 2026), as the
    review page drew it, in the order it loads. It runs beside bundle.js (LanternBox.world, here LB and LP) and reads it.
    This is the spec for the kit change (step 4c): Claude Code turns it into kit code; the drawing, sizes and timings here are
@@ -37,7 +43,7 @@
    B, the hunter: short cape over a belted tunic, legs and boots showing, lantern hung at the hip, the free hand ready to cast.
    C, the lantern-bearer: deep forward cowl with a long point, cloak to the ankles, lantern held out in front to lead into the dark,
       the sword trailing low behind. */
-const W_INK="#060508",W_RED="#b3261e";
+const W_INK="#060508";let W_RED="#b3261e";   // version 12: let, so setBelt can change it
 function wTaper(x,s){const x1=s[0],y1=s[1],x2=s[2],y2=s[3],w1=s[4],w2=s[5],dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L;
   x.beginPath();x.moveTo(x1+nx*w1/2,y1+ny*w1/2);x.lineTo(x2+nx*w2/2,y2+ny*w2/2);x.lineTo(x2-nx*w2/2,y2-ny*w2/2);x.lineTo(x1-nx*w1/2,y1-ny*w1/2);x.closePath();x.fill();
   x.beginPath();x.arc(x2,y2,w2/2,0,Math.PI*2);x.fill();if(w1>3){x.beginPath();x.arc(x1,y1,w1/2,0,Math.PI*2);x.fill();}}
@@ -150,7 +156,13 @@ function renderClose(cv,t,lv,opt,walking){const c=cv.getContext("2d"),H=150,s=cv
      lan     the lantern's swing ; ball  when set, the tucked roll at that angle ; hand  a glow at the free hand (0..1)
    Everything that moves on its own (the hem's flutter, the tails' ripple) reads a stepped time, so the whole figure steps
    like the monsters' puppets; only where it stands glides. */
-const MV_INK="#060508",MV_RED="#b3261e",MV_GLASS="#ffd27a",MV_GOLD="#ffcf6a",MV_LAMP="#ffdf9a";
+const MV_INK="#060508",MV_GLASS="#ffd27a",MV_GOLD="#ffcf6a",MV_LAMP="#ffdf9a";let MV_RED="#b3261e";
+// version 12: the tie belt is red to start; night blue, mulberry and ash are bought at the Echo Shrine (lightened to the red's 3.1 : 1 on
+// black, checked on the Pixel by Barney, 7 November 2026), each kept off the colours that already mean something (ember, gold,
+// witch-green, wisp-pale). setBelt chooses the one worn; it colours the puppet (MV_RED) and the stand-in (W_RED). Tokens: wanderer-scarf
+// (the red), belt-night-blue, belt-mulberry, belt-ash.
+const BELTS={red:"#b3261e",nightBlue:"#3d5cab",mulberry:"#94407f",ash:"#8f877c"};
+function setBelt(k){MV_RED=W_RED=BELTS[k]||BELTS.red;return MV_RED;}
 const MV_BASE={hx:0,hy:-25,lean:0,ft:[[-2,-3,0],[2.2,-3,0]],sH:[17,-12.5],sb:0.4636,sbend:-1,fH:[4.5,-16.5],fl:[8.5,5.7],fbend:1,
   hem:1,lift:0,flare:0,bil:1,tip:2.5,nod:0,vx:0,vy:0,lan:0,ball:null,hand:0,flut:0,sword:true};
 function mvP(o){const P=Object.assign({},MV_BASE,o||{});P.ft=(o&&o.ft)||MV_BASE.ft;return P;}
@@ -1137,13 +1149,17 @@ const LV_SEC={
   G:{name:"Mound between pits",L:900,pts:[[0,0,"f"],[130,0,"s"],[310,0.32,"s"],[480,0.27,"s"],[680,0,"f"]],pits:[[64,108],[740,784]],spots:[390]}};
 const LV_ORDER={night:"ACDBFGEDAF",storm:"AFDCBGEADC",dawn:"ABDEFGCDEA",mist:"ACGFEDBADF"};
 const LV_LEAD=300,LV_ARENA=1300;
+// version 12: no pit from 120 before a checkpoint to 320 after it, as kit 0.9.1 has it (LV_CP_CLEAR; Barney, 5 November 2026), so a life lost
+// never brings him back just short of a pit. Night, Blood Red Rain and Dawn each lose the pit 64 past their middle checkpoint.
+const LV_CP_CLEAR=[120,320];
 // the level's terrain, in the same form as round 5d's stretches (rlT), so the same ground, banks, pits and camera rise draw it
 const _lvT={};
 function lvTerrain(lv){if(_lvT[lv])return _lvT[lv];const pts=[[0,0,"f"]],pits=[],secs=[];let x=LV_LEAD;const ord=LV_ORDER[lv];
   for(let i=0;i<ord.length;i++){const S=LV_SEC[ord[i]];secs.push({id:ord[i],x0:x,x1:x+S.L});for(const p of S.pts)if(p[0]<S.L)pts.push([x+p[0],p[1],p[2]]);for(const q of S.pits||[])pits.push([x+q[0],x+q[1]]);x+=S.L;}
   const arena=x;pts.push([arena,0,"f"]);const len=arena+LV_ARENA;pts.push([len,0,"f"],[len+4000,0,"f"]);
   const cps=[{x:120,name:"start"},{x:secs[4].x1,name:"middle"},{x:arena+60,name:"boss door"}];
-  return _lvT[lv]={key:"level-"+lv,lv,pts,pits,max:RL_MAX[lv],seed:RL_SEED[lv]+100,rough:RL_ROUGH[lv],len,arena,secs,cps};}
+  const kept=pits.filter(p=>!cps.some(c=>p[1]>c.x-LV_CP_CLEAR[0]&&p[0]<c.x+LV_CP_CLEAR[1]));
+  return _lvT[lv]={key:"level-"+lv,lv,pts,pits:kept,max:RL_MAX[lv],seed:RL_SEED[lv]+100,rough:RL_ROUGH[lv],len,arena,secs,cps};}
 // each place's pieces (the same as round 5d's), one on each section's crest or plateau in turn, and its scenery scattered
 const _lvP={};
 function lvBuild(lv,S){const key=lv+"@"+S.toFixed(3);if(_lvP[key])return _lvP[key];const T=lvTerrain(lv),G=x=>tGround(T,x);
@@ -1842,13 +1858,13 @@ function vitals(phone,extra,pots){const iw=phone?13:14;
 function potion(k,phone){const P=POT[k],kk=k==="health"?"Q":"E",C=k==="health"?"H":"M";
   return `<span class="lb-potion-wrap${phone?" is-phone":""}"><button class="lb-potion is-${k}${phone?" is-phone":""}" type="button" data-k="${k}" aria-label="No ${k} potion"><span>
     <svg class="pot" viewBox="0 0 24 24" aria-hidden="true"><path class="glass-back" d="${P.glass}"/><g class="liq-g" clip-path="url(#lbPot${C})"><rect class="liq" x="3" y="${P.top}" width="18" height="12" fill="url(#lbLiq${C})"/><path class="shine" d="M${k==="health"?"8.4 13.4 Q8.6 11.4 10.2 10.4":"10.2 11.6 V18.4"}"/></g>
-      <path class="glass" d="${P.glass}"/><path class="mark" d="${P.mark}"/><path class="glint" d="M5 22 L9 22 L20 3 L16 3 Z"/></svg></span></button>${phone?"":`<span class="lb-pkey" aria-hidden="true">${kk}</span>`}</span>`;}
+      <path class="glass" d="${P.glass}"/><path class="mark" d="${P.mark}"/><path class="glint" d="M5 22 L9 22 L20 3 L16 3 Z"/></svg></span></button>${phone?"":`<span class="lb-pkey" aria-hidden="true">${kk}</span>`}<span class="lb-potion-pips" aria-hidden="true" hidden></span></span>`;}
 function potions(phone,beside){return `<div class="lb-potions${beside?" is-beside":""}${phone?" is-phone":""}" role="group" aria-label="Potions kept">${potion("health",phone)}${potion("mana",phone)}</div>`;}
 function counter(phone,label,num){return `<div class="lb-plaque is-hud lb-counter${phone?" is-phone":""}" role="status" aria-label="${num} ${label.toLowerCase()}"><div class="lb-face"><span class="lb-counter-label" aria-hidden="true">${label}</span><span class="lb-counter-num" aria-hidden="true">${num}</span></div></div>`;}
 function build(el,phone,opt){if(!defsDone){document.body.insertAdjacentHTML("afterbegin",defs);defsDone=true;}const pot=(opt&&opt.pot)||"under";
   el.insertAdjacentHTML("beforeend",`<div class="lb-ui lb-hud${phone?" is-phone":""}">
     <div class="lb-hud-left">${pot==="beside"?vitals(phone,"",potions(phone,true)):vitals(phone)}${pot==="under"?potions(phone,false):""}</div>
-    <div class="lb-hud-right">${phone?"":tile("full","Full screen")}${tile("help","How to play",phone)}${tile("pause","Pause",phone)}${counter(phone,"Wisps","0000")}</div>
+    <div class="lb-hud-right">${phone?"":tile("full","Full screen")}${tile("help","How to play",phone)}${tile("pause","Pause",phone)}${counter(phone,"Echo","0000")}</div>
     <div class="lb-bossbar" role="meter" aria-valuemin="0" aria-valuemax="100" hidden><p class="lb-bossbar-name"></p><div class="lb-bossbar-edge"><div class="lb-bossbar-track"><i class="trace"></i><i class="fill"></i></div></div></div>
     <div class="lb-plaque is-hud lb-line" hidden><div class="lb-face"><svg class="pic" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="lb-line-text"></span></div></div>
     <div class="lb-plaque is-hud lb-line is-name" hidden><div class="lb-face"><span class="lb-line-text"></span><div class="lb-rule" aria-hidden="true"><i></i></div></div></div>
@@ -1876,18 +1892,24 @@ function setCard(cd,card){const on=!!(card&&card.a>0);if(cd.hidden===on)cd.hidde
 // round 13: one socket. Kept: the flask grows in from 0.6 with one glint passing over it (0.4 s); Reduce motion fades it in, Effects off
 // leaves out the glint's light. Drunk: the liquid drains in 0.35 s, then the faint outline; Reduce motion fades the liquid out instead.
 const OPTS={rm:false,fxOff:false};
-function setPotion(b,st){const k=b.dataset.k,has=!!(st.potions&&st.potions[k]),topped=(k==="health"?st.hp:st.mp)>=0.999,fx=st.potFx&&st.potFx.k===k?st.potFx:null,
+// version 12: st.potions[k] may be a count (0 to 3; true is 1) and st.potCap[k] the sockets bought (1 to 3): with more than one, a pip
+// under the socket for each, filled while a potion is in it. The socket shows the potion while any is kept; a drink drains it, and with one
+// left the flask shows again at once (the next potion's keep moment can play over it).
+function potCount(st,k){const v=st.potions&&st.potions[k];return typeof v==="number"?v:(v?1:0);}
+function setPotion(b,st){const k=b.dataset.k,n=potCount(st,k),cap=Math.max(1,(st.potCap&&st.potCap[k])||1),has=n>0,topped=(k==="health"?st.hp:st.mp)>=0.999,fx=st.potFx&&st.potFx.k===k?st.potFx:null,
     svg=b.querySelector(".pot"),liq=b.querySelector(".liq"),gl=b.querySelector(".glint"),mk=b.querySelector(".mark"),top=POT[k].top,rm=OPTS.rm;
   const showFull=has||(fx&&fx.kind==="drink");b.classList.toggle("has-potion",showFull);b.classList.toggle("is-topped",has&&topped&&!fx);b.classList.toggle("fx-off",OPTS.fxOff);
   let sc=1,op=1,ly=top,la=1,ga=0,gx=0;
   if(fx&&fx.kind==="keep"){const u=Math.min(1,fx.u);if(rm){op=Math.min(1,u/0.75);}else{sc=0.6+0.4*ease(Math.min(1,u/0.7));op=Math.min(1,u/0.35);if(u>0.35){const g=(u-0.35)/0.65;ga=Math.sin(Math.min(1,g)*Math.PI)*0.85;gx=-14+28*g;}}}
-  if(fx&&fx.kind==="drink"){const u=Math.min(1,fx.u);if(rm){la=1-u;}else{ly=top+(22-top)*ease(u);}if(u>=1){b.classList.remove("has-potion");}}
+  if(fx&&fx.kind==="drink"){const u=Math.min(1,fx.u);if(rm){la=1-u;}else{ly=top+(22-top)*ease(u);}if(u>=1&&!has){b.classList.remove("has-potion");}}
   svg.style.transform=sc!==1?`scale(${sc.toFixed(3)})`:"";svg.style.opacity=op!==1?op.toFixed(3):"";
   liq.setAttribute("y",ly.toFixed(2));liq.style.opacity=la!==1?la.toFixed(3):"";mk.style.opacity=fx&&fx.kind==="drink"?String(rm?la:Math.max(0,1-fx.u*1.6)):"";
   gl.style.opacity=ga>0.01?ga.toFixed(3):"0";gl.setAttribute("transform",`translate(${gx.toFixed(2)} 0)`);
   const keyTxt=b.parentElement.querySelector(".lb-pkey");if(keyTxt)keyTxt.classList.toggle("is-on",!!(fx&&fx.kind==="drink"&&fx.u<0.5));
   const name=k==="health"?"Health potion":"Mana potion",how=b.classList.contains("is-phone")?"Tap to drink":(k==="health"?"Q to drink":"E to drink");
-  setOnce(b,"lab",has?(topped?`${name}, kept. ${k==="health"?"Health":"Mana"} is full`:`${name}, kept. ${how}`):`No ${k} potion kept`,v=>b.setAttribute("aria-label",v));}
+  const pp=b.parentElement.querySelector(".lb-potion-pips");if(pp)setOnce(b,"pp",cap+":"+n,()=>{pp.hidden=cap<2;pp.innerHTML=cap<2?"":Array.from({length:cap},(_,i)=>`<i${i<n?' class="is-on"':""}></i>`).join("");});
+  const many=cap>1?`, ${n} of ${cap}`:"";
+  setOnce(b,"lab",has?(topped?`${name}${many} kept. ${k==="health"?"Health":"Mana"} is full`:`${name}${many} kept. ${how}`):`No ${k} potion kept${cap>1?`, ${cap} sockets`:""}`,v=>b.setAttribute("aria-label",v));}
 function set(hud,st){const q=s=>hud.querySelector(s);
   const hp=Math.round(st.hp*100),mp=Math.round(st.mp*100);
   setOnce(hud,"hp",hp,v=>q(".hp").style.setProperty("--v",v+"%"));setOnce(hud,"mp",mp,v=>q(".mp").style.setProperty("--v",v+"%"));
@@ -1910,7 +1932,7 @@ function set(hud,st){const q=s=>hud.querySelector(s);
   const cast=q(".b-cast");if(cast){cast.classList.toggle("is-empty",!n);cast.classList.toggle("is-short",!!short);picFor(cast.querySelector(".ic"),kind);}
   setOnce(q(".lb-vitals"),"lab",`Health ${hp} per cent, armour ${st.pips} of 3, mana ${mp} per cent, ${st.lives} ${st.lives===1?"life":"lives"} left`,v=>q(".lb-vitals").setAttribute("aria-label",v));
   hud.querySelectorAll(".lb-potion").forEach(b=>setPotion(b,st));
-  const ctr=q(".lb-counter");if(ctr&&st.wisps!=null)setOnce(ctr,"w",st.wisps,v=>{const s=String(v).padStart(4,"0");ctr.querySelector(".lb-counter-num").textContent=s;ctr.setAttribute("aria-label",v+" wisps");});
+  const ctr=q(".lb-counter");if(ctr&&st.wisps!=null)setOnce(ctr,"w",st.wisps,v=>{const s=String(v).padStart(4,"0");ctr.querySelector(".lb-counter-num").textContent=s;ctr.setAttribute("aria-label",v+" echo");});
   const ha=st.hudA==null?1:st.hudA;[".lb-hud-left",".lb-hud-right",".lb-touch"].forEach(sl=>{const e=q(sl);if(e)setOnce(e,"ha",ha.toFixed(2),v=>e.style.opacity=v);});
   const ln=q(".lb-line:not(.is-name)");if(ln)setLine(ln,st.line);const nm=q(".lb-line.is-name");if(nm)setLine(nm,st.name&&st.name.u<2.6?{kind:null,text:st.name.name,u:st.name.u}:null);const cd=q(".lb-card");if(cd)setCard(cd,st.card);
   const bb=q(".lb-bossbar");if(bb){const on=!!(st.boss&&st.boss.a>0&&ha>0);if(bb.hidden===on)bb.hidden=!on;
@@ -2051,6 +2073,11 @@ let brown=null;function BROWN(){if(!brown){brown=ctx.createBuffer(1,ctx.sampleRa
 function ring(o){const f=o.f,P=o.partials;P.forEach(([r,amp,d])=>tone({f:f*r,dur:d,vol:(o.vol||0.1)*amp,a:0.001,wet:o.wet==null?0.3:o.wet,at:o.at||0}));}
 function bell(o){const f=o.f||220,P=o.partials||[[1,1,1],[2.0,0.5,0.7],[2.76,0.45,0.55],[5.4,0.25,0.35],[8.93,0.12,0.22]];P.forEach(([r,amp,ds])=>tone({f:f*r,dur:(o.dur||2.5)*ds,vol:(o.vol||0.18)*amp,a:0.003,wet:o.wet==null?0.5:o.wet,at:o.at||0}));}
 // ---- the effects ----
+// version 12: the wisp's rising note as a short echo: the note (660 to 990 Hz, a boss's golden wisp a fifth lower), then two to four
+// repeats 0.16 s apart, each half as loud, darker and further into the room; louder and longer the more echo it gives (1, 2, 5, 25).
+// Starting levels, to measure at step 5d as the rest were.
+function ECHO(v,at){v=Math.max(1,v||1);const s=0.75*(1+0.2*Math.log2(v)),n=v>=25?4:v>=5?3:2,f=v>=25?440:660,lp=[5000,2600,1600,1000,700];
+  for(let i=0;i<=n;i++)tone({f,to:f*1.5,glide:0.32,dur:0.4,a:0.03,vol:0.09*s*Math.pow(0.5,i),vib:[5,6],lp:lp[i],wet:0.5+0.1*i,at:(at||0)+i*0.16});}
 function DRINK(ch){noise({ft:"bandpass",from:1900,to:1100,q:3,dur:0.035,vol:0.22,wet:0.1});
   tone({f:190,to:125,dur:0.09,lp:700,vol:0.16,wet:0.05,at:0.07});tone({f:165,to:110,dur:0.08,lp:700,vol:0.12,wet:0.05,at:0.18});
   ch.forEach((f,i)=>tone({f,dur:0.55-i*0.08,a:0.1,vol:0.06,wet:0.6,at:0.27+i*0.05}));}
@@ -2066,7 +2093,10 @@ const FX={
   // metal armour struck and splitting: a clang of bright partials and a rough crunch
   crack:()=>{ring({f:620,vol:0.12,wet:0.4,partials:[[1,1,0.5],[1.63,0.8,0.38],[2.37,0.7,0.3],[3.12,0.5,0.22],[4.05,0.4,0.16],[5.3,0.3,0.12]]});noise({ft:"bandpass",from:3200,q:1.5,dur:0.14,tear:90,vol:0.3,wet:0.25});noise({ft:"highpass",from:3000,dur:0.03,vol:0.3,wet:0.2});
     for(let i=0;i<3;i++)tone({type:"triangle",f:3000+R()*2000,dur:0.03,vol:0.05,at:0.08+i*0.07,wet:0.4});},
-  defeat:()=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});tone({f:660,to:990,glide:0.7,dur:0.9,a:0.12,vol:0.09,vib:[5,6],wet:0.7,at:0.18});},
+  // a monster defeated: the card tearing, then its wisp's echo (version 12: the rising note became a short echo; v is the echo it gives)
+  defeat:v=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});ECHO(v||1,0.18);},
+  // version 12: the echo alone, as a boss's golden wisp rises (25), after bossDefeated's bell
+  echo:v=>ECHO(v||25,0),
   pickup:()=>{tone({f:1320,dur:0.12,vol:0.14,wet:0.5});tone({f:1760,dur:0.3,vol:0.12,wet:0.6,at:0.07});tone({f:2640,dur:0.25,vol:0.03,wet:0.7,at:0.12});},
   heal:()=>{[392,494,587,784].forEach((f,i)=>tone({f,dur:0.9-i*0.1,a:0.25,vol:0.07,wet:0.7,at:i*0.08}));},
   // round 13: a potion drunk: the cork, two quick swallows, then a short warm chord rising (lower and redder for health, brighter for mana)
@@ -2094,7 +2124,7 @@ const FX={
 };
 // each effect's level, set by measuring how loud it sounds (K-weighted, its loudest 0.4 s) against a target for its kind:
 // the big moments loudest, the main actions next, light touches and the menus quieter. GAIN is filled from that measure.
-const GAIN={swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */
+const GAIN={echo: 2.96,swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */
 // ---- the places' background sound: wind, rain, thunder, bats, crows, creaking trees ----
 function loopNoise(ft,f,q,vol,lfoRate,lfoDepth){const s=ctx.createBufferSource();s.buffer=nb;s.loop=true;const fl=ctx.createBiquadFilter();fl.type=ft;fl.frequency.value=f;fl.Q.value=q;
   const g=ctx.createGain();g.gain.value=vol;s.connect(fl);fl.connect(g);g.connect(amb);s.start(0,R()*1.5);const nodes=[s];
@@ -2137,7 +2167,7 @@ const AMB={
 function ambient(lv){stopAmb();if(!live()||!lv)return;amb=ctx.createGain();amb.gain.setValueAtTime(0.0001,ctx.currentTime);amb.gain.exponentialRampToValueAtTime(0.55,ctx.currentTime+1.2);amb.connect(out);ambLv=lv;amb._nodes=AMB[lv]();}
 function stopAmb(){timers.forEach(clearTimeout);timers=[];if(amb){const a=amb;try{a.gain.cancelScheduledValues(ctx.currentTime);a.gain.setValueAtTime(a.gain.value,ctx.currentTime);a.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.6);}catch(e){}
     setTimeout(()=>{(a._nodes||[]).forEach(n=>{try{n.stop();}catch(e){}});a.disconnect();},800);}amb=null;ambLv=null;}
-return {_buf:BUF,ready:()=>clipsP||Promise.resolve(),unlock,live,FX,GAIN,BED,EV,get _out(){return out;},_ev:{bats,caw,creak,thunder},play:k=>{if(live()&&FX[k]){curGain=GAIN[k]||1;try{FX[k]();}finally{curGain=1;}}},ambient,stopAmb,get ambLv(){return ambLv;}};
+return {_buf:BUF,ready:()=>clipsP||Promise.resolve(),unlock,live,FX,GAIN,BED,EV,get _out(){return out;},_ev:{bats,caw,creak,thunder},play:(k,v)=>{if(live()&&FX[k]){curGain=GAIN[k]||1;try{FX[k](v);}finally{curGain=1;}}},ambient,stopAmb,get ambLv(){return ambLv;}};
 })();
 
 /* ======================================== pot13.js ======================================== */
@@ -2189,3 +2219,49 @@ function loopPot(cv,t,lvAll,R,K,arg){const lv=lvAll,S=cv.height/LB.LH,W=cv.width
   // a phone's thumb on the socket as it is drunk (a computer's key lights: HUD.setPotion)
   const stg=cv.parentElement,th=stg&&stg.querySelector(".lb-thumb");if(th){const on=!keep&&tt>=tDrink-0.15&&tt<tDrink+0.25,b=stg.querySelector(".lb-potion.is-"+k);
     if(on&&b){const r=stg.getBoundingClientRect(),q=b.getBoundingClientRect(),z=r.width/stg.offsetWidth;th.style.left=((q.left+q.right)/2-r.left)/z+"px";th.style.top=((q.top+q.bottom)/2-r.top)/z+6+"px";th.style.opacity="0.9";}else th.style.opacity="0";}}
+
+// ---------- version 12 (design round 3 of step 5b, 7 November 2026; approved with design system 12): the lightning bolt and the acid spray,
+// each chosen in the Echo Shrine before a run in place of the fireball. A different effect, not more power. Starting figures, as the
+// fireball's: Claude Code tunes them. The acid's colour is one switch (ACID_LOOK, or a loop's option) so gold and green can be compared.
+const ACID_LOOKS={gold:{core:MV_GOLD,lit:MV_LAMP,hot:"#fff6dc"},green:{core:"#46c06e",lit:"#a8eec0",hot:"#e8ffee"}};
+let ACID_LOOK="gold";   // gold chosen by Barney, 7 November 2026 (green, #46c06e, was the alternative)
+// the bolt: a jagged line of gold from (x1, y1) to (x2, y2) that strikes at once and fades over its 0.2 s (u 0 to 1); one flash, on
+// the bolt only, never the screen (the arcade's flash rule). Its corners zig and zag in turn, as sharply on the fork as on the strike
+// (Barney, 7 November 2026); w only thins the fork's line (0.7).
+function fxBolt(c,x1,y1,x2,y2,k,u,seed,w){if(u<0||u>1)return;w=w||1;const a=(1-u)*(1-u*0.5),r=mvRng(seed||3),n=8,pts=[[x1,y1]],nx=-(y2-y1),ny=x2-x1,L=Math.hypot(nx,ny)||1;
+  for(let i=1;i<n;i++){const v=(i+(r()-0.5)*0.5)/n,j=(i%2?1:-1)*(0.35+0.65*r())*12*k;pts.push([x1+(x2-x1)*v+nx/L*j,y1+(y2-y1)*v+ny/L*j]);}pts.push([x2,y2]);
+  const line=(col,lw,al)=>{c.save();c.globalAlpha=al;c.strokeStyle=col;c.lineWidth=lw;c.lineJoin="round";c.lineCap="round";c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();c.restore();};
+  line(MV_GOLD,6*k*w,0.35*a);line(MV_LAMP,2.2*k*w,a);line("#fff8e6",0.9*k*w,a);fxGlowAt(c,x2,y2,16*k*w,0.8*a,MV_GOLD);fxGlowAt(c,x1,y1,10*k,0.6*a,MV_GOLD);}
+// the spray: a stream of droplets from the hand fanning into a short cone (about two body-lengths), falling a little, with a faint mist
+// along it, over 0.35 s (u 0 to 1); each droplet leaves the hand in turn, so the stream stays joined to him
+function fxAcid(c,x,y,f,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,r=mvRng(21),R=130*k;
+  fxGlowAt(c,x,y,(16-u*6)*k,0.85*(1-u*0.7),L.core);
+  for(let j=1;j<=4;j++){const v=j/4*Math.min(1,u*1.6);fxGlowAt(c,x+f*R*0.8*v,y+v*12*k,(10+18*v)*k,0.24*(1-u),L.core);}
+  for(let i=0;i<22;i++){const a=-0.3+r()*0.75,sp=0.6+r()*0.4,li=(i/22)*0.55,ui=(u-li)/0.45;if(ui<0||ui>1)continue;
+    const d=ui*R*sp,dx=Math.cos(a)*d*f,dy=Math.sin(a)*d+ui*ui*30*k,al=ui<0.85?1:(1-ui)/0.15;
+    fxGlowAt(c,x+dx,y+dy,8*k,0.5*al,L.core);fxMote(c,x+dx,y+dy,2.1*k,al,i%3?L.lit:L.hot);}}
+// the patch it leaves on the ground from x0 to x1 at ground y: it hisses for 1.5 s (u 0 to 1), bubbles popping and wisps of steam rising,
+// hurting whatever walks through
+function fxAcidPatch(c,x0,x1,y,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,al=u<0.1?u/0.1:u>0.75?(1-u)/0.25:1,r=mvRng(33);
+  for(let x=x0;x<=x1;x+=12*k)fxGlowAt(c,x,y-2,14*k,0.5*al,L.core);
+  c.save();c.globalAlpha=0.9*al;c.fillStyle=L.core;c.beginPath();c.ellipse((x0+x1)/2,y,(x1-x0)/2,3*k,0,0,Math.PI*2);c.fill();c.restore();
+  for(let i=0;i<7;i++){const bx=x0+(x1-x0)*r(),ph=(u*4+r())%1,br=(1.2+ph*2.6)*k;c.save();c.globalAlpha=al*(1-ph);c.strokeStyle=L.lit;c.lineWidth=1*k;c.beginPath();c.arc(bx,y-2*k-ph*2.4*k,br,0,Math.PI*2);c.stroke();c.restore();}
+  for(let i=0;i<5;i++){const mx=x0+(x1-x0)*r(),ph=(u*3+r())%1;fxMote(c,mx,y-ph*20*k,(1.5-ph)*k,al*(1-ph)*0.85,L.lit);}}
+// the cast for both: the fireball's throw, then a longer rest so the acid's patch can be seen out
+const SQ_SPELL2=mvSeq([[IDLE,3],[PF.back,1],[PF.thrust,1,"thr"],[PF.hold,2],[PF.recover,1],[IDLE,24]]);
+function spellHand(X,G){const G0=mvGeo(PF.thrust,0),hp=G0.T(G0.fHd[0],G0.fHd[1]);return[X+hp[0]*K132+10,G+1+hp[1]*K132];}
+function loopBolt(cv,t,lv,R,K){const H=250,G=230,{c,s,SW}=scSet(cv,H),st=t*R,q=SQ_SPELL2.at(st),S=q.s,tq=Math.floor(st)/R,e=LB.places[lv].edge,o=LB.options(lv,{walking:false});scGround(c,lv,SW,H,G);
+  const X=SW*0.16,BX=SW*0.5,BY=G-150,GX=SW*0.8,thr=SQ_SPELL2.start("thr"),[hx,hy]=spellHand(X,G);
+  const u1=(S-thr)/(0.2*R),u2=(S-thr-0.06*R)/(0.2*R),hitB=u1>=0&&u1<1.4,hitG=u2>=0&&u2<1.4;
+  pMonster(c,s,K,"bat2",BX+(hitB?6:0),BY,tq,o);pMonster(c,s,K,"ghoul2",GX+(hitG?6:0),G+2,tq,o);c.setTransform(s,0,0,s,0,0);
+  const Gm=mvDraw(c,X,G+1,q.P,tq,1,e,K132,{feet:true});fxHand(c,X,G+1,1,K132,q.P,Gm);
+  const bt=[BX-4,BY+8],gt=[GX-22,hy-4];fxBolt(c,hx,hy,bt[0],bt[1],K132,u1,5,1);fxBolt(c,bt[0],bt[1],gt[0],gt[1],K132,u2,11,0.7);
+  scLabel(c,"lightning bolt: the nearest ahead, then one more",SW*0.5,10);}
+function loopAcid(cv,t,lv,R,K,look){look=look||ACID_LOOK;const H=250,G=230,{c,s,SW}=scSet(cv,H),st=t*R,q=SQ_SPELL2.at(st),S=q.s,tq=Math.floor(st)/R,e=LB.places[lv].edge,o=LB.options(lv,{walking:false});scGround(c,lv,SW,H,G);
+  const X=SW*0.18,thr=SQ_SPELL2.start("thr"),[hx,hy]=spellHand(X,G),us=(S-thr)/(0.35*R),up=(S-thr-0.25*R)/(1.5*R),CX=X+SW*0.19,GX=X+SW*0.3,hit=us>=0.4&&us<1.2;
+  pMonster(c,s,K,"crawler",CX+(hit?4:0),G+1,tq,o);pMonster(c,s,K,"ghoul2",GX+(hit?5:0),G+2,tq,o);c.setTransform(s,0,0,s,0,0);
+  const Gm=mvDraw(c,X,G+1,q.P,tq,1,e,K132,{feet:true});fxHand(c,X,G+1,1,K132,q.P,Gm);
+  fxAcidPatch(c,X+SW*0.1,X+SW*0.32,G+1,K132,up,look);fxAcid(c,hx,hy,1,K132,us,look);
+  scLabel(c,"acid spray, "+(look==="green"?"green":"gold"),SW*0.5,10);}
+// the belts as worn: the walk loop with the belt chosen (arg: red, nightBlue, mulberry, ash), for the Wanderer card
+function loopBelt(cv,t,lv,R,K,arg){const was=MV_RED;setBelt(arg);try{loopWalk(cv,t,lv,R,K);}finally{MV_RED=W_RED=was;}}

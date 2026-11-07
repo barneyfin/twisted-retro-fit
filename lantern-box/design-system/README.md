@@ -9,15 +9,16 @@ Every screen has two layers.
 
 The arch is kept to the title on purpose: it is the one moment the Interface joins the paper theatre. Pause, settings, game over, initials, high scores, the rotate notice and the HUD are plaques, so play always reads the same way.
 
-During play only the HUD sits over the picture: health and mana top left, the tiles and the wisps counter top right. Everything else that happens in play (a hit, a defeat, a wisp rising) is World and is drawn in the scene.
+During play only the HUD sits over the picture: health and mana top left, the tiles and the echo counter top right. Everything else that happens in play (a hit, a defeat, a wisp rising) is World and is drawn in the scene; the one exception is teaching in play on a first run (Teaching, version 12).
 
 ## Content fundamentals
 
 - **Interface copy is sentence case**: "Start game", "High scores", "Reduce motion", "Quit to menu". Buttons are verbs or plain nouns; never "OK".
-- **Headings are plain words** in IM Fell English: Paused, Settings, Game over, New best, High scores, Turn your phone sideways. No ALL CAPS in source; the few uppercase lines (WISPS, NEW BEST, column heads) are uppercase by `text-transform`.
-- **The score is counted in wisps**: each defeated monster's pale wisp rises towards the counter. Write "1120 wisps" in sentences, "WISPS" as a label. The HUD counter and the title's Best are padded to four places with zeros (`0450`); the game-over number, the line above the initials and the high-score table are not (`880`).
+- **Headings are plain words** in IM Fell English: Paused, Settings, Game over, New best, High scores, Echo Shrine, Choose a run, Credits, Turn your phone sideways. No ALL CAPS in source; the few uppercase lines (ECHO, STOLEN ECHO, NEW BEST, READY, column heads) are uppercase by `text-transform`.
+- **The score is counted in echo** (wisps until version 12; PRD question 12): each defeated monster's pale wisp still rises towards the counter, and what it gives is echo. Echo has no plural: write "1120 echo" in sentences, "ECHO" as a label. Echo banked between runs is "stolen echo", spent at the Echo Shrine. The HUD counter and the title's Best are padded to four places with zeros (`0450`); the run's end's number, the line above the initials and the high-score table are not (`880`).
 - **Numbers are Alegreya Sans bold with tabular figures**, never IM Fell English: its old-style figures make 1120 read as "II2O".
-- **Controls are named, not described**: a keycap, then the action in `hint` ("Esc resume", "↑ ↓ choose · Enter select"). Computers only; phones get no keyboard hints.
+- **Controls are named, not described**: a keycap, then the action in `hint` ("P resume", "↑ ↓ choose · Enter select · Backspace back"). Computers only; phones get no keyboard hints.
+- **Never Esc** (version 12): P pauses and resumes, Backspace goes back. Portals keep Escape for leaving full screen (CrazyGames' quality guidelines), so no hint shows it and the CrazyGames build never listens for it; the arcade's own build still answers it, unshown. Letter keycaps show the player's own keyboard where the browser can tell (Keycap).
 - **Tone**: dread, not cute, and plain in the Interface. No exclamation marks, no emoji, no jokes. "Game over", not "You died". No blood anywhere: a defeated monster breaks into card pieces.
 - **Names are invented**. *Ghosts 'n Goblins* is a reference for how Gloam Hallow plays, never for its knight, monsters, look or title. Players are adults and teens.
 - **Sample names and numbers** in these previews (MOR, VEX, 2480 and so on) are made up.
@@ -30,10 +31,10 @@ During play only the HUD sits over the picture: health and mana top left, the ti
 - **Light has fixed roles.** Never swap them.
   - `gold-light` and `lamp-glass`: glow points only. Lit windows (`window-dark` when unlit), candles, lamps and lanterns, string lights (`string-light`, `string-light-storm` in the rain, with `string-glow`), the crack of light under a door, the wanderer's lantern (`lantern-glow`). Never on a monster.
   - `potion`: the potion is the one glow point in its own red.
-  - `ember` with `ember-glow` and `ember-hot`: danger only. Monsters' eyes (`ember-eye-core` pupils), their 2.5px rim and 11px glow, ember throats with `bone` teeth, seams; the bosses' ember detail. Never on scenery or pick-ups.
+  - `ember` with `ember-glow` and `ember-hot`: danger only. Monsters' eyes (`ember-eye-core` pupils), their 2.5px rim and 11px glow, ember throats with `bone` teeth, seams; the bosses' ember detail. Never on scenery or pick-ups. In the Interface, only the one destructive button, Clear saved progress (version 12).
   - Witch-green (`witch-core`, `witch-mid`, `witch-glow`, at the intense strength `witch-intense`): the splashes only, one small menacing thing per stretch of path.
   - `wisp-pale` (glow `wisp-pale-glow`): a defeated monster. `wisp-gold` (glow `wisp-gold-glow` through `gold-light`): a defeated boss.
-- **The wanderer** is `ink` with a thin lit edge in the place's light (`night-edge` …), a gold lantern and one red (`wanderer-scarf`): the long red tie belt, knotted at the back with two tails trailing, which replaced the scarf (PRD question 8, settled in step 4b round 1b).
+- **The wanderer** is `ink` with a thin lit edge in the place's light (`night-edge` …), a gold lantern and one belt: the long tie belt, knotted at the back with two tails trailing, which replaced the scarf (PRD question 8, settled in step 4b round 1b). Red (`wanderer-scarf`) to start; since version 12 night blue, mulberry or ash (`belt-night-blue`, `belt-mulberry`, `belt-ash`) bought at the Echo Shrine, each kept off the colours that already mean something (ember, gold, witch-green, wisp-pale). So the one-red rule is now one belt (PRD question 6).
 - **Bosses** are black card like the monsters, graded the same way, with the monsters' ember eyes, mouths, rim and glow (version 6). Their nod to the level's colour is small: a few inner lines lit faintly in it and a glow behind them (`boss-night-aura` …), which since version 7 lightens what is behind the boss (`boss-glow`) so it shows on a phone, against the bright horizon and on the Mist's pale sky. The moor mother's dead eye (`boss-dawn-dead-eye`) and the gaping tree's moss (`boss-mist-moss`) are their only other colours.
 - **Plaques**: edge `brass` 1.5px round a `plaque-face` (dialogs) or `hud-face` (HUD) face. Headings and numbers `heading`; items and names `text`; values `text-2`; descriptions, ranks and hints `text-3`; a letter not yet chosen `text-dim`. The selected item, primary buttons, a toggle that is On, the chosen segment and the highlighted row are the brass band: `brass` with `on-brass` text. Secondary controls are outlined in `brass-dim`. Rules are `brass-dim` lines either side of a `brass` diamond; row hairlines `rule-row` and `rule-dark`.
 - **The arch** is `ink` card lit from behind (`arch-filter`: `arch-edge`, `arch-glow`, `arch-glow-far`). Its lettering is light coming through cut letters: the name `title-letter` with `glow-title`, the selected item `title-selected` with `glow-title-item` beside a `gold-light` candle flame, other items and the Best label `title-item`, the hint `title-hint` with keycaps in `title-key` and `title-key-line`.
@@ -67,7 +68,7 @@ During play only the HUD sits over the picture: health and mana top left, the ti
 ### The HUD
 
 - Health and mana share one plaque top left, `space-5` in (12px and 10px on a phone): a heart and the health bar (10px tall), a flame and the mana bar (7px tall).
-- Top right, left to right: the full-screen tile (computers only), the pause tile, the wisps counter plaque (WISPS label over the `counter`). Tiles are 40px on a computer and 44px (`target`) on a phone.
+- Top right, left to right: the full-screen tile (computers only), the pause tile, the echo counter plaque (ECHO label over the `counter`). Tiles are 40px on a computer and 44px (`target`) on a phone.
 - Version 8 grows it (HUD): health with three armour slots, mana, a lantern per life and the spell's socket in one plaque; the "?" tile between full screen and pause; the boss bar along the bottom middle in a fight; a plaque line at the top middle when a spell or the sword gets better; the phone's stick and three buttons (TouchControls).
 - The HUD never moves, flashes or shakes. Hits and pick-ups are shown in the World.
 
@@ -96,7 +97,7 @@ During play only the HUD sits over the picture: health and mana top left, the ti
 
 ### States and focus
 
-- Menus have a selected item (the brass band, or the glow on the arch). Arrow keys move it, Enter or a tap confirms, Esc goes back. Keyboard focus follows the selection, so the band is the focus mark.
+- Menus have a selected item (the brass band, or the glow on the arch). Arrow keys move it, Enter or a tap confirms, Backspace goes back (never Esc). Keyboard focus follows the selection, so the band is the focus mark.
 - Every other control shows keyboard focus with a 2px ring in `focus`: inside a chamfered control (the chamfer clips anything outside), in `on-brass` on a brass fill; outside round controls (the slider, arch tiles), offset 2px.
 - Hover lightens an unselected item's text to `heading`. Disabled: 45% opacity.
 - Toggles say On or Off in words, not only by colour: On is the brass band, Off is outlined.
@@ -118,6 +119,7 @@ During play only the HUD sits over the picture: health and mana top left, the ti
 - Two soundtrack MP3s per game (ARCADE.md allows two in a Lantern Box game); which places get which, and when they switch, is decided by each game's gameplay.
 - Short effects for the Interface (choose, select, back): in Lantern Box a muted tick, a soft chime and a falling tick, not the shell's square-wave blips. Volume scales everything; 0 mutes.
 - Gloam Hallow's play sounds and each place's background are made in code, apart from two of Barney's recordings (the hurt and the crows' caws; ARCADE.md allows short sound effects since 4 November 2026): see Sound, and `SND` in play.js. Levels are set by measured loudness.
+- Version 12: the wisp's rising note is a short echo, louder and longer the more echo it gives (1, 2, 5, a boss's 25).
 
 ## Settings
 
@@ -126,19 +128,28 @@ During play only the HUD sits over the picture: health and mana top left, the ti
   - **Effects**: "Glow round lights, eyes and splashes." Off draws the lights, eyes and splashes without their glow.
   - **Reduce motion**: "Flatter scenery, slower rain, no shaking." As in Motion and safety.
   - **Picture**: Automatic, Best, Faster, Fastest. "Automatic picks the most detail your device can run smoothly." Automatic is the default.
+  - Version 12, Gloam Hallow: **Credits** (Open) and **Clear saved progress** (Clear, with its confirmation), sharing one row on a computer (SettingsPanel).
 - The arcade's Solid panels setting is not shown (plaques are already near solid) and its saved value is left alone.
-- Changes apply at once; Done (or Esc) only closes the plaque.
+- Changes apply at once; Done (or Backspace) only closes the plaque.
 
 ## Screens every game has
 
 - **Title** (TitleScreen): the arch over the first place, running slowly. Start game, High scores, Settings.
 - **Play** (PlayScreen): the World and the HUD.
-- **Pause** (PauseOverlay): Esc, P, the pause tile, losing focus or turning a phone upright. Resume, Restart, Settings, Quit to menu.
-- **Game over** (GameOverCard): the score large; NEW BEST when it beats the best on this device. If it makes the top ten, the only button is Continue, to the initials; otherwise Play again, High scores, Menu.
+- **Pause** (PauseOverlay): P, the pause tile, losing focus or turning a phone upright (and Esc in the arcade's own build, unshown). Resume, Restart, Settings, Quit to menu.
+- **Game over** (GameOverCard): the score large; NEW BEST when it beats the best on this device. If it makes the top ten, the only button is Continue, to the initials; otherwise Play again, High scores, Menu. In Gloam Hallow since version 12, the run's end (RunEnd) takes its place.
 - **Initials** (NameEntry), then **High scores** (HighScores) with the new row lit; from the title, High scores shows the table alone.
 - **Settings** (SettingsPanel), over whatever opened it.
 - **Rotate** (RotateNotice) on a phone held upright.
 - A modes screen only if a game has modes.
+
+### Gloam Hallow's screens added in version 12 (step 5b)
+- **The run's end** (RunEnd): Game over with this run's echo banked, a near-miss line, the next unlock, Play again focused.
+- **The Echo Shrine** (EchoShrine): stolen echo buys a spell, potion sockets and belts, from the title menu and the run's end.
+- **The choice of run** (Modes): The Bare Reckoning or The Echo Infusion, once anything is bought; Hysteria coming soon.
+- **The Grace pick** (GracePick): one of three Graces after each boss, under the next place's card.
+- **Teaching in play** (Teaching) on a first run; **Credits** (Credits) from Settings; **the win** (WinCard) offering the second loop.
+- **The Full Launch places** (AdPlaces): drawn only, built if CrazyGames invites the game.
 
 ## Using the World code
 
@@ -146,10 +157,11 @@ During play only the HUD sits over the picture: health and mana top left, the ti
 
 ## The play parts (play.js)
 
-`components/play.js` (version 8; 1.0.1 in version 9, 1.1.0 in version 11) carries everything designed for Gloam Hallow in step 4b's play-parts rounds, as the review page drew it, beside `bundle.js`: the wanderer's moves (Moves), the spells (Spells), the loot (Loot), the rolling ground, its pieces and the hill sections (Ground), the checkpoint lanterns (Checkpoint), the monsters' and bosses' attacks (MonsterAttacks, BossAttacks), the moments (Moments, PlaceCard), the HUD builder (HUD), the potions kept for later (Potions, version 11) and the sound (Sound). Its loops are the timing reference. It is the spec for the kit change (step 4c): Claude Code turns it into kit code without changing what it draws or how it times it. The gameplay note (`lantern-box/GAMEPLAY-gloam-hallow.md`) has the rules and the starting figures.
+`components/play.js` (version 8; 1.0.1 in version 9, 1.1.0 in version 11, 1.2.0 in version 12) carries everything designed for Gloam Hallow in step 4b's play-parts rounds, as the review page drew it, beside `bundle.js`: the wanderer's moves (Moves), the spells (Spells), the loot (Loot), the rolling ground, its pieces and the hill sections (Ground), the checkpoint lanterns (Checkpoint), the monsters' and bosses' attacks (MonsterAttacks, BossAttacks), the moments (Moments, PlaceCard), the HUD builder (HUD), the potions kept for later (Potions, version 11), the lightning bolt and acid spray, the belts and the echo sound (version 12) and the sound (Sound). Its loops are the timing reference. It is the spec for the kit change (step 4c): Claude Code turns it into kit code without changing what it draws or how it times it. The gameplay note (`lantern-box/GAMEPLAY-gloam-hallow.md`) has the rules and the starting figures.
 
 ## Versions
 
+- **Version 12** (7 November 2026, step 5b's design rounds 1 to 3; approved by Barney the same day at step 5c, before Claude Code starts step 5d): Gloam Hallow ready for a portal. **The rename**: wisps become echo (no plural), the bank "Stolen echo", the wisp shop the Echo Shrine; the look stays (WispCounter, HighScores, NameEntry, TitleArch, TitleScreen, GameOverCard). New: **RunEnd** (the run's end: this run's echo banked, the near-miss line, the next unlock, the daily bonus, Play again focused), **EchoShrine**, **GracePick** (the first deck of eight Graces, five pictures new), **Teaching**, **Credits** (the studio's credit as a Brand asset), **AdPlaces** (Full Launch, drawn only). Changed: **Modes** (The Bare Reckoning and The Echo Infusion, Hysteria coming soon at 500; a phone layout), **WinCard** ("A grim triumph.", three lines with three bells, the second loop's offer), **Potions** (up to three of each, pips), **SettingsPanel** (Credits, Clear saved progress and its confirmation; 560 wide), **Spells** (the lightning bolt and the acid spray in gold, the bolt's fork zigzagging), **Wanderer** (four belts), **Sound** (the wisp's echo). **Keys**: P to pause, Backspace to go back, never Esc in a hint (HowToPlay, PauseOverlay, Keycap, MenuPanel, HighScores, HysteriaFinish); the player's own key letters where the browser can tell. **Levels**: no pit near a checkpoint, as kit 0.9.1 (Checkpoint, Ground). Not yet designed: how the title menu reaches the Echo Shrine (TitleArch). Tokens version 12 (`belt-night-blue`, `belt-mulberry`, `belt-ash`; ember allowed on the one destructive button); bundle.css's version 12 section; play.js 1.2.0 (`setBelt`, the echo counter, the pips, `ECHO`, `SND.play` with a value). bundle.js unchanged (11.0.0). The new screens' backdrops are the live world drawn by play.js, not step 4a's stills (which show the old Veiled Ghost and the stand-in wanderer), and the Wanderer card shows the game's wanderer.
 - **Version 11** (5 November 2026, round 13, agreed by Barney: "All as agreed"): **potions kept for later**, one health and one mana, in two sockets under the plaque, drunk with a tap, Q or E (Potions, new: the sockets' looks and moments; HUD, Vitals, Loot, HowToPlay, Sound); **the plaque line moves** under the HUD's top row (PlaqueLine); **the double tap to roll** (TouchControls); **lit through a cloud softened** for the far layers (Places, Flyers); **the ghoul lurches** so its swipe outreaches the sword and **the walker's high sweep means stay down, or roll** (MonsterAttacks); **the Gaping Tree's branch at head height** (BossAttacks); monsters face the wanderer in a game (Monsters). bundle.js 11.0.0, play.js 1.1.0, tokens version 11 (`thru-cloud-soft`, `thru-cloud-far`).
 - **Version 10** (4 November 2026, Barney's option A, after he found it on his Pixel): lit through a cloud. Where a cloud is behind them, backdrop layers 1 and 2 and the far bat swarm take the cloud's own colour a step darker (`thru-cloud`, 0.75 of their tint), so a distant tower or bat no longer shows lighter than the cloud behind it (Places, Flyers). bundle.js 10.0.0; tokens version 10 (`thru-cloud` in Picture).
 - **Version 9** (4 November 2026, four small fixes found while building the kit in step 4c, bundled by Barney): the mouth-hat's signal eyes follow its hop, so no second pair of eyes shows (MonsterAttacks); the Veiled Ghost's "behind" signal fades smoothly instead of flickering 8 times a second (BossAttacks); the moor's crow flocks drawn nearer `ink` so they show across the dawn sky (Flyers); the place list's names capitalised as agreed (Places). bundle.js 9.0.0, play.js 1.0.1. No other changes.

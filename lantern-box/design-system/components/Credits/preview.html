@@ -1,0 +1,41 @@
+<!-- @dsCard group="Screens" height=994 width=960 subtitle="Version 12: the studio's credit, the music, the sound and the type, from Settings" -->
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Credits</title>
+<style>
+body{margin:0;background:var(--ink)}
+.stage{position:relative;overflow:hidden;background:var(--ink)}
+.stage>img,.stage>canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cap{margin:0;padding:8px 2px 6px;font:500 13px/16px var(--font-text);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.col{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.why{margin:0;padding:6px 2px 12px;font:400 14px/19px var(--font-text);color:var(--text-3);max-width:940px}
+
+</style>
+</head>
+<body>
+<p class="cap">Computer · from Settings</p><div class="stage lb-ui" style="width:960px;height:540px"><canvas data-loop="back" data-lv="night" data-arg="still:5" aria-hidden="true"></canvas><div class="lb-scrim"></div><div class="center"><div class="lb-plaque" role="dialog" aria-modal="true" aria-labelledby="cr-h" style="width:520px"><div class="lb-face is-centred" style="gap:12px;padding:20px 24px 16px"><h2 class="lb-heading" id="cr-h">Credits</h2><div class="lb-rule" aria-hidden="true"><i></i></div><img class="lb-credit-strip" src="/_blob/cc1381ae81899d30721b10ccdca71c75" alt="Made by Lantern Box Games"><div class="lb-credits"><p class="lb-credit"><span class="k">Music</span><span class="v">Music made with Google Gemini</span><span class="s">The Long Vigil · Lantern in the Moor</span></p><p class="lb-credit"><span class="k">Sound</span><span class="v">Two sound effects from Pixabay; the rest made in code</span></p><p class="lb-credit"><span class="k">Type</span><span class="v">IM Fell English, by Igino Marini · Alegreya Sans, by Huerta Tipográfica</span><span class="s">SIL Open Font Licence</span></p></div><button class="lb-btn" type="button">Back</button><p class="lb-hint" style="text-align:center"><span class="lb-kbd">Backspace</span> back</p></div></div></div></div><p class="cap">Phone held sideways</p><div class="stage lb-ui" style="width:844px;height:390px"><canvas data-loop="back" data-lv="night" data-arg="still:5" aria-hidden="true"></canvas><div class="lb-scrim"></div><div class="center"><div class="lb-plaque is-phone" role="dialog" aria-modal="true" aria-labelledby="cr-hp" style="width:720px"><div class="lb-face" style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1fr);column-gap:24px;align-items:center;padding:16px 20px"><div style="display:flex;flex-direction:column;align-items:center;gap:10px"><h2 class="lb-heading" id="cr-hp">Credits</h2><div class="lb-rule" aria-hidden="true" style="align-self:stretch"><i></i></div><img class="lb-credit-strip" src="/_blob/cc1381ae81899d30721b10ccdca71c75" alt="Made by Lantern Box Games"><button class="lb-btn" type="button" style="width:100%">Back</button></div><div class="lb-credits"><p class="lb-credit"><span class="k">Music</span><span class="v">Music made with Google Gemini</span><span class="s">The Long Vigil · Lantern in the Moor</span></p><p class="lb-credit"><span class="k">Sound</span><span class="v">Two sound effects from Pixabay; the rest made in code</span></p><p class="lb-credit"><span class="k">Type</span><span class="v">IM Fell English, by Igino Marini · Alegreya Sans, by Huerta Tipográfica</span><span class="s">SIL Open Font Licence</span></p></div></div></div></div></div>
+<script src="../../components/play.js"></script>
+<script>
+/* version 12's runner: draws each backdrop canvas[data-loop="back"] once as a still of the place from play.js (data-lv the place,
+   data-arg "still:<seconds>" the moment of the walk), and builds a HUD on any .stage[data-hud]. */
+(()=>{const back=(cv,t,lv,R,K,arg)=>{const a=(arg||"still:5").split(":");if(a[0]==="run"){loopRoll(cv,t,lv,R,K,lv);return;}const key=lv+cv.width+"x"+cv.height;if(K.key===key)return;loopRoll(cv,+a[1]||5,lv,R,K,lv);K.key=key;};
+document.querySelectorAll(".stage[data-hud]").forEach(s=>{s.__hud=HUD.build(s,s.dataset.hud==="phone");});
+const anims=[...document.querySelectorAll("canvas[data-loop]")].map(cv=>({cv,K:{},on:true,fn:back}));
+const dpr=()=>Math.min(2,window.devicePixelRatio||1);let t=0.6,last=0;
+function fitA(it){const r=it.cv.getBoundingClientRect(),d=dpr(),w=Math.max(60,Math.round(r.width*d)),h=Math.max(30,Math.round(r.height*d));if(it.cv.width!==w||it.cv.height!==h){it.cv.width=w;it.cv.height=h;it.K={};}}
+function fit(){anims.forEach(fitA);}
+try{new ResizeObserver(()=>requestAnimationFrame(fit)).observe(document.body);}catch(e){}
+const hud=document.querySelector(".stage[data-hud]");
+function frame(n){const dt=last?Math.min(0.05,(n-last)/1000):0;last=n;t+=dt;
+  for(const it of anims){try{it.fn(it.cv,t,it.cv.dataset.lv||"night",12,it.K,it.cv.dataset.arg);}catch(e){console.error(e);}}
+  if(hud){try{HUD.tick(t,"night",anims,true);}catch(e){console.error(e);}}
+  requestAnimationFrame(frame);}
+const go=()=>{fit();requestAnimationFrame(frame);};
+if(document.fonts&&document.fonts.load){Promise.all([document.fonts.load('12px "Alegreya Sans"'),document.fonts.load('700 12px "Alegreya Sans"'),document.fonts.load('24px "IM Fell English"')]).catch(()=>{}).then(go);}else go();
+})();
+</script>
+</body>
+</html>

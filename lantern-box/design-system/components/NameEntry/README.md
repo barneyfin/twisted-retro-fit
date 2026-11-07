@@ -11,7 +11,7 @@ Three initials chosen letter by letter, after a score that makes the top ten: a 
   <div class="lb-face is-centred" style="padding:22px 18px 18px">
     <h2 class="lb-heading" id="ne-title">New best</h2>
     <div class="lb-rule" aria-hidden="true"><i></i></div>
-    <p class="lb-hint" style="font-size:17px;color:var(--text-2)"><span class="lb-num" style="font-size:20px">1120</span> wisps. Enter your initials.</p>
+    <p class="lb-hint" style="font-size:17px;color:var(--text-2)"><span class="lb-num" style="font-size:20px">1120</span> echo. Enter your initials.</p>
     <div class="lb-slots" role="group" aria-label="Initials">
       <div class="lb-slot-col"><span class="lb-chev is-blank"></span><span class="lb-slot">B</span><span class="lb-chev is-blank"></span></div>
       <div class="lb-slot-col">{up chevron}<span class="lb-slot is-selected" aria-current="true">A</span>{down chevron}</div>
@@ -22,7 +22,7 @@ Three initials chosen letter by letter, after a score that makes the top ten: a 
   </div>
 </div>
 ```
-On a phone held sideways (580px wide, `is-phone`): two columns. Left: the heading, "1120 wisps. Tap a letter, then the arrows to change it." and Done. Right: the slots as buttons (`lb-slot-btn`, 60 by 70px); the selected one has 44px arrow buttons above and below (`lb-arrow-btn`), Next letter and Previous letter.
+On a phone held sideways (580px wide, `is-phone`): two columns. Left: the heading, "1120 echo. Tap a letter, then the arrows to change it." and Done. Right: the slots as buttons (`lb-slot-btn`, 60 by 70px); the selected one has 44px arrow buttons above and below (`lb-arrow-btn`), Next letter and Previous letter.
 
 ## The game provides
 - Nothing: the kit handles the letters and saves the row.

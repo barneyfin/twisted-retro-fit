@@ -17,3 +17,8 @@ The play screen's HUD as agreed in step 4b round 9: Vitals grown (health with it
 - **The potion sockets** (round 13): one health potion and one mana potion can be kept and drunk when the player chooses. Two sockets of their own, 8px under the plaque's left end (`lb-potions` of `lb-potion`, in `lb-hud-left`), 40px on a computer as the tiles, 44px on a phone. See Potions.
 - `HUD.build(stage, phone, {pot: "under"})` writes them ("beside" puts them inside the plaque, the option not chosen); `HUD.set` takes `potions: {health, mana}` and `potFx: {k, kind: "keep"|"drink", u}`; `HUD.OPTS.rm` and `HUD.OPTS.fxOff` give the moments' Reduce motion and Effects off versions.
 - **The plaque line moves** under the HUD's top row, centred: 99px down on a computer, 89 on a phone (see PlaqueLine).
+
+## Version 12
+- **The counter counts echo** (WispCounter): the label ECHO; the HUD builder writes it (`HUD.build`), and the state keeps its key, `wisps`.
+- **Up to three potions of each**: pips under each socket once a second is bought (Potions); `HUD.set` takes `potions` as counts and `potCap`.
+- **Teaching in play** on a first run sits over play beside the HUD, never over it (Teaching).

@@ -1,6 +1,6 @@
 # GameOverCard
 
-The end of a run: a plaque headed Game over, the score large in wisps, and either Continue (a top-ten score) or Play again, High scores and Menu.
+The end of a run: a plaque headed Game over, the score large in echo, and either Continue (a top-ten score) or Play again, High scores and Menu.
 
 ## When to use
 - When the run ends (the game decides how).
@@ -31,3 +31,6 @@ On a phone held sideways (560px wide): `is-phone`, two columns: the heading, num
 - The score is the largest thing on the plaque: `score-xl` (54px on a phone), tabular, not padded, `heading` with `glow-score`; WISPS under it in `unit`.
 - NEW BEST in `flag` between two `brass` diamonds. It does not flash or pulse.
 - Play again carries the diamond as the selected item. The primary control is focused on open.
+
+## Version 12
+- **In Gloam Hallow the run's end replaces this card** (RunEnd): the echo banked, a near-miss line, the next unlock and Play again focused. This card stays as the pattern for a Lantern Box game without saved progress. The unit reads echo (PRD question 12).

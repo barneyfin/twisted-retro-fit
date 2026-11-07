@@ -17,7 +17,7 @@ A plaque's list of choices: the selected item is the brass band with a diamond, 
 ```
 
 ## The game provides
-- Labels, sentence case. Which item is selected: arrow keys move it, Enter or a tap confirms, Esc goes back. It moves instantly.
+- Labels, sentence case. Which item is selected: arrow keys move it, Enter or a tap confirms, Backspace goes back (version 12: never Esc). It moves instantly.
 
 ## Rules
 - Items `item-height` (46px) tall, `menu` type, `space-1` apart, labels 40px in from the left so they line up with the selected one's.

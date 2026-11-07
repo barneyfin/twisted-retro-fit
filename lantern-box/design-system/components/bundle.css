@@ -429,3 +429,194 @@
 /* How to play on a phone: the two sockets drawn small beside "Tap a potion" */
 .lb-touchkey svg .pk path{fill:var(--tile-face);stroke:var(--brass);stroke-width:1.1}
 .lb-touchkey svg .pf path{fill:var(--ink);stroke:var(--heading);stroke-width:1.6}
+
+/* ======================================== version 12 (step 5b's design rounds 1 to 3, 7 November 2026) ========================================
+   The run's end, the Echo Shrine, the choice of run, the Graces, teaching in play, the potion pips, Settings' new rows, Credits, the win's
+   three lines, and the Full Launch places (drawn now, built only if CrazyGames invites the game). Tokens only. */
+/* a chamfered fill, as the brass band's */
+.lb-chamfer{--ch:var(--chamfer-control);clip-path:polygon(var(--ch) 0,calc(100% - var(--ch)) 0,100% var(--ch),100% calc(100% - var(--ch)),calc(100% - var(--ch)) 100%,var(--ch) 100%,0 calc(100% - var(--ch)),0 var(--ch))}
+
+/* ---- the run's end (RunEnd) ---- */
+.lb-near{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;font:400 16px/20px var(--font-text);color:var(--text-2)}
+.lb-near .lb-num{font-size:17px}
+.lb-near-name{font:400 18px/20px var(--font-display);color:var(--text)}
+.lb-near-bar{display:block;flex:none;width:96px;height:8px;background:var(--track);border:1px solid var(--track-line)}
+.lb-near-bar>i{display:block;height:100%;background:linear-gradient(180deg,var(--boss-top) 0%,var(--ember) 55%,var(--boss-low) 100%)}
+.lb-next{display:flex;align-items:center;gap:12px;padding:10px 2px;border-top:1px solid var(--rule-row);border-bottom:1px solid var(--rule-row)}
+.lb-next .lb-spell,.lb-next .lb-potion{cursor:default;flex:none}
+.lb-next-body{flex-grow:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+.lb-next-row{margin:0;display:flex;align-items:baseline;justify-content:space-between;gap:12px;font:400 17px/20px var(--font-text);color:var(--text)}
+.lb-togo{font:400 15px/20px var(--font-text);color:var(--text-2);white-space:nowrap}
+.lb-togo .lb-num{font-size:17px}
+.lb-echo-bar{display:flex;height:10px;background:var(--track);border:1px solid var(--track-line)}
+.lb-echo-bar>i{display:block;height:100%}
+.lb-echo-bar>.was{background:var(--wisp-pale-glow);opacity:.5}
+.lb-echo-bar>.now{background:var(--wisp-pale);box-shadow:0 0 8px rgba(200,214,255,.55)}
+.lb-ready{display:inline-flex;align-items:center;gap:6px;font:700 13px/16px var(--font-text);letter-spacing:.12em;text-transform:uppercase;color:var(--heading);white-space:nowrap}
+.lb-ready::before{content:"";flex:none;width:8px;height:8px;background:var(--brass);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.lb-btn.is-lit{border-color:var(--brass);color:var(--heading)}
+.lb-first{margin:0;font:400 16px/1.35 var(--font-text);color:var(--text-2);text-align:center}
+.lb-daily{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;font:400 15px/20px var(--font-text);color:var(--text-2)}
+.lb-daily .lb-num{font-size:16px}
+.lb-daily-mark{--ch:3px;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:20px;padding:0 5px;background:var(--brass);color:var(--on-brass);font:700 13px/1 var(--font-text);
+  clip-path:polygon(var(--ch) 0,calc(100% - var(--ch)) 0,100% var(--ch),100% calc(100% - var(--ch)),calc(100% - var(--ch)) 100%,var(--ch) 100%,0 calc(100% - var(--ch)),0 var(--ch))}
+.lb-plaque.is-phone .lb-near{font-size:14px;gap:7px}
+.lb-plaque.is-phone .lb-near .lb-num{font-size:15px}
+.lb-plaque.is-phone .lb-near-name{font-size:16px}
+.lb-plaque.is-phone .lb-near-bar{width:72px}
+.lb-plaque.is-phone .lb-next-row{font-size:16px}
+.lb-plaque.is-phone .lb-togo{font-size:14px}
+.lb-plaque.is-phone .lb-daily{font-size:14px}
+
+/* ---- the Echo Shrine (EchoShrine) ---- */
+.lb-bank{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none}
+.lb-bank-label{font:400 11px/14px var(--font-text);letter-spacing:.14em;text-transform:uppercase;color:var(--wisp-label)}
+.lb-bank-num{font:700 26px/1 var(--font-text);font-variant-numeric:tabular-nums;color:var(--heading)}
+.lb-shrine-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:20px}
+.lb-shrine-col{display:flex;flex-direction:column;gap:8px;min-width:0}
+.lb-shrine-col+.lb-shrine-col{border-left:1px solid var(--rule-row);padding-left:20px}
+.lb-shrine-title{margin:0 0 2px;font:500 12px/16px var(--font-text);letter-spacing:.14em;text-transform:uppercase;color:var(--text-3)}
+.lb-shrine-row{display:flex;align-items:center;gap:10px;min-height:var(--target);padding:4px 6px 4px 4px}
+.lb-shrine-row.is-chosen{--ch:var(--chamfer-control);background:var(--brass-wash);box-shadow:inset 0 0 0 1px var(--brass);
+  clip-path:polygon(var(--ch) 0,calc(100% - var(--ch)) 0,100% var(--ch),100% calc(100% - var(--ch)),calc(100% - var(--ch)) 100%,var(--ch) 100%,0 calc(100% - var(--ch)),0 var(--ch))}
+.lb-shrine-row.is-soon{border-top:1px solid var(--rule-row);padding-top:8px}
+.lb-shrine-row .lb-spell{cursor:default;flex:none}
+.lb-shrine-text{display:flex;flex-direction:column;gap:1px;flex-grow:1;min-width:0}
+.lb-shrine-name{font:400 17px/20px var(--font-text);color:var(--text)}
+.lb-shrine-note{font:400 14px/18px var(--font-text);color:var(--text-3)}
+.lb-shrine-state{flex:none;font:700 12px/16px var(--font-text);letter-spacing:.12em;text-transform:uppercase;color:var(--heading)}
+.lb-shrine-row.is-soon .lb-shrine-state{color:var(--text-3)}
+.lb-shrine-pots{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.lb-buy{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;min-width:76px;height:36px;padding:0 10px;border:1.5px solid var(--brass-dim);background:transparent;
+  color:var(--text);font:400 16px var(--font-text);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap}
+.lb-buy:hover{color:var(--heading)}
+.lb-buy.is-ready{--ch:var(--chamfer-control);border:0;background:var(--brass);color:var(--on-brass);font-weight:700;
+  clip-path:polygon(var(--ch) 0,calc(100% - var(--ch)) 0,100% var(--ch),100% calc(100% - var(--ch)),calc(100% - var(--ch)) 100%,var(--ch) 100%,0 calc(100% - var(--ch)),0 var(--ch))}
+.lb-buy:disabled{color:var(--text-dim);border-color:var(--brass-deep);cursor:default}
+.lb-buy:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--focus)}
+.lb-buy.is-ready:focus-visible{box-shadow:inset 0 0 0 2px var(--on-brass)}
+.lb-socks{display:flex;gap:6px;flex:none}
+.lb-socks .lb-potion{cursor:default}
+.lb-belts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.lb-belt{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:8px;border:1px solid var(--rule-dark);background:transparent;color:var(--text);text-align:left;cursor:pointer;font:inherit}
+.lb-belt.is-worn{border-color:var(--brass);background:var(--brass-wash)}
+.lb-belt .band{display:block;height:12px;border-radius:1px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);background:var(--wanderer-scarf)}
+.lb-belt .band.is-night-blue{background:var(--belt-night-blue)}
+.lb-belt .band.is-mulberry{background:var(--belt-mulberry)}
+.lb-belt .band.is-ash{background:var(--belt-ash)}
+.lb-belt .row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.lb-belt .nm{font:400 15px/18px var(--font-text);color:var(--text)}
+.lb-belt .st{font:700 11px/14px var(--font-text);letter-spacing:.12em;text-transform:uppercase;color:var(--heading)}
+.lb-belt .st.is-wear{color:var(--text-3)}
+.lb-belt .pr{font:400 15px/18px var(--font-text);font-variant-numeric:tabular-nums;color:var(--text-2)}
+.lb-belt .pr.is-short{color:var(--text-dim)}
+.lb-belt:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--focus)}
+.lb-shrine-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--rule-dark);padding-top:12px}
+.lb-shrine-foot .lb-hint{margin:0}
+.lb-shrine-soon{display:flex;align-items:center;gap:8px;color:var(--text-3)}
+.lb-shrine-soon svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.lb-shrine-soon b{font-weight:400;color:var(--text)}
+.lb-plaque.is-phone .lb-shrine-cols{column-gap:14px}
+.lb-plaque.is-phone .lb-shrine-col+.lb-shrine-col{padding-left:14px}
+.lb-plaque.is-phone .lb-shrine-col{gap:6px}
+.lb-plaque.is-phone .lb-shrine-row{gap:8px;padding:2px 4px 2px 2px}
+.lb-plaque.is-phone .lb-shrine-name{font-size:16px;line-height:19px}
+.lb-plaque.is-phone .lb-shrine-note{font-size:13px;line-height:16px}
+.lb-plaque.is-phone .lb-buy{min-width:64px;height:var(--target);font-size:15px}
+.lb-plaque.is-phone .lb-belt{padding:6px 7px}
+.lb-plaque.is-phone .lb-bank-num{font-size:23px}
+.lb-plaque.is-phone .lb-socks{gap:5px}
+
+/* ---- the choice of run (Modes, version 12): what each run takes, under its words ---- */
+.lb-mode .terms{font:400 14px/18px var(--font-text);color:var(--text-3)}
+.lb-mode.is-selected .terms{color:var(--on-brass);padding-left:26px}
+.lb-mode.is-locked .terms{color:var(--text-3)}
+
+/* ---- the Graces (GracePick): three cards under the next place's card ---- */
+.lb-grace-pick{display:flex;flex-direction:column;align-items:center;gap:10px}
+.lb-graces{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;width:100%}
+.lb-grace{--ch:var(--chamfer-plaque);display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 14px 14px;border:1.5px solid var(--brass-dim);background:var(--plaque-face);color:var(--text);text-align:center;cursor:pointer;font:inherit;
+  clip-path:polygon(var(--ch) 0,calc(100% - var(--ch)) 0,100% var(--ch),100% calc(100% - var(--ch)),calc(100% - var(--ch)) 100%,var(--ch) 100%,0 calc(100% - var(--ch)),0 var(--ch))}
+.lb-grace .pic{width:30px;height:30px;fill:none;stroke:var(--heading);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.lb-grace .pic .solid{fill:var(--heading);stroke:none}
+.lb-grace .nm{font:400 22px/1.1 var(--font-display);color:var(--heading)}
+.lb-grace .ln{font:400 15px/1.3 var(--font-text);color:var(--text-2)}
+.lb-grace:hover .nm{color:var(--focus)}
+.lb-grace.is-selected{border-color:var(--heading);background:var(--brass-wash);box-shadow:inset 0 0 0 1px var(--heading)}
+.lb-grace:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--focus)}
+.lb-graces.is-phone{gap:10px}
+.lb-graces.is-phone .lb-grace{padding:10px;gap:5px}
+.lb-graces.is-phone .lb-grace .nm{font-size:19px}
+.lb-graces.is-phone .lb-grace .ln{font-size:14px}
+
+/* ---- teaching in play (Teaching): small HUD-face plaques with keycaps, each dimming once its control is used ---- */
+.lb-teach-hint{--ch:var(--chamfer-control);display:inline-flex;align-items:center;gap:8px;padding:6px 10px;background:var(--hud-face);border:1px solid var(--brass-dim);font:400 15px/20px var(--font-text);color:var(--text);white-space:nowrap;
+  clip-path:polygon(var(--ch) 0,calc(100% - var(--ch)) 0,100% var(--ch),100% calc(100% - var(--ch)),calc(100% - var(--ch)) 100%,var(--ch) 100%,0 calc(100% - var(--ch)),0 var(--ch))}
+.lb-teach-hint .lb-kbd{height:22px;min-width:22px;font-size:13px}
+.lb-teach-hint.is-done{opacity:.35}
+.lb-teach-hint.is-next{border-color:var(--heading)}
+.lb-teach-row{display:flex;justify-content:center;gap:12px}
+.lb-teach-skip{position:absolute;display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:1px solid var(--brass-dim);background:var(--hud-face);color:var(--text-2);font:400 14px var(--font-text);cursor:pointer}
+.lb-teach-skip.is-phone{height:var(--target);font-size:15px}
+.lb-teach-zone{position:absolute;border:1.5px dashed var(--heading);opacity:.7;pointer-events:none}
+.lb-teach-ring{position:absolute;border:2px solid var(--heading);opacity:.85;pointer-events:none}
+.lb-teach-ring.is-later{opacity:.45}
+.lb-teach-label{position:absolute;padding:3px 8px;background:var(--hud-face);border:1px solid var(--brass-dim);font:400 14px/18px var(--font-text);color:var(--text);white-space:nowrap}
+.lb-teach-label.is-later{color:var(--text-3)}
+
+/* ---- the potions, up to three of each (Potions, version 12): a pip under the socket for each one bought, filled while a potion is in it.
+   9px under a computer's socket, clear of its keycap; the same on a phone, which has none. Shown only once a second socket is bought. ---- */
+.lb-potion-pips{position:absolute;left:0;right:0;top:49px;display:flex;justify-content:center;gap:5px;pointer-events:none}
+.lb-potion-pips[hidden]{display:none}
+.lb-potion-pips i{display:block;width:6px;height:6px;transform:rotate(45deg);border:1px solid var(--brass-dim)}
+.lb-potion-pips i.is-on{background:var(--heading);border-color:var(--heading)}
+.lb-potion-wrap.is-phone .lb-potion-pips{top:53px}
+
+/* ---- a destructive button (Clear saved progress): ember outline and words, because ember means danger ---- */
+.lb-btn.is-danger{border-color:var(--ember);color:var(--ember)}
+.lb-btn.is-danger:hover{color:var(--ember)}
+.lb-btn.is-danger:focus-visible{box-shadow:inset 0 0 0 2px var(--focus)}
+.lb-setting .lb-btn{flex:none;min-width:96px}
+
+/* ---- credits (Credits) ---- */
+.lb-credit-strip{display:block;width:300px;height:auto}
+.lb-credits{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.lb-credit{margin:0;display:flex;flex-direction:column;gap:2px}
+.lb-credit .k{font:700 11px/14px var(--font-text);letter-spacing:.14em;text-transform:uppercase;color:var(--text-3)}
+.lb-credit .v{font:400 17px/1.3 var(--font-text);color:var(--text)}
+.lb-credit .s{font:400 14px/1.3 var(--font-text);color:var(--text-3)}
+.lb-plaque.is-phone .lb-credit .v{font-size:16px}
+.lb-plaque.is-phone .lb-credit-strip{width:240px}
+
+/* ---- the win's three lines (WinCard, version 12), shown one at a time with the win's three bells ---- */
+.lb-heading.is-win{font-size:40px}
+.lb-win-line.is-lead{font-size:21px;color:var(--heading)}
+.lb-win-loop{margin:4px 0 0;font:400 15px/1.3 var(--font-text);color:var(--text-2);text-align:center}
+.lb-plaque.is-phone .lb-heading.is-win{font-size:34px}
+.lb-plaque.is-phone .lb-win-line.is-lead{font-size:18px}
+.lb-plaque.is-phone .lb-win-loop{font-size:14px}
+
+/* ---- the Full Launch places (AdPlaces): drawn now, built only if CrazyGames invites the game. A dashed outline and a small tag, so
+   nobody mistakes them for Basic Launch work; a built game shows the button or banner alone, without the outline or the tag. ---- */
+.lb-fl{position:relative;outline:1.5px dashed var(--brass-dim);outline-offset:4px}
+.lb-fl-tag{position:absolute;top:-13px;right:6px;padding:0 6px;background:var(--plaque-face);font:700 10px/14px var(--font-text);letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);white-space:nowrap}
+.lb-fl-tag.is-left{right:auto;left:6px}
+.lb-ad{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.lb-ad svg{width:18px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.lb-fl-banner{display:flex;align-items:center;justify-content:center;width:320px;height:50px;border:1px solid var(--rule-dark);background:var(--tile-face);font:400 13px/16px var(--font-text);color:var(--text-dim)}
+.lb-countdown{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:2px solid var(--on-brass);font:700 14px/1 var(--font-text);font-variant-numeric:tabular-nums}
+/* the choice of run on a phone held sideways: the three side by side (Modes, version 12) */
+.lb-modes.is-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:stretch}
+.lb-modes.is-row .lb-mode{padding:9px 12px 10px;border:1px solid var(--rule-dark)}
+.lb-modes.is-row .lb-mode.is-selected{border:0}
+.lb-modes.is-row .lb-mode .name{font-size:18px;line-height:22px}
+.lb-modes.is-row .lb-mode .note,.lb-modes.is-row .lb-mode .lock-note{font-size:14px;line-height:17px}
+.lb-modes.is-row .lb-mode.is-selected .note,.lb-modes.is-row .lb-mode.is-selected .terms{padding-left:0}
+.lb-modes.is-row .lb-mode .terms{font-size:13px;line-height:16px;margin-top:2px}
+/* a locked unlock's picture (the Echo Shrine's Hysteria) */
+.lb-spell.is-dim{opacity:.5}
+/* the Echo Shrine: a column's labels keep their height; Hysteria's row on one line */
+.lb-shrine-col>.lb-shrine-text{flex-grow:0}
+.lb-shrine-text.is-inline{flex-direction:row;align-items:baseline;gap:10px}
+.lb-shrine-row.is-soon{min-height:0;padding-top:8px;padding-bottom:0}
+.lb-shrine-row.is-soon .lb-spell{width:36px;height:36px}

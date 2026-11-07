@@ -1,0 +1,41 @@
+<!-- @dsCard group="Full Launch" height=871 width=960 subtitle="Version 12: the Full Launch ad places, drawn now, built only if CrazyGames invites the game" -->
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>AdPlaces</title>
+<style>
+body{margin:0;background:var(--ink)}
+.stage{position:relative;overflow:hidden;background:var(--ink)}
+.stage>img,.stage>canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cap{margin:0;padding:8px 2px 6px;font:500 13px/16px var(--font-text);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.col{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.why{margin:0;padding:6px 2px 12px;font:400 14px/19px var(--font-text);color:var(--text-3);max-width:940px}
+.tbl{width:100%;border-collapse:collapse;font:400 14px/18px var(--font-text);color:var(--text)}.tbl th{padding:0 8px 6px;text-align:left;font:500 12px/16px var(--font-text);letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}.tbl td{padding:6px 8px;border-top:1px solid var(--rule-row);vertical-align:top}.tbl td:first-child{color:var(--heading);white-space:nowrap}
+</style>
+</head>
+<body>
+<p class="cap">The revive offer · computer</p><div class="stage lb-ui" style="width:960px;height:540px"><canvas data-loop="back" data-lv="night" data-arg="still:5" aria-hidden="true"></canvas><div class="lb-scrim"></div><div class="center"><div class="lb-fl"><span class="lb-fl-tag">Full Launch · once a session · The Echo Infusion only</span><div class="lb-plaque" role="dialog" aria-modal="true" aria-labelledby="rv-h" style="width:440px"><div class="lb-face is-centred" style="gap:12px;padding:22px 22px 18px"><h2 class="lb-heading" id="rv-h">Rise again?</h2><p class="lb-win-line">Once each night, the lantern can be lit again.</p><div class="lb-rule" aria-hidden="true"><i></i></div><button class="lb-btn is-primary lb-ad" type="button" style="width:100%"><svg viewBox="0 0 18 14" aria-hidden="true"><rect x="1" y="1" width="16" height="12" rx="2"/><path d="M7.5 4.5 L12 7 L7.5 9.5 Z"/></svg>Watch an ad and rise <span class="lb-countdown" aria-label="5 seconds left">5</span></button><button class="lb-btn" type="button" style="width:100%">No, end the run</button></div></div></div></div></div><p class="why">If he rises: one more life, where he fell, with 2 to 3 seconds of safety. If the countdown runs out, or no ad is available, the run's end follows as usual.</p><p class="cap">The five places, all drawn now and built only if CrazyGames invites the game to Full Launch</p><div class="stage lb-ui" style="width:960px;height:230px;background:var(--ink)"><div class="lb-plaque" style="position:absolute;left:20px;right:20px;top:14px"><div class="lb-face" style="gap:6px;padding:14px 18px"><table class="tbl"><thead><tr><th scope="col">Place</th><th scope="col">Where it is drawn</th><th scope="col">What it gives</th></tr></thead><tbody><tr><td>Revive</td><td>Before the run's end (here)</td><td>One more life where he fell, 2 to 3 s of safety; once a session, The Echo Infusion only</td></tr><tr><td>Double this run's echo</td><td>RunEnd</td><td>This run's echo twice over</td></tr><tr><td>Try a spell for one run</td><td>EchoShrine</td><td>A spell not yet bought, for the next run only</td></tr><tr><td>Bind a second Grace</td><td>GracePick</td><td>A second pick at the same moment</td></tr><tr><td>Banner</td><td>EchoShrine</td><td>320 × 50 under the plaque, 15 px from any button</td></tr></tbody></table></div></div></div>
+<script src="../../components/play.js"></script>
+<script>
+/* version 12's runner: draws each backdrop canvas[data-loop="back"] once as a still of the place from play.js (data-lv the place,
+   data-arg "still:<seconds>" the moment of the walk), and builds a HUD on any .stage[data-hud]. */
+(()=>{const back=(cv,t,lv,R,K,arg)=>{const a=(arg||"still:5").split(":");if(a[0]==="run"){loopRoll(cv,t,lv,R,K,lv);return;}const key=lv+cv.width+"x"+cv.height;if(K.key===key)return;loopRoll(cv,+a[1]||5,lv,R,K,lv);K.key=key;};
+document.querySelectorAll(".stage[data-hud]").forEach(s=>{s.__hud=HUD.build(s,s.dataset.hud==="phone");});
+const anims=[...document.querySelectorAll("canvas[data-loop]")].map(cv=>({cv,K:{},on:true,fn:back}));
+const dpr=()=>Math.min(2,window.devicePixelRatio||1);let t=0.6,last=0;
+function fitA(it){const r=it.cv.getBoundingClientRect(),d=dpr(),w=Math.max(60,Math.round(r.width*d)),h=Math.max(30,Math.round(r.height*d));if(it.cv.width!==w||it.cv.height!==h){it.cv.width=w;it.cv.height=h;it.K={};}}
+function fit(){anims.forEach(fitA);}
+try{new ResizeObserver(()=>requestAnimationFrame(fit)).observe(document.body);}catch(e){}
+const hud=document.querySelector(".stage[data-hud]");
+function frame(n){const dt=last?Math.min(0.05,(n-last)/1000):0;last=n;t+=dt;
+  for(const it of anims){try{it.fn(it.cv,t,it.cv.dataset.lv||"night",12,it.K,it.cv.dataset.arg);}catch(e){console.error(e);}}
+  if(hud){try{HUD.tick(t,"night",anims,true);}catch(e){console.error(e);}}
+  requestAnimationFrame(frame);}
+const go=()=>{fit();requestAnimationFrame(frame);};
+if(document.fonts&&document.fonts.load){Promise.all([document.fonts.load('12px "Alegreya Sans"'),document.fonts.load('700 12px "Alegreya Sans"'),document.fonts.load('24px "IM Fell English"')]).catch(()=>{}).then(go);}else go();
+})();
+</script>
+</body>
+</html>

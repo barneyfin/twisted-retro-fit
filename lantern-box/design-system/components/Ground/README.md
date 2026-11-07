@@ -10,3 +10,6 @@ The play strip's floor rolls up and down in hills and banks, with pits in the di
 - A level: a flat start, then ten sections in the place's own fixed order (Night ACDBFGEDAF, Blood Red Rain AFDCBGEADC, Dawn ABDEFGCDEA, Mist ACGFEDBADF), never the same twice running, then the flat boss arena. Seven sections: ripples; a long climb with a crag drop; a bank and plateau; a pit in a dip; the big hill; terraces; a mound between two pits. The second loop shuffles them.
 - The camera follows the wanderer along and up; the layers rise at their own rates (PRD question 5).
 - Pieces each have a lit top edge and sit on crests and plateaus: Night the churchyard wall and a box tomb; Blood Red Rain barrels, crates and the handcart; Dawn the drystone wall, dolmen, boulders and cairn; Mist the fallen trunk, stumps, the great stump and a mossy rock.
+
+## Version 12
+- `lvTerrain` leaves out any pit from 120 before a checkpoint to 320 after it (`LV_CP_CLEAR`), as kit 0.9.1 does, so the fly-through shows the levels as played: three pits each in Night, Blood Red Rain and Dawn, four in the Mist (Checkpoint).

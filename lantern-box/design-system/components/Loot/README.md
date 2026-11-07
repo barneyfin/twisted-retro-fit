@@ -12,3 +12,6 @@ What a defeated monster drops: health potion, mana potion, the heal and fireball
 
 ## Version 11
 - A potion kept flies up to its socket instead of into his chest: it lifts and flies there, shrinking (0.45 s), and the socket fills (Potions). The other loot, and a potion drunk at once, lift into his chest as before.
+
+## Version 12
+- Potions picked up fill any empty socket bought, up to three of each (Potions). The scrolls teach the spell chosen at the Echo Shrine for this run: the fireball, the lightning bolt or the acid spray (Spells).

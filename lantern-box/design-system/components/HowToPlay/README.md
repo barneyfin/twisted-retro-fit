@@ -7,9 +7,12 @@ A dialog plaque (650 wide; on a phone 720 wide in two columns) headed How to pla
 
 ## Rules
 - The goal, Barney's words: "Cut your path through four blighted lands, felling the terror bound to each. Sever the roots of The Gaping Tree to break the night." over "Three chances to break the dark. Fall, and return to the glow of your last lit lantern."
-- Keys: A D or the arrows, walk; W or up, climb a bank; Space, jump; Shift, roll; J, attack; K, cast; L, switch spell; Esc or P, pause; Q, drink a health potion; E, drink a mana potion (version 11). A phone shows the stick and buttons instead, and a computer no touch controls.
-- From play the button is Resume; from the title, Back. Esc does the same.
+- Keys: A D or the arrows, walk; W or up, climb a bank; Space, jump; Shift, roll; J, attack; K, cast; L, switch spell; P, pause; Q, drink a health potion; E, drink a mana potion (version 11). A phone shows the stick and buttons instead, and a computer no touch controls.
+- From play the button is Resume (P does the same); from the title, Back (Backspace does the same).
 
 ## Version 11
 - A computer gains two rows: Q, drink a health potion; E, drink a mana potion. The plaque is 650 wide so they fit on one line.
 - A phone gains a row with the two sockets drawn small: "Tap a potion, top left, to drink it"; and the left thumb's line ends "flick or double tap to roll". The plaque is 720 wide.
+
+## Version 12
+- P pauses and resumes; Backspace goes back. Esc is never shown, because a portal keeps it for leaving full screen (CrazyGames' quality guidelines); in the arcade's own build it still pauses and goes back, unshown. Keys show the player's own letters where the browser can tell (Keycap).
