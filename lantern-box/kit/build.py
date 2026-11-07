@@ -5,7 +5,9 @@ beside the fonts and the font check come from City Nights' copy of it (city-nigh
 Turns each Lantern Box game's source (lantern-box/games/<name>/index.html) into one self-contained file
 (dist/<name>.html, beside the other kits' games): the kit's stylesheet, script and fonts are copied into the page,
 with the fonts' licences beside them, so the result plays offline, from any folder, with no other files.
-A game's soundtrack (a music.js beside its index.html) is copied in too.
+A game's soundtrack (a music.js beside its index.html) is copied in too, and (kit 0.10.0) the studio's credit, the repo's
+brand/svg/lbg-credit.svg, unchanged, for the Credits plaque (ARCADE.md: every game carries it, the one exception to no image
+files and no colour codes).
 
 Run it from the Retro Games folder:
     python lantern-box/kit/build.py               build every Lantern Box game
@@ -24,6 +26,8 @@ It warns about anything the arcade's rules (ARCADE.md) or Lantern Box's rules fo
 - things that would flash or repeat faster than 3 times a second, where the code shows it: fast endless
   animations, fast blink formulas and fast timers
 - kit fonts that differ from the design system's copy
+- a game touching storage itself (kit 0.10.0): saved progress goes only through the kit (save in the config)
+- a studio credit (brand/svg/lbg-credit.svg) with anything in it that could fetch or run something
 - the kit's recorded sounds (SND_CLIPS) coming to 100 KB or more, or without their source and licence noted in
   lantern-box/kit/licences/README.md (ARCADE.md)
 
@@ -45,6 +49,8 @@ LICENCES = KIT / "licences"
 DESIGN_FONTS = LB / "design-system" / "fonts"
 OTHER_GAMES = [ROOT / "games", ROOT / "city-nights" / "games"]   # the other kits' games build into the same dist/ folder
 KIT_FILES = [KIT / "lantern-box.css", KIT / "lantern-box.js"]
+CREDIT = ROOT / "brand" / "svg" / "lbg-credit.svg"   # kit 0.10.0: the studio's credit, built into every game unchanged
+CREDIT_MARK = "'__LB_CREDIT__'"                       # where lantern-box.js takes it
 
 LINK_RE = re.compile(r"<link\b[^>]*\bdata-lb-inline\b[^>]*>", re.IGNORECASE)
 SCRIPT_RE = re.compile(r"<script\b[^>]*\bdata-lb-inline\b[^>]*>\s*</script>", re.IGNORECASE)
@@ -96,6 +102,8 @@ GAME_CHECKS = [
     (re.compile(r"data:image/(?!svg)", re.IGNORECASE), "a picture stored as data: Lantern Box draws everything in code"),
     (re.compile(r"\b(?:AudioContext|decodeAudioData|createBufferSource)\b"),
      "its own audio code: sounds come from the kit, and a soundtrack from the kit's music option"),
+    (re.compile(r"\b(?:localStorage|sessionStorage|indexedDB)\b|\bdocument\.cookie\b"),
+     "storage touched directly: a game saves only through the kit (save in the config, lb.progress and lb.saveProgress)"),
     (re.compile(r"<script\b(?![^>]*data-lb-inline)[^>]*\bsrc\s*=|<link\b(?![^>]*data-lb-inline)[^>]*\bhref\s*=|"
                 r"<(?:iframe|object|embed)\b|@import\b|url\(\s*[\"']?(?![\"']?(?:data:|#))", re.IGNORECASE),
      "an extra file: keep the game's code in index.html (a soundtrack, music.js, is the one exception: mark its tag data-lb-inline)"),
@@ -183,8 +191,40 @@ def inline_css(css_path):
     return css.replace("</style", "<\\/style")
 
 
+def credit_data():
+    """The studio's credit as a data: address, exactly as brand/ holds it."""
+    if not CREDIT.exists():
+        fail("cannot find the studio's credit, " + rel(CREDIT) + ": every game carries it (ARCADE.md)")
+    return "data:image/svg+xml;base64," + base64.b64encode(CREDIT.read_bytes()).decode("ascii")
+
+
+def check_credit():
+    """Warn about the studio's credit: anything in it that could fetch or run something, or the kit without its place for it.
+    Returns the number of warnings."""
+    notes = []
+    if not CREDIT.exists():
+        fail("cannot find the studio's credit, " + rel(CREDIT) + ": every game carries it (ARCADE.md)")
+    svg = CREDIT.read_text(encoding="utf-8")
+    if not re.match(r"\s*(?:<\?xml[^>]*>\s*)?<svg\b", svg):
+        notes.append(rel(CREDIT) + " does not start with <svg>")
+    for rx, why in [(r"<script\b|\son[a-z]+\s*=", "a script"),
+                    (r"\bhref\s*=\s*[\"'](?!#)", "a link to another file"),
+                    (r"url\(\s*[\"']?(?!#)", "a link to another file"),
+                    (r"\b(?:https?|wss?|ftp)://(?!www\.w3\.org/)", "an internet address"),
+                    (r"<(?:foreignObject|image|iframe)\b", "something other than drawing")]:
+        if re.search(rx, svg, re.IGNORECASE):
+            notes.append(rel(CREDIT) + " holds " + why + ": it is built into every game as it is, so it must only draw")
+    if read_text(KIT / "lantern-box.js").count(CREDIT_MARK) != 1:
+        notes.append("lantern-box.js has no single " + CREDIT_MARK + " for the studio's credit")
+    for note in notes:
+        print("  Warning: " + note + ".")
+    return len(notes)
+
+
 def inline_js(js_path):
     js = read_text(js_path)
+    if js_path.resolve() == (KIT / "lantern-box.js").resolve():
+        js = js.replace(CREDIT_MARK, "'" + credit_data() + "'", 1)   # kit 0.10.0: the studio's credit, for Credits
     return js.replace("</script", "<\\/script")
 
 
@@ -356,7 +396,7 @@ def main():
         dirs = sorted(p for p in GAMES.iterdir() if p.is_dir() and (p / "index.html").exists()) if GAMES.exists() else []
         if not dirs:
             fail("no games found in lantern-box/games/")
-    warnings = check_kit() + check_clips()
+    warnings = check_kit() + check_clips() + check_credit()
     for f in KIT_FILES:
         if f.exists():
             warnings += check_lines(rel(f), read_text(f), game=False)

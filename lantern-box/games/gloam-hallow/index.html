@@ -28,7 +28,12 @@
    Design system version 11 (kit 0.9.0, from Barney's second play): one health and one mana potion kept for later, in the HUD's two
    sockets, drunk with a tap, Q or E (kept through a lost life; the line saying how to drink one once per kind each run); the ghoul
    lurches about 30 forward as it swipes, so it outreaches the sword; the Gaping Tree's branch sweeps at head height all the way out.
-   Settings has a Testing panel while the game is being tried out (delete `test` below to remove it). */
+   Settings has a Testing panel while the game is being tried out (delete `test` below to remove it).
+   Step 5d (kit 0.10.0, design system version 12): saved progress, one versioned record through the kit (lb.progress): the stolen
+   echo, what has been bought, the spell and belt chosen, the first run, the hints, the furthest place and the day's doubled run;
+   wisps are echo on screen, and each defeat's echo sounds louder the more it gives; the run's end in place of game over (the run's
+   echo banked, doubled on the day's first Echo Infusion, a near-miss line, the next unlock), with the Echo Shrine's stand-in until
+   step 5e builds it; Credits; P pauses and Backspace goes back. */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
 const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
@@ -49,6 +54,7 @@ const CLIMB_MIN = 40, CLIMB_MAX = 135;   // the faces a climb takes: a jump clea
 const JUMP_CLIMB = 66;           // jump pressed at the foot of a face higher than this climbs it (a standing jump only just clears 67 to 73)
 const ROLL_T = 0.5;              // the roll: 6 puppet steps, 82 lines
 const LIVES = 3;
+const LIFE_BONUS = 10;           // echo for each life still lit at the win (the win's words below)
 const RETURN_AT = 46;            // he forms again this far past the checkpoint that brought him back
 
 // Fighting (4d-2a; starting figures)
@@ -132,6 +138,83 @@ const BOSS = {
   mist:  { hp: 55, at: 200, body: [-60, 75, -230, 0], rest: [1.0, 1.5], dmg: { roots: 0.25, branch: 0.3, splinters: 0.2 } },
 };
 const BOSS_WISPS = 25;
+
+/* ---------- saved progress (step 5d; design system version 12): one versioned record, read and written only through the kit ----------
+   lb.progress is the record; lb.saveProgress() writes it. Nothing about a run in progress is kept: a run always starts at Night. */
+const SAVE_VERSION = 1;
+const BELTS = ['nightBlue', 'mulberry', 'ash'];   // bought at the Echo Shrine; 'scarf' is the red one he starts in (its token, wanderer-scarf)
+function freshRecord() {
+  return { echo: 0,                       // the stolen echo
+    sockets: { health: 1, mana: 1 },      // potion sockets bought, 1 to 3 each
+    bolt: false, acid: false,             // the spells bought
+    belts: { nightBlue: false, mulberry: false, ash: false }, hysteria: false,
+    spell: 'fire', belt: 'scarf',         // the attack spell chosen and the belt worn
+    played: false, hintsHidden: false,    // whether the first run has been played, and whether the hints were hidden
+    furthest: -1,                         // the furthest place reached (0 to 3; 4 the win), for "Furthest yet"
+    doubled: '' };                        // the day of the last doubled Echo Infusion run (the device's own date)
+}
+// a record read back: every value checked, so a damaged one goes back to its start rather than breaking the game
+function readRecord(old) {
+  const r = freshRecord(), whole = (v, a, b, d) => (typeof v === 'number' && isFinite(v) ? Math.max(a, Math.min(b, Math.floor(v))) : d);
+  r.echo = whole(old.echo, 0, 1e9, 0);
+  const so = old.sockets && typeof old.sockets === 'object' ? old.sockets : {};
+  r.sockets = { health: whole(so.health, 1, 3, 1), mana: whole(so.mana, 1, 3, 1) };
+  r.bolt = old.bolt === true; r.acid = old.acid === true; r.hysteria = old.hysteria === true;
+  const be = old.belts && typeof old.belts === 'object' ? old.belts : {};
+  BELTS.forEach((k) => { r.belts[k] = be[k] === true; });
+  r.spell = (old.spell === 'bolt' && r.bolt) || (old.spell === 'acid' && r.acid) ? old.spell : 'fire';
+  r.belt = BELTS.indexOf(old.belt) >= 0 && r.belts[old.belt] ? old.belt : 'scarf';
+  r.played = old.played === true; r.hintsHidden = old.hintsHidden === true;
+  r.furthest = whole(old.furthest, -1, PLACES.length, -1);
+  r.doubled = typeof old.doubled === 'string' && /^\d{4}-\d\d-\d\d$/.test(old.doubled) ? old.doubled : '';
+  return r;
+}
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+// the places' proper names, for "Furthest yet"
+const PLACE_NAMES = ['The Graveyard', 'The Old Town', 'The Open Moor', 'The Wind Bent Forest'];
+// the Echo Shrine's unlocks, cheapest first, at the gameplay note's starting prices (tuned at step 5f); a third socket needs the second
+const UNLOCKS = [
+  { id: 'health2', kind: 'health', name: 'A second health potion', towards: 'a second health potion', price: 25, has: (r) => r.sockets.health >= 2 },
+  { id: 'bolt', kind: 'bolt', name: 'Lightning bolt', towards: 'the lightning bolt', price: 75, has: (r) => r.bolt },
+  { id: 'nightBlue', kind: 'belt', name: 'Night blue belt', towards: 'the night blue belt', price: 100, has: (r) => r.belts.nightBlue },
+  { id: 'mana2', kind: 'mana', name: 'A second mana potion', towards: 'a second mana potion', price: 175, has: (r) => r.sockets.mana >= 2 },
+  { id: 'mulberry', kind: 'belt', name: 'Mulberry belt', towards: 'the mulberry belt', price: 250, has: (r) => r.belts.mulberry },
+  { id: 'ash', kind: 'belt', name: 'Ash belt', towards: 'the ash belt', price: 250, has: (r) => r.belts.ash },
+  { id: 'acid', kind: 'acid', name: 'Acid spray', towards: 'the acid spray', price: 300, has: (r) => r.acid },
+  { id: 'health3', kind: 'health', name: 'A third health potion', towards: 'a third health potion', price: 350, has: (r) => r.sockets.health >= 3, needs: 'health2' },
+  { id: 'mana3', kind: 'mana', name: 'A third mana potion', towards: 'a third mana potion', price: 400, has: (r) => r.sockets.mana >= 3, needs: 'mana2' },
+];
+function nextUnlock(rec) {             // the cheapest thing not yet bought (and buyable: a third socket only after the second)
+  return UNLOCKS.find((u) => !u.has(rec) && (!u.needs || UNLOCKS.find((n) => n.id === u.needs).has(rec))) || null;
+}
+/* A run's echo banked as stolen echo when it ends, whatever happened (the gameplay note's The score): at the run's end and the win
+   (ended), and when it is left by Restart or Quit to menu (Barney, 7 November 2026: banked, without the run's end, and it uses up
+   neither the day's doubled run nor the first run). Echo still rising from a defeat when the run ends counts. The first Echo Infusion
+   run of each day earns double: only what that run earned, never the stored total, never The Bare Reckoning. */
+function bankRun(g, lb, ended, bonus) {
+  if (g.banked) return g.banked;
+  if (g.echoDue > 0) { lb.addWisps(g.echoDue); g.echoDue = 0; }
+  const rec = lb.progress, earned = lb.wisps + (bonus || 0), day = today();
+  const daily = ended && g.run === 'infusion' && earned > 0 && rec.doubled !== day;
+  const stolen = daily ? earned * 2 : earned;
+  const b = { was: rec.echo, stolen, daily: daily ? stolen : null, first: ended && !rec.played, furthest: rec.furthest };
+  rec.echo += stolen;
+  if (daily) rec.doubled = day;
+  rec.furthest = Math.max(rec.furthest, g.won ? PLACES.length : g.p);
+  if (ended) rec.played = true;
+  lb.saveProgress();
+  return (g.banked = b);
+}
+// the run's end (RunEnd): the kit draws it; these are its rules
+function runEndInfo(g, lb) {
+  const b = bankRun(g, lb, true), rec = lb.progress, boss = g.boss;
+  let near = null;
+  if (boss && boss.hp > 0 && boss.name && boss.st !== 'wait' && boss.st !== 'defeat' && boss.st !== 'done') near = { boss: boss.name, left: boss.hp / boss.max };
+  else if (!b.first && g.p > b.furthest) near = { furthest: PLACE_NAMES[g.p] };   // not on the very first run: it has nothing to beat (Barney)
+  const u = nextUnlock(rec);
+  return { near, daily: b.daily, first: b.first, scored: g.run === 'bare', shrine: { bank: rec.echo },
+    next: u ? { kind: u.kind, name: u.name, towards: u.towards, price: u.price, was: b.was, now: b.stolen } : null };
+}
 const BOSS_TOUCH = 0.15;         // its body hurts on touch too (not while he rolls through it), so it is struck from the sword's reach
 const HEAD_H = 100;              // his height to the top of his hat: a boss's attack that touches the hat hurts
 const DESIGN_FACING = { dawn: { sickle: -1, bolts: -1 } };   // the kit's: the moor mother's sickle and bolts are drawn turned round
@@ -145,11 +228,17 @@ LanternBox.game({
   potions: true,   // kit 0.9.0: the potion sockets
   howTo: { goal: ['Cut your path through four blighted lands, felling the terror bound to each. Sever the roots of The Gaping Tree to break the night.',
     'Three chances to break the dark. Fall, and return to the glow of your last lit lantern.'] },
-  win: { heading: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.', lifeBonus: 10 },
+  win: { heading: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.', lifeBonus: LIFE_BONUS },
   music: [{ data: window.GLOAM_HALLOW_MUSIC_1 }, { data: window.GLOAM_HALLOW_MUSIC_2 }],
   place: 'night',
+  // step 5d (kit 0.10.0): saved progress through the kit, its Clear's words, and Credits
+  save: { version: SAVE_VERSION, fresh: freshRecord, read: readRecord,
+    clear: 'Your stolen echo and everything bought at the Echo Shrine will be gone, and the next run starts as a first run, hints and all. High scores and settings stay.' },
+  credits: { music: ['Music made with Google Gemini', 'The Long Vigil \u00b7 Lantern in the Moor'], sound: 'Two sound effects from Pixabay; the rest made in code' },
+  onLeave(g, lb) { bankRun(g, lb, false); },   // Restart or Quit to menu: the run's echo is banked all the same
   // Testing (delete for the finished game): where a run starts, and help for trying it out
   test: { options: [
+    { id: 'run', name: 'Run', choices: [['bare', 'The Bare Reckoning'], ['infusion', 'The Echo Infusion']] },   // step 5d, until the choice of run (5e)
     { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
     { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
     { id: 'mons', name: 'Monsters', choices: [['normal', 'Normal'], ['none', 'None'], ['crowd', 'A crowd']] },
@@ -166,7 +255,8 @@ LanternBox.game({
       safeT: 0, hurtT: 9, hurtKind: 'health', atkBuf: 0, swHit: false, mons: [], monsTest: t.mons || 'normal',
       spells: { heal: t.all ? 3 : 0, fire: t.all ? 3 : 0 }, spellList: t.all ? ['heal', 'fire'] : [], sel: 0, castBuf: 0, cast: null, healT: 9,
       manaShown: 1, loot: [], shots: [], chest: null, hand: null,
-      pots: { health: false, mana: false }, potLine: {}, drinkT: 9, drinkKind: 'health', fills: [] };   // version 11: the potions kept
+      pots: { health: false, mana: false }, potLine: {}, drinkT: 9, drinkKind: 'health', fills: [],   // version 11: the potions kept
+      run: t.run === 'infusion' ? 'infusion' : 'bare', echoDue: 0, banked: null, won: false };   // step 5d: the run played, echo still rising, banked
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
     lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); hudSpells(g, lb); lb.hud.potions(false, false);
@@ -270,7 +360,7 @@ function enterPlace(g, lb) {         // once the place card's black is down: the
 }
 function leavePlace(g, lb) {         // walking on out of the boss's arena: the next place's card, or after the Mist the win
   if (g.x < g.L.length + 30 || g.out) return;
-  if (g.p === PLACES.length - 1) { g.mode = 'over'; lb.win(); return; }
+  if (g.p === PLACES.length - 1) { g.mode = 'over'; g.won = true; bankRun(g, lb, true, g.lives * LIFE_BONUS); lb.win(); return; }   // step 5d: banked
   g.out = true; g.mode = 'card';
   lb.placeCard(PLACES[g.p + 1], () => { lb.fade(0); loadPlace(g, lb, g.p + 1, 0); enterPlace(g, lb); }, () => { g.mode = 'ground'; g.mt = 0; });
 }
@@ -409,8 +499,9 @@ function lostUpdate(g, lb, dt) {
     P.broke = true;
     lb.sfx('lifeLost');
     if (!g.safe) { g.lives--; lb.hud.lives(g.lives); }
-    if (g.lives <= 0) { g.mode = 'over'; lb.gameOver(1.6); return; }
+    if (g.lives <= 0) { P.last = true; lb.runEnd(() => runEndInfo(g, lb), 0.8 - 0.34); }   // step 5d: the plaque 0.8 s after the blow
   }
+  if (P.last) return;                  // the last life: no fade and no return; the scene holds still under the run's end
   const tOut = 0.34 + 0.8, tBlack = tOut + 0.35, tRet = tBlack + 0.3;
   lb.fade(t < tOut ? 0 : Math.min(1, (t - tOut) / 0.35));
   if (t >= tRet) {                     // back at the last lit checkpoint, forming in its light
@@ -467,11 +558,12 @@ function damage(g, lb, m, n, dir) {    // a blow or a fireball: it flares and jo
   // the mouth-hat and the ghoul strike back when struck while coming for him (ready to attack), rushing in for a second if out of reach
   if (MON[m.kind].answer && !m.atk && m.cd <= 0.25) { m.cd = 0; m.rush = 1.0; }
 }
-function defeat(g, lb, m) {            // card pieces and its wisp rising to the score (the kit's, 1.6 s); the wisps count as it arrives
+function defeat(g, lb, m) {            // card pieces and its wisp rising to the score (the kit's, 1.6 s); the echo counts as it arrives
   m.st = 'defeat'; m.t = 0; m.atk = null; m.wdx = 0; m.ody = 0; m.beatenAt = lb.time;
-  lb.sfx('defeat');
   const n = MON[m.kind].wisps;
-  lb.after(0.9, () => lb.addWisps(n));
+  lb.sfx('defeat', n);                 // step 5d: the card tearing, then its wisp's echo, louder the more echo it gives
+  g.echoDue += n;
+  lb.after(0.9, () => { if (g.banked) return; g.echoDue -= n; lb.addWisps(n); });
   dropLoot(g, lb, m);
 }
 
@@ -696,7 +788,8 @@ function bossDamage(g, lb, n) {
   // beaten: its card pieces and golden wisp, the bar goes, its sure drop, and its crawlers break up with it
   b.st = 'defeat'; b.t = 0; b.move = null;
   lb.sfx('bossDefeated'); lb.hud.boss(null);
-  lb.after(1.2, () => lb.addWisps(BOSS_WISPS));
+  g.echoDue += BOSS_WISPS;
+  lb.after(1.2, () => { if (g.banked) return; g.echoDue -= BOSS_WISPS; lb.addWisps(BOSS_WISPS); lb.sfx('echo', BOSS_WISPS); });   // step 5d: its golden wisp's echo
   g.mons.forEach((m) => { if (m.summoned && alive(m)) { m.st = 'defeat'; m.t = 0; m.atk = null; m.beatenAt = lb.time; } });
   const can = [];
   for (const sp of ['heal', 'fire']) if (g.spells[sp] === 0) can.push(sp);

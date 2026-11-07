@@ -1,14 +1,14 @@
-/* Lantern Box 0.9 — runtime
+/* Lantern Box 0.10 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
    (a 2D canvas 540 lines tall that fills the window; its width follows the window), the game loop, keyboard and touch
-   input, every screen outside play (title, pause, settings, game over, initials, high scores, rotate), the HUD, full
-   screen, sound, music, saved data and the tools that draw the World (lb.world). Public API: see `api` below. */
+   input, every screen outside play (title, pause, settings, credits, game over or the run's end, initials, high scores,
+   rotate), the HUD, full screen, sound, music, saved data (settings, scores and, kit 0.10.0, a game's saved progress) and the tools that draw the World (lb.world). Public API: see `api` below. */
 (function () {
   'use strict';
 
-  const VERSION = '0.9.1';
+  const VERSION = '0.10.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -48,6 +48,9 @@
     },
     set(key, value) {
       try { window.localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* storage unavailable */ }
+    },
+    remove(key) {   // kit 0.10.0: Clear saved progress
+      try { window.localStorage.removeItem(key); } catch (e) { /* storage unavailable */ }
     }
   };
   const asObject = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -73,9 +76,24 @@
     left: ['Left arrow', 'M8.5 5 H1.5 M4.5 2 L1.5 5 L4.5 8'],
     right: ['Right arrow', 'M1.5 5 H8.5 M5.5 2 L8.5 5 L5.5 8']
   };
+  // kit 0.10.0 (design system version 12, Keycap): a letter keycap shows the key in that place on the player's own keyboard where the
+  // browser can tell its layout (the Keyboard API's layout map, in Chrome and Edge; a page inside another site's frame may be refused it),
+  // and the letter as printed otherwise. The kit binds keys by place (event.code), so a letter here names a place on a US keyboard:
+  // an AZERTY player sees Q for A and Z for W.
+  const LAYOUT = { map: null };
+  try {
+    const kb = navigator.keyboard;
+    if (kb && kb.getLayoutMap) kb.getLayoutMap().then((m) => { LAYOUT.map = m; }, () => { /* refused: the letters as printed */ });
+  } catch (e) { /* no layout map: the letters as printed */ }
+  const keyLetter = (name) => {
+    if (!LAYOUT.map || !/^[A-Z]$/.test(name)) return name;
+    let v = null;
+    try { v = LAYOUT.map.get('Key' + name); } catch (e) { v = null; }
+    return typeof v === 'string' && v.length === 1 && v.trim() ? v.toUpperCase() : name;
+  };
   const kbd = (name) => (KEY_ARROW[name]
     ? '<span class="lb-kbd" aria-label="' + KEY_ARROW[name][0] + '"><svg viewBox="0 0 10 10"><path d="' + KEY_ARROW[name][1] + '"/></svg></span>'
-    : '<span class="lb-kbd">' + name + '</span>');
+    : '<span class="lb-kbd">' + keyLetter(name) + '</span>');
   const RULE = '<div class="lb-rule" aria-hidden="true"><i></i></div>';
 
   /* ---------- Sound: the audio context, its volume, and a plain tone and noise for a game's own (Lantern Box's named sounds are SND8's) ---------- */
@@ -198,6 +216,11 @@ let brown=null;function BROWN(){if(!brown){brown=ctx.createBuffer(1,ctx.sampleRa
 function ring(o){const f=o.f,P=o.partials;P.forEach(([r,amp,d])=>tone({f:f*r,dur:d,vol:(o.vol||0.1)*amp,a:0.001,wet:o.wet==null?0.3:o.wet,at:o.at||0}));}
 function bell(o){const f=o.f||220,P=o.partials||[[1,1,1],[2.0,0.5,0.7],[2.76,0.45,0.55],[5.4,0.25,0.35],[8.93,0.12,0.22]];P.forEach(([r,amp,ds])=>tone({f:f*r,dur:(o.dur||2.5)*ds,vol:(o.vol||0.18)*amp,a:0.003,wet:o.wet==null?0.5:o.wet,at:o.at||0}));}
 // ---- the effects ----
+// version 12: the wisp's rising note as a short echo: the note (660 to 990 Hz, a boss's golden wisp a fifth lower), then two to four
+// repeats 0.16 s apart, each half as loud, darker and further into the room; louder and longer the more echo it gives (1, 2, 5, 25).
+// Starting levels, to measure at step 5d as the rest were.
+function ECHO(v,at){v=Math.max(1,v||1);const s=0.75*(1+0.2*Math.log2(v)),n=v>=25?4:v>=5?3:2,f=v>=25?440:660,lp=[5000,2600,1600,1000,700];
+  for(let i=0;i<=n;i++)tone({f,to:f*1.5,glide:0.32,dur:0.4,a:0.03,vol:0.09*s*Math.pow(0.5,i),vib:[5,6],lp:lp[i],wet:0.5+0.1*i,at:(at||0)+i*0.16});}
 function DRINK(ch){noise({ft:"bandpass",from:1900,to:1100,q:3,dur:0.035,vol:0.22,wet:0.1});
   tone({f:190,to:125,dur:0.09,lp:700,vol:0.16,wet:0.05,at:0.07});tone({f:165,to:110,dur:0.08,lp:700,vol:0.12,wet:0.05,at:0.18});
   ch.forEach((f,i)=>tone({f,dur:0.55-i*0.08,a:0.1,vol:0.06,wet:0.6,at:0.27+i*0.05}));}
@@ -213,7 +236,10 @@ const FX={
   // metal armour struck and splitting: a clang of bright partials and a rough crunch
   crack:()=>{ring({f:620,vol:0.12,wet:0.4,partials:[[1,1,0.5],[1.63,0.8,0.38],[2.37,0.7,0.3],[3.12,0.5,0.22],[4.05,0.4,0.16],[5.3,0.3,0.12]]});noise({ft:"bandpass",from:3200,q:1.5,dur:0.14,tear:90,vol:0.3,wet:0.25});noise({ft:"highpass",from:3000,dur:0.03,vol:0.3,wet:0.2});
     for(let i=0;i<3;i++)tone({type:"triangle",f:3000+R()*2000,dur:0.03,vol:0.05,at:0.08+i*0.07,wet:0.4});},
-  defeat:()=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});tone({f:660,to:990,glide:0.7,dur:0.9,a:0.12,vol:0.09,vib:[5,6],wet:0.7,at:0.18});},
+  // a monster defeated: the card tearing, then its wisp's echo (version 12: the rising note became a short echo; v is the echo it gives)
+  defeat:v=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});ECHO(v||1,0.18);},
+  // version 12: the echo alone, as a boss's golden wisp rises (25), after bossDefeated's bell
+  echo:v=>ECHO(v||25,0),
   pickup:()=>{tone({f:1320,dur:0.12,vol:0.14,wet:0.5});tone({f:1760,dur:0.3,vol:0.12,wet:0.6,at:0.07});tone({f:2640,dur:0.25,vol:0.03,wet:0.7,at:0.12});},
   heal:()=>{[392,494,587,784].forEach((f,i)=>tone({f,dur:0.9-i*0.1,a:0.25,vol:0.07,wet:0.7,at:i*0.08}));},
   // round 13: a potion drunk: the cork, two quick swallows, then a short warm chord rising (lower and redder for health, brighter for mana)
@@ -241,7 +267,7 @@ const FX={
 };
 // each effect's level, set by measuring how loud it sounds (K-weighted, its loudest 0.4 s) against a target for its kind:
 // the big moments loudest, the main actions next, light touches and the menus quieter. GAIN is filled from that measure.
-const GAIN={swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */
+const GAIN={echo: 5.22,swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 5.22, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */ /* kit 0.10.0 (step 5d, starting figures): defeat and echo measured as the rest, K-weighted over the loudest 0.4 s: a defeat giving 1 echo as loud as the old defeat (-29.6), echo the same gain, so 25 echo comes near the boss-defeated bell; tune by ear */
 // ---- the places' background sound: wind, rain, thunder, bats, crows, creaking trees ----
 function loopNoise(ft,f,q,vol,lfoRate,lfoDepth){const s=ctx.createBufferSource();s.buffer=nb;s.loop=true;const fl=ctx.createBiquadFilter();fl.type=ft;fl.frequency.value=f;fl.Q.value=q;
   const g=ctx.createGain();g.gain.value=vol;s.connect(fl);fl.connect(g);g.connect(amb);s.start(0,R()*1.5);const nodes=[s];
@@ -284,7 +310,7 @@ const AMB={
 function ambient(lv){stopAmb();if(!live()||!lv)return;amb=ctx.createGain();amb.gain.setValueAtTime(0.0001,ctx.currentTime);amb.gain.exponentialRampToValueAtTime(0.55,ctx.currentTime+1.2);amb.connect(out);ambLv=lv;amb._nodes=AMB[lv]();}
 function stopAmb(){timers.forEach(clearTimeout);timers=[];if(amb){const a=amb;try{a.gain.cancelScheduledValues(ctx.currentTime);a.gain.setValueAtTime(a.gain.value,ctx.currentTime);a.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.6);}catch(e){}
     setTimeout(()=>{(a._nodes||[]).forEach(n=>{try{n.stop();}catch(e){}});a.disconnect();},800);}amb=null;ambLv=null;}
-return {level:v=>{lvl=v;if(out)out.gain.setTargetAtTime(0.5*v,ctx.currentTime,0.03);},_buf:BUF,ready:()=>clipsP||Promise.resolve(),unlock,live,FX,GAIN,BED,EV,get _out(){return out;},_ev:{bats,caw,creak,thunder},play:k=>{if(live()&&FX[k]){curGain=GAIN[k]||1;try{FX[k]();}finally{curGain=1;}}},ambient,stopAmb,get ambLv(){return ambLv;}};
+return {level:v=>{lvl=v;if(out)out.gain.setTargetAtTime(0.5*v,ctx.currentTime,0.03);},_buf:BUF,ready:()=>clipsP||Promise.resolve(),unlock,live,FX,GAIN,BED,EV,get _out(){return out;},_ev:{bats,caw,creak,thunder},play:(k,v)=>{if(live()&&FX[k]){curGain=GAIN[k]||1;try{FX[k](v);}finally{curGain=1;}}},ambient,stopAmb,get ambLv(){return ambLv;}};
 })();
 
   /* ---------- Music (optional: a looping track, or two, given as MP3 text in the game's config) ----------
@@ -432,11 +458,13 @@ return {level:v=>{lvl=v;if(out)out.gain.setTargetAtTime(0.5*v,ctx.currentTime,0.
         if (f && f.focus) f.focus({ preventScroll: true });
       },
       activate(n) {
+        if (opts.until && performance.now() < opts.until) return;   // kit 0.10.0: the run's end takes input from 1.0 s
         const it = items[n == null ? i : n];
         if (it && it.activate) it.activate();
       },
       key(e) {
         const it = items[i];
+        if (opts.keys && opts.keys[e.code]) { if (!e.repeat) opts.keys[e.code](); return true; }   // kit 0.10.0: P resumes
         switch (e.code) {
           case 'ArrowUp': case 'KeyW': nav.select(i - 1); return true;
           case 'ArrowDown': case 'KeyS': nav.select(i + 1); return true;
@@ -450,8 +478,8 @@ return {level:v=>{lvl=v;if(out)out.gain.setTargetAtTime(0.5*v,ctx.currentTime,0.
             if (e.repeat) return true;
             nav.activate();
             return true;
-          case 'Escape': case 'Backspace':
-            if (opts.back) { opts.back(); return true; }
+          case 'Escape': case 'Backspace':   // kit 0.10.0: Backspace goes back; Esc still does in the arcade's own build, never shown
+            if (opts.back) { if (!e.repeat) opts.back(); return true; }
             return false;
           default: return false;
         }
@@ -4436,7 +4464,7 @@ function vitals(phone,extra,pots){const iw=phone?13:14;
   </div></div>`;}
 // round 13: a potion socket (the button is clipped to its chamfer, so the key sits beside it in the wrapper) and the pair
 // the kit: phone is the touch size (44px, on a phone or any touch device); keys, the keycaps, only where there is a keyboard (no touch)
-function potion(k,phone,keys){const P=POT[k],kk=k==="health"?"Q":"E",C=k==="health"?"H":"M";
+function potion(k,phone,keys){const P=POT[k],kk=keyLetter(k==="health"?"Q":"E"),C=k==="health"?"H":"M";
   return `<span class="lb-potion-wrap${phone?" is-phone":""}"><button class="lb-potion is-${k}${phone?" is-phone":""}" type="button" data-k="${k}" aria-label="No ${k} potion"><span>
     <svg class="pot" viewBox="0 0 24 24" aria-hidden="true"><path class="glass-back" d="${P.glass}"/><g class="liq-g" clip-path="url(#lbPot${C})"><rect class="liq" x="3" y="${P.top}" width="18" height="12" fill="url(#lbLiq${C})"/><path class="shine" d="M${k==="health"?"8.4 13.4 Q8.6 11.4 10.2 10.4":"10.2 11.6 V18.4"}"/></g>
       <path class="glass" d="${P.glass}"/><path class="mark" d="${P.mark}"/><path class="glint" d="M5 22 L9 22 L20 3 L16 3 Z"/></svg></span></button>${keys?`<span class="lb-pkey" aria-hidden="true">${kk}</span>`:""}</span>`;}
@@ -4446,7 +4474,7 @@ function build(el,phone,o){o=o||{};if(!defsDone){document.body.insertAdjacentHTM
   const pot=o.pot||null,big=phone||!!o.touch,keys=!o.touch; // kit 0.9.0: o.pot "under" (the design's choice) or "beside" adds the potion sockets
   el.insertAdjacentHTML("beforeend",`<div class="lb-ui lb-hud${phone?" is-phone":""}">
     <div class="lb-hud-left">${pot==="beside"?vitals(phone,"",potions(big,true,keys)):vitals(phone)}${pot==="under"?potions(big,false,keys):""}</div>
-    <div class="lb-hud-right">${o.full?tile("full","Full screen"):""}${tile("help","How to play",phone)}${tile("pause","Pause",phone)}${counter(phone,"Wisps","0000")}</div>
+    <div class="lb-hud-right">${o.full?tile("full","Full screen"):""}${tile("help","How to play",phone)}${tile("pause","Pause",phone)}${counter(phone,"Echo","0000")}</div>
     <div class="lb-bossbar" role="meter" aria-valuemin="0" aria-valuemax="100" hidden><p class="lb-bossbar-name"></p><div class="lb-bossbar-edge"><div class="lb-bossbar-track"><i class="trace"></i><i class="fill"></i></div></div></div>
     <div class="lb-plaque is-hud lb-line" hidden><div class="lb-face"><svg class="pic" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="lb-line-text"></span></div></div>
     <div class="lb-plaque is-hud lb-line is-name" hidden><div class="lb-face"><span class="lb-line-text"></span><div class="lb-rule" aria-hidden="true"><i></i></div></div></div>
@@ -4484,7 +4512,7 @@ function setPotion(b,st){const k=b.dataset.k,has=!!(st.potions&&st.potions[k]),t
   liq.setAttribute("y",ly.toFixed(2));liq.style.opacity=la!==1?la.toFixed(3):"";mk.style.opacity=fx&&fx.kind==="drink"?String(rm?la:Math.max(0,1-fx.u*1.6)):"";
   gl.style.opacity=ga>0.01?ga.toFixed(3):"0";gl.setAttribute("transform",`translate(${gx.toFixed(2)} 0)`);
   const keyTxt=b.parentElement.querySelector(".lb-pkey");if(keyTxt)keyTxt.classList.toggle("is-on",!!(fx&&fx.kind==="drink"&&fx.u<0.5));
-  const name=k==="health"?"Health potion":"Mana potion",how=keyTxt?(k==="health"?"Q to drink":"E to drink"):"Tap to drink"; /* the kit: by the keycap, not the size */
+  const name=k==="health"?"Health potion":"Mana potion",how=keyTxt?keyLetter(k==="health"?"Q":"E")+" to drink":"Tap to drink"; /* kit 0.10.0: the player's own letter */ /* the kit: by the keycap, not the size */
   setOnce(b,"lab",has?(topped?`${name}, kept. ${k==="health"?"Health":"Mana"} is full`:`${name}, kept. ${how}`):`No ${k} potion kept`,v=>b.setAttribute("aria-label",v));}
 function set(hud,st){const q=s=>hud.querySelector(s);
   const hp=Math.round(st.hp*100),mp=Math.round(st.mp*100);
@@ -4508,7 +4536,7 @@ function set(hud,st){const q=s=>hud.querySelector(s);
   const cast=q(".b-cast");if(cast){cast.classList.toggle("is-empty",!n);cast.classList.toggle("is-short",!!short);picFor(cast.querySelector(".ic"),kind);}
   setOnce(q(".lb-vitals"),"lab",`Health ${hp} per cent, armour ${st.pips} of 3, mana ${mp} per cent, ${st.lives} ${st.lives===1?"life":"lives"} left`,v=>q(".lb-vitals").setAttribute("aria-label",v));
   hud.querySelectorAll(".lb-potion").forEach(b=>setPotion(b,st));
-  const ctr=q(".lb-counter");if(ctr&&st.wisps!=null)setOnce(ctr,"w",st.wisps,v=>{const s=String(v).padStart(4,"0");ctr.querySelector(".lb-counter-num").textContent=s;ctr.setAttribute("aria-label",v+" wisps");});
+  const ctr=q(".lb-counter");if(ctr&&st.wisps!=null)setOnce(ctr,"w",st.wisps,v=>{const s=String(v).padStart(4,"0");ctr.querySelector(".lb-counter-num").textContent=s;ctr.setAttribute("aria-label",v+" echo");});
   const ha=st.hudA==null?1:st.hudA;[".lb-hud-left",".lb-hud-right",".lb-touch"].forEach(sl=>{const e=q(sl);if(e)setOnce(e,"ha",ha.toFixed(2),v=>e.style.opacity=v);});
   const ln=q(".lb-line:not(.is-name)");if(ln)setLine(ln,st.line);const nm=q(".lb-line.is-name");if(nm)setLine(nm,st.name&&st.name.u<2.6?{kind:null,text:st.name.name,u:st.name.u}:null);const cd=q(".lb-card");if(cd)setCard(cd,st.card);
   const bb=q(".lb-bossbar");if(bb){const on=!!(st.boss&&st.boss.a>0&&ha>0);if(bb.hidden===on)bb.hidden=!on;
@@ -4570,16 +4598,44 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       testOptions().forEach((op) => { const v = saved[op.id]; testValues[op.id] = op.choices ? (op.choices.some((ch) => ch[0] === v) ? v : op.choices[0][0]) : !!v; });
     }
     const saveTest = () => store.set('lanternbox.test.' + gameId, testValues);
+    /* kit 0.10.0 (design system version 12): saved progress, one versioned record per game (lanternbox.save.<game>), read and written
+       only through store, which can't crash when storage is refused (a private window then plays without saving). The game's config
+       gives save: { version, fresh(), read(old, version), clear } (clear: the confirmation's words); fresh() makes a new record and
+       read(old, version) turns a stored one into a good record, or returns null to start afresh. A record that can't be read (not an
+       object, no version, a newer version, or read throwing) starts afresh rather than stopping. The game reads and changes lb.progress
+       and writes it with lb.saveProgress(); Settings' Clear saved progress removes it. Nothing about a run in progress is kept. */
+    const saveCfg = cfg.save && typeof cfg.save.fresh === 'function' ? cfg.save : null;
+    const saveKey = 'lanternbox.save.' + gameId;
+    const saveVersion = saveCfg ? Math.max(1, Math.floor(+saveCfg.version) || 1) : 0;
+    function freshSave() { const r = asObject(saveCfg.fresh()); r.v = saveVersion; return r; }
+    function loadSave() {
+      const old = store.get(saveKey, null);
+      let rec = null;
+      if (old && typeof old === 'object' && !Array.isArray(old) && Number.isInteger(old.v) && old.v >= 1 && old.v <= saveVersion) {
+        try { rec = saveCfg.read ? saveCfg.read(old, old.v) : old; } catch (e) { rec = null; }
+      }
+      if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return freshSave();
+      rec.v = saveVersion;
+      return rec;
+    }
+    let progress = null;
+    if (saveCfg) { try { progress = loadSave(); } catch (e) { console.error(e); progress = {}; } }
+    const saveProgress = () => { if (saveCfg && progress) { progress.v = saveVersion; store.set(saveKey, progress); } };
+    function clearProgress() {
+      store.remove(saveKey);
+      progress = freshSave();
+      if (saveCfg.onClear) { try { saveCfg.onClear(api); } catch (e) { reportError(e); } }
+    }
     const audio = makeAudio(settings);
     // version 8 (4c-7): every named sound is design system version 8's (lb.sounds lists them); the shell's moments as Barney chose: the menus'
     // muted tick, soft chime and falling tick (select, confirm, back), pause the soft chime, game over the life lost's falling tones, new best
     // the plaque line's chime
     const SHELL_SOUND = { blip: 'select', pause: 'confirm', gameOver: 'lifeLost', newBest: 'line' };
     const soundOn = () => !settings.muted && settings.volume > 0;
-    function sfx(name) {
+    function sfx(name, v) {   // kit 0.10.0: v, the echo a defeat gives (lb.sfx('defeat', 5), lb.sfx('echo', 25))
       const k = SHELL_SOUND[name] || name;
       if (!SND8.FX[k]) { console.warn('Lantern Box: no sound called "' + name + '". The names are in lb.sounds.'); return; }
-      if (soundOn()) SND8.play(k);
+      if (soundOn()) SND8.play(k, v);
     }
     // each place's background sound, quiet under the music, while the game is played (lb.ambient(place) names it; the game's choice)
     const AMBIENT = ['night', 'storm', 'dawn', 'mist'];
@@ -4596,7 +4652,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     sfx.noise = (o) => audio.noise(o || {});
     const music = cfg.music ? makeMusic(audio, settings, cfg.music) : null;
 
-    /* High scores, per game: a top-ten array of { s: wisps, i: initials, d: date }, in Retro Kit's format and under its
+    /* High scores, per game: a top-ten array of { s: echo, i: initials, d: date }, in Retro Kit's format and under its
        key, where the arcade website looks. */
     const scoreKey = () => 'retrokit.scores.' + gameId;
     const readScores = () => {
@@ -5035,7 +5091,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       pauseTile.setAttribute('aria-label', 'Pause');
       pauseTile.addEventListener('click', () => { pauseTile.blur(); pause(); });
       right.append(pauseTile);
-      const counter = el('div', 'lb-plaque is-hud lb-counter' + ph, '<div class="lb-face"><span class="lb-counter-label" aria-hidden="true">Wisps</span><span class="lb-counter-num" aria-hidden="true"></span></div>');
+      const counter = el('div', 'lb-plaque is-hud lb-counter' + ph, '<div class="lb-face"><span class="lb-counter-label" aria-hidden="true">Echo</span><span class="lb-counter-num" aria-hidden="true"></span></div>');
       counter.setAttribute('role', 'status');
       right.append(counter);
       hud.append(left, right);
@@ -5051,7 +5107,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       if (hudNodes.mana) hudNodes.mana.style.setProperty('--v', pc(state.mana) + '%');
       hudNodes.vitals.setAttribute('aria-label', 'Health ' + pc(state.health) + ' per cent' + (hasMana ? ', mana ' + pc(state.mana) + ' per cent' : ''));
       hudNodes.num.textContent = pad4(state.score);
-      hudNodes.counter.setAttribute('aria-label', state.score + ' wisps');
+      hudNodes.counter.setAttribute('aria-label', state.score + ' echo');
     }
     // version 8: the full HUD's moments, timed on the kit's clock as the design system times them: a pip cracks (0.4 s) or fills (0.5 s), a
     // life's lantern gutters out (0.8 s), the spell turns over (0.24 s), each plaque line shows for 2 s in turn, the boss's name 2.6 s; the boss
@@ -5129,7 +5185,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         // o.line: true the first time, for the plaque line saying how to drink it (tap on a touch device, Q or E on a computer)
         const k = kind === 'mana' ? 'mana' : 'health', d = settings.reduceMotion ? 0 : 0.45;
         h8.potions[k] = true; h8.potFx[k] = { kind: 'keep', t0: state.time + d, len: 0.4 };
-        if (o && o.line) after(d + 0.35, () => hud.line(k === 'health' ? 'potH' : 'potM', 'Kept for later. ' + (touch ? 'Tap' : k === 'health' ? 'Q' : 'E') + ' to drink'));
+        if (o && o.line) after(d + 0.35, () => hud.line(k === 'health' ? 'potH' : 'potM', 'Kept for later. ' + (touch ? 'Tap' : keyLetter(k === 'health' ? 'Q' : 'E')) + ' to drink'));
         syncHud();
       },
       drink(kind) {   // a potion drunk: its socket drains (0.35 s; its key lights on a computer) and the drink's sound plays. The game fills the bar
@@ -5220,8 +5276,10 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       items.forEach((it) => m.append(it.el));
       return m;
     }
-    const startOver = () => { sfx('confirm'); closeDialog(); startGame(); };
-    const toMenu = () => { sfx('back'); quitToTitle(); };
+    // kit 0.10.0: onLeave(g, lb) in the config hears of a run left before its end (Restart or Quit to menu), so the game can bank what it earned
+    function leaveRun() { if (state.inGame && !state.over && cfg.onLeave) { try { cfg.onLeave(state.game, api); } catch (e) { reportError(e); } } }
+    const startOver = () => { sfx('confirm'); leaveRun(); closeDialog(); startGame(); };
+    const toMenu = () => { sfx('back'); leaveRun(); quitToTitle(); };
 
     function pauseDialog() {
       const { panel, face } = plaque('lb-pa-t', 340, 300, V.phone ? '' : 'padding:22px 16px 16px');
@@ -5233,16 +5291,17 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       ];
       face.append(heading('lb-pa-t', 'Paused'), el('div', '', RULE).firstChild, menuNav('Pause menu', items));
       if (!touch && !V.phone) {
-        const hint = el('p', 'lb-hint', kbd('Esc') + ' resume');
+        const hint = el('p', 'lb-hint', kbd('P') + ' resume');   // kit 0.10.0: never Esc in a hint (a portal keeps it for leaving full screen)
         hint.style.cssText = 'text-align:center;margin-top:2px';
         face.append(hint);
       }
-      return { panel: panel, items: items, opts: { back: resume } };
+      return { panel: panel, items: items, opts: { back: resume, keys: { KeyP: resume } } };
     }
 
-    function settingsDialog(close, from) {
+    function settingsDialog(close, from, focus) {
       const phone = V.phone;
-      const { panel, face } = plaque('lb-se-t', 500, 680, phone ? 'gap:12px;padding:14px 20px 18px' : 'padding:20px 22px 18px');
+      // kit 0.10.0 (version 12): 560 wide (it was 500; 720 on a phone, was 680), parts 10px apart, so the new row fits 540
+      const { panel, face } = plaque('lb-se-t', 560, 720, phone ? 'gap:10px;padding:12px 20px 14px' : 'padding:14px 22px 12px;gap:10px');
       const items = [];
       // Volume
       const vol = el('div', 'lb-setting is-first', '<label class="lb-setting-name" for="lb-vol"></label><input class="lb-slider" id="lb-vol" type="range" min="0" max="100"><span class="lb-value"></span>');
@@ -5305,13 +5364,27 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       const picNote = txt('p', 'lb-note', 'Automatic picks the most detail your device can run smoothly.');
       const picName = txt('span', 'lb-setting-name', 'Picture');
       picName.id = 'lb-set-pic';
+      // kit 0.10.0 (version 12): Credits in every game (ARCADE.md: every game carries the studio's credit), and Clear saved progress in a
+      // game that saves, from the title's Settings only, so a run in progress never outlives its record (Barney, 7 November 2026)
+      const openBtn = button('Open');
+      openBtn.setAttribute('aria-label', 'Open credits');
+      const credItem = { el: openBtn, activate: () => openCredits(from) };
+      items.push(credItem);
+      let clearBtn = null, clearItem = null;
+      if (saveCfg && from !== 'paused') {
+        clearBtn = button('Clear');
+        clearBtn.classList.add('is-danger');
+        clearBtn.setAttribute('aria-label', 'Clear saved progress');
+        clearItem = { el: clearBtn, activate: () => openClear(from) };
+        items.push(clearItem);
+      }
       // kit 0.8.1: Testing, while the game asks for it (cfg.test)
       const testBtn = testCfg ? button('Testing') : null;
       if (testBtn) items.push({ el: testBtn, activate: () => openTesting(from) });
       // Done
       const done = button('Done', true);
       items.push({ el: done, activate: close });
-      const opts = { back: close, start: items.length - 1 };   // the primary button is focused when a plaque opens
+      const opts = { back: close, start: focus === 'credits' ? items.indexOf(credItem) : focus === 'clear' && clearItem ? items.indexOf(clearItem) : items.length - 1 };   // the primary button is focused when a plaque opens
 
       if (phone) {
         done.style.padding = '0 24px';
@@ -5321,13 +5394,16 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         head.append(done);
         const cols = el('div');
         cols.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:26px';
+        // kit 0.10.0: Credits under Reduce motion, Clear saved progress under Picture's note
+        const plainRow = (name, btn) => { const r = el('div', 'lb-setting', '<div class="lb-setting-text"><span class="lb-setting-name"></span></div>'); r.querySelector('.lb-setting-name').textContent = name; r.append(btn); return r; };
         const a = el('div');
-        a.style.cssText = 'display:flex;flex-direction:column;gap:10px';
-        a.append(vol, fxRow, rmRow);
+        a.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+        a.append(vol, fxRow, rmRow, plainRow('Credits', openBtn));
         const b = el('div');
-        b.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+        b.style.cssText = 'display:flex;flex-direction:column;gap:8px';
         picName.style.cssText = 'line-height:44px;height:44px';
         b.append(picName, seg, picNote);
+        if (clearBtn) b.append(plainRow('Clear saved progress', clearBtn));
         cols.append(a, b);
         face.append(head, cols);
       } else {
@@ -5339,12 +5415,30 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         seg.style.flexGrow = '1';
         line.append(picName, seg);
         pic.append(line, picNote);
-        const foot = el('div', '', '<span class="lb-hint">' + kbd('Esc') + ' done</span>');
+        // kit 0.10.0: Credits and Clear saved progress share one row, split by a hairline
+        const more = el('div', 'lb-setting');
+        more.style.gap = '16px';
+        const part = (name, btn, flex) => {
+          const p = el('div');
+          p.style.cssText = 'display:flex;align-items:center;gap:10px;flex:' + flex;
+          const gap = el('span');
+          gap.style.flex = '1';
+          p.append(txt('span', 'lb-setting-name', name), gap, btn);
+          return p;
+        };
+        more.append(part('Credits', openBtn, '1'));
+        if (clearBtn) {
+          const hair = el('div');
+          hair.setAttribute('aria-hidden', 'true');
+          hair.style.cssText = 'width:1px;align-self:stretch;background:var(--rule-row)';
+          more.append(hair, part('Clear saved progress', clearBtn, '1.5'));
+        }
+        const foot = el('div', '', '<span class="lb-hint">' + kbd('Backspace') + ' done</span>');
         foot.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:12px;padding-top:2px';
         if (testBtn) foot.append(testBtn);
         foot.append(done);
         if (touch) foot.firstChild.remove();
-        face.append(heading('lb-se-t', 'Settings'), el('div', '', RULE).firstChild, vol, fxRow, rmRow, pic, foot);
+        face.append(heading('lb-se-t', 'Settings'), el('div', '', RULE).firstChild, vol, fxRow, rmRow, pic, more, foot);
       }
       return { panel: panel, items: items, opts: opts };
     }
@@ -5357,6 +5451,74 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       state.screen = 'settings';
       sfx('confirm');
       showDialog(() => settingsDialog(settingsCloser(from), from));
+    }
+    const backToSettings = (from, focus) => { sfx('back'); state.screen = 'settings'; showDialog(() => settingsDialog(settingsCloser(from), from, focus)); };
+
+    /* kit 0.10.0 (design system version 12, Credits): who made the game, from Settings. The studio's credit strip is the repo's
+       brand/svg/lbg-credit.svg, which build.py builds in (ARCADE.md's one exception to no image files and no colour codes), never
+       redrawn; then the game's own lines (credits: { music: [line, note], sound: line } in the config) and the kit's type.
+       Backspace or Enter goes back to Settings. */
+    const CREDIT_SRC = '__LB_CREDIT__';   // build.py puts the studio's credit here, as a data: address
+    const TYPE_CREDIT = ['IM Fell English, by Igino Marini \u00b7 Alegreya Sans, by Huerta Tipogr\u00e1fica', 'SIL Open Font Licence'];
+    function creditsDialog(back) {
+      const phone = V.phone;
+      const { panel, face } = plaque('lb-cr-t', 520, 720, phone ? 'display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1fr);column-gap:24px;align-items:center;padding:16px 20px' : 'gap:12px;padding:20px 24px 16px', phone ? '' : 'is-centred');
+      let strip;
+      if (CREDIT_SRC.indexOf('data:image/svg+xml') === 0) {
+        strip = el('img', 'lb-credit-strip');
+        strip.alt = 'Made by Lantern Box Games';
+        strip.src = CREDIT_SRC;
+      } else strip = txt('p', 'lb-credit-strip', 'Made by Lantern Box Games');   // not built: the words alone
+      const list = el('div', 'lb-credits');
+      const entry = (k, v, s) => { const p = el('p', 'lb-credit'); p.append(txt('span', 'k', k), txt('span', 'v', v)); if (s) p.append(txt('span', 's', s)); return p; };
+      const cr = asObject(cfg.credits);
+      if (Array.isArray(cr.music) && cr.music[0]) list.append(entry('Music', String(cr.music[0]), cr.music[1] ? String(cr.music[1]) : ''));
+      if (cr.sound) list.append(entry('Sound', String(cr.sound)));
+      list.append(entry('Type', TYPE_CREDIT[0], TYPE_CREDIT[1]));
+      const btn = button('Back');
+      const items = [{ el: btn, activate: back }];
+      if (phone) {
+        btn.style.width = '100%';
+        const left = el('div');
+        left.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px';
+        const rule = el('div', '', RULE).firstChild;
+        rule.style.alignSelf = 'stretch';
+        left.append(heading('lb-cr-t', 'Credits'), rule, strip, btn);
+        face.append(left, list);
+      } else {
+        face.append(heading('lb-cr-t', 'Credits'), el('div', '', RULE).firstChild, strip, list, btn);
+        if (!touch) { const hint = el('p', 'lb-hint', kbd('Backspace') + ' back'); hint.style.textAlign = 'center'; face.append(hint); }
+      }
+      return { panel: panel, items: items, opts: { back: back } };
+    }
+    function openCredits(from) {
+      state.screen = 'credits';
+      sfx('confirm');
+      showDialog(() => creditsDialog(() => backToSettings(from, 'credits')));
+    }
+    /* kit 0.10.0 (version 12, SettingsPanel): the confirmation. Keep it is the primary button and focused, so Enter never clears by
+       accident; Clear it is the one destructive button (ember). Clearing removes the saved record only: high scores and settings stay. */
+    function clearDialog(keep, clear) {
+      const phone = V.phone;
+      const { panel, face } = plaque('lb-cl-t', 400, 440, 'gap:12px;padding:22px 22px 18px', 'is-centred');
+      panel.setAttribute('role', 'alertdialog');
+      panel.setAttribute('aria-describedby', 'lb-cl-d');
+      const note = txt('p', 'lb-note', saveCfg.clear || 'Everything this game has saved will be gone. High scores and settings stay.');
+      note.id = 'lb-cl-d';
+      note.style.textAlign = 'center';
+      const k = button('Keep it', true, true);
+      k.style.width = '100%';
+      const c = button('Clear it');
+      c.classList.add('is-danger');
+      c.style.width = '100%';
+      face.append(heading('lb-cl-t', 'Clear saved progress?'), el('div', '', RULE).firstChild, note, k, c);
+      if (!touch && !phone) { const hint = el('p', 'lb-hint', kbd('Enter') + ' keep it \u00b7 ' + kbd('Backspace') + ' back'); hint.style.textAlign = 'center'; face.append(hint); }
+      return { panel: panel, items: [{ el: k, activate: keep }, { el: c, activate: clear }], opts: { back: keep } };
+    }
+    function openClear(from) {
+      state.screen = 'clear';
+      sfx('confirm');
+      showDialog(() => clearDialog(() => backToSettings(from, 'clear'), () => { clearProgress(); backToSettings(from, 'clear'); }));
     }
     /* kit 0.8.1: Testing, for trying a game out; it shows only while the game's config has test: { options: [ ... ] }, each option either
        { id, name, choices: [[value, label], ...] } or { id, name, toggle: true, note }. The kit adds a frame-rate line (fps). The values are kept on
@@ -5414,7 +5576,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         cols.append(a, b);
         face.append(head, cols);
       } else {
-        const foot = el('div', '', '<span class="lb-hint">' + kbd('Esc') + ' back</span>');
+        const foot = el('div', '', '<span class="lb-hint">' + kbd('Backspace') + ' back</span>');
         foot.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:12px;padding-top:2px';
         foot.append(done);
         if (touch) foot.firstChild.remove();
@@ -5430,7 +5592,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     }
 
     function scoreRows(table, highlight, from, to) {
-      const t = el('table', 'lb-scores', '<thead><tr><th scope="col">No.</th><th scope="col">Name</th><th scope="col">Wisps</th></tr></thead>');
+      const t = el('table', 'lb-scores', '<thead><tr><th scope="col">No.</th><th scope="col">Name</th><th scope="col">Echo</th></tr></thead>');
       const body = el('tbody');
       for (let i = from; i < to && i < table.length; i++) {
         const tr = el('tr', i === highlight ? 'is-new' : '');
@@ -5448,7 +5610,17 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       let buttons;
       let items;
       let opts;
-      if (afterGame) {
+      const firstEnd = afterGame && runEndInfo && runEndInfo.o.first && runEndInfo.o.shrine;   // kit 0.10.0: a first run that made the top ten
+      if (firstEnd) {
+        const spend = button('Spend your echo', true);
+        const again = button('Play again');
+        const menu = button('Menu');
+        if (phone) { spend.style.padding = '0 16px'; again.style.padding = '0 16px'; menu.style.padding = '0 16px'; }
+        buttons = [spend, again, menu];
+        items = [{ el: spend, activate: () => openShrine(() => { sfx('back'); state.screen = 'scores'; showDialog(() => scoresDialog(highlight, true)); }) },
+          { el: again, activate: startOver }, { el: menu, activate: toMenu }];
+        opts = { back: toMenu };
+      } else if (afterGame) {
         const again = button('Play again', true, true);
         const menu = button('Menu');
         if (phone) { again.style.padding = '0 18px'; menu.style.padding = '0 20px'; }
@@ -5500,7 +5672,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         result.append(h);
       }
       if (newBest) result.append(txt('p', 'lb-flag', 'New best'));
-      result.append(txt('p', 'lb-num lb-score-xl', String(score)), txt('p', 'lb-unit', 'wisps'));
+      result.append(txt('p', 'lb-num lb-score-xl', String(score)), txt('p', 'lb-unit', 'echo'));
       if (!phone) face.append(h, el('div', '', RULE).firstChild);
       face.append(result);
       let items;
@@ -5522,9 +5694,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       return { panel: panel, items: items, opts: opts };
     }
     /* version 8 (4c-6a): How to play (HowToPlay): the game's goal in two lines, then the controls; from the '?' tile in play (the game paused
-       behind it, its button Resume) or the title (Back). Esc does the same. */
+       behind it, its button Resume) or the title (Back). Kit 0.10.0: P resumes, Backspace goes back (Esc still does, never shown). */
     const HOWTO_KEYS = [[['A', 'D', ' or ', 'left', 'right'], 'walk'], [['J'], 'attack'], [['W', ' or ', 'up'], 'climb a bank'], [['K'], 'cast'],
-      [['Space'], 'jump'], [['L'], 'switch spell'], [['Shift'], 'roll'], [['Esc', ' or ', 'P'], 'pause']];
+      [['Space'], 'jump'], [['L'], 'switch spell'], [['Shift'], 'roll'], [['P'], 'pause']];
     const OCT34 = '<polygon class="oct" points="10.0,0.7 24.0,0.7 33.3,10.0 33.3,24.0 24.0,33.3 10.0,33.3 0.7,24.0 0.7,10.0"/>';
     // kit 0.9.0 (version 11): with potions, Q and E on a computer and the two sockets drawn small on a touch device
     const HOWTO_POT_KEYS = [[['Q'], 'drink a health potion'], [['E'], 'drink a mana potion']];
@@ -5566,9 +5738,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         face.append(left, controls());
       } else {
         face.append(heading('lb-ht-t', 'How to play'), el('div', '', RULE).firstChild, ...goals, controls(), btn);
-        if (!touch) { const hint = el('p', 'lb-hint', kbd('Esc') + ' ' + label.toLowerCase()); hint.style.textAlign = 'center'; face.append(hint); }
+        if (!touch) { const hint = el('p', 'lb-hint', kbd(from === 'play' ? 'P' : 'Backspace') + ' ' + label.toLowerCase()); hint.style.textAlign = 'center'; face.append(hint); }
       }
-      return { panel: panel, items: items, opts: { back: close } };
+      return { panel: panel, items: items, opts: { back: close, keys: from === 'play' ? { KeyP: close } : null } };
     }
     function openHowTo(from) {
       if (!howTo) return;
@@ -5592,7 +5764,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       const result = el('div', 'lb-result');
       if (newBest) result.append(txt('p', 'lb-flag', 'New best'));
       const num = txt('p', 'lb-num lb-score-xl', String(base));
-      result.append(num, txt('p', 'lb-unit', 'wisps'));
+      result.append(num, txt('p', 'lb-unit', 'echo'));
       const lanterns = el('span', 'lanterns');
       for (let i = 0; i < Math.max(3, lives); i++) { const l = el('span', '', HUD8.ICON.life()).firstChild; if (i >= lives) l.classList.add('is-out'); lanterns.append(l); }
       const plus = txt('span', 'plus', '+0');
@@ -5632,6 +5804,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     function showWin() {
       if (!state.inGame) return;
       state.screen = 'over';
+      state.over = true;
       state.ending = false;
       sfx('win');   // three bells
       const lives = h8.lives, base = state.score, total = base + lives * (winWords.lifeBonus == null ? 10 : winWords.lifeBonus);
@@ -5641,8 +5814,206 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       if (newBest) setTimeout(() => sfx('newBest'), 650);
       showDialog(() => winDialog(base, lives, total, newBest, total > 0 && (table.length < 10 || total > table[table.length - 1].s)));
     }
+    /* kit 0.10.0 (design system version 12, RunEnd): the run's end, in place of game over, for a game with saved progress.
+       lb.runEnd(info, delay): the run ends; play runs on for delay (the last life falling, with no fade to black; 0.8 s from the
+       blow that took it, in the design, so the game times it), then the plaque appears and the scene holds still under the
+       scrim. info, or a function
+       returning it when the plaque appears, is the game's rules, already decided:
+         line: the words under Game over; near: { boss, left 0..1 } (fell in a boss fight) or { furthest: place } or null;
+         daily: the doubled figure on the day's first Echo Infusion, or null; next: { kind ('health', 'mana', 'bolt', 'acid' or a
+         spell's picture), name, towards (for screen readers, 'the acid spray'), price, was (banked before this run), now (this
+         run's stolen echo) } or null when everything is bought; first: the very first run (its line and "Spend your echo");
+         scored: false keeps the run off the high scores; shrine: { bank } for the Echo Shrine's button (kit 0.10.0's stand-in
+         plaque until the shrine is built, step 5e).
+       From 0.8 to 2.0 s this run's echo steps into the bar and "to go" counts down; READY lights once with the soft chime if the
+       unlock is reached; the buttons take input at 1.0 s, so a jump or a swing mashed as he falls can't skip it. */
+    const UNLOCK_PIC = {   // version 12's pictures for the spells bought at the Echo Shrine (EchoShrine, RunEnd), as drawn
+      bolt: '<path d="M13.5 2.5 L5.5 13.5 H11.5 L9.5 21.5 L18.5 9.5 H12.5 Z"/>',
+      acid: '<path d="M4 12 H9"/><path d="M9 12 L20 5.5 M9 12 H21 M9 12 L20 18.5"/><circle class="solid" cx="15" cy="9.4" r="1.3"/><circle class="solid" cx="17.6" cy="13.6" r="1.3"/><circle class="solid" cx="13.2" cy="14.6" r="1.1"/>'
+    };
+    function unlockPic(kind) {
+      if (kind === 'health' || kind === 'mana') {
+        const P = HUD8.POT[kind], C = kind === 'health' ? 'H' : 'M';
+        return '<span class="lb-potion is-' + kind + ' has-potion" aria-hidden="true"><span><svg class="pot" viewBox="0 0 24 24"><path class="glass-back" d="' + P.glass + '"/>' +
+          '<g class="liq-g" clip-path="url(#lbPot' + C + ')"><rect x="3" y="' + P.top + '" width="18" height="12" fill="url(#lbLiq' + C + ')"/></g>' +
+          '<path class="glass" d="' + P.glass + '"/><path class="mark" d="' + P.mark + '"/></svg></span></span>';
+      }
+      const pic = UNLOCK_PIC[kind] || HUD8.ICON[kind];
+      return pic ? '<span class="lb-spell" aria-hidden="true"><span><svg class="pic" viewBox="0 0 24 24">' + pic + '</svg></span></span>' : '';
+    }
+    const RUN_LINE = 'The rot overcomes you, but your echo remains.';
+    const FIRST_LINE = 'Your echo stays with you when a run ends. Spend it at the Echo Shrine.';
+    let runEndInfo = null;   // the last run's end: what it showed and how far its count had got
+    function runEnd(info, delay) {
+      if (state.ending || !state.inGame || !state.game) return;
+      state.ending = true;
+      after(delay == null ? 0.8 : Math.max(0, +delay || 0), () => {
+        let o;
+        try { o = asObject(typeof info === 'function' ? info() : info); } catch (e) { reportError(e); o = {}; }
+        showRunEnd(o);
+      });
+    }
+    function showRunEnd(o) {
+      state.screen = 'over';
+      state.ending = false;
+      state.over = true;
+      const table = readScores(), score = state.score, scored = o.scored !== false;
+      const prevBest = table.length ? table[0].s : 0;
+      const newBest = scored && score > 0 && score > prevBest;
+      const qualifies = scored && score > 0 && (table.length < 10 || score > table[table.length - 1].s);
+      if (newBest) setTimeout(() => sfx('newBest'), 650);
+      runEndInfo = { o: o, newBest: newBest, qualifies: qualifies, t0: performance.now(), chimed: false, timer: 0 };
+      showDialog(runEndDialog);
+    }
+    function runEndDialog() {
+      const R = runEndInfo, o = R.o, phone = V.phone;
+      const shrine = o.shrine ? asObject(o.shrine) : null, first = !!o.first && !!shrine;
+      const faceCss = phone ? 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;align-items:center;padding:18px 20px'
+        : R.qualifies ? 'gap:10px;padding:20px 20px 16px' : o.daily ? 'gap:6px;padding:14px 20px 12px' : 'gap:8px;padding:18px 20px 14px';
+      const { panel, face } = plaque('lb-re-t', 470, 660, faceCss);
+      const parts = [heading('lb-re-t', 'Game over')];
+      if (o.line !== '') parts.push(txt('p', 'lb-win-line', o.line || RUN_LINE));
+      parts.push(el('div', '', RULE).firstChild);
+      const result = el('div', 'lb-result');
+      if (R.newBest) result.append(txt('p', 'lb-flag', 'New best'));
+      result.append(txt('p', 'lb-num lb-score-xl', String(state.score)), txt('p', 'lb-unit', 'echo'));
+      parts.push(result);
+      // the near-miss line: the boss he fell to and how much of it was left, or the furthest place yet, or nothing
+      const near = asObject(o.near);
+      if (near.boss) {
+        const pc = Math.round(clamp(Math.ceil((+near.left || 0) * 100), 1, 100));   // up, so a boss still standing never reads 0%
+        const p = el('p', 'lb-near');
+        p.append(document.createTextNode('Fell to '), txt('span', 'lb-near-name', String(near.boss)));
+        const bar = el('span', 'lb-near-bar', '<i></i>');
+        bar.setAttribute('aria-hidden', 'true');
+        bar.firstChild.style.width = pc + '%';
+        p.append(bar, el('span', '', '<span class="lb-num">' + pc + '%</span> left'));
+        parts.push(p);
+      } else if (near.furthest) {
+        const p = el('p', 'lb-near');
+        p.append(txt('span', 'lb-ready', 'Furthest yet'), txt('span', 'lb-near-name', String(near.furthest)));
+        parts.push(p);
+      }
+      if (o.daily) parts.push(el('p', 'lb-daily', '<span class="lb-daily-mark">\u00d72</span>First Echo Infusion today: <span class="lb-num">' + Math.round(+o.daily || 0) + '</span> echo stolen'));
+      // the next unlock: its picture, its name and what is still to go; the bar from 0 to its price, banked echo darker, this run's bright
+      let paint = null, shrineBtn = null;
+      const right = [];
+      if (o.next) {
+        const n = asObject(o.next), price = Math.max(1, Math.round(+n.price || 1)), was = clamp(Math.round(+n.was || 0), 0, price), gain = clamp(Math.round(+n.now || 0), 0, price - was);
+        const box = el('div', 'lb-next', unlockPic(n.kind));
+        const body = el('div', 'lb-next-body');
+        const row = el('p', 'lb-next-row');
+        const nameEl = el('span');
+        const side = el('span');
+        row.append(nameEl, side);
+        const meter = el('div', 'lb-echo-bar', '<i class="was"></i><i class="now"></i>');
+        meter.setAttribute('role', 'meter');
+        meter.setAttribute('aria-valuemin', '0');
+        meter.setAttribute('aria-valuemax', String(price));
+        body.append(row, meter);
+        box.append(body);
+        right.push(box);
+        const wasI = meter.querySelector('.was'), nowI = meter.querySelector('.now');
+        wasI.style.width = (was / price * 100).toFixed(2) + '%';
+        if (!was) wasI.hidden = true;
+        let shown = null;
+        paint = (u) => {
+          const got = Math.round(gain * clamp(u, 0, 1)), total = was + got, ready = total >= price;
+          nowI.style.width = (got / price * 100).toFixed(2) + '%';
+          meter.setAttribute('aria-valuenow', String(total));
+          const key = ready ? 'r' : String(price - total);
+          if (key === shown) return;
+          shown = key;
+          nameEl.textContent = ready || phone ? String(n.name) : 'Next: ' + n.name;   // the phone draws the name alone (as its preview)
+          meter.setAttribute('aria-label', 'Stolen echo towards ' + (n.towards || n.name) + (ready ? ': ready' : ''));
+          if (ready) { side.className = 'lb-ready'; side.textContent = 'Ready'; }
+          else { side.className = 'lb-togo'; side.innerHTML = '<span class="lb-num">' + (price - total) + '</span> to go'; }
+          if (shrineBtn) shrineBtn.classList.toggle('is-lit', ready);
+          if (ready && was < price && !R.chimed && u < 1.5) { R.chimed = true; sfx('confirm'); }   // once, as the bar fills
+        };
+      }
+      if (first) right.push(txt('p', 'lb-first', FIRST_LINE));
+      // the buttons
+      const items = [];
+      const btns = el('div', 'lb-btns');
+      let primary, hint = null, opts;
+      const fromShrine = () => { sfx('back'); state.screen = 'over'; showDialog(runEndDialog, items.findIndex((it) => it.shrine)); };
+      if (R.qualifies) {
+        primary = button('Continue', true);
+        items.push({ el: primary, activate: () => { sfx('confirm'); openInitials(); } });
+        hint = kbd('Enter') + ' continue to your initials';
+        opts = {};
+      } else if (first) {
+        primary = button('Spend your echo', true);
+        items.push({ el: primary, shrine: true, activate: () => openShrine(fromShrine) });
+        const again = button('Play again'), menu = button('Menu');
+        btns.append(again, menu);
+        items.push({ el: again, activate: startOver }, { el: menu, activate: toMenu });
+        hint = kbd('Enter') + ' spend your echo \u00b7 ' + kbd('Backspace') + ' menu';
+        opts = { back: toMenu };
+      } else {
+        primary = button('Play again', true, true);
+        items.push({ el: primary, activate: startOver });
+        if (shrine) { shrineBtn = button('Echo Shrine'); btns.append(shrineBtn); items.push({ el: shrineBtn, shrine: true, activate: () => openShrine(fromShrine) }); }
+        const menu = button('Menu');
+        btns.append(menu);
+        items.push({ el: menu, activate: toMenu });
+        hint = kbd('Enter') + ' play again \u00b7 ' + kbd('Backspace') + ' menu';
+        opts = { back: toMenu };
+      }
+      primary.style.width = '100%';
+      right.push(primary);
+      if (btns.children.length) right.push(btns);
+      opts.until = R.t0 + 200;   // the plaque shows at 0.8 s; the buttons take input at 1.0 s
+      const back = opts.back;
+      if (back) opts.back = () => { if (performance.now() >= opts.until) back(); };
+      if (phone) {
+        const a = el('div'); a.style.cssText = 'display:flex;flex-direction:column;gap:8px'; a.append(...parts);
+        const b = el('div'); b.style.cssText = 'display:flex;flex-direction:column;gap:10px'; b.append(...right);
+        face.append(a, b);
+      } else {
+        face.append(...parts, ...right);
+        if (!touch && hint) { const h = el('p', 'lb-hint', hint); h.style.textAlign = 'center'; face.append(h); }
+      }
+      // the count, 0.8 to 2.0 s: it carries on from wherever it had got to if the plaque is built again (another layout, back from the shrine)
+      if (paint) {
+        clearTimeout(R.timer);
+        const step = () => {
+          if (runEndInfo !== R || !panel.isConnected) return;
+          const u = (performance.now() - R.t0) / 1200;
+          paint(u);
+          if (u < 1) R.timer = setTimeout(step, 40);
+        };
+        paint(Math.min(1, (performance.now() - R.t0) / 1200));
+        R.timer = setTimeout(step, 40);
+      }
+      return { panel: panel, items: items, opts: opts };
+    }
+    /* kit 0.10.0: the Echo Shrine's stand-in until the shrine is built (step 5e; Barney, 7 November 2026): its name, the stolen echo,
+       and Back to wherever it was opened from. */
+    function shrineDialog(back) {
+      const phone = V.phone, o = runEndInfo ? asObject(runEndInfo.o.shrine) : {};
+      const { panel, face } = plaque('lb-sh-t', 420, 440, 'gap:12px;padding:20px 22px 16px');
+      const head = el('div');
+      head.style.cssText = 'display:flex;align-items:flex-end;justify-content:space-between;gap:12px';
+      const bank = el('div', 'lb-bank');
+      bank.append(txt('span', 'lb-bank-label', 'Stolen echo'), txt('span', 'lb-bank-num', String(Math.max(0, Math.round(+o.bank || 0)))));
+      head.append(heading('lb-sh-t', 'Echo Shrine'), bank);
+      const note = txt('p', 'lb-note', 'Coming soon: spend your stolen echo here on spells, potions and belts, kept for good.');
+      const btn = button('Back', true);
+      btn.style.width = '100%';
+      face.append(head, el('div', '', RULE).firstChild, note, btn);
+      if (!touch && !phone) { const hint = el('p', 'lb-hint', kbd('Backspace') + ' back'); hint.style.textAlign = 'center'; face.append(hint); }
+      return { panel: panel, items: [{ el: btn, activate: back }], opts: { back: back } };
+    }
+    function openShrine(back) {
+      state.screen = 'shrine';
+      sfx('confirm');
+      showDialog(() => shrineDialog(back));
+    }
     function showGameOver() {
       state.screen = 'over';
+      state.over = true;
       state.ending = false;
       sfx('gameOver');
       const table = readScores();
@@ -5721,7 +6092,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       done.addEventListener('click', saveInitials);
       if (phone) {
         slots.style.cssText = 'gap:10px;padding:0';
-        const line = el('p', 'lb-hint', '<span class="lb-num" style="font-size:18px">' + state.score + '</span> wisps. Tap a letter, then the arrows to change it.');
+        const line = el('p', 'lb-hint', '<span class="lb-num" style="font-size:18px">' + state.score + '</span> echo. Tap a letter, then the arrows to change it.');
         line.style.cssText = 'font-size:16px;line-height:1.35;color:var(--text-2)';
         done.style.marginTop = '6px';
         const left = el('div');
@@ -5729,7 +6100,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         left.append(h, line, done);
         face.append(left, slots);
       } else {
-        const line = el('p', 'lb-hint', '<span class="lb-num" style="font-size:20px">' + state.score + '</span> wisps. Enter your initials.');
+        const line = el('p', 'lb-hint', '<span class="lb-num" style="font-size:20px">' + state.score + '</span> echo. Enter your initials.');
         line.style.cssText = 'font-size:17px;color:var(--text-2)';
         face.append(h, el('div', '', RULE).firstChild, line, slots);
         if (!touch) face.append(el('p', 'lb-hint', kbd('up') + ' ' + kbd('down') + ' letter · ' + kbd('left') + ' ' + kbd('right') + ' move · ' + kbd('Enter') + ' done'));
@@ -5803,7 +6174,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         item('High scores', () => { sfx('confirm'); openScores(-1, false); }),
         item('Settings', () => openSettings('title'))
       ].filter(Boolean);
-      const best = el('p', 'lb-best', 'Best <span class="lb-num">' + pad4(bestScore()) + '</span> wisps');
+      const best = el('p', 'lb-best', 'Best <span class="lb-num">' + pad4(bestScore()) + '</span> echo');
       inner.append(h1, rule, menu, best);
       if (!touch && !phone) inner.append(el('p', 'lb-hint', kbd('up') + ' ' + kbd('down') + ' choose · ' + kbd('Enter') + ' select'));
       arch.append(inner);
@@ -5839,6 +6210,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       state.time = 0;
       state.timers = [];
       state.ending = false;
+      state.over = false;   // kit 0.10.0: true once the run's end, game over or the win shows
+      runEndInfo = null;
       state.shakeAmt = 0;
       state.shakeT = 0;
       resetH8();
@@ -5868,6 +6241,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     }
     function quitToTitle() {
       closeDialog();
+      runEndInfo = null;
       state.inGame = false;
       state.screen = 'title';
       state.game = null;
@@ -5900,6 +6274,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     /* ----- Keyboard ----- */
     document.addEventListener('keydown', (e) => {
       audio.unlock();
+      if (e.code === 'Backspace') e.preventDefault();   // kit 0.10.0: Backspace goes back in the menus, and never takes the browser back a page
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       physical.add(e.code);
       if (state.screen === 'initials' && initials) { initialsKey(e); return; }
@@ -6088,7 +6463,14 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
        the title, 'night' if left out), drawTitle(ctx, lb) (to draw the title's picture itself), mana, music, init(lb), onPause(g, lb),
        and (version 8) hud: 'full', howTo, win, and (kit 0.8.1) test: { options } for the Testing panel (Settings), its values in lb.test,
        and (kit 0.9.0) potions: true for the potion sockets (with How to play's rows for them).
-       world.monster takes facing (kit 0.8.1): 1 mirrors it to face right. */
+       world.monster takes facing (kit 0.8.1): 1 mirrors it to face right.
+       Kit 0.10.0 (design system version 12): the score is counted in echo on screen (lb.addWisps and lb.wisps keep their names).
+         save: { version, fresh, read, clear, onClear } in the config gives the game one saved record, lb.progress, written with
+         lb.saveProgress(); Settings then offers Clear saved progress (from the title). lb.runEnd(info, delay) ends the run with the run's
+         end in place of game over (see runEnd). onLeave(g, lb) hears of a run left by Restart or Quit to menu. credits: { music: [line,
+         note], sound: line } words the Credits plaque. lb.sfx('defeat', echo) and lb.sfx('echo', 25): the wisp's echo, louder the more it
+         gives. lb.keyLetter('A'): the letter on the player's own keyboard in that place, for a game's own hints. P pauses and resumes,
+         Backspace goes back; no hint shows Esc. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
@@ -6101,6 +6483,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       get ending() { return state.ending; },
       get best() { return Math.max(bestScore(), state.score); },
       addWisps: addWisps, gameOver: gameOver, shake: shake, after: after,
+      get progress() { return progress; }, saveProgress: saveProgress, runEnd: runEnd, keyLetter: keyLetter,   // kit 0.10.0
       fade: fade, placeCard: placeCard, placing: placing, win: showWin, howTo: () => openHowTo('play'),   // version 8 (4c-6a)
       get test() { return testCfg ? Object.assign({}, testValues) : null; },   // kit 0.8.1: Testing's values, or null when the game has none
       sounds: Object.keys(SND8.FX), ambient: ambient,   // version 8 (4c-7)
@@ -6144,7 +6527,10 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       start: startGame, pause: pause, resume: resume, quit: quitToTitle,
       setWisps: (n) => { state.score = n | 0; syncHud(); },
       showGameOver: showGameOver, openSettings: openSettings, openScores: openScores, openInitials: openInitials,
-      openHowTo: openHowTo, showWin: showWin, h8: state.h8, snd: SND8, openTesting: openTesting
+      openHowTo: openHowTo, showWin: showWin, h8: state.h8, snd: SND8, openTesting: openTesting,
+      showRunEnd: showRunEnd, openCredits: openCredits, openClear: openClear, clearProgress: () => clearProgress(), layout: LAYOUT,   // kit 0.10.0
+      setScores: (table) => { if (Array.isArray(table)) store.set(scoreKey(), table); else store.remove(scoreKey()); },   // kit 0.10.0: the test page's sample tables
+      get runEnd() { return runEndInfo; }
     };
     return api;
   }
