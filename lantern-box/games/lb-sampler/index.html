@@ -605,6 +605,7 @@ LanternBox.game({
   save: { version: 1, fresh: () => ({ runs: 0 }),
     clear: 'Your stolen echo and everything bought at the Echo Shrine will be gone, and the next run starts as a first run, hints and all. High scores and settings stay.' },
   credits: { sound: 'Two sound effects from Pixabay; the rest made in code' },
+  shrine: { bank: () => 96 },   // kit 0.10.2: the Echo Shrine on the title's arch and High scores on an arch tile
   // kit 0.8.1: the Testing panel (Settings), with the options Gloam Hallow will use; the test page shows them but only uses the frame-rate line
   test: { options: [
     { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },

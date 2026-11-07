@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.10.1';
+  const VERSION = '0.10.2';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -63,6 +63,7 @@
     fullscreen: SVG24('<path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15"/>'),
     fullscreenExit: SVG24('<path d="M9 4 V9 H4 M15 4 V9 H20 M15 20 V15 H20 M9 20 V15 H4"/>'),
     pause: SVG24('<path d="M9 5 V19 M15 5 V19"/>'),
+    scores: SVG24('<path d="M3 20 H21 M4 20 V14 H9 V20 M9 20 V8 H15 V20 M15 20 V11 H20 V20"/>'),   // kit 0.10.2: High scores' arch tile, a podium (a stand-in until the design system draws it)
     heart: (s) => '<svg width="' + s + '" height="' + (s - 1) + '" viewBox="0 0 14 13" aria-hidden="true"><path d="M7 12.5 C2 9 0 6.5 0 4 A3.6 3.6 0 0 1 7 2.4 A3.6 3.6 0 0 1 14 4 C14 6.5 12 9 7 12.5 Z"/></svg>',
     flame: (s) => '<svg width="' + s + '" height="' + s + '" viewBox="0 0 12 18" aria-hidden="true"><path d="M6 1 C9 6 11 8 11 12 A5 5 0 0 1 1 12 C1 8 3 6 6 1 Z"/></svg>',
     chevUp: '<svg class="lb-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11 L8 5 L13 11"/></svg>',
@@ -4519,7 +4520,7 @@ function setPotion(b,st){const k=b.dataset.k,has=!!(st.potions&&st.potions[k]),t
 function set(hud,st){const q=s=>hud.querySelector(s);
   const hp=Math.round(st.hp*100),mp=Math.round(st.mp*100);
   setOnce(hud,"hp",hp,v=>q(".hp").style.setProperty("--v",v+"%"));setOnce(hud,"mp",mp,v=>q(".mp").style.setProperty("--v",v+"%"));
-  const pips=hud.querySelectorAll(".lb-pip");pips.forEach((p,i)=>{const fx=st.pipFx&&st.pipFx.i===i?st.pipFx:null;p.classList.toggle("is-on",i<st.pips||!!fx);
+  const pips=hud.querySelectorAll(".lb-pip");pips.forEach((p,i)=>{const fx=st.pipFx?(Array.isArray(st.pipFx)?st.pipFx.find(f=>f.i===i):st.pipFx.i===i?st.pipFx:null)||null:null; /* kit 0.10.2: several pips at once */p.classList.toggle("is-on",i<st.pips||!!fx);
     const hl=p.querySelector(".hl"),hr=p.querySelector(".hr"),ck=p.querySelector(".crack"),gl=p.querySelector(".glint");
     if(fx&&fx.kind==="crack"){const u=fx.u,a=ease(Math.max(0,(u-0.25)/0.75));ck.style.opacity=u<0.25?u/0.25:Math.max(0,1-a*1.6);
       hl.setAttribute("transform",`translate(${-1.6*a} ${3.2*a*a}) rotate(${-16*a} 5 11)`);hr.setAttribute("transform",`translate(${1.6*a} ${3.6*a*a}) rotate(${18*a} 5 11)`);hl.style.opacity=hr.style.opacity=String(1-a);gl.style.opacity=0;}
@@ -4565,6 +4566,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     // lines, the place card); howTo: { goal: [two lines], keys, touchKeys } adds How to play to the title and the '?' tile; win: { heading, line,
     // lifeBonus } words the win screen (lb.win())
     const fullHud = cfg.hud === 'full', howTo = cfg.howTo || null, winWords = cfg.win || { heading: 'The end', line: '', lifeBonus: 10 };
+    // kit 0.10.2 (Barney, 7 November 2026): shrine: { bank(lb) } puts the Echo Shrine on the title's arch in High scores' place, and High
+    // scores becomes an arch tile beside the sound tile; until the shrine is built (step 5e) it opens the kit's stand-in
+    const shrineCfg = cfg.shrine && typeof cfg.shrine === 'object' ? cfg.shrine : null;
     const potionsOn = fullHud && !!cfg.potions;   // kit 0.9.0 (design system version 11): potions: true adds the two potion sockets under the plaque
     const touch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     const mqPortrait = window.matchMedia('(orientation: portrait)');
@@ -5117,7 +5121,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     const h8 = state.h8;
     function h8State() {
       const T = state.time, fx = (f) => (f && T - f.t0 < f.len ? f : null), st = { hp: state.health, mp: state.mana, pips: h8.pips, lives: h8.lives, spells: h8.spells, sel: h8.sel, cost: h8.cost, wisps: state.score, hudA: h8.hudA };
-      const pf = fx(h8.pipFx); if (pf) st.pipFx = { i: pf.i, kind: pf.kind, u: (T - pf.t0) / pf.len };
+      // kit 0.10.2: a moment for each pip changing, so several can crack together (one waiting to start shows whole)
+      const pfs = (h8.pipFx || []).filter((f) => T - f.t0 < f.len); if (pfs.length) st.pipFx = pfs.map((f) => ({ i: f.i, kind: f.kind, u: Math.max(0, (T - f.t0) / f.len) }));
       const lf = fx(h8.lifeFx); if (lf) st.lifeFx = { i: lf.i, u: T - lf.t0 };
       const ff = fx(h8.flipFx); if (ff) { st.flip = (T - ff.t0) / ff.len; if (st.flip < 0.5) st.flipKind = ff.from; }
       // kit 0.9.0: the potion sockets: a kept one shows once its flight has landed; each kind's moment (kept 0.4 s, drunk 0.35 s) as potFx[kind]
@@ -5161,7 +5166,11 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       health(f) { state.health = clamp(+f || 0, 0, 1); syncHud(); },
       mana(f) { state.mana = clamp(+f || 0, 0, 1); syncHud(); },
       // version 8 (hud: 'full')
-      armour(n) { n = clamp(n | 0, 0, 3); if (n < h8.pips) h8.pipFx = { i: n, kind: 'crack', t0: state.time, len: 0.4 }; else if (n > h8.pips) h8.pipFx = { i: n - 1, kind: 'gain', t0: state.time, len: 0.5 }; h8.pips = n; syncHud(); },
+      // kit 0.10.2: armour(n, { stagger }): every pip lost cracks, each stagger seconds after the one above it (0: together)
+      armour(n, o) { n = clamp(n | 0, 0, 3); const gap = Math.max(0, +(o && o.stagger) || 0);
+        if (n < h8.pips) { h8.pipFx = []; for (let i = h8.pips - 1; i >= n; i--) h8.pipFx.push({ i: i, kind: 'crack', t0: state.time + (h8.pips - 1 - i) * gap, len: 0.4 }); }
+        else if (n > h8.pips) h8.pipFx = [{ i: n - 1, kind: 'gain', t0: state.time, len: 0.5 }];
+        h8.pips = n; syncHud(); },
       lives(n) { n = clamp(n | 0, 0, 9); if (n < h8.lives) h8.lifeFx = { i: n, t0: state.time, len: 0.8 }; h8.lives = n; syncHud(); },
       spells(list, sel, cost) { // the spells known (in world.LOOT's names: 'heal', 'fire'), the chosen one, and what it costs (so its picture dims when mana is short)
         list = (list || []).slice(); sel = sel | 0;
@@ -5619,7 +5628,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         const menu = button('Menu');
         if (phone) { spend.style.padding = '0 16px'; again.style.padding = '0 16px'; menu.style.padding = '0 16px'; }
         buttons = [spend, again, menu];
-        items = [{ el: spend, activate: () => openShrine(() => { sfx('back'); state.screen = 'scores'; showDialog(() => scoresDialog(highlight, true)); }) },
+        items = [{ el: spend, activate: () => openShrine(() => { sfx('back'); state.screen = 'scores'; showDialog(() => scoresDialog(highlight, true)); }, asObject(runEndInfo.o.shrine).bank) },
           { el: again, activate: startOver }, { el: menu, activate: toMenu }];
         opts = { back: toMenu };
       } else if (afterGame) {
@@ -5947,7 +5956,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         opts = {};
       } else if (first) {
         primary = button('Spend your echo', true);
-        items.push({ el: primary, shrine: true, activate: () => openShrine(fromShrine) });
+        items.push({ el: primary, shrine: true, activate: () => openShrine(fromShrine, shrine.bank) });
         const again = button('Play again'), menu = button('Menu');
         btns.append(again, menu);
         items.push({ el: again, activate: startOver }, { el: menu, activate: toMenu });
@@ -5956,7 +5965,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       } else {
         primary = button('Play again', true, true);
         items.push({ el: primary, activate: startOver });
-        if (shrine) { shrineBtn = button('Echo Shrine'); btns.append(shrineBtn); items.push({ el: shrineBtn, shrine: true, activate: () => openShrine(fromShrine) }); }
+        if (shrine) { shrineBtn = button('Echo Shrine'); btns.append(shrineBtn); items.push({ el: shrineBtn, shrine: true, activate: () => openShrine(fromShrine, shrine.bank) }); }
         const menu = button('Menu');
         btns.append(menu);
         items.push({ el: menu, activate: toMenu });
@@ -5993,8 +6002,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     }
     /* kit 0.10.0: the Echo Shrine's stand-in until the shrine is built (step 5e; Barney, 7 November 2026): its name, the stolen echo,
        and Back to wherever it was opened from. */
-    function shrineDialog(back) {
-      const phone = V.phone, o = runEndInfo ? asObject(runEndInfo.o.shrine) : {};
+    const shrineBank = () => { try { return shrineCfg && typeof shrineCfg.bank === 'function' ? +shrineCfg.bank(api) || 0 : 0; } catch (e) { reportError(e); return 0; } };
+    function shrineDialog(back, bankNow) {
+      const phone = V.phone, o = { bank: bankNow };
       const { panel, face } = plaque('lb-sh-t', 420, 440, 'gap:12px;padding:20px 22px 16px');
       const head = el('div');
       head.style.cssText = 'display:flex;align-items:flex-end;justify-content:space-between;gap:12px';
@@ -6008,10 +6018,10 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       if (!touch && !phone) { const hint = el('p', 'lb-hint', kbd('Backspace') + ' back'); hint.style.textAlign = 'center'; face.append(hint); }
       return { panel: panel, items: [{ el: btn, activate: back }], opts: { back: back } };
     }
-    function openShrine(back) {
+    function openShrine(back, bank) {
       state.screen = 'shrine';
       sfx('confirm');
-      showDialog(() => shrineDialog(back));
+      showDialog(() => shrineDialog(back, bank));
     }
     function showGameOver() {
       state.screen = 'over';
@@ -6173,7 +6183,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       const items = [
         item('Start game', () => { sfx('confirm'); startGame(); }),
         howTo ? item('How to play', () => openHowTo('title')) : null,
-        item('High scores', () => { sfx('confirm'); openScores(-1, false); }),
+        shrineCfg ? item('Echo Shrine', () => openShrine(() => { sfx('back'); state.screen = 'title'; closeDialog(); }, shrineBank()))   // kit 0.10.2
+          : item('High scores', () => { sfx('confirm'); openScores(-1, false); }),
         item('Settings', () => openSettings('title'))
       ].filter(Boolean);
       const best = el('p', 'lb-best', 'Best <span class="lb-num">' + pad4(bestScore()) + '</span> echo');
@@ -6186,6 +6197,13 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       sound.type = 'button';
       sound.dataset.act = 'sound';
       sound.addEventListener('click', () => { settings.muted = !settings.muted; applySettings(); audio.unlock(); sfx('blip'); sound.blur(); });
+      if (shrineCfg) {   // kit 0.10.2: High scores' own arch tile, beside sound
+        const sc = el('button', 'lb-arch-tile', ICON.scores);
+        sc.type = 'button';
+        sc.setAttribute('aria-label', 'High scores');
+        sc.addEventListener('click', () => { sc.blur(); sfx('confirm'); openScores(-1, false); });
+        tiles.append(sc);
+      }
       tiles.append(sound, fullscreenTile('lb-arch-tile'));
       titleScreen.append(scrim, wrap, tiles);
       const keep = titleNav ? titleNav.index : 0;
@@ -6422,7 +6440,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
          itself. lb.ambient(place) sets the place's background sound ('night', 'storm', 'dawn' or 'mist'; null for none), heard only
          in play: it fades in over 1.2 s and out over 0.6 s. The first Blood Red Rain makes its rain, a moment's work, so set it while
          the place card is black. Track 2 begins at Dawn's card: lb.music(1) in its onBlack.
-       The full HUD (version 8; hud: 'full' in the config): lb.hud.armour(0..3) (a pip cracks or fills), lb.hud.lives(n) (a lantern
+       The full HUD (version 8; hud: 'full' in the config): lb.hud.armour(0..3) (a pip cracks or fills; kit 0.10.2: lb.hud.armour(n, { stagger }) cracks every pip lost, each stagger seconds after the one above), lb.hud.lives(n) (a lantern
          gutters out), lb.hud.spells(list, sel, cost) (the spells known, e.g. ['heal', 'fire'], the chosen one, and its mana cost: its
          picture dims while mana is short; a new choice turns it over; a tap on the socket presses input.pressed.switch),
          lb.hud.line(kind, text) (a plaque line, 2 s; lines take turns; kind a loot picture or none), lb.hud.bossName(name) (2.6 s),
@@ -6470,7 +6488,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
          save: { version, fresh, read, clear, onClear } in the config gives the game one saved record, lb.progress, written with
          lb.saveProgress(); Settings then offers Clear saved progress (from the title). lb.runEnd(info, delay) ends the run with the run's
          end in place of game over (see runEnd). onLeave(g, lb) hears of a run left by Restart or Quit to menu. credits: { music: [line,
-         note], sound: line } words the Credits plaque. lb.sfx('defeat', echo) and lb.sfx('echo', 25): the wisp's echo, louder the more it
+         note], sound: line } words the Credits plaque. Kit 0.10.2: shrine: { bank(lb) } puts the Echo Shrine on the title's arch in High
+         scores' place (the kit's stand-in until it is built) and High scores on an arch tile beside sound. lb.sfx('defeat', echo) and lb.sfx('echo', 25): the wisp's echo, louder the more it
          gives. lb.keyLetter('A'): the letter on the player's own keyboard in that place, for a game's own hints. P pauses and resumes,
          Backspace goes back; no hint shows Esc. */
     const api = {

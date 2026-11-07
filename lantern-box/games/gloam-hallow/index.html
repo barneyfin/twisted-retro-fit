@@ -63,6 +63,8 @@ const SWORD_T = 4 / 12;          // the kit's swing: wind, strike, follow, recov
 const ATTACK_BUF = 0.15;         // attack pressed this long before he is free (landing, the end of a roll) still swings
 const BODY_W = 13, BODY_H = 88, ROLL_H = 38;   // his body: half its width, its height, and its height rolling (under high attacks)
 const SAFE_T = 1;                // the second of safety after a hit
+const ARMOUR_SHATTER = 0.12;     // as the last life goes, each armour pip cracks this long after the one above it (starting figure)
+const ARMOUR_CUT = 0.10;         // each armour pip held takes this share off every hit (starting figure: three take 30%); pips last the run (Barney, 7 November 2026)
 const COMEBACK = 0.4;            // the share of the monsters beaten since the checkpoint that come back after a life lost
 // Each kind: the share of health a touch or attack takes (small 10%, medium 15%, large 25%), hits to defeat, wisps, its body (x0, x1 as
 // it faces left, then y0, y1 from its feet; measured from the kit's drawings), and how it comes at him. Ground monsters keep to their
@@ -236,6 +238,7 @@ LanternBox.game({
     clear: 'Your stolen echo and everything bought at the Echo Shrine will be gone, and the next run starts as a first run, hints and all. High scores and settings stay.' },
   credits: { music: ['Music made with Google Gemini', 'The Long Vigil \u00b7 Lantern in the Moor'], sound: 'Two sound effects from Pixabay; the rest made in code' },
   onLeave(g, lb) { bankRun(g, lb, false); },   // Restart or Quit to menu: the run's echo is banked all the same
+  shrine: { bank: (lb) => lb.progress.echo },   // kit 0.10.2: the Echo Shrine on the title's arch (High scores on an arch tile), the stand-in until 5e
   // Testing (delete for the finished game): where a run starts, and help for trying it out
   test: { options: [
     { id: 'run', name: 'Run', choices: [['bare', 'The Bare Reckoning'], ['infusion', 'The Echo Infusion']] },   // step 5d, until the choice of run (5e)
@@ -492,6 +495,13 @@ function startLost(g, lb, kind, pit) {
   g.mode = 'lost'; g.mt = 0; g.atkBuf = 0;
   g.fills = []; g.drinkT = 9;            // version 11: a drink's fill stops (kept potions stay kept, as Barney chose)
   g.lost = { kind, pit, x0: g.x, y0: g.y, lip: pit ? g.L.ground(g.x) : g.y, f: g.facing };
+  // the last life (Barney, 7 November 2026): the armour, kept all run, shatters with the blow: each pip cracks in turn, with the card
+  // shards, all done before the run's end at 0.8 s
+  if (g.lives <= 1 && !g.safe && g.armour > 0) {
+    const n = g.armour; g.armour = 0; g.hurtKind = 'armour';
+    lb.hud.armour(0, { stagger: ARMOUR_SHATTER });
+    for (let i = 0; i < n; i++) lb.after(i * ARMOUR_SHATTER, () => lb.sfx('crack'));
+  }
 }
 function lostUpdate(g, lb, dt) {
   const t = g.mt, P = g.lost;
@@ -508,7 +518,8 @@ function lostUpdate(g, lb, dt) {
     const cp = g.cps[g.lastCp];
     g.x = cp.x + RETURN_AT; g.y = surfaceAt(g, g.x); g.on = pieceUnder(g, g.x, g.y); g.vy = 0; g.facing = 1;
     g.mode = 'return'; g.mt = 0; g.safeT = 0; g.hurtT = 9;
-    g.armour = 0; lb.hud.armour(0);    // a lost life loses the armour; spells, sword upgrades and kept potions are kept, and loot picked up stays picked up
+    // a lost life keeps the armour (Barney, 7 November 2026: pips last until the run ends), and the spells, sword upgrades and kept potions;
+    // loot picked up stays picked up
     g.shots = []; g.cast = null; g.castBuf = 0;
     if (g.boss && g.boss.st !== 'done') {   // a life lost in a boss fight: back at its door, the boss whole again, its crawlers gone
       g.boss = newBoss(g); lb.hud.boss(null);
@@ -932,8 +943,8 @@ function hurtCheck(g, lb) {
 }
 function hurt(g, lb, dmg, fromX) {
   g.safeT = SAFE_T; g.hurtT = 0; g.atkBuf = 0;
-  if (g.armour > 0) { g.armour--; lb.hud.armour(g.armour); g.hurtKind = 'armour'; lb.sfx('crack'); }   // a pip goes before any health
-  else { g.health = Math.max(0, g.health - dmg); lb.hud.health(g.health); g.hurtKind = 'health'; lb.sfx('hurt'); }
+  // armour (Barney, 7 November 2026): each pip held takes ARMOUR_CUT off the hit, and no pip is lost; they last until the run ends
+  g.health = Math.max(0, g.health - dmg * (1 - ARMOUR_CUT * Math.min(3, g.armour))); lb.hud.health(g.health); g.hurtKind = 'health'; lb.sfx('hurt');
   if (g.health <= 0.001) return startLost(g, lb, 'health', null);
   if (g.mode === 'air') return;        // in the air: the sparks and the second of safety, and on he goes
   g.facing = fromX >= g.x ? 1 : -1;    // turned to it and knocked back a step (the kit's hurt move)

@@ -42,7 +42,7 @@ The modes screen's earlier mode, The Wandering Rot, gives way to these two runs;
 - **Small pieces** to stand on and climb, each with a lit top edge; the wanderer walks off the end (nothing is dropped through). Graveyard: the arched churchyard wall, a box tomb. Old town: barrels, big crates, a handcart. Moor: the drystone wall, the dolmen, boulders, the cairn. Forest: the fallen trunk, a small stump, the great stump, a mossy rock. No more kinds are needed (Barney). They sit on the sections' crests and plateaus.
 - **Checkpoints**: the start of each place, once halfway through it (after the fifth section), and at the boss's door. No pit from 120 before a checkpoint to 320 after it (Barney, 5 November 2026; kit 0.9.1, and design system 12 since), so Night, Blood Red Rain and Dawn have three pits each and the Mist four. Each is a lantern on a post that lights as the wanderer passes, and stays lit: the wanderer's own lantern made big, on a post that belongs to the place (graveyard, a wrought-iron crook on a stone plinth; old town, a timber post with an iron sign bracket; moor, a gnarled stake in a cairn; forest, a sapling pole bent over). The boss's door has the same checkpoint (step 4b round 6; Barney, 4 November 2026).
 - **Lives**: **3** for the run (*starting figure*). When health empties or the wanderer falls into a pit, a life is lost and the run restarts at the last checkpoint. About **40%** (*starting figure*) of the monsters beaten since that checkpoint come back, so a restart has consequences without being a grind; loot picked up stays picked up. A life lost in a boss fight restarts at the boss's door, the boss at full health (Barney, 4 November 2026, step 4b round 10). **Game over** comes when the lives run out. Game over loses everything (arcade-style).
-- **A lost life** refills health and mana and loses the armour. Spells learnt and sword upgrades are kept.
+- **A lost life** refills health and mana. Spells learnt, sword upgrades and armour are kept (armour since Barney's play of step 5d, 7 November 2026).
 - **Game over** (phase 5): the run's end. The run's echo is banked as stolen echo, whatever happened; the score stays this run's echo, and spending never lowers a high score.
 - **The win**: beating The Gaping Tree. The win screen counts the lives bonus into the score.
 - **The second loop** (built before submission, PRD question 8): the win screen offers "Go round again". The same run carries on at Night, harder, with the score still counting; each place's hill sections are shuffled. It is the reward for finishing; it no longer unlocks Hysteria.
@@ -50,7 +50,7 @@ The modes screen's earlier mode, The Wandering Rot, gives way to these two runs;
 
 ## Health, mana, armour
 
-- **Health** is the HUD's bar. **Armour** is shield pips continuing the health line: the slots are always shown as faint outlines, each piece found fills one, up to **3** (*starting figure*), and a hit takes a pip before any health.
+- **Health** is the HUD's bar. **Armour** is shield pips continuing the health line: the slots are always shown as faint outlines, each piece found fills one, up to **3** (*starting figure*). Since Barney's play of step 5d (7 November 2026), each pip held takes **10%** off every hit (*starting figure*; three take 30%), and no pip is lost to a hit: armour lasts until the run ends, through a lost life too, and shatters as the last life goes. (It was: a hit takes a pip before any health.)
 - **Mana** pays for spells. It slowly refills on its own; mana potions refill it faster.
 - **Not enough mana**: casting without enough mana casts nothing; the hand's light sputters out in a puff of smoke, so the player knows the button worked (Barney, 4 November 2026, step 4b round 3). While mana is short of the chosen spell's cost, its picture in the HUD dims (step 4b round 9).
 - **Spells**: heal, and one attack spell, chosen at the Echo Shrine before a run: the fireball to start, the lightning bolt and the acid spray bought (PRD questions 3 and 5). That run's scrolls teach the chosen one; the first scroll for a spell teaches it, later scrolls make it stronger; L or a tap switches between heal and the attack spell. The fireball flies at chest height, so it passes over crawlers (the sword's job) and answers the ghoul's long reach; it flies straight until it hits a monster or leaves the screen (Barney, 4 November 2026, step 4b round 3).
@@ -80,7 +80,7 @@ The HUD counter shows four digits, so a run (and its second loop) must stay unde
 
 ## The Echo Shrine
 
-Phase 5 (PRD question 3; design round 1, Barney, 7 November 2026). From the title menu and the run's end; only the very first run's end makes it the primary button, and nothing comes before a first run. Everything is bought for good; the spell and the belt can be changed there before any run. Anything affordable can be bought in any order; a third potion socket needs the second first. The run's end shows the cheapest thing not yet bought as "Next".
+Phase 5 (PRD question 3; design round 1, Barney, 7 November 2026). From the title menu (in High scores' old place in the arch) and the run's end; only the very first run's end makes it the primary button, and nothing comes before a first run. Everything is bought for good; the spell and the belt can be changed there before any run. Anything affordable can be bought in any order; a third potion socket needs the second first. The run's end shows the cheapest thing not yet bought as "Next".
 
 | Unlock | Starting price (echo; tuned at step 5f) |
 |---|---|
@@ -101,7 +101,7 @@ The first nine come to 1,925; with Hysteria, 2,425. The first costs less than a 
 
 ## Graces
 
-Phase 5 (PRD question 7; design round 2, Barney, 7 November 2026). After each of the first three bosses, as the next place's card comes up, the card holds, play stopped, for "Bind a twisted Grace": a free pick of one of three, drawn at random from the deck, never one already held. Three picks a run, none before Night. Each lasts for that run only. No Grace touches echo.
+Phase 5 (PRD question 7; design round 2, Barney, 7 November 2026). After each of the first three bosses, as the next place's card comes up, the card holds, play stopped, for "Bind a twisted Grace": a free pick of one of three, drawn at random from the deck, never one already held. Three picks a run, none before Night. Each lasts for that run only. No Grace touches echo. **Rarer Graces** (Barney, 7 November 2026, for step 5e): some cards should have really good benefits, to bring players back for one more run, and be rarer: each card gets its own chance of being among the three offered (a weight), so the strongest turn up less often. Which cards and how rare: to design with 5e. Iron Skin stays as it is.
 
 | Grace | What it does |
 |---|---|
@@ -182,7 +182,7 @@ Nothing flashes; the only pulse (the wanderer's second of safety) is slow.
 | Moment | What the player sees | How long | Does play stop? |
 |---|---|---|---|
 | Wanderer hurt | Knocked back a step, a burst of ember sparks, health drops; a second of safety, shown by the wanderer's lit edge pulsing slowly | 0.4 s | No |
-| Armour pip lost | The pip cracks in the HUD; a few card shards fall from the wanderer | 0.4 s | No |
+| Armour lost at the run's end | Since step 5d armour isn't lost to a hit: as the last life goes, the armour shatters with the blow, each pip cracking in the HUD in turn, 0.12 s apart (*starting figure*), with a few card shards falling from the wanderer, all before the run's end at 0.8 s (Barney, 7 November 2026) | 0.4 s a pip | No |
 | Monster hit | It jolts back a puppet step and its ember rim flares once | instant | No |
 | Monster defeated | Card pieces and its pale wisp rising to the score (in the design system), with its echo sound | 1.6 s | No |
 | Pick-up | The loot lifts into the wanderer with a gold glint; the bar fills | 0.5 s | No |
@@ -207,7 +207,7 @@ Nothing flashes; the only pulse (the wanderer's second of safety) is slow.
 
 Designed in step 4b round 9 (Barney, 4 November 2026).
 
-- **Top left**, one plaque in three rows: the health bar with its heart and, continuing the line, the three armour slots (a shield pip fills each one held; a hit cracks the last in two and it falls); the mana bar with its flame; and one small gold lantern per life (a spent life's lantern stays, dark, so the player sees how many are left). At the right end, **the chosen spell's socket** (44 px): its picture; two small diamonds when two spells are known, the lit one chosen; empty and dim until the first spell is learnt; dimmed while mana is short of its cost. A tap on it switches spells on a phone (L on a computer); the picture turns over like a card.
+- **Top left**, one plaque in three rows: the health bar with its heart and, continuing the line, the three armour slots (a shield pip fills each one held; since step 5d a hit leaves them, as they take a share off it); the mana bar with its flame; and one small gold lantern per life (a spent life's lantern stays, dark, so the player sees how many are left). At the right end, **the chosen spell's socket** (44 px): its picture; two small diamonds when two spells are known, the lit one chosen; empty and dim until the first spell is learnt; dimmed while mana is short of its cost. A tap on it switches spells on a phone (L on a computer); the picture turns over like a card.
 - **The potion sockets** (round 13), 8 px under the plaque's left end: health then mana, each under its own bar, 40 px on a computer and 44 on a phone. Empty, a faint outline of the potion; kept, the potion in its bar's colours; kept while its bar is full, dimmed. On a computer, a small Q or E keycap on each socket's corner. Once a second socket is bought, pips under each socket, one per socket bought, filled while a potion is in it (phase 5).
 - **The plaque line** (new spell, sword upgrade, a potion first kept) and the boss's name sit centred under the HUD's top row: 99 px down on a computer, 89 on a phone (round 13).
 - **Top right**: full screen (computers only; never in the CrazyGames build), the "?" tile, the pause tile and the echo counter, ECHO over the number (in Hysteria, the clock instead: TIME over minutes and seconds, in the same plaque).
@@ -228,7 +228,7 @@ Title (with "How to play" added to its menu as the second item: Start game, How 
 - **the choice of run** (phase 5, once anything is bought), headed "Choose a run": The Bare Reckoning, The Echo Infusion and Hysteria (locked, "Coming soon · 500 echo at the Echo Shrine"), each with Barney's words and what it takes;
 - **the Grace pick** (phase 5) under the place card;
 - **Settings** gains Credits and Clear saved progress (with its confirmation, "Clear saved progress?": Keep it, primary and focused, or Clear it); **Credits**: the studio's credit, "Music made with Google Gemini" with both tracks, the Pixabay sound effects, the two fonts and their licence (phase 5, design round 3);
-- **the title menu**: how the Echo Shrine is reached from the title is not designed yet (the arch holds four items): Barney to choose before step 5e;
+- **the title menu**: the Echo Shrine takes High scores' place in the arch (Start game, How to play, Echo Shrine, Settings), and High scores becomes an arch tile beside the sound tile (Barney, 7 November 2026; a fifth item didn't fit the arch);
 - **Hysteria's finish** (*later*): its two lines, then the time large in place of the score, to a tenth of a second (24:07.3), Continue to the initials when it is among the fastest ten, and its table of fastest times.
 
 ## Words
