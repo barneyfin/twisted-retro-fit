@@ -427,8 +427,23 @@ function runEndScreen(D, k) {
   D.setWisps(score);
   D.showRunEnd(JSON.parse(JSON.stringify(o)));
 }
-function winOffer(lb) {   // kit 0.15.0: the win's offer of the second loop, as Gloam Hallow makes it
-  return { offer: true, shrine: { bank: 96 }, again: () => lb.hud.line(null, 'Again, harder'), finish: () => {} };
+function winOffer(lb, stolen) {   // kit 0.15.0: the win's offer of the second loop, as Gloam Hallow makes it (kit 0.17.0: the echo stolen)
+  stolen = stolen || { n: 632, daily: true };   // the ×2: an Echo Infusion run, never on the high scores
+  return { offer: true, shrine: { bank: 96 }, again: () => lb.placeCard('night', null, null, { again: true }), finish: () => {}, stolen, scored: !stolen.daily };
+}
+// kit 0.17.0 (design system version 13): Graces as GracePick draws them, for the pick, the pause screen's row and the plaque line
+const SAMPLE_GRACES = {
+  grave: { id: 'grave', name: 'The Grave Refuses', line: 'When you fall, you draw breath once more.', tier: 'strong', pic: '<path d="M8.5 26.5 V14 A6.5 6.5 0 0 1 21.5 14 V26.5"/><path d="M4.5 26.5 H25.5"/><path d="M15.8 7.8 L13.4 12.2 L16.6 15.4 L13.8 19.6 L15.4 22.6"/><path d="M11.6 4.6 L15 1.8 L18.4 4.6"/>' },
+  iron: { id: 'iron', name: 'Iron Skin', line: 'Start every place with full armour.', tier: 'rare', pic: '<path d="M15 3 L25 7 V14 C25 20 20.5 24.5 15 27 C9.5 24.5 5 20 5 14 V7 Z"/><path d="M10 14.5 L13.5 18 L20 11"/>' },
+  keen: { id: 'keen', name: 'Keen Edge', line: 'Your sword bites deeper.', tier: 'common', pic: '<path d="M24 4 L11 17 M8.5 14.5 L15.5 21.5 M11 19 L6 24"/><path d="M24 4 L20 5 L12 13 L17 18 L25 10 Z"/>' },
+  fleet: { id: 'fleet', name: 'Fleet Foot', line: 'Rolls recover faster.', tier: 'common', pic: '<path d="M24.5 17.5 A8.5 8.5 0 1 1 22 9"/><path d="M22.4 3.8 L22 9 L16.8 8.6"/><path d="M3 23 H8 M4.5 27 H11"/>' },
+  ward: { id: 'ward', name: 'Lantern Ward', line: 'The first hit in each place is ignored.', tier: 'rare', pic: '<path d="M11.5 10 H18.5 L20 12 V21 H10 V12 Z"/><path d="M13 10 V8.2 A2 2 0 0 1 17 8.2 V10"/><path d="M8.5 23.5 H21.5"/><path class="solid" d="M15 13.2 C16.4 15 16.6 16 16.6 16.9 A1.6 1.6 0 0 1 13.4 16.9 C13.4 16 13.6 15 15 13.2 Z"/><path d="M5.5 21 A11 11 0 0 1 5.5 9"/><path d="M24.5 9 A11 11 0 0 1 24.5 21"/>' },
+  reverb: { id: 'reverb', name: 'Reverberate', line: 'The incantation kisses twice.', tier: 'strong', pic: '<circle class="solid" cx="20.5" cy="9" r="3.1"/><circle class="solid" cx="20.5" cy="21" r="3.1"/><path d="M3.5 6.5 L15.6 8.6 M6.5 11.6 L15.6 9.9 M3.5 18.5 L15.6 20.6 M6.5 23.6 L15.6 21.9"/>' },
+};
+const graceList = (ids, spent) => ids.map((id) => { const x = SAMPLE_GRACES[id]; return { name: x.name, pic: x.pic, strong: x.tier === 'strong', spent: !!spent && id === 'grave' }; });
+function gracePick(lb, ids) {   // the pick under Blood Red Rain's card, as the preview draws it
+  lb.placeCard('storm', null, () => { const x = SAMPLE_GRACES[gracePick.took]; if (x) lb.hud.line({ pic: x.pic, strong: x.tier === 'strong' }, x.name + ' bound'); },
+    { pick: { heading: 'Bind a twisted Grace', options: ids.map((id) => SAMPLE_GRACES[id]), take: (id) => { gracePick.took = id; } } });
 }
 function screensPanel(g, lb) {
   const D = lb._debug;
@@ -447,8 +462,13 @@ function screensPanel(g, lb) {
     // kit 0.15.0 (design system version 12, WinCard): as its preview draws it (296, two lanterns lit), the offer of the second loop; after
     // the second loop, no offer (a new best); Go round again carries the run on with its plaque line, Finish goes on as game over does
     ['The win: as drawn', () => { seedScores(); D.setWisps(296); lb.hud.lives(g.lives = 2); lb.win(winOffer(lb)); }],
-    ['The win: 1 life', () => { seedScores(); D.setWisps(400); lb.hud.lives(g.lives = 1); lb.win(winOffer(lb)); }],
-    ['The win: second loop', () => { seedScores(); D.setWisps(2580); lb.hud.lives(g.lives = 3); lb.win({ shrine: { bank: 96 } }); }],
+    ['The win: 1 life', () => { seedScores(); D.setWisps(400); lb.hud.lives(g.lives = 1); lb.win(winOffer(lb, { n: 410 })); }],
+    ['The win: no ×2', () => { seedScores([['ASH', 900], ['FEN', 800], ['IVY', 700], ['OWL', 650], ['RYE', 600], ['ELM', 550], ['YEW', 500], ['OAK', 450], ['BOG', 400], ['FOX', 350]]); D.setWisps(296); lb.hud.lives(g.lives = 2); lb.win(winOffer(lb, { n: 316 })); }],   // the phone preview's
+    // kit 0.17.0 (version 13): the second loop's win in its own words, the echo stolen, no offer
+    ['The win: second loop', () => { seedScores(); D.setWisps(1382); lb.hud.lives(g.lives = 3); lb.win({ shrine: { bank: 96 }, scored: false, stolen: { n: 1412 },
+      words: { heading: 'A monstrous glory.', lead: 'The greater horrors have bled dry.', line: 'Gloam Hallow now fears your tread.' } }); }],
+    ['Pause: Graces bound', () => { lb.held(graceList(['grave', 'keen', 'iron'])); D.pause(); }],   // kit 0.17.0 (PauseOverlay)
+    ['Pause: one spent', () => { lb.held(graceList(['grave', 'keen', 'iron'], true)); D.pause(); }],
     ['No scores yet', () => { D.setScores(null); D.openScores(-1, true); }],
     ['Rotate notice', () => { D.rotate(true); setTimeout(() => D.rotate(false), 4000); }],
     ['Title', () => { seedScores(); D.quit(); }],
@@ -554,6 +574,10 @@ function hudPanel(g, lb) {
     ['Two lines', () => { lb.hud.line(...LINES[4]); lb.hud.line(...LINES[5]); }],
     ['Boss fight', () => bossFight(g, lb)],
     ['Place card', () => placeCard(g, lb)],
+    ['Place card: again', () => lb.placeCard(PLACE_NAMES[(g.place + 1) % PLACE_NAMES.length], null, null, { again: true })],   // kit 0.17.0
+    ['Grace pick', () => gracePick(lb, ['grave', 'iron', 'keen'])],   // kit 0.17.0: a strong, a rare and a common Grace
+    ['Grace pick: phone', () => gracePick(lb, ['fleet', 'ward', 'reverb'])],
+    ['A Grace bound', () => { const x = SAMPLE_GRACES.reverb; lb.hud.line({ pic: x.pic, strong: true }, 'Reverberate bound'); lb.hud.line({ pic: SAMPLE_GRACES.iron.pic }, 'Iron Skin bound'); }],
     ['Keep: health', () => keepPot(g, lb, 'health')],   // kit 0.9.0: the potions
     ['Keep: mana', () => keepPot(g, lb, 'mana')],
     ['Drink: health', () => drinkPot(g, lb, 'health')],

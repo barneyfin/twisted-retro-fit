@@ -504,6 +504,9 @@
 .lb-line .pic{display:block;flex:none;width:22px;height:22px;fill:none;stroke:var(--heading);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .lb-line .pic .solid{fill:var(--heading);stroke:none}
 .lb-line.no-pic .pic{display:none}
+/* kit 0.17.0: a Grace's picture in the line (PlaqueLine, version 13): GracePick's, in its 30-unit box at 22 px; a strong one in grace-strong */
+.lb-line .pic.is-grace{stroke-width:1.8}
+.lb-line .pic.is-strong{stroke:var(--grace-strong)}.lb-line .pic.is-strong .solid{fill:var(--grace-strong)}
 .lb-line.no-pic>.lb-face{padding:0 20px}
 .lb-line-text{font:400 22px/1 var(--font-display);color:var(--heading);white-space:nowrap}
 .lb-hud.is-phone .lb-line{top:10px}

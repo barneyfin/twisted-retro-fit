@@ -1,4 +1,4 @@
-/* Lantern Box 0.16 — runtime
+/* Lantern Box 0.17 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.16.0';
+  const VERSION = '0.17.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -3792,6 +3792,12 @@ function fxAcid(c,x,y,f,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||AC
     fxGlowAt(c,x+dx,y+dy,8*k,0.5*al,L.core);fxMote(c,x+dx,y+dy,2.1*k,al,i%3?L.lit:L.hot);}}
 // the patch it leaves on the ground from x0 to x1 at ground y: it hisses for 1.5 s (u 0 to 1), bubbles popping and wisps of steam rising,
 // hurting whatever walks through
+// version 13 (kit 0.17.0): Lantern Ward: a hit it ignores. The lantern flares gold, a ring of ten gold motes opens from it, the ward chime; no damage, no knockback,
+// and the second of safety's slow pulse as after any hit. 0.6 s. Reduce motion: the motes stay put and fade. Effects off: no glow.
+function fxWard(c,x,y,k,u,rm,fxOff){if(u<0||u>1)return;const a=1-u,fl=Math.sin(Math.PI*Math.min(1,u*2.2)),R=(rm?20:8+30*Math.pow(u,0.55))*k;
+  if(!fxOff){fxGlowAt(c,x,y,(30+50*fl)*k,Math.min(1,1.5*a),MV_GOLD);fxGlowAt(c,x,y,(12+18*fl)*k,a,MV_LAMP);fxGlowAt(c,x,y,(12+18*fl)*k,a*fl,MV_LAMP);}
+  c.save();c.globalAlpha=0.45*a;c.strokeStyle=MV_GOLD;c.lineWidth=1.1*k;c.beginPath();c.ellipse(x,y,R,R*0.8,0,0,Math.PI*2);c.stroke();c.restore();
+  for(let i=0;i<10;i++){const an=i/10*Math.PI*2+0.3;fxMote(c,x+Math.cos(an)*R,y+Math.sin(an)*R*0.8,(2.6-1.4*u)*k,a,MV_LAMP);}}
 // version 13 (kit 0.16.0): gy(x), when given, is the ground's height at x, so the patch lies along a slope instead of flat across it
 function fxAcidPatch(c,x0,x1,y,k,u,look,gy){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,al=u<0.1?u/0.1:u>0.75?(1-u)/0.25:1,r=mvRng(33),Y=gy||(()=>y);
   for(let x=x0;x<=x1;x+=12*k)fxGlowAt(c,x,Y(x)-2,14*k,0.5*al,L.core);
@@ -4342,6 +4348,7 @@ function makeTools(env){
       // "health", t: seconds since the blow}; shatter: seconds since he broke into his card pieces (1.1 s); pit [x0, x1]: falling into that pit,
       // so drawn only above the ground and in the gap; drink {kind: "health" or "mana", t: seconds since it was drunk} (kit 0.9.0: motes in the
       // potion's colour rise round him, 0.9 s). Returns where his chest, hand and lantern are (x along the path, y in picture lines).
+      // Kit 0.17.0: ward: seconds since Lantern Ward ignored a hit (its lantern flares gold with a ring of motes, 0.6 s; fxWard).
       const f=frame("wanderer");o=o||{};
       const name=o.move||(o.walking===false?"idle":"walk"),step=o.step==null?f.t*MV_RATE:o.step,mv=mvMove(name,step);
       const lvl=o.sword?{r:o.sword.reach||0,s:o.sword.bite||0}:null,P=lvl?withLvl(mv.P,lvl):mv.P,tq=Math.floor(f.t*MV_RATE)/MV_RATE;
@@ -4369,6 +4376,7 @@ function makeTools(env){
         if(o.hurt){const ch=mvPt(G,P,X,Y,fc,K132,12,-21),u=o.hurt.t||0;if(o.hurt.kind==="armour")fxShards(c,ch[0],ch[1],fc,K132,u/0.5,e);else fxEmber(c,ch[0],ch[1],fc,K132,u/0.45);}
       }
       if(o.pit)c.restore();
+      if(o.ward!=null&&o.ward>=0&&o.ward<=0.6){const lp=mvPt(G,P,X,Y,fc,K132,13.4,3.5);fxWard(c,lp[0],lp[1],K132,o.ward/0.6,f.rm,!FX);}   // kit 0.17.0
       const pt=(bx,by)=>{const p=mvPt(G,P,X,Y,fc,K132,bx,by);return{x:p[0]+f.camX,y:p[1]};};
       const hd=G?G.T(G.fHd[0],G.fHd[1]):[P.hx+4,P.hy-16];
       return{tag:mv.tag,done:mv.done,chest:pt(4,-22),hit:pt(12,-21),lantern:pt(13.4,3.5),hand:{x:x+fc*hd[0]*K132,y:Y+hd[1]*K132}};
@@ -4559,7 +4567,7 @@ function build(el,phone,o){o=o||{};if(!defsDone){document.body.insertAdjacentHTM
     <div class="lb-bossbar" role="meter" aria-valuemin="0" aria-valuemax="100" hidden><p class="lb-bossbar-name"></p><div class="lb-bossbar-edge"><div class="lb-bossbar-track"><i class="trace"></i><i class="fill"></i></div></div></div>
     <div class="lb-plaque is-hud lb-line" hidden><div class="lb-face"><svg class="pic" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="lb-line-text"></span></div></div>
     <div class="lb-plaque is-hud lb-line is-name" hidden><div class="lb-face"><span class="lb-line-text"></span><div class="lb-rule" aria-hidden="true"><i></i></div></div></div>
-    <div class="lb-card" hidden><div class="lb-plaque${phone?" is-phone":""}"><div class="lb-face is-centred"><h2 class="lb-heading"></h2><div class="lb-rule" aria-hidden="true"><i></i></div><p class="lb-card-sub"></p></div></div></div>
+    <div class="lb-card" hidden><div class="lb-plaque${phone?" is-phone":""}"><div class="lb-face is-centred"><h2 class="lb-heading"></h2><p class="lb-card-again" hidden></p><div class="lb-rule" aria-hidden="true"><i></i></div><p class="lb-card-sub"></p></div></div></div>
     ${o.touch?`<div class="lb-touch" aria-hidden="true">
       <div class="lb-stick">${oct(112,"base")}<svg class="chev" viewBox="0 0 112 112">${ICON.stick}</svg><div class="lb-knob">${oct(50,"knob")}<i></i></div></div>
       <div class="lb-thumb"></div>
@@ -4574,12 +4582,14 @@ const hexRGB=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const mixHex=(a,b,u)=>{const A=hexRGB(a),B=hexRGB(b);return "rgb("+A.map((v,i)=>Math.round(v+(B[i]-v)*u)).join(",")+")";};
 const ease=u=>u<=0?0:u>=1?1:u*u*(3-2*u);
 function setOnce(o,k,v,f){if(o["_"+k]!==v){o["_"+k]=v;f(v);}}
-function picFor(svg,kind){setOnce(svg,"pic",kind||"",k=>{svg.innerHTML=k?ICON[k]:"";});}
+function picFor(svg,kind){const g=!!kind&&typeof kind==="object";   /* kit 0.17.0: kind { pic, strong }: a Grace's picture (30-unit box) */
+  setOnce(svg,"pic",g?"g:"+(kind.strong?"*":"")+kind.pic:(kind||""),()=>{svg.setAttribute("viewBox",g?"0 0 30 30":"0 0 24 24");svg.classList.toggle("is-grace",g);svg.classList.toggle("is-strong",g&&!!kind.strong);svg.innerHTML=g?String(kind.pic||""):kind?ICON[kind]:"";});}
 function setLine(ln,line){const on=!!line;if(ln.hidden===on)ln.hidden=!on;if(!on)return;
   setOnce(ln,"t",line.text,v=>{ln.querySelector(".lb-line-text").textContent=v;ln.setAttribute("aria-label",v);});ln.classList.toggle("no-pic",!line.kind);if(line.kind)picFor(ln.querySelector(".pic"),line.kind);
   const u=line.u,long=ln.classList.contains("is-name"),T=long?2.6:2,a=u<0.22?u/0.22:u>T-0.4?Math.max(0,(T-u)/0.4):1,dy=-8*(1-ease(Math.min(1,u/0.25)));ln.style.opacity=String(a);ln.style.transform=`translate(-50%,${dy.toFixed(2)}px)`;}
 function setCard(cd,card){const on=!!(card&&card.a>0);if(cd.hidden===on)cd.hidden=!on;if(!on)return;
-  setOnce(cd,"lv",card.lv,v=>{cd.querySelector(".lb-heading").textContent=CARDS[v][0];cd.querySelector(".lb-card-sub").textContent=CARDS[v][1];cd.setAttribute("aria-label",CARDS[v][0]+", "+CARDS[v][1]);});cd.style.opacity=String(card.a);}
+  setOnce(cd,"lv",card.lv+"|"+(card.again||""),()=>{const v=card.lv,ag=cd.querySelector(".lb-card-again");cd.querySelector(".lb-heading").textContent=CARDS[v][0];cd.querySelector(".lb-card-sub").textContent=CARDS[v][1];
+    ag.textContent=card.again||"";ag.hidden=!card.again;cd.setAttribute("aria-label",CARDS[v][0]+(card.again?", "+card.again:"")+", "+CARDS[v][1]);});cd.style.opacity=String(card.a);}   /* kit 0.17.0: again */
 // round 13: one socket. Kept: the flask grows in from 0.6 with one glint passing over it (0.4 s); Reduce motion fades it in, Effects off
 // leaves out the glint's light. Drunk: the liquid drains in 0.35 s, then the faint outline; Reduce motion fades the liquid out instead.
 const OPTS={rm:false,fxOff:false};
@@ -4859,7 +4869,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       if (k < 1) node.style.transform = 'scale(' + k + ')';
     }
     function fitScreens() {
-      const plaque = dialogLayer.querySelector('.lb-plaque');
+      const plaque = dialogLayer.querySelector('.lb-dialog-wrap') || dialogLayer.querySelector('.lb-plaque');   // kit 0.17.0: a plaque with a row under it fits as one
       if (plaque) fitTo(plaque, dialogLayer.clientWidth - 12, dialogLayer.clientHeight - 12);
       const arch = titleScreen.querySelector('.lb-title-arch');
       if (arch) fitTo(arch, titleScreen.clientWidth, titleScreen.clientHeight - arch.offsetTop - 4);
@@ -5242,7 +5252,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         if (t >= 3) { h8.card = null; if (c.onDone) c.onDone(); }
         else {
           const black = t < 0.5 ? t / 0.5 : t < 1.9 ? 1 : 1 - (t - 1.9) / 1.1;
-          st.card = { lv: c.place, a: t < 0.5 ? 0 : t < 0.9 ? (t - 0.5) / 0.4 : t < 2.4 ? 1 : 1 - (t - 2.4) / 0.6 };
+          st.card = { lv: c.place, again: c.again, a: t < 0.5 ? 0 : t < 0.9 ? (t - 0.5) / 0.4 : t < 2.4 ? 1 : 1 - (t - 2.4) / 0.6 };
           st.hudA = Math.min(st.hudA, t < 0.5 ? 1 - t / 0.5 : t < 1.9 ? 0 : (t - 1.9) / 1.1);
           fadeEl.style.opacity = String(Math.max(black, h8.fade));
         }
@@ -5305,7 +5315,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     // kit 0.13.0 (design system version 12, GracePick): placeCard(place, onBlack, onDone, { pick: { heading, options: [{ id, name, line, pic }],
     // take(id) } }): the cards appear with the card's plaque, under it; the card holds, play stopped, once it is up (1.2 s) until one is
     // taken (left and right choose, Enter takes; a click or a tap takes one at once), then runs on as usual
-    function placeCard(place, onBlack, onDone, o) { h8.card = { place: place, t0: state.time, onBlack: onBlack || null, onDone: onDone || null, called: false, pick: o && o.pick && Array.isArray(o.pick.options) && o.pick.options.length ? o.pick : null, sel: 0, taken: false }; sfx('placeCard'); syncHud(); }   // with its low toll
+    // kit 0.17.0: o.again (true, or the words) puts "Again, harder" under the place's name, as the second loop's cards say (PlaceCard, version 13)
+    function placeCard(place, onBlack, onDone, o) { h8.card = { place: place, t0: state.time, onBlack: onBlack || null, onDone: onDone || null, called: false, pick: o && o.pick && Array.isArray(o.pick.options) && o.pick.options.length ? o.pick : null, sel: 0, taken: false, again: o && o.again ? (o.again === true ? 'Again, harder' : String(o.again)) : null }; sfx('placeCard'); syncHud(); }   // with its low toll
     const CARD_HOLD = 1.2, CARD_UP = 0.9;
     const picking = () => { const c = h8.card; return !!(c && c.pick && !c.taken && state.time - c.t0 >= CARD_UP); };
     function pickSelect(i) { const c = h8.card; if (!picking() || !pickEl) return; c.sel = clamp(i, 0, c.pick.options.length - 1); [...pickEl.querySelectorAll('.lb-grace')].forEach((b, k) => { b.classList.toggle('is-selected', k === c.sel); b.setAttribute('aria-checked', k === c.sel ? 'true' : 'false'); }); sfx('select'); }
@@ -5319,6 +5330,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       try { c.pick.take(c.pick.options[c.sel].id); } catch (e) { reportError(e); }
     }
     let pickEl = null;
+    const TIER_WORD = { common: 'Frail', rare: 'Potent', strong: 'Malignant' };   // kit 0.17.0: Barney's words (design system version 13)
     function syncPick() {   // the pick's plaque parts, inside the place card, while it shows
       const cardEl = hudNodes && hudNodes.full && hudNodes.full.querySelector('.lb-card');
       const c = h8.card, want = !!(cardEl && c && c.pick);
@@ -5332,9 +5344,11 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       h.id = 'lb-gp-h';
       const row = el('div', 'lb-graces' + (phone ? ' is-phone' : ''));
       p.options.forEach((op, k) => {
-        const b = el('button', 'lb-grace' + (k === c.sel ? ' is-selected' : ''), '<svg class="pic" viewBox="0 0 30 30" aria-hidden="true">' + (op.pic || '') + '</svg><span class="nm"></span><span class="ln"></span>');
+        const tier = TIER_WORD[op.tier] ? op.tier : null, word = tier ? String(op.tierWord || TIER_WORD[tier]) : '';   // kit 0.17.0
+        const b = el('button', 'lb-grace' + (tier === 'rare' ? ' is-rare' : tier === 'strong' ? ' is-strong' : '') + (k === c.sel ? ' is-selected' : ''), (tier ? '<span class="tier"></span>' : '') + '<svg class="pic" viewBox="0 0 30 30" aria-hidden="true">' + (op.pic || '') + '</svg><span class="nm"></span><span class="ln"></span>');
         b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', k === c.sel ? 'true' : 'false');
         b.querySelector('.nm').textContent = op.name; b.querySelector('.ln').textContent = op.line || '';
+        if (tier) { b.querySelector('.tier').textContent = word; b.setAttribute('aria-label', op.name + ', ' + word.toLowerCase() + ': ' + (op.line || '')); }
         b.addEventListener('click', () => { b.blur(); pickTake(k); });
         row.append(b);
       });
@@ -5505,6 +5519,24 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     const startOver = () => { sfx('confirm'); leaveRun(); closeDialog(); startGame(); };
     const toMenu = () => { sfx('back'); leaveRun(); quitToTitle(); };
 
+    /* kit 0.17.0 (design system version 13, PauseOverlay): lb.held(list, heading) names what the run holds, shown under the pause plaque:
+       list [{ name, pic (the 30-unit picture), strong, spent }] in the order bound, heading the flag over it ('Graces bound'); none, no row */
+    let heldList = null;
+    function setHeld(list, heading) { heldList = Array.isArray(list) && list.length ? { items: list.map((q) => Object.assign({}, asObject(q))), heading: heading == null ? 'Graces bound' : String(heading) } : null; }
+    function heldRow() {
+      const sec = el('section', 'lb-held');
+      sec.setAttribute('aria-labelledby', 'lb-held-h');
+      const h = txt('p', 'lb-flag', heldList.heading); h.id = 'lb-held-h';
+      const ul = el('ul', 'lb-held-list');
+      heldList.items.slice(0, 3).forEach((q) => {
+        const li = el('li', 'lb-held-item' + (q.strong ? ' is-strong' : '') + (q.spent ? ' is-spent' : ''), '<svg viewBox="0 0 30 30" aria-hidden="true">' + (q.pic || '') + '</svg>');
+        li.append(document.createTextNode(String(q.name || '')));
+        if (q.spent) li.append(txt('span', 'lb-sr', ', spent'));
+        ul.append(li);
+      });
+      sec.append(h, ul);
+      return sec;
+    }
     function pauseDialog() {
       const { panel, face } = plaque('lb-pa-t', 340, 300, V.phone ? '' : 'padding:22px 16px 16px');
       const items = [
@@ -5518,6 +5550,12 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         const hint = el('p', 'lb-hint', kbd('P') + ' resume');   // kit 0.10.0: never Esc in a hint (a portal keeps it for leaving full screen)
         hint.style.cssText = 'text-align:center;margin-top:2px';
         face.append(hint);
+      }
+      if (heldList) {   // kit 0.17.0: the plaque and the row centred together, 14 px apart (10 on a phone)
+        const wrap = el('div', 'lb-dialog-wrap');
+        wrap.style.cssText = 'position:relative;flex:none;display:flex;flex-direction:column;align-items:center;gap:' + (V.phone ? 10 : 14) + 'px';
+        wrap.append(panel, heldRow());
+        return { panel: wrap, items: items, opts: { back: resume, keys: { KeyP: resume } } };
       }
       return { panel: panel, items: items, opts: { back: resume, keys: { KeyP: resume } } };
     }
@@ -6038,11 +6076,13 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     let winInfo = null;
     function win12Dialog() {
       const W = winInfo, phone = V.phone, bonus = winWords.lifeBonus == null ? 10 : winWords.lifeBonus;
-      const { panel, face } = plaque('lb-wn-t', 470, 700, phone ? 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;align-items:center;padding:18px 20px' : 'gap:9px;padding:20px 22px 16px', phone ? '' : 'is-centred');
+      const ww = Object.assign({}, winWords, asObject(W.o.words));   // kit 0.17.0: this win's own words (the second loop's)
+      const v13 = !!W.o.stolen;   // kit 0.17.0: with the echo stolen, version 13's closer spacing (WinCard)
+      const { panel, face } = plaque('lb-wn-t', 470, 700, phone ? 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;align-items:center;padding:' + (v13 ? '16px 20px' : '18px 20px') : (v13 ? 'gap:8px;padding:18px 22px 14px' : 'gap:9px;padding:20px 22px 16px'), phone ? '' : 'is-centred');
       const at = (e, t) => { e.dataset.at = String(t); return e; };
-      const h = at(heading('lb-wn-t', winWords.heading), 0); h.classList.add('is-win');
-      const lead = at(txt('p', 'lb-win-line is-lead', winWords.lead), 0.7);
-      const line = at(txt('p', 'lb-win-line', winWords.line || ''), 1.4);
+      const h = at(heading('lb-wn-t', ww.heading), 0); h.classList.add('is-win');
+      const lead = at(txt('p', 'lb-win-line is-lead', ww.lead), 0.7);
+      const line = at(txt('p', 'lb-win-line', ww.line || ''), 1.4);
       const rule = at(el('div', '', RULE).firstChild, 2.1);
       const result = at(el('div', 'lb-result'), 2.1);
       if (W.newBest) result.append(txt('p', 'lb-flag', 'New best'));
@@ -6053,6 +6093,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       const plus = txt('span', 'plus', '+' + W.n * bonus);
       const bon = at(el('p', 'lb-bonus', 'Lives left '), 2.1);
       bon.append(lanterns, plus);
+      const stolen = [];   // kit 0.17.0 (version 13): the echo stolen, after the lanterns are counted (3.3 s), with the day's ×2
+      if (W.o.stolen) { const so = asObject(W.o.stolen); stolen.push(at(el('p', 'lb-daily lb-stolen', (so.daily ? '<span class="lb-daily-mark">\u00d72</span>' : '') + '<span class="lb-num">' + Math.round(+so.n || 0) + '</span> echo stolen'), 3.3)); }
       // what follows the count: the offer, or the end's buttons
       const items = [], tail = [], opts = {};
       let hint = null;
@@ -6072,7 +6114,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         hint = kbd('Enter') + ' continue to your initials';
       } else {
         const again = at(button('Play again', true, true), endAt), btns = at(el('div', 'lb-btns'), endAt);
-        again.style.width = '100%';
+        again.style.width = '100%'; btns.style.alignSelf = 'stretch';   // kit 0.17.0: the row across the card, as WinCard's version 13 draws it
         items.push({ el: again, activate: startOver });
         if (W.o.shrine) { const sh = button('Echo Shrine'); btns.append(sh); items.push({ el: sh, activate: () => goShrine(() => { sfx('back'); state.screen = 'over'; showDialog(win12Dialog); }, asObject(W.o.shrine).bank) }); }
         const menu = button('Menu'); btns.append(menu); items.push({ el: menu, activate: toMenu });
@@ -6084,9 +6126,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       if (hintEl) hintEl.style.textAlign = 'center';
       if (phone) {
         const a = el('div'); a.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center'; a.append(h, lead, line, rule);
-        const b = el('div'); b.style.cssText = 'display:flex;flex-direction:column;gap:9px'; b.append(result, bon, ...tail);
+        const b = el('div'); b.style.cssText = 'display:flex;flex-direction:column;gap:' + (v13 ? 8 : 9) + 'px'; b.append(result, bon, ...stolen, ...tail);   // kit 0.17.0: 8 in version 13
         face.append(a, b);
-      } else { face.append(h, lead, line, rule, result, bon, ...tail); if (hintEl) face.append(hintEl); }
+      } else { face.append(h, lead, line, rule, result, bon, ...stolen, ...tail); if (hintEl) face.append(hintEl); }
       // the buttons wait until 3.6 s; each part shows at its moment, and the lanterns count in from 2.6 s
       opts.until = W.finished ? 0 : W.t0 + 3600;
       const back = opts.back;
@@ -6607,7 +6649,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       state.timers = [];
       state.ending = false;
       state.over = false;   // kit 0.10.0: true once the run's end, game over or the win shows
-      runEndInfo = null; winInfo = null;
+      runEndInfo = null; winInfo = null; heldList = null;
       state.shakeAmt = 0;
       state.shakeT = 0;
       resetH8();
@@ -6893,7 +6935,11 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
        Kit 0.16.0 (design system version 13): lb.hud.armourGlint() for a hit with armour (a brass glint across the pips held); the sounds
          'bolt', 'acid', 'acidHiss', 'ward' and 'gameOver' (the run's end plays it); the wisp's echo after the card tear at its own level;
          the bolt's and the acid's own scrolls; world.acidPatch along the ground; High scores' crowned headstone; the run's end's two-line
-         near miss on a phone and a belt's box as the next unlock. */
+         near miss on a phone and a belt's box as the next unlock.
+       Kit 0.17.0: a Grace's tier on its card (pick options' tier 'common', 'rare' or 'strong', tierWord; Frail, Potent, Malignant);
+         lb.held([{ name, pic, strong, spent }], heading) lists what the run holds under the pause plaque; lb.hud.line({ pic, strong }, text)
+         puts a Grace's picture in the plaque line; world.wanderer's ward (Lantern Ward's flare at his lantern); lb.placeCard(.., { again })
+         ("Again, harder" under the place's name); lb.win({ words: { heading, lead, line }, stolen: { n, daily } }). */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
@@ -6909,7 +6955,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       get progress() { return progress; }, saveProgress: saveProgress, runEnd: runEnd, keyLetter: keyLetter,   // kit 0.10.0
       ui: ui, get run() { return state.run || null; },   // kit 0.11.0
       teach: { show: teachShow, hide: teachHide, get showing() { return teach.items.map((it) => it.id); } },   // kit 0.14.0
-      fade: fade, placeCard: placeCard, placing: placing, win: (o) => showWin(o), howTo: () => openHowTo('play'),   // version 8 (4c-6a)
+      fade: fade, placeCard: placeCard, placing: placing, win: (o) => showWin(o), held: setHeld, howTo: () => openHowTo('play'),   // version 8 (4c-6a)
       get test() { return testCfg ? Object.assign({}, testValues) : null; },   // kit 0.8.1: Testing's values, or null when the game has none
       sounds: Object.keys(SND8.FX), ambient: ambient,   // version 8 (4c-7)
       music: (i) => { if (music && music.tracks[i]) music.want = i; },
