@@ -17,7 +17,7 @@ Two, each with its own high-score table. **Hysteria comes after the first playab
 | The Wandering Rot | Night to Mist. Beat them all. | Everything below. Scored in wisps |
 | Hysteria | Every second counts. | "Beat the clock as fast as possible; wisps don't count" (Barney). Night to the Mist's boss once, every boss beaten, 3 lives; the clock never stops, through deaths and restarts; game over leaves no time. Its table lists the fastest times first. Locked until the player has beaten The Wandering Rot and its second loop; the device remembers the unlock (one saved flag, beside the high scores). While locked, its note reads "Fell The Wandering Rot to begin anew—walk the cursed path once more against darker terrors." (Barney, 4 November 2026) |
 
-**Saving.** The arcade's shared settings and per-game high scores, plus the one Hysteria flag. This is the only saved state: a run always starts at Night (the PRD's out-of-scope line, changed 3 November 2026). Hysteria's times stay in the game. The kit's shell sorts every table highest first, and the website's card shows the highest number across a game's tables. Save and show the times so that Hysteria's table lists the fastest first and a time never becomes the card's best. The website itself does not change (Barney, 3 November 2026).
+**Saving.** The arcade's shared settings and per-game high scores, plus the one Hysteria flag. This is the only saved state: a run always starts at Night (the PRD's out-of-scope line, changed 3 November 2026). Hysteria's times stay in the game. The kit's shell sorts every table highest first, and the website's card shows the highest number across a game's tables. Save and show the times so that Hysteria's table lists the fastest first and a time never becomes the card's best. The website itself does not change (Barney, 3 November 2026). Changing in phase 5: banked wisps and the wisp shop's unlocks will be saved too (PRD question 1, Barney, 7 November 2026); the details come with design system 12.
 
 ## Moving, fighting and the controls
 
@@ -191,7 +191,7 @@ Title (with "How to play" added to its menu as the second item: Start game, How 
 
 - **First playable version**: everything above except what is marked *later*. That means the four places in order with their monsters and bosses; The Wandering Rot through to the win screen; health, lives, armour and mana; heal and fireball; the loot; the rolling ground with its hill sections, small pieces and pits; checkpoints; the HUD with the boss bar; the "?" page; both tracks, the effects and the background sound; keyboard and phone controls.
 - **Later**: the second loop ("Go round again") and Hysteria, with its unlock and its table of times.
-- **Never**: blood on screen; saved progress beyond the Hysteria unlock; more than the four places; gamepads (an arcade rule); online scores.
+- **Never**: blood on screen; more than the four places; gamepads (an arcade rule); online scores.
 
 ## For the design system (step 4b, in the Claude app project)
 
