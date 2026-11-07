@@ -29,3 +29,9 @@ Add `is-phone` for 206px wide.
 
 ## Version 11
 - The two potion sockets sit 8px under the plaque's left end, each potion under its own bar (the heart above the health potion, the flame above the mana potion). The plaque itself is unchanged. See Potions.
+
+## Version 13
+- **Armour is kept all run** (Barney, from building step 5e). Each pip held takes 10% off every hit (a starting figure: three pips, 30%). A pip is never lost to a hit or a lost life; it goes only at the run's end, when, as the last life goes, the pips crack in turn, the last first, 0.12 s apart, with his card pieces (`armEnd`; the close-up "Armour at the run's end").
+- A hit with armour shows the usual ember sparks, plus one brass glint passing across the pips held, 0.06 s apart (`HUD.set`'s `armGlint`, 0.3 s each). No crack and no card shards for a hit: those are version 8's and 11's, now gone.
+- An armour pick-up with all three pips full stays on the ground, as a potion does when its sockets are full.
+- Iron Skin, "Start every place with full armour", now fills the armour at each place's start (GracePick).

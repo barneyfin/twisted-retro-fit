@@ -13,6 +13,6 @@ The wanderer's moves as a posable card puppet: walk, jump, climb, the dodge roll
 
 ## Rules
 - Puppet steps: the poses change in steps (12 a second), never tweened smoothly; the walk is 12 steps.
-- Hurt: knocked back a step; armour hits drop card shards, health hits throw ember sparks; then a second of safety, his lit edge pulsing slowly (1.5 a second). Nothing flashes.
+- Hurt: knocked back a step; every hit throws ember sparks (version 13: armour no longer drops card shards; it takes 10% off each hit per pip); then a second of safety, his lit edge pulsing slowly (1.5 a second). Nothing flashes.
 - The life lost: hit, buckle, kneel, then he breaks into his card pieces, gold-edged (1.1 s), and the fade.
 - The sword's upgrades: longer reach lengthens the swing's arc; stronger hits brighten its edge.

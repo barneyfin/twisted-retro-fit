@@ -17,3 +17,11 @@ Every sound in the game: effects made in code as the kit makes its sounds, two o
 ## Version 12
 - **The wisp's echo** (PRD question 12, Barney, 7 November 2026): the soft rising note as a defeated monster's wisp rises becomes a short echo: the same note, then two to four repeats 0.16 s apart, each half as loud, darker and further into the room. Louder and longer the more echo it gives: 1, 2 or 5 from a monster, 25 from a boss's golden wisp (a fifth lower, after the boss's bell). `SND.play("defeat", v)` plays the card tear and the echo; `SND.play("echo", 25)` the echo alone. Starting levels (`GAIN.echo` as `defeat`), to measure at step 5d as the rest were.
 - The run's end's READY uses the menus' soft chime (`confirm`); the win's three lines each come with one of the `win` sound's three bells.
+
+## Version 13
+- **The wisp's echo is louder and comes after the tear.** It plays at its own level (`ECHO_VOL`, 0.2, was 0.09), about 4 to 8 dB above the card tear, and in a defeat it starts as the tear ends (0.28 s; it was 0.18 s, under the tear). Claude Code found version 12's too quiet to hear. Starting figures.
+- **Game over** (`gameOver`): one low, muted toll (110 Hz, its upper partials soft, a low thud under it), as the run's end's plaque appears, 0.8 s after the lost life's falling tones. As loud as the place card's toll.
+- **The lightning bolt** (`bolt`), **the acid spray** (`acid`) and **its patch** (`acidHiss`): see Spells.
+- **Lantern Ward** (`ward`): a glassy chime, bright and short (a bell at 1568 Hz with a high partial), as loud as the plaque line, when a hit is ignored.
+- **Armour crack** now plays only at the run's end, as the pips crack in turn (HUD); a hit with armour has the usual hurt.
+- Levels as measured offline over each sound's loudest 0.4 s: fireball −28, bolt −28.7, acid about −27, the plaque line and the ward −31.9, the place card −25.2 and game over −26.9, a monster defeated (1 echo) −27.1, a boss's echo (25) −23.4.

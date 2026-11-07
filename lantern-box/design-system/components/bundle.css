@@ -620,3 +620,34 @@
 .lb-shrine-text.is-inline{flex-direction:row;align-items:baseline;gap:10px}
 .lb-shrine-row.is-soon{min-height:0;padding-top:8px;padding-bottom:0}
 .lb-shrine-row.is-soon .lb-spell{width:36px;height:36px}
+
+/* ---------- version 13 ---------- */
+/* the Grace's tier shows on its card as a word (Frail, Potent, Malignant); Potent adds a double brass edge, Malignant a gold edge and softly lit corners; nothing flashes */
+.lb-grace{position:relative;padding-top:24px}
+.lb-grace .tier{position:absolute;top:7px;left:0;right:0;font:600 11px/12px var(--font-text);letter-spacing:.16em;text-transform:uppercase;color:var(--text-3)}
+.lb-grace.is-rare{box-shadow:inset 0 0 0 3px var(--plaque-face),inset 0 0 0 4.5px var(--brass)}
+.lb-grace.is-rare .tier{color:var(--brass)}
+.lb-grace.is-rare.is-selected{box-shadow:inset 0 0 0 1px var(--heading),inset 0 0 0 3px var(--plaque-face),inset 0 0 0 4.5px var(--brass)}
+.lb-grace.is-strong{border-color:var(--grace-strong);background:radial-gradient(circle at 0 0,var(--grace-strong-glow),transparent 44px),radial-gradient(circle at 100% 0,var(--grace-strong-glow),transparent 44px),radial-gradient(circle at 0 100%,var(--grace-strong-glow),transparent 44px),radial-gradient(circle at 100% 100%,var(--grace-strong-glow),transparent 44px),var(--plaque-face)}
+.lb-grace.is-strong .tier,.lb-grace.is-strong .nm{color:var(--grace-strong)}
+.lb-grace.is-strong .pic{stroke:var(--grace-strong)}.lb-grace.is-strong .pic .solid{fill:var(--grace-strong)}
+.lb-grace.is-strong.is-selected{background:radial-gradient(circle at 0 0,var(--grace-strong-glow),transparent 44px),radial-gradient(circle at 100% 0,var(--grace-strong-glow),transparent 44px),radial-gradient(circle at 0 100%,var(--grace-strong-glow),transparent 44px),radial-gradient(circle at 100% 100%,var(--grace-strong-glow),transparent 44px),var(--brass-wash);box-shadow:inset 0 0 0 1px var(--grace-strong)}
+.lb-graces.is-phone .lb-grace{padding-top:20px}
+.lb-graces.is-phone .lb-grace .tier{top:5px}
+/* the pause screen's Graces held (PauseOverlay) */
+.lb-held{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.lb-held-list{display:flex;justify-content:center;gap:10px;margin:0;padding:0;list-style:none}
+.lb-held-item{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 6px;border:1px solid var(--brass-dim);background:var(--plaque-face);font:400 14px/18px var(--font-text);color:var(--text-2)}
+.lb-held-item svg{width:22px;height:22px;flex:none;fill:none;stroke:var(--heading);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.lb-held-item svg .solid{fill:var(--heading);stroke:none}
+.lb-held-item.is-strong{border-color:var(--grace-strong)}.lb-held-item.is-strong svg{stroke:var(--grace-strong)}.lb-held-item.is-strong svg .solid{fill:var(--grace-strong)}
+.lb-held-item.is-spent{opacity:.5}
+/* the second loop's place card: "Again, harder" under the place's name (PlaceCard) */
+.lb-card-again{margin:-6px 0 0;font:600 13px/16px var(--font-text);letter-spacing:.18em;text-transform:uppercase;color:var(--brass)}
+.lb-hud.is-phone .lb-card-again{font-size:12px;margin-top:-5px}
+/* the run's end: the phone's two-line near miss; a belt as the next unlock (RunEnd) */
+.lb-near.is-two{flex-wrap:wrap;row-gap:5px}
+.lb-near.is-two .br{flex-basis:100%;height:0}
+.lb-next-belt{display:flex;align-items:center;justify-content:center;flex:none;width:var(--target);height:var(--target);border:1px solid var(--rule-dark)}
+.lb-next-belt .band{display:block;width:30px;height:12px;border-radius:1px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);background:var(--wanderer-scarf)}
+.lb-next-belt .band.is-night-blue{background:var(--belt-night-blue)}.lb-next-belt .band.is-mulberry{background:var(--belt-mulberry)}.lb-next-belt .band.is-ash{background:var(--belt-ash)}

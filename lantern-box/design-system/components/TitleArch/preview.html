@@ -1,4 +1,4 @@
-<!-- @dsCard group="Title" height=556 width=480 subtitle="The arch over Night, computer size, with four items (version 8)" -->
+<!-- @dsCard group="Title" height=556 width=480 subtitle="The arch over Night, computer size: Start game, How to play, Echo Shrine, Settings (version 13)" -->
 <!doctype html>
 <html lang="en-GB">
 <head>
@@ -7,13 +7,32 @@
 <style>
 body{margin:0;background:var(--ink)}
 .stage{position:relative;overflow:hidden;background:var(--ink)}
-.stage>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stage>img,.stage>canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .cap{margin:0;padding:8px 2px 6px;font:500 13px/16px var(--font-text);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
 
 </style>
 </head>
 <body>
-<div class="stage lb-ui " style="width:480px;height:540px"><img src="/_blob/03e6c24ca02016660d68e86d4d4d1e60" alt=""><div class="lb-scrim is-title"></div><div style="position:absolute;left:70px;top:26px;width:340px"><div class="lb-arch has-four"><div class="lb-arch-card"></div><div class="lb-arch-inner"><h1 class="lb-title">Gloam<br>Hallow</h1><div class="lb-rule is-arch" aria-hidden="true"><i></i></div><nav class="lb-title-menu" aria-label="Title menu"><button class="lb-title-item is-selected" type="button" aria-current="true">Start game</button><button class="lb-title-item" type="button">How to play</button><button class="lb-title-item" type="button">High scores</button><button class="lb-title-item" type="button">Settings</button></nav><p class="lb-best">Best <span class="lb-num">0450</span> echo</p><p class="lb-hint"><span class="lb-kbd" aria-label="Up arrow"><svg viewBox="0 0 10 10"><path d="M5 8.5 V1.5 M2 4.5 L5 1.5 L8 4.5"/></svg></span> <span class="lb-kbd" aria-label="Down arrow"><svg viewBox="0 0 10 10"><path d="M5 1.5 V8.5 M2 5.5 L5 8.5 L8 5.5"/></svg></span> choose · <span class="lb-kbd">Enter</span> select</p></div></div></div></div>
-<script>/* static preview */</script>
+<div class="stage lb-ui " style="width:480px;height:540px"><canvas data-loop="back" data-lv="night" data-arg="still:3" aria-hidden="true"></canvas><div class="lb-scrim is-title"></div><div style="position:absolute;left:70px;top:26px;width:340px"><div class="lb-arch has-four"><div class="lb-arch-card"></div><div class="lb-arch-inner"><h1 class="lb-title">Gloam<br>Hallow</h1><div class="lb-rule is-arch" aria-hidden="true"><i></i></div><nav class="lb-title-menu" aria-label="Title menu"><button class="lb-title-item is-selected" type="button" aria-current="true">Start game</button><button class="lb-title-item" type="button">How to play</button><button class="lb-title-item" type="button">Echo Shrine</button><button class="lb-title-item" type="button">Settings</button></nav><p class="lb-best">Best <span class="lb-num">0450</span> echo</p><p class="lb-hint"><span class="lb-kbd" aria-label="Up arrow"><svg viewBox="0 0 10 10"><path d="M5 8.5 V1.5 M2 4.5 L5 1.5 L8 4.5"/></svg></span> <span class="lb-kbd" aria-label="Down arrow"><svg viewBox="0 0 10 10"><path d="M5 1.5 V8.5 M2 5.5 L5 8.5 L8 5.5"/></svg></span> choose · <span class="lb-kbd">Enter</span> select</p></div></div></div></div>
+<script src="../../components/play.js"></script>
+<script>
+/* version 12's runner: draws each backdrop canvas[data-loop="back"] once as a still of the place from play.js (data-lv the place,
+   data-arg "still:<seconds>" the moment of the walk), and builds a HUD on any .stage[data-hud]. */
+(()=>{const back=(cv,t,lv,R,K,arg)=>{const a=(arg||"still:5").split(":");if(a[0]==="run"){loopRoll(cv,t,lv,R,K,lv);return;}const key=lv+cv.width+"x"+cv.height;if(K.key===key)return;loopRoll(cv,+a[1]||5,lv,R,K,lv);K.key=key;};
+document.querySelectorAll(".stage[data-hud]").forEach(s=>{s.__hud=HUD.build(s,s.dataset.hud==="phone");});
+const anims=[...document.querySelectorAll("canvas[data-loop]")].map(cv=>({cv,K:{},on:true,fn:back}));
+const dpr=()=>Math.min(2,window.devicePixelRatio||1);let t=0.6,last=0;
+function fitA(it){const r=it.cv.getBoundingClientRect(),d=dpr(),w=Math.max(60,Math.round(r.width*d)),h=Math.max(30,Math.round(r.height*d));if(it.cv.width!==w||it.cv.height!==h){it.cv.width=w;it.cv.height=h;it.K={};}}
+function fit(){anims.forEach(fitA);}
+try{new ResizeObserver(()=>requestAnimationFrame(fit)).observe(document.body);}catch(e){}
+const hud=document.querySelector(".stage[data-hud]");
+function frame(n){const dt=last?Math.min(0.05,(n-last)/1000):0;last=n;t+=dt;
+  for(const it of anims){try{it.fn(it.cv,t,it.cv.dataset.lv||"night",12,it.K,it.cv.dataset.arg);}catch(e){console.error(e);}}
+  if(hud){try{HUD.tick(t,"night",anims,true);}catch(e){console.error(e);}}
+  requestAnimationFrame(frame);}
+const go=()=>{fit();requestAnimationFrame(frame);};
+if(document.fonts&&document.fonts.load){Promise.all([document.fonts.load('12px "Alegreya Sans"'),document.fonts.load('700 12px "Alegreya Sans"'),document.fonts.load('24px "IM Fell English"')]).catch(()=>{}).then(go);}else go();
+})();
+</script>
 </body>
 </html>

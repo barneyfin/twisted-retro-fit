@@ -1,10 +1,14 @@
-/* Lantern Box: the play parts, design system version 12 (7 November 2026, approved by Barney). Version 1.2.0 of this file.
+/* Lantern Box: the play parts, design system version 13 (7 November 2026, approved by Barney). Version 1.3.0 of this file.
    Version 1.2.0 (design system 12, step 5b's design rounds 1 to 3, 7 November 2026; approved by Barney at step 5c): the lightning
    bolt and the acid spray, chosen in the Echo Shrine in place of the fireball (fxBolt, fxAcid, fxAcidPatch, loopBolt, loopAcid), the acid
    in gold as every spell (the green alternative stays one switch away, ACID_LOOK); the belt's colour chosen in the Echo Shrine (BELTS,
    setBelt, loopBelt); the HUD counter counts echo, not wisps (only the words change: the wisp still rises, and the state keeps its
    key, wisps); no pit near a checkpoint, as kit 0.9.1 (LV_CP_CLEAR); up to three potions of each kind, a pip under each socket for each one bought (HUD.set's potCap); the wisp's rising note
    becomes a short echo, louder the more echo it gives (ECHO; SND.play takes the value: SND.play("defeat", 5), SND.play("echo", 25)).
+   Version 1.3.0 (design system 13, from building step 5e, 7 November 2026): armour is never lost to a hit or a lost life, a hit glints
+   across the pips (HUD.set's armGlint) and the pips crack in turn only as the last life goes (armEnd); the wisp's echo louder, after the
+   card tear; a game-over toll; the lightning bolt's and the acid spray's own sounds; their scrolls (lootShape, lSpellPic, loopScrolls); the
+   acid's patch following the ground (fxAcidPatch's gy); Lantern Ward's ignored hit (fxWard, the ward chime, loopWard).
    Everything designed and agreed for Gloam Hallow in step 4b, the play-parts rounds 1 to 12 (3 and 4 November 2026), as the
    review page drew it, in the order it loads. It runs beside bundle.js (LanternBox.world, here LB and LP) and reads it.
    This is the spec for the kit change (step 4c): Claude Code turns it into kit code; the drawing, sizes and timings here are
@@ -613,8 +617,12 @@ function lDiamond(c,x,y,rx,ry){c.beginPath();c.moveTo(x,y-ry);c.lineTo(x+rx,y);c
 function lSpellPic(c,kind,x,y,s,col){c.save();c.fillStyle=c.strokeStyle=col;c.lineCap="round";c.lineJoin="round";
   if(kind==="heal"){c.lineWidth=1.1*s;c.beginPath();c.ellipse(x,y+1.6*s,3.6*s,1.25*s,0,0,Math.PI*2);c.stroke();c.lineWidth=1.3*s;c.beginPath();c.moveTo(x,y+1.2*s);c.lineTo(x,y-3.2*s);c.stroke();
     c.beginPath();c.moveTo(x-2*s,y-1.6*s);c.lineTo(x,y-3.6*s);c.lineTo(x+2*s,y-1.6*s);c.stroke();}
-  else{c.beginPath();c.arc(x+2*s,y,2.4*s,0,Math.PI*2);c.fill();
+  else if(kind!=="bolt"&&kind!=="acid"){c.beginPath();c.arc(x+2*s,y,2.4*s,0,Math.PI*2);c.fill();
     for(const q of [[0.9,-1.9,-4.2,-3.8,-0.4,-0.7],[0.2,-0.6,-5.8,0.2,0.2,0.9],[0.9,1.9,-3.9,3.4,-0.4,0.8]]){c.beginPath();c.moveTo(x+q[0]*s,y+q[1]*s);c.lineTo(x+q[2]*s,y+q[3]*s);c.lineTo(x+q[4]*s,y+q[5]*s);c.closePath();c.fill();}}
+  // version 13: the lightning bolt's and the acid spray's scrolls, from the Echo Shrine's pictures (Spells), drawn for the scroll's size
+  else if(kind==="bolt"){c.beginPath();[[0.6,-4.2],[-2.9,0.6],[-0.2,0.6],[-1.1,4.2],[2.9,-1.1],[0.2,-1.1]].forEach(([a,b],i)=>i?c.lineTo(x+a*s,y+b*s):c.moveTo(x+a*s,y+b*s));c.closePath();c.fill();}
+  else if(kind==="acid"){c.lineWidth=1.05*s;c.beginPath();c.moveTo(x-5.2*s,y);c.lineTo(x-1.8*s,y);c.moveTo(x-1.8*s,y);c.lineTo(x+4*s,y-2.9*s);c.moveTo(x-1.8*s,y);c.lineTo(x+4.6*s,y);c.moveTo(x-1.8*s,y);c.lineTo(x+4*s,y+2.9*s);c.stroke();
+    for(const [a,b,r] of [[1.9,-1.25,0.62],[3.2,1.05,0.62],[1,1.6,0.5]]){c.beginPath();c.arc(x+a*s,y+b*s,r*s,0,Math.PI*2);c.fill();}}
   c.restore();}
 // the item's own drawing, at (0,0) = its base, before any hover; col = the edge it is drawn with (its own light), body = ink
 function lootShape(c,k,t,rm){const col=lootCol(k);c.lineJoin="round";c.lineCap="round";const edge=()=>{c.lineWidth=1.3;c.strokeStyle=col;c.stroke();c.fillStyle=MV_INK;c.fill();};
@@ -624,7 +632,7 @@ function lootShape(c,k,t,rm){const col=lootCol(k);c.lineJoin="round";c.lineCap="
   else if(k==="mana"){c.beginPath();c.moveTo(-4.8,-1.5);c.lineTo(-4.8,-16);c.quadraticCurveTo(-4.8,-19,-2.2,-21.5);c.lineTo(-2.2,-26.5);c.lineTo(-3.4,-26.5);c.lineTo(-3.4,-29);c.lineTo(3.4,-29);c.lineTo(3.4,-26.5);c.lineTo(2.2,-26.5);c.lineTo(2.2,-21.5);c.quadraticCurveTo(4.8,-19,4.8,-16);c.lineTo(4.8,-1.5);c.quadraticCurveTo(4.8,0.5,2.8,0.5);c.lineTo(-2.8,0.5);c.quadraticCurveTo(-4.8,0.5,-4.8,-1.5);c.closePath();edge();
     c.save();c.beginPath();c.rect(-3.4,-15.5,6.8,14.6);c.clip();c.fillStyle=L_TEAL;c.fillRect(-4,-15.5,8,15);c.fillStyle=L_TEAL2;c.fillRect(-4,-4,8,4);c.restore();
     c.fillStyle=MV_INK;lFlame(c,0,-8,3.1);c.fillStyle="rgba(255,255,255,0.55)";c.fillRect(-2.6,-14.5,1,8);}
-  else if(k==="heal"||k==="fire"){c.save();c.shadowColor=MV_GOLD;c.shadowBlur=6;c.fillStyle="#fff0c0";c.beginPath();c.moveTo(-6,-23);c.lineTo(6,-23);c.lineTo(6,-7.5);for(let i=0;i<=4;i++)c.lineTo(6-i*3,-7.5+(i%2?1.2:0));c.closePath();c.fill();c.restore();
+  else if(k==="heal"||k==="fire"||k==="bolt"||k==="acid"){c.save();c.shadowColor=MV_GOLD;c.shadowBlur=6;c.fillStyle="#fff0c0";c.beginPath();c.moveTo(-6,-23);c.lineTo(6,-23);c.lineTo(6,-7.5);for(let i=0;i<=4;i++)c.lineTo(6-i*3,-7.5+(i%2?1.2:0));c.closePath();c.fill();c.restore();
     c.fillStyle=MV_LAMP;c.fillRect(-6,-23,12,2);lSpellPic(c,k,0,-15,1,MV_INK);
     for(const y of [-25.5,-8]){c.beginPath();c.rect(-8,y,16,3.2);c.arc(-8.6,y+1.6,1.9,0,Math.PI*2);c.arc(8.6,y+1.6,1.9,0,Math.PI*2);edge();}}
   else if(k==="reach"){c.beginPath();c.moveTo(-2.4,-28);c.lineTo(2.4,-28);c.lineTo(0.5,-2);c.lineTo(-0.5,-2);c.closePath();c.rect(-6.5,-30.2,13,2.4);c.rect(-1.3,-35.5,2.6,5.5);c.moveTo(1.9,-37.2);c.arc(0,-37.2,1.9,0,Math.PI*2);edge();
@@ -1744,13 +1752,13 @@ function loopLost(cv,t,lvAll,R,K){if(K.mode!==LOST_MODE){for(const k in K)delete
       // the wanderer: knocked back a step by each blow; the third takes his last health
       let kb=0,P=mvIdle(Math.floor(tt*R)),eA=1,fx=null;
       I.forEach((Ik,k)=>{const d=tt-Ik;if(d<0)return;const st=Math.floor(d*R);kb+=8*K132*Math.min(1,d*R);
-        if(k<2){if(st===0)P=PU.hit;else if(st===1)P=PU.stagger;else if(st===2)P=PU.recover;eA=Math.min(eA,moPulse(d));if(d<0.5)fx=[k===0?"shards":"ember",d];}
+        if(k<2){if(st===0)P=PU.hit;else if(st===1)P=PU.stagger;else if(st===2)P=PU.recover;eA=Math.min(eA,moPulse(d));if(d<0.5)fx=["ember",d];}
         else{P=st===0?PU.hit:st===1?PL.buckle:PL.kneel;if(d<0.45)fx=["ember",d];}});
       const X=wx0-kb,Y=G(X)+1;
       if(tt<shat){const Gm=mvDraw(x,X,Y,P,Math.floor(tt*R)/R,1,e,K132,{feet:true,edgeA:eA});const ch=mvPt(Gm,P,X,Y,1,K132,12,-21);
         if(fx){if(fx[0]==="shards")fxShards(x,ch[0],ch[1],1,K132,fx[1]/0.5,e);else fxEmber(x,ch[0],ch[1],1,K132,fx[1]/0.45);}}
       else mvShatter(x,K,X-6*K132,Y,1,Math.min(1,(tt-shat)/1.1),e);
-      if(tt>=I[0]){hs.pips=0;if(tt<I[0]+0.4)hs.pipFx={i:0,kind:"crack",u:(tt-I[0])/0.4};}
+      if(tt>=I[0]&&tt<I[0]+0.5)hs.armGlint=tt-I[0];
       if(tt>=I[1])hs.hp=0.12;if(tt>=I[2])hs.hp=0;}
     else{ // walking on, a step too far: he drops into the pit and breaks up as he falls
       hs.pips=1;hs.hp=0.62;const tf=K.tFall,st=Math.min(K.steps,Math.max(0,(tt-0.5)*R));let X=wx0+st*ST,Y=G(X)+1,P=tt<0.5?mvIdle(Math.floor(tt*R)):mvWalk(Math.floor(st));
@@ -1913,12 +1921,18 @@ function setPotion(b,st){const k=b.dataset.k,n=potCount(st,k),cap=Math.max(1,(st
 function set(hud,st){const q=s=>hud.querySelector(s);
   const hp=Math.round(st.hp*100),mp=Math.round(st.mp*100);
   setOnce(hud,"hp",hp,v=>q(".hp").style.setProperty("--v",v+"%"));setOnce(hud,"mp",mp,v=>q(".mp").style.setProperty("--v",v+"%"));
-  const pips=hud.querySelectorAll(".lb-pip");pips.forEach((p,i)=>{const fx=st.pipFx&&st.pipFx.i===i?st.pipFx:null;p.classList.toggle("is-on",i<st.pips||!!fx);
+  // version 13: armEnd (seconds since the last life went) cracks the pips in turn, the last first, 0.12 s apart; armGlint (seconds since a
+  // hit) passes one brass glint across the pips held, as each takes its share of the hit. A pip is never lost to a hit or a lost life.
+  const pips=hud.querySelectorAll(".lb-pip");pips.forEach((p,i)=>{let fx=st.pipFx&&st.pipFx.i===i?st.pipFx:null,gone=false;
+    if(!fx&&st.armEnd!=null&&i<st.pips){const v=(st.armEnd-(st.pips-1-i)*0.12)/0.4;if(v>=1)gone=true;else if(v>=0)fx={i,kind:"crack",u:v};}
+    if(!fx&&!gone&&st.armGlint!=null&&i<st.pips){const v=(st.armGlint-i*0.06)/0.3;if(v>=0&&v<1)fx={i,kind:"glint",u:v};}
+    p.classList.toggle("is-on",(i<st.pips&&!gone)||!!fx);
     const hl=p.querySelector(".hl"),hr=p.querySelector(".hr"),ck=p.querySelector(".crack"),gl=p.querySelector(".glint");
     if(fx&&fx.kind==="crack"){const u=fx.u,a=ease(Math.max(0,(u-0.25)/0.75));ck.style.opacity=u<0.25?u/0.25:Math.max(0,1-a*1.6);
       hl.setAttribute("transform",`translate(${-1.6*a} ${3.2*a*a}) rotate(${-16*a} 5 11)`);hr.setAttribute("transform",`translate(${1.6*a} ${3.6*a*a}) rotate(${18*a} 5 11)`);hl.style.opacity=hr.style.opacity=String(1-a);gl.style.opacity=0;}
     else if(fx&&fx.kind==="gain"){const u=fx.u,s=0.35+0.65*ease(Math.min(1,u/0.6));hl.setAttribute("transform",`translate(5 6) scale(${s}) translate(-5 -6)`);hr.setAttribute("transform",`translate(5 6) scale(${s}) translate(-5 -6)`);
       hl.style.opacity=hr.style.opacity=String(Math.min(1,u/0.35));gl.style.opacity=u>0.45?Math.max(0,1-Math.abs(u-0.7)/0.25):0;ck.style.opacity=0;}
+    else if(fx&&fx.kind==="glint"){if(hl.getAttribute("transform")){hl.removeAttribute("transform");hr.removeAttribute("transform");}hl.style.opacity=hr.style.opacity="";ck.style.opacity=0;gl.style.opacity=String(Math.sin(Math.PI*fx.u));}
     else{if(hl.getAttribute("transform")){hl.removeAttribute("transform");hr.removeAttribute("transform");}hl.style.opacity=hr.style.opacity="";ck.style.opacity=0;gl.style.opacity=0;}});
   const lives=hud.querySelectorAll(".lb-life");lives.forEach((l,i)=>{const fx=st.lifeFx&&st.lifeFx.i===i?st.lifeFx:null,g=l.querySelector(".glass"),f=l.querySelector(".flame"),pf=l.querySelectorAll(".puff");
     if(fx){l.classList.remove("is-out");const u=fx.u,a=Math.min(1,u/0.5);g.style.fill=mixHex("#ffcf6a","#1a1218",ease(a));f.style.opacity=String(Math.max(0,1-a*1.4));f.setAttribute("transform",`translate(5 9.8) scale(${Math.max(0.01,1-a)}) translate(-5 -9.8)`);
@@ -1961,13 +1975,17 @@ function demoPhone(hud,t){const P=6.4,c=Math.floor(t/P),u=t-c*P,spots=[[150,300]
 const CL={
   armour:{T:6.6,at(u){const s={hp:0.7,mp:0.6,pips:1,lives:3,spells:["fire"],sel:0,cost:0.25},w=(a,b)=>u>=a&&u<b?(u-a)/(b-a):null;let cap="One pip of armour";
       if(u>=0.6){s.pips=2;cap="Armour found: a pip fills with a glint";}const g=w(0.6,1.1);if(g!=null)s.pipFx={i:1,kind:"gain",u:g};
-      if(u>=2.3){s.pips=1;cap="A hit takes a pip first: it cracks and falls";}const c1=w(2.3,2.7);if(c1!=null)s.pipFx={i:1,kind:"crack",u:c1};
-      if(u>=3.5){s.pips=0;}const c2=w(3.5,3.9);if(c2!=null)s.pipFx={i:0,kind:"crack",u:c2};
-      if(u>=4.7){s.hp=0.55;cap="With no armour left, a hit takes health";}return [s,cap];}},
+      if(u>=2.3){s.hp=0.62;cap="A hit: each pip takes 10% off it, and a glint crosses them";}if(u>=2.3&&u<2.8)s.armGlint=u-2.3;
+      if(u>=3.6){s.pips=3;cap="Pips are kept through hits and lost lives, all run";}const g3=w(3.6,4.1);if(g3!=null)s.pipFx={i:2,kind:"gain",u:g3};
+      return [s,cap];}},
+  // version 13: the run's end: as the last life goes, the pips crack in turn, the last first, 0.12 s apart, with the card shards
+  armourEnd:{T:4.2,at(u){const s={hp:0.08,mp:0.3,pips:3,lives:1,spells:["fire"],sel:0,cost:0.25},w=(a,b)=>u>=a&&u<b?(u-a)/(b-a):null;let cap="Three pips, the last life";
+      if(u>=1.0){s.lives=0;s.hp=0;cap="The last life goes: the pips crack in turn, 0.12 s apart";s.armEnd=u-1.0;}const l=w(1.0,1.8);if(l!=null)s.lifeFx={i:0,u:l};
+      if(u>=2.4){s.pips=0;s.armEnd=null;cap="Then the run's end";}return [s,cap];}},
   lives:{T:6.2,at(u){const s={hp:0.14,mp:0.3,pips:1,lives:3,spells:["fire"],sel:0,cost:0.25},w=(a,b)=>u>=a&&u<b?(u-a)/(b-a):null;let cap="Three lives: three lit lanterns";
       if(u>=1.0)cap="Health nearly gone";
-      if(u>=1.9){s.lives=2;s.pips=0;cap="A life lost: its lantern gutters out";}const l=w(1.9,2.7);if(l!=null)s.lifeFx={i:2,u:l};
-      if(u>=2.9){const r=Math.min(1,(u-2.9)/0.5);s.hp=0.14+0.86*Math.round(ease(r)*8)/8;s.mp=0.3+0.7*Math.round(ease(r)*8)/8;cap="Health and mana refill; the armour is gone";}
+      if(u>=1.9){s.lives=2;cap="A life lost: its lantern gutters out";}const l=w(1.9,2.7);if(l!=null)s.lifeFx={i:2,u:l};
+      if(u>=2.9){const r=Math.min(1,(u-2.9)/0.5);s.hp=0.14+0.86*Math.round(ease(r)*8)/8;s.mp=0.3+0.7*Math.round(ease(r)*8)/8;cap="Health and mana refill; the armour stays (version 13)";}
       if(u>=4.6)cap="A spent lantern stays, dark, so you can see two of three are left";return [s,cap];}},
   spells:{T:9.6,at(u){const s={hp:0.8,mp:0.6,pips:0,lives:3,spells:[],sel:0,cost:0.25},w=(a,b)=>u>=a&&u<b?(u-a)/(b-a):null;let cap="No spell yet: the socket is empty and dim";
       if(u>=1.4){s.spells=["heal"];cap="Heal learnt: its picture fills the socket";}
@@ -2076,8 +2094,11 @@ function bell(o){const f=o.f||220,P=o.partials||[[1,1,1],[2.0,0.5,0.7],[2.76,0.4
 // version 12: the wisp's rising note as a short echo: the note (660 to 990 Hz, a boss's golden wisp a fifth lower), then two to four
 // repeats 0.16 s apart, each half as loud, darker and further into the room; louder and longer the more echo it gives (1, 2, 5, 25).
 // Starting levels, to measure at step 5d as the rest were.
+// version 13: at its own level, louder than the card tear (ECHO_VOL; the kit's version 12 echo was too quiet to hear), and in a defeat it
+// starts as the tear ends (0.28 s). Starting figures.
+const ECHO_VOL=0.2;
 function ECHO(v,at){v=Math.max(1,v||1);const s=0.75*(1+0.2*Math.log2(v)),n=v>=25?4:v>=5?3:2,f=v>=25?440:660,lp=[5000,2600,1600,1000,700];
-  for(let i=0;i<=n;i++)tone({f,to:f*1.5,glide:0.32,dur:0.4,a:0.03,vol:0.09*s*Math.pow(0.5,i),vib:[5,6],lp:lp[i],wet:0.5+0.1*i,at:(at||0)+i*0.16});}
+  for(let i=0;i<=n;i++)tone({f,to:f*1.5,glide:0.32,dur:0.4,a:0.03,vol:ECHO_VOL*s*Math.pow(0.5,i),vib:[5,6],lp:lp[i],wet:0.5+0.1*i,at:(at||0)+i*0.16});}
 function DRINK(ch){noise({ft:"bandpass",from:1900,to:1100,q:3,dur:0.035,vol:0.22,wet:0.1});
   tone({f:190,to:125,dur:0.09,lp:700,vol:0.16,wet:0.05,at:0.07});tone({f:165,to:110,dur:0.08,lp:700,vol:0.12,wet:0.05,at:0.18});
   ch.forEach((f,i)=>tone({f,dur:0.55-i*0.08,a:0.1,vol:0.06,wet:0.6,at:0.27+i*0.05}));}
@@ -2094,7 +2115,7 @@ const FX={
   crack:()=>{ring({f:620,vol:0.12,wet:0.4,partials:[[1,1,0.5],[1.63,0.8,0.38],[2.37,0.7,0.3],[3.12,0.5,0.22],[4.05,0.4,0.16],[5.3,0.3,0.12]]});noise({ft:"bandpass",from:3200,q:1.5,dur:0.14,tear:90,vol:0.3,wet:0.25});noise({ft:"highpass",from:3000,dur:0.03,vol:0.3,wet:0.2});
     for(let i=0;i<3;i++)tone({type:"triangle",f:3000+R()*2000,dur:0.03,vol:0.05,at:0.08+i*0.07,wet:0.4});},
   // a monster defeated: the card tearing, then its wisp's echo (version 12: the rising note became a short echo; v is the echo it gives)
-  defeat:v=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});ECHO(v||1,0.18);},
+  defeat:v=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});ECHO(v||1,0.28);},   // version 13: after the tear
   // version 12: the echo alone, as a boss's golden wisp rises (25), after bossDefeated's bell
   echo:v=>ECHO(v||25,0),
   pickup:()=>{tone({f:1320,dur:0.12,vol:0.14,wet:0.5});tone({f:1760,dur:0.3,vol:0.12,wet:0.6,at:0.07});tone({f:2640,dur:0.25,vol:0.03,wet:0.7,at:0.12});},
@@ -2120,11 +2141,23 @@ const FX={
   win:()=>{bell({f:196,dur:4,vol:0.16});bell({f:247,dur:4,vol:0.12,at:0.7});bell({f:294,dur:4.5,vol:0.12,at:1.4});tone({f:392,dur:3,a:1.2,vol:0.05,wet:0.8,at:1.4});},
   select:()=>tone({type:"triangle",f:620,dur:0.05,lp:2000,vol:0.15,wet:0.15}),
   confirm:()=>bell({f:523,dur:0.6,vol:0.1,partials:[[1,1,1],[2,0.3,0.5]]}),
+  // version 13: the run's end's own tone, as its plaque appears (0.8 s after the last life falls): one low, muted toll
+  gameOver:()=>{bell({f:110,dur:3.2,vol:0.2,wet:0.6,partials:[[1,1,1],[2.0,0.22,0.5],[2.76,0.12,0.35]]});noise({from:260,to:90,dur:0.35,a:0.01,vol:0.12,wet:0.3});},
+  // version 13: the lightning bolt: a sharp crack, a buzzing zap as it strikes, and a smaller crack as it forks (0.06 s later)
+  bolt:()=>{noise({ft:"highpass",from:3500,dur:0.04,vol:0.34,wet:0.3});tone({type:"sawtooth",f:180,to:90,dur:0.22,a:0.003,lp:2600,vib:[55,40],vol:0.13,wet:0.3});
+    noise({ft:"bandpass",from:4200,to:1800,q:2,dur:0.2,tear:60,vol:0.22,wet:0.35});noise({ft:"highpass",from:3000,dur:0.03,vol:0.22,wet:0.3,at:0.06});
+    tone({type:"sawtooth",f:150,to:80,dur:0.16,a:0.003,lp:2200,vib:[60,35],vol:0.08,wet:0.35,at:0.06});},
+  // version 13: the acid spray: a wet hissing spray, then its patch's quiet bubbling hiss (acidHiss, the patch's 1.5 s)
+  acid:()=>{noise({ft:"bandpass",from:2800,to:1300,q:1.1,dur:0.38,a:0.02,tear:22,vol:0.36,wet:0.2});noise({from:600,to:300,dur:0.3,a:0.02,vol:0.16,wet:0.15});
+    for(let i=0;i<6;i++)tone({type:"triangle",f:700+R()*900,to:300,dur:0.05,vol:0.04,at:0.08+R()*0.3,wet:0.2});},
+  acidHiss:()=>{noise({ft:"highpass",from:2400,to:3200,dur:1.5,a:0.1,vol:0.07,wet:0.3});for(let i=0;i<12;i++)tone({type:"sine",f:300+R()*500,to:900+R()*400,glide:0.05,dur:0.05,vol:0.035,at:0.1+R()*1.3,wet:0.35});},
+  // version 13: a hit Lantern Ward ignores: a glassy chime, bright and short, as the lantern flares
+  ward:()=>{bell({f:1568,dur:0.9,vol:0.1,wet:0.6,partials:[[1,1,1],[2.4,0.4,0.5],[3.9,0.2,0.3]]});tone({f:2093,dur:0.5,a:0.01,vol:0.04,wet:0.7,at:0.04});},
   back:()=>tone({type:"triangle",f:440,to:330,dur:0.09,lp:1800,vol:0.15,wet:0.15}),
 };
 // each effect's level, set by measuring how loud it sounds (K-weighted, its loudest 0.4 s) against a target for its kind:
 // the big moments loudest, the main actions next, light touches and the menus quieter. GAIN is filled from that measure.
-const GAIN={echo: 2.96,swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */
+const GAIN={gameOver: 1.0,bolt: 3.5,acid: 4.8,acidHiss: 1.3,ward: 1.84,echo: 2.96,swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */
 // ---- the places' background sound: wind, rain, thunder, bats, crows, creaking trees ----
 function loopNoise(ft,f,q,vol,lfoRate,lfoDepth){const s=ctx.createBufferSource();s.buffer=nb;s.loop=true;const fl=ctx.createBiquadFilter();fl.type=ft;fl.frequency.value=f;fl.Q.value=q;
   const g=ctx.createGain();g.gain.value=vol;s.connect(fl);fl.connect(g);g.connect(amb);s.start(0,R()*1.5);const nodes=[s];
@@ -2242,11 +2275,13 @@ function fxAcid(c,x,y,f,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||AC
     fxGlowAt(c,x+dx,y+dy,8*k,0.5*al,L.core);fxMote(c,x+dx,y+dy,2.1*k,al,i%3?L.lit:L.hot);}}
 // the patch it leaves on the ground from x0 to x1 at ground y: it hisses for 1.5 s (u 0 to 1), bubbles popping and wisps of steam rising,
 // hurting whatever walks through
-function fxAcidPatch(c,x0,x1,y,k,u,look){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,al=u<0.1?u/0.1:u>0.75?(1-u)/0.25:1,r=mvRng(33);
-  for(let x=x0;x<=x1;x+=12*k)fxGlowAt(c,x,y-2,14*k,0.5*al,L.core);
-  c.save();c.globalAlpha=0.9*al;c.fillStyle=L.core;c.beginPath();c.ellipse((x0+x1)/2,y,(x1-x0)/2,3*k,0,0,Math.PI*2);c.fill();c.restore();
-  for(let i=0;i<7;i++){const bx=x0+(x1-x0)*r(),ph=(u*4+r())%1,br=(1.2+ph*2.6)*k;c.save();c.globalAlpha=al*(1-ph);c.strokeStyle=L.lit;c.lineWidth=1*k;c.beginPath();c.arc(bx,y-2*k-ph*2.4*k,br,0,Math.PI*2);c.stroke();c.restore();}
-  for(let i=0;i<5;i++){const mx=x0+(x1-x0)*r(),ph=(u*3+r())%1;fxMote(c,mx,y-ph*20*k,(1.5-ph)*k,al*(1-ph)*0.85,L.lit);}}
+// version 13: gy(x), when given, is the ground's height at x, so the patch lies along a slope instead of flat across it
+function fxAcidPatch(c,x0,x1,y,k,u,look,gy){if(u<0||u>1)return;const L=ACID_LOOKS[look||ACID_LOOK]||ACID_LOOKS.gold,al=u<0.1?u/0.1:u>0.75?(1-u)/0.25:1,r=mvRng(33),Y=gy||(()=>y);
+  for(let x=x0;x<=x1;x+=12*k)fxGlowAt(c,x,Y(x)-2,14*k,0.5*al,L.core);
+  c.save();c.globalAlpha=0.9*al;c.fillStyle=L.core;c.beginPath();const n=16,th=x=>3*k*Math.sqrt(Math.max(0,1-Math.pow(2*(x-x0)/(x1-x0)-1,2)));
+  for(let i=0;i<=n;i++){const x=x0+(x1-x0)*i/n;c.lineTo(x,Y(x)-th(x));}for(let i=n;i>=0;i--){const x=x0+(x1-x0)*i/n;c.lineTo(x,Y(x)+th(x));}c.closePath();c.fill();c.restore();
+  for(let i=0;i<7;i++){const bx=x0+(x1-x0)*r(),ph=(u*4+r())%1,br=(1.2+ph*2.6)*k;c.save();c.globalAlpha=al*(1-ph);c.strokeStyle=L.lit;c.lineWidth=1*k;c.beginPath();c.arc(bx,Y(bx)-2*k-ph*2.4*k,br,0,Math.PI*2);c.stroke();c.restore();}
+  for(let i=0;i<5;i++){const mx=x0+(x1-x0)*r(),ph=(u*3+r())%1;fxMote(c,mx,Y(mx)-ph*20*k,(1.5-ph)*k,al*(1-ph)*0.85,L.lit);}}
 // the cast for both: the fireball's throw, then a longer rest so the acid's patch can be seen out
 const SQ_SPELL2=mvSeq([[IDLE,3],[PF.back,1],[PF.thrust,1,"thr"],[PF.hold,2],[PF.recover,1],[IDLE,24]]);
 function spellHand(X,G){const G0=mvGeo(PF.thrust,0),hp=G0.T(G0.fHd[0],G0.fHd[1]);return[X+hp[0]*K132+10,G+1+hp[1]*K132];}
@@ -2265,3 +2300,28 @@ function loopAcid(cv,t,lv,R,K,look){look=look||ACID_LOOK;const H=250,G=230,{c,s,
   scLabel(c,"acid spray, "+(look==="green"?"green":"gold"),SW*0.5,10);}
 // the belts as worn: the walk loop with the belt chosen (arg: red, nightBlue, mulberry, ash), for the Wanderer card
 function loopBelt(cv,t,lv,R,K,arg){const was=MV_RED;setBelt(arg);try{loopWalk(cv,t,lv,R,K);}finally{MV_RED=W_RED=was;}}
+// ---------- version 13 (7 November 2026, from building step 5e; approved by Barney the same day) ----------
+// Lantern Ward: a hit it ignores. The lantern flares gold, a ring of ten gold motes opens from it, the ward chime; no damage, no knockback,
+// and the second of safety's slow pulse as after any hit. 0.6 s. Reduce motion: the motes stay put and fade. Effects off: no glow.
+function fxWard(c,x,y,k,u,rm,fxOff){if(u<0||u>1)return;const a=1-u,fl=Math.sin(Math.PI*Math.min(1,u*2.2)),R=(rm?20:8+30*Math.pow(u,0.55))*k;
+  if(!fxOff){fxGlowAt(c,x,y,(30+50*fl)*k,Math.min(1,1.5*a),MV_GOLD);fxGlowAt(c,x,y,(12+18*fl)*k,a,MV_LAMP);fxGlowAt(c,x,y,(12+18*fl)*k,a*fl,MV_LAMP);}
+  c.save();c.globalAlpha=0.45*a;c.strokeStyle=MV_GOLD;c.lineWidth=1.1*k;c.beginPath();c.ellipse(x,y,R,R*0.8,0,0,Math.PI*2);c.stroke();c.restore();
+  for(let i=0;i<10;i++){const an=i/10*Math.PI*2+0.3;fxMote(c,x+Math.cos(an)*R,y+Math.sin(an)*R*0.8,(2.6-1.4*u)*k,a,MV_LAMP);}}
+function loopWard(cv,t,lv,R,K){const H=230,G=212,{c,s,SW}=scSet(cv,H),T=2.6,tt=t%T,tq=Math.floor(t*R)/R,e=LB.places[lv].edge,o=LB.options(lv,{walking:false});scGround(c,lv,SW,H,G);
+  const X=SW*0.42,imp=1.0,gx0=SW*0.95,gx1=X+70,gX=tt<0.82?gx0+(gx1+16-gx0)*tt/0.82:tt<imp?gx1+16-16*(tt-0.82)/0.18:tt<1.6?gx1:gx1+(gx0-gx1)*Math.min(1,(tt-1.6)/0.8);  // a lunge into the hit at 1.0 s
+  pMonster(c,s,K,"ghoul2",gX,G+2,tq,o);c.setTransform(s,0,0,s,0,0);
+  const P=mvIdle(Math.floor(t*R)),d=tt-imp,eA=d>=0?moPulse(d):1,Gm=mvDraw(c,X,G+1,P,tq,1,e,K132,{feet:true,edgeA:eA});
+  const G0=mvGeo(P,tq),lx=X+G0.hook[0]*K132,ly=G+1+(G0.hook[1]+12)*K132;fxWard(c,lx,ly,K132,d/0.6);
+  scLabel(c,"Lantern Ward: the first hit in each place is ignored",SW*0.5,10);}
+// the three attack spells' scrolls, as they lie on the ground: fire, bolt, acid
+function loopScrolls(cv,t,lv,R,K){const H=84,G=70,{c,s,SW}=scSet(cv,H);scGround(c,lv,SW,H,G);
+  ["fire","bolt","acid"].forEach((k,i)=>drawLoot(c,k,SW*(0.25+0.25*i),G+1,t,{seed:i*0.7}));}  // left to right: the fireball's, the lightning bolt's, the acid spray's
+// the acid on a slope: the patch follows the ground (fxAcidPatch's gy)
+function loopAcidSlope(cv,t,lv,R,K){const H=250,G=230,{c,s,SW}=scSet(cv,H),st=t*R,q=SQ_SPELL2.at(st),S=q.s,tq=Math.floor(st)/R,e=LB.places[lv].edge,o=LB.options(lv,{walking:false});scGround(c,lv,SW,H,G);
+  const X=SW*0.18,x0=X+SW*0.06,gy=x=>x<x0?G+1:G+1-(x-x0)*0.32;c.fillStyle=MV_INK;c.beginPath();c.moveTo(x0,G+1);c.lineTo(SW+4,gy(SW+4));c.lineTo(SW+4,H+4);c.lineTo(x0,H+4);c.closePath();c.fill();
+  c.save();c.strokeStyle=e;c.globalAlpha=0.5;c.lineWidth=1.3;c.beginPath();c.moveTo(x0,G+1);c.lineTo(SW+4,gy(SW+4));c.stroke();c.restore();
+  const thr=SQ_SPELL2.start("thr"),[hx,hy]=spellHand(X,G),us=(S-thr)/(0.35*R),up=(S-thr-0.25*R)/(1.5*R),CX=X+SW*0.2,hit=us>=0.4&&us<1.2;
+  pMonster(c,s,K,"crawler",CX+(hit?4:0),gy(CX),tq,o);c.setTransform(s,0,0,s,0,0);
+  const Gm=mvDraw(c,X,G+1,q.P,tq,1,e,K132,{feet:true});fxHand(c,X,G+1,1,K132,q.P,Gm);
+  fxAcidPatch(c,X+SW*0.1,X+SW*0.34,G+1,K132,up,"gold",gy);fxAcid(c,hx,hy,1,K132,us,"gold");
+  scLabel(c,"on a slope, the patch follows the ground",SW*0.5,10);}

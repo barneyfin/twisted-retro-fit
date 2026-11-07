@@ -3,7 +3,7 @@
 The top ten scores on this device: a plaque headed High scores, the newest row as the brass band.
 
 ## When to use
-- From the title menu's High scores (one button: Back, with Backspace).
+- From the title screen's High scores tile (version 13; it was a title menu item). One button: Back, with Backspace, returning to the title with the tile focused.
 - After NameEntry saves a score: the new row is the band, and the buttons are Play again (primary) and Menu.
 - In a game with modes, one table per mode.
 

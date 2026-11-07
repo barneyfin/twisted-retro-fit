@@ -1,19 +1,23 @@
-<!-- @dsCard group="Title" height=120 width=360 subtitle="Sound on, sound off, full screen" -->
+<!-- @dsCard group="Title" height=290 width=480 subtitle="High scores, sound and full screen; High scores' crowned headstone, chosen from three (version 13)" -->
 <!doctype html>
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
 <title>ArchTile</title>
 <style>
-body{margin:0;background:var(--ink)}
+body{margin:0;background:var(--ink);color:var(--text-2);font:400 15px/1.4 var(--font-text)}
 .stage{position:relative;overflow:hidden;background:var(--ink)}
-.stage>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .cap{margin:0;padding:8px 2px 6px;font:500 13px/16px var(--font-text);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
-
+.opts{display:flex;gap:28px;padding:22px 24px 10px}
+.opt{margin:0;display:flex;flex-direction:column;align-items:center;gap:10px;width:120px}
+.opt figcaption{font-size:13px;line-height:17px;color:var(--text-3);text-align:center}
 </style>
 </head>
 <body>
-<div class="stage lb-ui " style="width:360px;height:120px"><div style="position:absolute;left:40px;top:38px;width:280px"><div class="lb-arch-tiles"><button class="lb-arch-tile" type="button" aria-label="Sound on" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 H8 L13 5 V19 L8 15 H4 Z"/><path d="M16.5 9.5 Q18.5 12 16.5 14.5"/><path d="M19 7 Q22.5 12 19 17"/></svg></button><button class="lb-arch-tile" type="button" aria-label="Sound off" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 H8 L13 5 V19 L8 15 H4 Z"/><path d="M17 9.5 L22 14.5 M22 9.5 L17 14.5"/></svg></button><button class="lb-arch-tile" type="button" aria-label="Full screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15"/></svg></button></div></div></div>
+<p class="cap">The tiles, left to right (High scores is new in version 13)</p>
+<div class="stage lb-ui" style="width:480px;height:100px"><div style="position:absolute;left:24px;top:30px"><div class="lb-arch-tiles"><button class="lb-arch-tile" type="button" aria-label="High scores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 21 V13.2 A5.5 5.5 0 0 1 17.5 13.2 V21"/><path d="M4.5 21 H19.5"/><path d="M9.6 14 H14.4 M9.6 17.4 H14.4"/><path d="M8.6 6.4 L8.7 2.3 L12 4.8 L15.3 2.3 L15.4 6.4 Z"/></svg></button><button class="lb-arch-tile" type="button" aria-label="Sound on" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 H8 L13 5 V19 L8 15 H4 Z"/><path d="M16.5 9.5 Q18.5 12 16.5 14.5"/><path d="M19 7 Q22.5 12 19 17"/></svg></button><button class="lb-arch-tile" type="button" aria-label="Sound off" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 H8 L13 5 V19 L8 15 H4 Z"/><path d="M17 9.5 L22 14.5 M22 9.5 L17 14.5"/></svg></button><button class="lb-arch-tile" type="button" aria-label="Full screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15"/></svg></button></div></div></div>
+<p class="cap">High scores: the three icons drawn; Barney chose the crowned headstone</p>
+<div class="stage lb-ui" style="width:480px;height:130px"><div class="opts"><figure class="opt"><div class="lb-arch-tiles"><button class="lb-arch-tile" type="button" aria-label="High scores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 21 V13.2 A5.5 5.5 0 0 1 17.5 13.2 V21"/><path d="M4.5 21 H19.5"/><path d="M9.6 14 H14.4 M9.6 17.4 H14.4"/><path d="M8.6 6.4 L8.7 2.3 L12 4.8 L15.3 2.3 L15.4 6.4 Z"/></svg></button></div><figcaption>Crowned headstone (chosen)</figcaption></figure><figure class="opt"><div class="lb-arch-tiles"><button class="lb-arch-tile" type="button" aria-label="High scores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20.5 C5 18.5 3.4 13.6 5.2 7.5"/><path d="M15 20.5 C19 18.5 20.6 13.6 18.8 7.5"/><path d="M5.6 16.6 L2.9 15.8 M4.4 12.4 L2 11 M5 8.6 L3.6 6.2"/><path d="M18.4 16.6 L21.1 15.8 M19.6 12.4 L22 11 M19 8.6 L20.4 6.2"/><path d="M12 9 V16 M10.4 10.4 L12 9"/></svg></button></div><figcaption>Laurel</figcaption></figure><figure class="opt"><div class="lb-arch-tiles"><button class="lb-arch-tile" type="button" aria-label="High scores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5 H18.5 A1.8 1.8 0 0 1 18.5 8.6 H17"/><path d="M7 5 A1.8 1.8 0 0 0 7 8.6 V19.2"/><path d="M17 8.6 V19.4 A1.8 1.8 0 0 1 15.2 21.2 H5.2 A1.8 1.8 0 0 1 5.2 17.6 H7"/><path d="M9.8 11 H14.4 M9.8 14.2 H13.2 M9.8 17.4 H12"/></svg></button></div><figcaption>Ranked scroll</figcaption></figure></div></div>
 <script>/* static preview */</script>
 </body>
 </html>

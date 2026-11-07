@@ -20,3 +20,12 @@ Two spells bought in the Echo Shrine and chosen there before a run, in place of 
 - **The acid is gold**, as every spell (Barney, 7 November 2026, after seeing gold and green side by side in this card). Green (#46c06e) was the alternative; `ACID_LOOK` in `play.js` would switch it.
 - **The bolt's fork zigzags as sharply as its strike** (Barney, 7 November 2026): the corners alternate side to side on both parts; the fork's line is only thinner.
 - Barney, 7 November 2026: the concept is agreed; the execution has to be good, so both are judged in play before they're tuned.
+
+## Version 13
+- **Their own sounds** (play.js `SND.play("bolt")`, `"acid"`, `"acidHiss"`), instead of the fireball's throw and burst:
+  - the lightning bolt: a sharp crack, a buzzing zap as it strikes, and a smaller crack as it forks, 0.06 s later;
+  - the acid spray: a wet hissing spray; then, while its patch lies, a quiet bubbling hiss (`acidHiss`, the patch's 1.5 s).
+  Both are measured as loud as the fireball (about −28 dB over their loudest 0.4 s); the patch's hiss sits well under them. Starting levels, to tune by ear.
+- **Their scrolls** are drawn for the scroll, not shrunk from the Echo Shrine's pictures: the bolt as a solid zigzag, the acid as a spray of three lines with three drops (Loot).
+- **The acid's patch follows the ground**: `fxAcidPatch(c, x0, x1, y, k, u, look, gy)` takes the ground's height at each x (`gy`), so on a slope it lies along it; its bubbles and motes rise from the slope too.
+- **An early scroll**: once a run, a scroll for the run's attack spell lies on the path in Night (Loot). Scrolls otherwise come only from walkers, who join at Dawn, and bosses.

@@ -7,14 +7,15 @@ The lancet arch: a gothic arch cut from black card, lit from behind, holding the
 
 ## Markup
 ```html
-<div class="lb-ui lb-arch">                 <!-- add is-phone for 260 x 374 -->
+<div class="lb-ui lb-arch has-four">        <!-- add is-phone for 260 x 374 -->
   <div class="lb-arch-card"></div>
   <div class="lb-arch-inner">
     <h1 class="lb-title">Gloam<br>Hallow</h1>
     <div class="lb-rule is-arch" aria-hidden="true"><i></i></div>
     <nav class="lb-title-menu" aria-label="Title menu">
       <button class="lb-title-item is-selected" type="button" aria-current="true">Start game</button>
-      <button class="lb-title-item" type="button">High scores</button>
+      <button class="lb-title-item" type="button">How to play</button>
+      <button class="lb-title-item" type="button">Echo Shrine</button>
       <button class="lb-title-item" type="button">Settings</button>
     </nav>
     <p class="lb-best">Best <span class="lb-num">0450</span> echo</p>
@@ -39,3 +40,8 @@ The lancet arch: a gothic arch cut from black card, lit from behind, holding the
 ## Version 12
 - The Best line reads echo (PRD question 12). Start game opens the choice of run once anything is bought (Modes).
 - **Not yet designed**: the Echo Shrine is reached "from the title menu and the run's end" (PRD), but the arch holds four items (Start game, How to play, High scores, Settings) and none of step 5b's rounds drew a fifth. Barney to choose before step 5e builds the shrine; until then it is reached from the run's end only.
+
+## Version 13
+- **The four items are Start game, How to play, Echo Shrine, Settings.** This settles version 12's open question. High scores leaves the arch and becomes an arch tile, first in the row before sound (ArchTile), because a fifth item doesn't fit: Claude Code measured the computer's hint ending at 544 against the arch's foot at 514, and the phone's Best line at 414 on a 390-point screen.
+- Echo Shrine opens the shrine from the title (EchoShrine); its Back returns here with Echo Shrine selected. The shrine is still reached from the run's end too.
+- The preview's backdrop is the live Night drawn by play.js, as in every version 12 card.

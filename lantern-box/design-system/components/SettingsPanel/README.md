@@ -34,3 +34,6 @@ On a phone held sideways (680px wide): `lb-plaque is-phone`, an `lb-header` with
 - **The confirmation** (`role="alertdialog"`, 400 wide; 440 on a phone): "Clear saved progress?", "Your stolen echo and everything bought at the Echo Shrine will be gone, and the next run starts as a first run, hints and all. High scores and settings stay.", then Keep it (primary, focused) and Clear it (`is-danger`). Enter keeps it; Backspace goes back.
 - Clearing removes the stolen echo and everything bought, Hysteria included, and brings the first-run hints back; high scores and settings stay. It writes the one saved record, through the one storage function.
 - The hint is "Backspace done": never Esc, which a portal keeps for leaving full screen.
+
+## Version 13
+- On a computer the plaque is centred across the screen and **27px from the top** (it was 14px), as Claude Code built it: it still clears the screen's foot. On a phone it stays 14px from the top.

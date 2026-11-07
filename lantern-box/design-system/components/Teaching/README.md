@@ -12,3 +12,9 @@ Over the play screen, under nothing but the HUD: `lb-teach-row` of `lb-teach-hin
 - **Going**: a hint dims to 35% as soon as its control is used, then goes after a second; the next to learn is edged in `heading`. H, or Hide hints, hides them all for good (the hints come back only after Clear saved progress).
 - **Keys**: the letters as the player's own keyboard has them, where the browser can tell (an AZERTY player sees Q for walk left); otherwise as printed above. Never Esc.
 - Hints never cover the HUD, the boss bar or the plaque line, never flash, and never stop play.
+
+## Version 13
+Confirmed by Barney as Claude Code built them (7 November 2026):
+- **When the later hints appear**: roll when a monster first starts an attack within 400 of him; drink when the first potion is kept (with the potion's plaque line); cast once a spell is learnt (on most first runs that is now the scroll on the path in Night: Loot).
+- **No drink hint on a phone**: the potion's plaque line already says "Tap to drink".
+- **The computer's row** sits 120/540 of the window's height above the bottom, so it scales with the window.

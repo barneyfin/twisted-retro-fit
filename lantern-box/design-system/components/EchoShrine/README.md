@@ -19,3 +19,7 @@ A dialog plaque (780 wide; 804 on a phone held sideways, `is-phone`): an `lb-hea
 - **Keys** (computers): arrows move through the rows, Enter buys, chooses or wears, Backspace goes back. Never Esc.
 - A new player is never sent here before their first run; only the very first run's end makes it the primary button (RunEnd).
 - **Full Launch** (drawn, not built): "Try acid spray for one run" under the spells, a rewarded ad for a spell not yet bought; a 320 × 50 banner under the plaque, at least 15 px from any button (AdPlaces).
+
+## Version 13
+- **Buying chooses or wears at once** (confirmed by Barney as built): a spell bought becomes the spell for the next run, and a belt bought is worn, with the same press. Either can be changed back here before any run.
+- **From the title**: Echo Shrine is now the title arch's third item (TitleArch); Back returns to the title with it selected. From the run's end, as before.

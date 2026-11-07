@@ -10,7 +10,7 @@ The title screen assembled: the first place running slowly behind a light scrim,
 <div class="lb-ui" style="position:absolute;inset:0">
   <div class="lb-scrim is-title"></div>
   <div style="position:absolute;left:60px;top:26px">{TitleArch}</div>
-  <div style="position:absolute;right:22px;top:20px">{ArchTile x2}</div>
+  <div style="position:absolute;right:22px;top:20px">{ArchTile x3: High scores, sound, full screen}</div>
 </div>
 ```
 On a phone held sideways: the arch `is-phone` at 44px left and 8px top; the tiles 18px from the right and 14px from the top; no hint.
@@ -25,3 +25,7 @@ On a phone held sideways: the arch `is-phone` at 44px left and 8px top; the tile
 
 ## Version 8
 - How to play is the arch's second item (TitleArch, `has-four`).
+
+## Version 13
+- The arch reads Start game, How to play, Echo Shrine, Settings; High scores is the first arch tile, before sound and full screen (TitleArch, ArchTile). The tiles keep their place from the right, so sound and full screen don't move.
+- The hidden alternative from version 8 (How to play as a tile) is gone from the preview; it was never chosen.

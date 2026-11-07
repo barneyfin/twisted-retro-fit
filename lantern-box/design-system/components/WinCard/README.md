@@ -14,3 +14,10 @@ A dialog plaque (460 wide; 640 in two columns on a phone): `lb-heading` "The fle
 - **The second loop** is offered, built before submission: the line "Fell The Wandering Rot to begin anew—walk the cursed path once more against darker terrors." (`lb-win-loop`, Barney's words, moved here from Hysteria's lock), then Go round again (primary, the diamond) and Finish, from 3.6 s, when the buttons take input. Finish goes on as game over does: the initials for a top-ten score, otherwise the run's end's buttons.
 - The score is in echo. "Hysteria unlocked" is gone: Hysteria is bought at the Echo Shrine instead (Modes).
 - Keys: Enter goes round again. Never Esc.
+
+## Version 13
+Gaps found building step 5e, settled with Barney (7 November 2026).
+- **The echo stolen**: after the lanterns are counted (3.3 s), the line "{n} echo stolen" (`lb-daily lb-stolen`, as the run's end's daily line), so the win says what was banked, as the run's end does. On the day's first Echo Infusion run it carries the ×2 mark and the doubled figure. The ×2 never applies in The Bare Reckoning, as at the run's end.
+- **After Finish** the offer gives way at once to the run's end's buttons: Play again (primary, focused), Echo Shrine and Menu; or, for a top-ten score in The Bare Reckoning, Continue alone, to the initials. The lines, the score and the echo stolen stay. Keys: Enter plays again, Backspace goes to the menu.
+- **The second loop's win** has no offer (there is no third loop): its lines, the score, the echo stolen, then the end buttons at 3.6 s, when they take input. Its three lines are Barney's (7 November 2026): "A monstrous glory." (the heading, `is-win`) over "The greater horrors have bled dry." (`lb-win-line is-lead`) and "Gloam Hallow now fears your tread.", each with one of the win's three bells as on the first loop's win. Its echo is already doubled by the loop; the ×2 mark only ever means the day's first Echo Infusion.
+- The phone keeps two columns: the lines left; the score, the lives, the echo stolen and the buttons right.

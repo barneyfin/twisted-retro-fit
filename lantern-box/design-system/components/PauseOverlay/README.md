@@ -31,3 +31,9 @@ On a phone: `lb-plaque is-phone`, 300px wide, no hint.
 
 ## Version 12
 - P pauses and resumes, and the hint reads "P resume": never Esc, which a portal keeps for leaving full screen. The arcade's own build still lets Esc pause, unshown; the CrazyGames build never listens for it.
+
+## Version 13
+- **The Graces bound** this run show under the plaque (Barney, 7 November 2026), so a player can see what the run holds without crowding the HUD: an `lb-flag` "Graces bound", then a row (`lb-held-list`) of up to three, each its picture (22px, the GracePick picture) and name (`lb-held-item`), in the order bound. A strong Grace is outlined in `grace-strong` (`is-strong`).
+- Before the first boss there are none, and the row isn't shown. In the second loop it shows the three carried over.
+- A Grace that acts once (The Grave Refuses) stays listed once spent, at half opacity (`is-spent`), with ", spent" for screen readers.
+- The plaque and the row are centred together; on a phone 10px apart, on a computer 14px. The preview's backdrops are now the live places drawn by play.js.

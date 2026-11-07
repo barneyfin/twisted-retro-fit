@@ -29,6 +29,8 @@
   --touch-face-light: rgba(12,7,9,0.3);
   --touch-face-pressed: rgba(201,162,90,0.3);
   --brass-wash: rgba(201,162,90,0.14);
+  --grace-strong: #ffcf6a;
+  --grace-strong-glow: rgba(255,207,106,0.26);
   --brass-tint: rgba(201,162,90,0.1);
   --brass-glow: rgba(255,190,100,0.35);
   --scrim: rgba(6,5,8,0.6);

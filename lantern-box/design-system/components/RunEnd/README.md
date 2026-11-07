@@ -30,3 +30,12 @@ A dialog plaque (470 wide; 660 in two columns on a phone held sideways), as Game
 - **Timing**: 0 to 0.8 s the last life falls as now (the blow, the knee, the card pieces) but with no fade to black: the scene holds still under the scrim. At 0.8 s the plaque appears (Interface changes are instant). From 0.8 to 2.0 s this run's echo steps into the bar, as the win counts its lanterns, and "to go" counts down with it; if an unlock is reached, READY lights once with the soft chime (`confirm`). At 1.0 s the buttons take input, so a jump or a swing mashed as he falls can't skip the screen. Nothing flashes.
 - **Full Launch** (drawn, not built): "Double this run's echo", a rewarded ad, between the next unlock and Play again (AdPlaces).
 - On a phone held sideways: two columns, the heading, line, score and near-miss left; the next unlock and the buttons right; no keyboard hints.
+
+## Version 13
+Gaps found building step 5e, settled with Barney (7 November 2026).
+- **The phone's near-miss line is always two lines** (`lb-near is-two`, a break after the name): "Fell to {boss}", then the bar and "{n}% left". Claude Code found the one line wrapping for The Tentacled Skull at any share, and for The Veiled Ghost and The Moor Mother at 100%; one planned layout for every boss is steadier than a wrap that comes and goes. It fits 390.
+- **Furthest yet**: when he fell outside a boss fight but got further than any run before, the line is "Furthest yet" (`lb-ready`, the brass diamond) beside the place's name, as built. Never both lines.
+- **The ×2 line on a phone** sits in the left column, under the near-miss line, as built; the right column keeps the next unlock and the buttons.
+- **A belt as the next unlock** shows its band in its colour in a 44px box (`lb-next-belt`), as at the Echo Shrine; "Next: Mulberry belt". Barney is happy with the band.
+- **The game-over toll**: one low, muted toll (`SND.play("gameOver")`) as the plaque appears at 0.8 s, after the lost life's falling tones (Sound). It replaces nothing: the lost life's sound still plays as he falls.
+- **The armour** cracks in turn as the last life goes, before the plaque (HUD).
