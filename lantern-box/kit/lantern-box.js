@@ -1,4 +1,4 @@
-/* Lantern Box 0.13 — runtime
+/* Lantern Box 0.14 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.13.0';
+  const VERSION = '0.14.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -5173,7 +5173,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     }
     function syncHud() {
       if (!hudNodes) return;
-      if (hudNodes.full) { HUD8.OPTS.rm = !!settings.reduceMotion; HUD8.OPTS.fxOff = !(settings.effects && pictureLevel() !== 'fastest'); HUD8.set(hudNodes.full, h8State()); syncPick(); return; }
+      if (hudNodes.full) { HUD8.OPTS.rm = !!settings.reduceMotion; HUD8.OPTS.fxOff = !(settings.effects && pictureLevel() !== 'fastest'); HUD8.set(hudNodes.full, h8State()); syncPick(); syncTeach(); return; }
       const pc = (f) => Math.round(clamp(f, 0, 1) * 100);
       hudNodes.health.style.setProperty('--v', pc(state.health) + '%');
       if (hudNodes.mana) hudNodes.mana.style.setProperty('--v', pc(state.mana) + '%');
@@ -5320,9 +5320,87 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       cardEl.append(pickEl);
     }
     const placing = () => !!h8.card;
+    /* kit 0.14.0 (design system version 12, Teaching): teaching in play. The game says when a control matters, lb.teach.show(id, { later }),
+       with ids walk, jump, attack, cast, roll, drink; the kit draws it as the design does (on a computer a row of keycaps and a word above the
+       path, with Hide hints and its H keycap bottom right; on a touch device the stick's half outlined and labelled, the touch buttons ringed and
+       named, Hide hints top middle), edges the next to learn, dims a hint to 35% the moment its control is used and drops it a second later.
+       later: shown fainter, not yet usable (the phone's "Cast, once a spell is learnt", "Flick to roll"). H or Hide hints hides them all, and
+       onHintsHidden(lb) in the config hears it (to keep it so). The hints never stop play, never flash, step aside while the place card or the
+       boss bar shows, and show only in play. */
+    const TEACH = {
+      walk: { keys: ['A', 'D'], word: 'walk' }, jump: { keys: ['Space'], word: 'jump', btn: 'b-jump', label: 'Jump' },
+      attack: { keys: ['J'], word: 'attack', btn: 'b-attack', label: 'Attack' }, cast: { keys: ['K'], word: 'cast', btn: 'b-cast', label: 'Cast', later: 'Cast, once a spell is learnt' },
+      roll: { keys: ['Shift'], word: 'roll' }, drink: { keys: ['Q', 'E'], word: 'drink' }
+    };
+    const teach = { items: [], el: null, dirty: true, shownFor: '' };
+    function teachShow(id, o) {
+      if (!TEACH[id]) return;
+      const later = !!(o && o.later);
+      let it = teach.items.find((x) => x.id === id);
+      if (!it) { it = { id: id, later: later, done: null }; teach.items.push(it); } else if (it.later && !later) it.later = false;
+      teach.dirty = true;
+    }
+    function teachHide() {
+      if (!teach.items.length) return;
+      teach.items = []; teach.dirty = true; sfx('back');
+      if (cfg.onHintsHidden) { try { cfg.onHintsHidden(api); } catch (e) { reportError(e); } }
+    }
+    function teachTick() {   // each frame of play: a hint whose control is used dims, and goes a second later
+      if (!teach.items.length) return;
+      const T = state.time, used = { walk: input.left || input.right, jump: input.pressed.jump, attack: input.pressed.attack, cast: input.pressed.cast, roll: input.pressed.roll, drink: input.pressed.drinkHealth || input.pressed.drinkMana };
+      teach.items.forEach((it) => { if (it.done == null && !it.later && used[it.id]) { it.done = T; teach.dirty = true; } });
+      const n = teach.items.length;
+      teach.items = teach.items.filter((it) => it.done == null || T - it.done < 1);
+      if (teach.items.length !== n) teach.dirty = true;
+    }
+    function syncTeach() {   // draws the hints as they stand (only when something changed or the layout did)
+      const hudEl = hudNodes && hudNodes.full;
+      if (!hudEl) return;
+      const key = V.w + 'x' + V.h + (touch ? 't' : 'k');
+      if (!teach.el || !teach.el.isConnected) { teach.el = el('div', 'lb-teach'); teach.el.style.cssText = 'position:absolute;inset:0;pointer-events:none'; hudEl.append(teach.el); teach.dirty = true; }
+      const away = state.screen !== 'play' || !!h8.card || !!h8.boss;
+      teach.el.hidden = away || !teach.items.length;
+      if (!teach.dirty && teach.shownFor === key) return;
+      teach.dirty = false; teach.shownFor = key;
+      const box = teach.el, list = teach.items;
+      box.innerHTML = '';
+      if (!list.length) return;
+      const next = list.find((it) => it.done == null && !it.later);
+      if (!touch) {
+        const row = el('div', 'lb-teach-row');
+        row.setAttribute('role', 'group'); row.setAttribute('aria-label', 'Controls, shown on a first run');
+        row.style.cssText = 'position:absolute;left:0;right:0;bottom:calc(100% * 120 / 540)';
+        list.forEach((it) => { const d = TEACH[it.id]; row.append(el('span', 'lb-teach-hint' + (it.done != null ? ' is-done' : '') + (it === next ? ' is-next' : ''), d.keys.map(kbd).join('') + ' ' + d.word)); });
+        const skip = el('button', 'lb-teach-skip', kbd('H') + ' Hide hints');
+        skip.type = 'button'; skip.style.cssText = 'right:20px;bottom:20px;pointer-events:auto';
+        skip.addEventListener('click', () => { skip.blur(); teachHide(); });
+        box.append(row, skip);
+        return;
+      }
+      // a touch device: the stick's half, its words, and the touch buttons ringed and named, as the phone's preview places them
+      const R = box.getBoundingClientRect(), add = (cls, css, text) => { const e = el(text == null ? 'div' : 'span', cls); e.style.cssText = css; if (text != null) e.textContent = text; box.append(e); return e; };
+      const dim = (it) => (it.done != null ? ';opacity:.35' : '');
+      const walk = list.find((it) => it.id === 'walk'), roll = list.find((it) => it.id === 'roll');
+      if (walk) { add('lb-teach-zone', 'left:12px;top:calc(100% * 150 / 390);width:calc(50% - 24px);bottom:12px' + dim(walk)); add('lb-teach-label', 'left:calc(100% * 110 / 844);top:calc(100% * 176 / 390)' + dim(walk), 'Touch and drag here to move'); }
+      if (roll) add('lb-teach-label is-later', 'left:calc(100% * 110 / 844);top:calc(100% * 206 / 390)' + dim(roll), 'Flick to roll');
+      list.forEach((it) => {
+        const d = TEACH[it.id], b = d.btn && hudEl.querySelector('.lb-touch-btn.' + d.btn);
+        if (!b) return;
+        const r = b.getBoundingClientRect(), x = r.left - R.left - 6, y = r.top - R.top - 6, w = r.width + 12, h = r.height + 12, faint = it.later ? ' is-later' : '';
+        add('lb-teach-ring' + faint, 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px' + dim(it));
+        const text = it.later && d.later ? d.later : d.label;
+        if (it.id === 'attack') add('lb-teach-label' + faint, 'left:' + (x + 28) + 'px;top:' + (y - 4) + 'px;transform:translateY(-100%)' + dim(it), text);
+        else add('lb-teach-label' + faint, 'right:' + (R.width - x + 12) + 'px;top:' + (y + h / 2) + 'px;transform:translateY(-50%)' + dim(it), text);
+      });
+      const skip = el('button', 'lb-teach-skip is-phone', 'Hide hints');
+      skip.type = 'button'; skip.style.cssText = 'left:50%;top:14px;transform:translateX(-50%);pointer-events:auto';
+      skip.addEventListener('click', () => { skip.blur(); teachHide(); });
+      box.append(skip);
+    }
     function resetH8() {   // a new run (or the title): three lives, no armour, no spells, no potions kept, nothing showing
       Object.assign(h8, { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0, potions: { health: 0, mana: 0 }, potCap: { health: 1, mana: 1 }, potFx: { health: null, mana: null } });
       fadeEl.style.opacity = '0';
+      teach.items = []; teach.dirty = true;   // kit 0.14.0
     }
 
     /* ----- Settings ----- */
@@ -6462,6 +6540,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         if (GAME_CODES.has(e.code) || e.code.indexOf('Arrow') === 0) e.preventDefault();
         if (stale.has(e.code)) return;
         if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); if (!e.repeat) pause(); return; }
+        if (e.code === 'KeyH' && teach.items.length) { e.preventDefault(); if (!e.repeat) teachHide(); return; }   // kit 0.14.0: H hides the hints
         if (picking()) {   // kit 0.13.0: a pick under the place card takes the keys: left and right choose, Enter (or Space) takes
           e.preventDefault();
           if (e.repeat) return;
@@ -6499,6 +6578,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       }
       if (state.screen !== 'play') return;
       prepareInput();
+      teachTick();   // kit 0.14.0: a hint whose control is used dims
       try { cfg.update(state.game, api); } catch (e) { reportError(e); }
       endTickInput();
       if (state.shakeT > 0) { state.shakeT -= STEP; if (state.shakeT <= 0) state.shakeAmt = 0; }
@@ -6667,7 +6747,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
        Kit 0.12.0: world.bolt(x1, y1, x2, y2, { t, seed, fork }), world.acid(x, y, { facing, t }) and world.acidPatch(x0, x1, { y, t }): version 12's
          lightning bolt and acid spray (play.js 1.2.0); world.LOOT has their scrolls ('bolt', 'acid'), and the HUD's spell socket takes them.
        Kit 0.13.0: lb.placeCard(place, onBlack, onDone, { pick: { heading, options: [{ id, name, line, pic }], take(id) } }) shows a pick under
-         the card's plaque (GracePick), holding the card until one is taken. */
+         the card's plaque (GracePick), holding the card until one is taken.
+       Kit 0.14.0: lb.teach.show(id, { later }) (walk, jump, attack, cast, roll, drink) teaches a control in play as Teaching draws it; the kit
+         sees it used, dims it and drops it; lb.teach.hide() (or H, or Hide hints) hides them all, and onHintsHidden(lb) in the config hears it. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
@@ -6682,6 +6764,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       addWisps: addWisps, gameOver: gameOver, shake: shake, after: after,
       get progress() { return progress; }, saveProgress: saveProgress, runEnd: runEnd, keyLetter: keyLetter,   // kit 0.10.0
       ui: ui, get run() { return state.run || null; },   // kit 0.11.0
+      teach: { show: teachShow, hide: teachHide, get showing() { return teach.items.map((it) => it.id); } },   // kit 0.14.0
       fade: fade, placeCard: placeCard, placing: placing, win: showWin, howTo: () => openHowTo('play'),   // version 8 (4c-6a)
       get test() { return testCfg ? Object.assign({}, testValues) : null; },   // kit 0.8.1: Testing's values, or null when the game has none
       sounds: Object.keys(SND8.FX), ambient: ambient,   // version 8 (4c-7)

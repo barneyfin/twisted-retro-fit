@@ -40,7 +40,9 @@
    Step 5e-2 (kit 0.12.0): the lightning bolt and the acid spray, chosen at the Echo Shrine in place of the fireball; that run's scrolls teach
    the chosen one.
    Step 5e-3 (kit 0.13.0): the Graces: after each of the first three bosses, the next place's card holds for "Bind a twisted Grace", three
-   drawn from the deck by their weights, never one already held; each lasts the run. */
+   drawn from the deck by their weights, never one already held; each lasts the run.
+   Step 5e-4 (kit 0.14.0): teaching in play on a first run, and again after Clear saved progress: walk, jump and attack as Night's card
+   lifts; cast, roll and drink the first time each matters; H or Hide hints hides them for good. */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
 const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
@@ -435,10 +437,12 @@ LanternBox.game({
     clear: 'Your stolen echo and everything bought at the Echo Shrine will be gone, and the next run starts as a first run, hints and all. High scores and settings stay.' },
   credits: { music: ['Music made with Google Gemini', 'The Long Vigil \u00b7 Lantern in the Moor'], sound: 'Two sound effects from Pixabay; the rest made in code' },
   onLeave(g, lb) { bankRun(g, lb, false); },   // Restart or Quit to menu: the run's echo is banked all the same
+  onHintsHidden(lb) { lb.progress.hintsHidden = true; lb.saveProgress(); if (G) G.teach = false; },   // step 5e-4: hidden for good
   shrine: { bank: (lb) => lb.progress.echo, open: openShrine },   // kit 0.10.2: on the title's arch; step 5e-1: the Echo Shrine itself
   chooseRun,   // step 5e-1: the choice of run, once anything is bought
   // Testing (delete for the finished game): where a run starts, and help for trying it out
   test: { options: [
+    { id: 'teach', name: 'Teaching in play', choices: [['saved', 'First run only'], ['always', 'Always']] },   // step 5e-4
     { id: 'spell', name: 'Attack spell', choices: [['shrine', 'As chosen'], ['fire', 'Fireball'], ['bolt', 'Lightning bolt'], ['acid', 'Acid spray']] },   // step 5e-2
     { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
     { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
@@ -466,12 +470,13 @@ LanternBox.game({
     g.spells = { heal: t.all ? 3 : 0 }; g.spells[g.attack] = t.all ? 3 : 0; g.spellList = t.all ? ['heal', g.attack] : [];
     g.zaps = []; g.sprays = []; g.patches = [];   // step 5e-2: the bolts, the sprays and the patches on the ground
     g.graces = {}; g.warded = false;              // step 5e-3: the Graces held this run, and Lantern Ward used in this place
+    g.teach = t.teach === 'always' || (!rec.played && !rec.hintsHidden); g.taught = {};   // step 5e-4: teaching in play on a first run
     lb.world.belt(rec.belt);
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
     lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); hudSpells(g, lb); lb.hud.potCap(g.potCap.health, g.potCap.mana); lb.hud.potions(0, 0);
     lb.fade(1);   // black until the first place card lifts
-    lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; });
+    lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; if (g.teach) startTeaching(g, lb); });
     return g;
   },
 
@@ -495,6 +500,7 @@ LanternBox.game({
     if (!(g.boss && g.boss.st === 'arrive')) moveUpdate(g, lb, dt);   // play stops while the boss comes in
     bossUpdate(g, lb, dt);
     monstersUpdate(g, lb, dt);
+    if (g.teach && !g.taught.roll && g.mons.some((m) => alive(m) && m.atk && Math.abs(m.px - g.x) < ROLL_TEACH)) teachOnce(g, lb, 'roll');   // step 5e-4: roll, the first time a monster comes at him
     shotsUpdate(g, lb, dt);
     spellsUpdate(g, lb, dt);   // step 5e-2: the bolt, the spray and its patch
     lootUpdate(g, lb, dt);
@@ -837,6 +843,19 @@ function shotsUpdate(g, lb, dt) {     // each fireball flies on until it hits a 
   if (g.shots.some((s) => s.gone)) g.shots = g.shots.filter((s) => !s.gone);
 }
 
+/* ---------- teaching in play (step 5e-4; design system version 12, Teaching): the kit draws the hints and sees each control used ---------- */
+const ROLL_TEACH = 400;          // the roll is taught the first time a monster begins an attack this near (starting figure)
+function startTeaching(g, lb) {  // as Night's card lifts: walk, jump, attack; on a touch device the flick and the cast button too, fainter
+  ['walk', 'jump', 'attack'].forEach((id) => lb.teach.show(id));
+  if (lb.touch) { lb.teach.show('roll', { later: true }); lb.teach.show('cast', { later: !g.spellList.length }); }   // fainter until a spell is learnt
+}
+function teachOnce(g, lb, id) {  // the first time a control matters in a taught run
+  if (!g.teach || g.taught[id]) return;
+  g.taught[id] = true;
+  if (id === 'roll' && lb.touch) return;   // a touch device has had "Flick to roll" from the start
+  lb.teach.show(id);
+}
+
 /* ---------- the lightning bolt and the acid spray (step 5e-2; design system version 12, Spells; the review loops are the timing) ---------- */
 // targets: every monster alive and the boss's body while it can be struck, each with its box and its middle
 function boltTargets(g) {
@@ -1153,6 +1172,7 @@ function lootUpdate(g, lb, dt) {
 function take(g, lb, it) {             // false: not needed now (health, mana or armour full), so it stays for later; 'keep': into its socket
   if ((it.kind === 'health' || it.kind === 'mana') && g.pots[it.kind] < g.potCap[it.kind]) {   // version 11: a potion kept while a socket is empty (5e-1: up to three)
     g.pots[it.kind]++; lb.hud.keep(it.kind, { line: !g.potLine[it.kind] }); g.potLine[it.kind] = true;   // the line once per kind each run
+    if (!lb.touch) teachOnce(g, lb, 'drink');   // step 5e-4: drink, with the potion's plaque line (a phone's says tap)
     lb.sfx('pickup');
     return 'keep';
   }
@@ -1163,7 +1183,7 @@ function take(g, lb, it) {             // false: not needed now (health, mana or
     case 'heal': case 'fire': case 'bolt': case 'acid': {   // the first scroll teaches the spell (and chooses it); later ones make it stronger
       const first = g.spells[it.kind] === 0;
       g.spells[it.kind] = Math.min(3, g.spells[it.kind] + 1);
-      if (first) { g.spellList.push(it.kind); g.sel = g.spellList.length - 1; }
+      if (first) { g.spellList.push(it.kind); g.sel = g.spellList.length - 1; teachOnce(g, lb, 'cast'); }   // step 5e-4: cast, once a spell is learnt
       hudSpells(g, lb); lb.hud.line(it.kind, LINES[it.kind][first ? 0 : 1]);
       break;
     }
