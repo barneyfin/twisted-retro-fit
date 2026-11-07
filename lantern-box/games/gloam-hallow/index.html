@@ -38,7 +38,9 @@
    takes: The Bare Reckoning the chosen spell and belt and one potion of each, The Echo Infusion every socket bought; up to three potions of
    each kind, and the belts.
    Step 5e-2 (kit 0.12.0): the lightning bolt and the acid spray, chosen at the Echo Shrine in place of the fireball; that run's scrolls teach
-   the chosen one. */
+   the chosen one.
+   Step 5e-3 (kit 0.13.0): the Graces: after each of the first three bosses, the next place's card holds for "Bind a twisted Grace", three
+   drawn from the deck by their weights, never one already held; each lasts the run. */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
 const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
@@ -128,6 +130,38 @@ const SPELL = {                  // three levels each, from scrolls: heal 40% of
   bolt: { cost: 0.25, dmg: [0, 4 / 3, 2, 8 / 3] },   // each hit about two-thirds of a fireball's
   acid: { cost: 0.25, dmg: [0, 2, 3, 4] },           // about a fireball's in all: half as it sprays, half from its patch
 };
+// the Graces (step 5e-3; design system version 12, GracePick): the first deck, their pictures as drawn, Barney's rarity (7 November 2026:
+// the strongest rarer; weights 1, 2 and 3) and their sizes, all starting figures. No Grace touches echo.
+const GRACES = [
+  { id: 'keen', name: 'Keen Edge', line: 'Your sword bites deeper.', weight: 3, pic: '<path d="M24 4 L11 17 M8.5 14.5 L15.5 21.5 M11 19 L6 24"/><path d="M24 4 L20 5 L12 13 L17 18 L25 10 Z"/>' },
+  { id: 'reach', name: 'Long Reach', line: 'Your sword reaches further.', weight: 3, pic: '<path d="M8 22 L18.5 11.5"/><path d="M5.5 19.5 L10.5 24.5"/><path d="M8 22 L4.5 25.5"/><path d="M21 9 L26 4"/><path d="M20.5 4 H26 V9.5"/>' },
+  { id: 'deep', name: 'Deep Well', line: 'Mana refills twice as fast.', weight: 1, pic: '<path d="M15 4 C19.5 9.5 21 13 21 16.5 A6 6 0 0 1 9 16.5 C9 13 10.5 9.5 15 4 Z"/><path d="M12 18 A3 3 0 0 0 15 21"/><path d="M5 26 H25"/>' },
+  { id: 'iron', name: 'Iron Skin', line: 'Start every place with full armour.', weight: 1, pic: '<path d="M15 3 L25 7 V14 C25 20 20.5 24.5 15 27 C9.5 24.5 5 20 5 14 V7 Z"/><path d="M10 14.5 L13.5 18 L20 11"/>' },
+  { id: 'fleet', name: 'Fleet Foot', line: 'Rolls recover faster.', weight: 3, pic: '<path d="M24.5 17.5 A8.5 8.5 0 1 1 22 9"/><path d="M22.4 3.8 L22 9 L16.8 8.6"/><path d="M3 23 H8 M4.5 27 H11"/>' },
+  { id: 'kindled', name: 'Kindled Heal', line: 'Heal restores more.', weight: 2, pic: '<path d="M15 26 C8.5 21.5 5.5 18 5.5 14.5 A4.6 4.6 0 0 1 15 12.4 A4.6 4.6 0 0 1 24.5 14.5 C24.5 18 21.5 21.5 15 26 Z"/><path class="solid" d="M15 2.5 C17.3 5 17.7 6.5 16.7 8 A2 2 0 0 1 13.3 8 C12.3 6.5 12.7 5 15 2.5 Z"/>' },
+  { id: 'surge', name: 'Spell Surge', line: 'Your attack spell costs less mana.', weight: 2, pic: '<path d="M11.5 4 C16 9.5 17.5 12.8 17.5 16 A6 6 0 0 1 5.5 16 C5.5 13.4 6.6 11.3 8.2 9.8 C8.5 11.8 9.4 12.9 10.6 13.2 C10.2 10.2 10.6 7 11.5 4 Z"/><path d="M24 12 V25 M20.5 21.5 L24 25 L27.5 21.5"/>' },
+  { id: 'ward', name: 'Lantern Ward', line: 'The first hit in each place is ignored.', weight: 1, pic: '<path d="M11.5 10 H18.5 L20 12 V21 H10 V12 Z"/><path d="M13 10 V8.2 A2 2 0 0 1 17 8.2 V10"/><path d="M8.5 23.5 H21.5"/><path class="solid" d="M15 13.2 C16.4 15 16.6 16 16.6 16.9 A1.6 1.6 0 0 1 13.4 16.9 C13.4 16 13.6 15 15 13.2 Z"/><path d="M5.5 21 A11 11 0 0 1 5.5 9"/><path d="M24.5 9 A11 11 0 0 1 24.5 21"/>' },
+];
+const GRACE = { keen: 1, reach: 1, deep: 2, fleet: 1.3, kindled: 0.15, surge: 0.7 };   // one bite or reach level more; mana twice as fast; rolls 1.3 times quicker; heal +15% of health; the attack spell at 70% of its mana
+function drawGraces(g, lb) {   // three, by weight, never one already held
+  const pool = GRACES.filter((x) => !g.graces[x.id]), out = [];
+  while (out.length < 3 && pool.length) {
+    let r = lb.rand() * pool.reduce((t, x) => t + x.weight, 0), i = 0;
+    while (i < pool.length - 1 && r >= pool[i].weight) { r -= pool[i].weight; i++; }
+    out.push(pool.splice(i, 1)[0]);
+  }
+  return out;
+}
+function takeGrace(g, lb, id) {
+  g.graces[id] = true;
+  if (id === 'iron') { g.armour = 3; lb.hud.armour(3); }   // its place has just begun
+  if (id === 'surge') hudSpells(g, lb);
+}
+const swordBite = (g) => 1 + 0.5 * (g.sword.bite + (g.graces.keen ? GRACE.keen : 0));
+const swordReach = (g) => SWORD_REACH + REACH_UP * (g.sword.reach + (g.graces.reach ? GRACE.reach : 0));
+const spellCost = (g, sp) => (sp === 'heal' ? SPELL.heal.cost : SPELL[sp].cost * (g.graces.surge ? GRACE.surge : 1));
+const rollAt = (g) => g.mt * (g.graces && g.graces.fleet ? GRACE.fleet : 1);
+
 // the bolt and the acid (step 5e-2; all starting figures, to judge in play): a body-length is his height
 const BODY_LEN = 88;
 const BOLT_RANGE = 5 * BODY_LEN, BOLT_FORK = 2 * BODY_LEN;   // strikes the nearest ahead within 5 body-lengths at once, then forks to one more within 2
@@ -431,6 +465,7 @@ LanternBox.game({
     g.attack = ['fire', 'bolt', 'acid'].indexOf(t.spell) >= 0 ? t.spell : rec.spell;   // Testing can try any (step 5e-2)
     g.spells = { heal: t.all ? 3 : 0 }; g.spells[g.attack] = t.all ? 3 : 0; g.spellList = t.all ? ['heal', g.attack] : [];
     g.zaps = []; g.sprays = []; g.patches = [];   // step 5e-2: the bolts, the sprays and the patches on the ground
+    g.graces = {}; g.warded = false;              // step 5e-3: the Graces held this run, and Lantern Ward used in this place
     lb.world.belt(rec.belt);
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
@@ -456,7 +491,7 @@ LanternBox.game({
     if (lb.input.pressed.drinkHealth) drink(g, lb, 'health');   // version 11: a kept potion (a tap on its socket, Q or E)
     if (lb.input.pressed.drinkMana) drink(g, lb, 'mana');
     g.drinkT += dt; fillsUpdate(g, lb, dt);
-    if (g.mode !== 'lost' && g.mode !== 'return' && g.mana < 1) { g.mana = Math.min(1, g.mana + MANA_RATE * dt); hudMana(g, lb, false); }
+    if (g.mode !== 'lost' && g.mode !== 'return' && g.mana < 1) { g.mana = Math.min(1, g.mana + MANA_RATE * (g.graces.deep ? GRACE.deep : 1) * dt); hudMana(g, lb, false); }
     if (!(g.boss && g.boss.st === 'arrive')) moveUpdate(g, lb, dt);   // play stops while the boss comes in
     bossUpdate(g, lb, dt);
     monstersUpdate(g, lb, dt);
@@ -532,6 +567,8 @@ function loadPlace(g, lb, p, ci) {   // the place's level and its checkpoints; c
 }
 function enterPlace(g, lb) {         // once the place card's black is down: the place's sound and track
   g.out = false;
+  g.warded = false;                    // step 5e-3: Lantern Ward, once in each place
+  if (g.graces.iron) { g.armour = 3; lb.hud.armour(3); }   // Iron Skin: every place begins with full armour
   lb.ambient(PLACES[g.p]);
   lb.music(TRACK[PLACES[g.p]]);
 }
@@ -539,7 +576,9 @@ function leavePlace(g, lb) {         // walking on out of the boss's arena: the 
   if (g.x < g.L.length + 30 || g.out) return;
   if (g.p === PLACES.length - 1) { g.mode = 'over'; g.won = true; bankRun(g, lb, true, g.lives * LIFE_BONUS); lb.win(); return; }   // step 5d: banked
   g.out = true; g.mode = 'card';
-  lb.placeCard(PLACES[g.p + 1], () => { lb.fade(0); loadPlace(g, lb, g.p + 1, 0); enterPlace(g, lb); }, () => { g.mode = 'ground'; g.mt = 0; });
+  const offer = drawGraces(g, lb);   // step 5e-3: after each of the first three bosses, a Grace, as the next place's card comes up
+  lb.placeCard(PLACES[g.p + 1], () => { lb.fade(0); loadPlace(g, lb, g.p + 1, 0); enterPlace(g, lb); }, () => { g.mode = 'ground'; g.mt = 0; },
+    offer.length ? { pick: { heading: 'Bind a twisted Grace', options: offer.map((x) => ({ id: x.id, name: x.name, line: x.line, pic: x.pic })), take: (id) => takeGrace(g, lb, id) } } : undefined);
 }
 function checkpoints(g, lb) {        // a checkpoint lights as he passes it, and becomes where he returns
   g.cps.forEach((cp, k) => {
@@ -648,11 +687,12 @@ function climbUpdate(g, lb, dt) {
 }
 function startRoll(g, lb) { g.mode = 'roll'; g.mt = 0; g.rollX = g.x; g.rollOn = 0; lb.sfx('roll'); }
 function rollUpdate(g, lb, dt) {
-  const s = Math.min(g.mt, ROLL_T) * lb.world.stepRate, m = lb.world.move('roll', s);
-  const r = g.mt < ROLL_T ? stepTo(g, g.rollX + g.facing * m.dx) : stepTo(g, g.x + g.facing * ROLL_ON * dt);
+  const rt = rollAt(g);                // step 5e-3: Fleet Foot rolls quicker, over the same ground
+  const s = Math.min(rt, ROLL_T) * lb.world.stepRate, m = lb.world.move('roll', s);
+  const r = rt < ROLL_T ? stepTo(g, g.rollX + g.facing * m.dx) : stepTo(g, g.x + g.facing * ROLL_ON * dt);
   if (r.drop) return startDrop(g);
   if (r.blocked) { g.rollX = g.x - g.facing * m.dx; g.rollOn = ROLL_ON_T; }   // against a face: he rolls on the spot
-  if (g.mt >= ROLL_T) {
+  if (rt >= ROLL_T) {
     // rolling through a ghoul or a walker: a roll that would end inside its body carries on until he is clear (4d-2b)
     const inside = r.blocked ? null : g.mons.find((q) => alive(q) && MON[q.kind].through && MON[q.kind].ground && overlapsBody(g, q));
     g.rollOn += dt;
@@ -723,7 +763,7 @@ function swordUpdate(g, lb, dt, i) {
 // every monster in front of him, from his feet to above his head, as far as the blade reaches; each takes 1, and half more for each
 // bite upgrade
 function swordHits(g, lb) {
-  const f = g.facing, reach = SWORD_REACH + REACH_UP * g.sword.reach, xa = g.x - 10 * f, xb = g.x + reach * f;
+  const f = g.facing, reach = swordReach(g), xa = g.x - 10 * f, xb = g.x + reach * f;
   const x0 = Math.min(xa, xb), x1 = Math.max(xa, xb), y0 = g.y - 135, y1 = g.y + 4;
   let hits = 0;
   for (const m of g.mons) {
@@ -731,10 +771,10 @@ function swordHits(g, lb) {
     const b = monBox(m);
     if (b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1) continue;
     hits++;
-    damage(g, lb, m, 1 + 0.5 * g.sword.bite, f);
+    damage(g, lb, m, swordBite(g), f);
   }
   const bb = bossBody(g);
-  if (bb && !(bb[1] < x0 || bb[0] > x1 || bb[3] < y0 || bb[2] > y1)) { hits++; bossDamage(g, lb, 1 + 0.5 * g.sword.bite); }
+  if (bb && !(bb[1] < x0 || bb[0] > x1 || bb[3] < y0 || bb[2] > y1)) { hits++; bossDamage(g, lb, swordBite(g)); }
   if (hits) lb.sfx('hit');
 }
 function damage(g, lb, m, n, dir) {    // a blow or a fireball: it flares and jolts (the kit's)
@@ -754,11 +794,11 @@ function defeat(g, lb, m) {            // card pieces and its wisp rising to the
 
 /* ---------- spells and mana (4d-3) ---------- */
 function hudMana(g, lb, now) { if (now || Math.abs(g.mana - g.manaShown) >= 0.01 || g.mana >= 1) { lb.hud.mana(g.mana); g.manaShown = g.mana; } }
-function hudSpells(g, lb) { const sp = g.spellList[g.sel]; lb.hud.spells(g.spellList.slice(), g.sel, sp ? SPELL[sp].cost : 0); }
+function hudSpells(g, lb) { const sp = g.spellList[g.sel]; lb.hud.spells(g.spellList.slice(), g.sel, sp ? spellCost(g, sp) : 0); }
 function switchSpell(g, lb) { if (g.spellList.length < 2) return; g.sel = (g.sel + 1) % g.spellList.length; hudSpells(g, lb); }
 // on the ground: the chosen spell, or, short of mana, the hand's light sputtering out (the kit's fizzle), nothing cast
 function startCast(g, lb) {
-  const sp = g.spellList[g.sel], cost = SPELL[sp].cost;
+  const sp = g.spellList[g.sel], cost = spellCost(g, sp);
   g.castBuf = 0; g.mode = 'cast'; g.mt = 0;
   if (g.mana < cost - 1e-6) { g.cast = { move: 'fizzle', spell: sp, done: false }; return; }
   g.mana -= cost; hudMana(g, lb, true);
@@ -768,7 +808,7 @@ function castUpdate(g, lb, dt) {
   const c = g.cast, s = g.mt * lb.world.stepRate, steps = lb.world.move(c.move, 0).steps;
   if (!c.done && c.move === 'heal') {  // the heal: a pale gold glow rises round him as the hand goes up (its "go" step)
     c.done = true; g.healT = 0; lb.sfx('heal');
-    g.health = Math.min(1, g.health + SPELL.heal.amount[g.spells.heal]); lb.hud.health(g.health);
+    g.health = Math.min(1, g.health + SPELL.heal.amount[g.spells.heal] + (g.graces.kindled ? GRACE.kindled : 0)); lb.hud.health(g.health);
   }
   if (!c.done && s >= 1) {             // the throw (the fireball leaves on its "thr" step), or the fizzle's spark
     c.done = true;
@@ -1189,7 +1229,9 @@ function hurtCheck(g, lb) {
   if (hit) return hurt(g, lb, hit.dmg, hit.x);
 }
 function hurt(g, lb, dmg, fromX) {
-  g.safeT = SAFE_T; g.hurtT = 0; g.atkBuf = 0;
+  g.safeT = SAFE_T;
+  if (g.graces.ward && !g.warded) { g.warded = true; return; }   // step 5e-3: Lantern Ward ignores the first hit in each place (its second of safety follows)
+  g.hurtT = 0; g.atkBuf = 0;
   // armour (Barney, 7 November 2026): each pip held takes ARMOUR_CUT off the hit, and no pip is lost; they last until the run ends
   g.health = Math.max(0, g.health - dmg * (1 - ARMOUR_CUT * Math.min(3, g.armour))); lb.hud.health(g.health); g.hurtKind = 'health'; lb.sfx('hurt');
   if (g.health <= 0.001) return startLost(g, lb, 'health', null);
@@ -1363,7 +1405,7 @@ function monsterUpdate(m, g, lb, dt, busy) {
     }
     goal = g.x - m.f * (m.cd <= 0 ? K.range * 0.8 : K.keep);   // in to striking range, or holding off while it gathers itself
   } else {
-    const keep = SWORD_REACH + REACH_UP * g.sword.reach + halfW(m) + 14, away = m.bx >= g.x ? 1 : -1;
+    const keep = swordReach(g) + halfW(m) + 14, away = m.bx >= g.x ? 1 : -1;
     if (!m.pdir) m.pdir = away;
     if (m.bx <= m.patch[0] + 6) m.pdir = 1;                    // (6: more than the 4 lines that count as arrived)
     if (m.bx >= m.patch[1] - 6) m.pdir = -1;
@@ -1446,7 +1488,7 @@ function drawWanderer(g, lb, w) {
       const c = g.climb, s = Math.min(g.mt * R, c.steps - 1e-3), m = w.move('climb', s);
       return w.wanderer(c.foot + f * m.dx, o({ move: 'climb', step: s, y: c.y0 + 1 + m.dy * c.scale }));
     }
-    case 'roll': return w.wanderer(g.x, o({ move: 'roll', step: g.mt < ROLL_T ? g.mt * R : 3 + ((g.mt - ROLL_T) * R) % 1 }));   // carrying on: tumbling still
+    case 'roll': { const rt = rollAt(g); return w.wanderer(g.x, o({ move: 'roll', step: rt < ROLL_T ? rt * R : 3 + ((rt - ROLL_T) * R) % 1 })); }   // carrying on: tumbling still
     case 'sword': return w.wanderer(g.x, o({ move: 'sword', step: Math.min(g.mt * R, 3.99) }));
     case 'hurt': return w.wanderer(g.x, o({ move: 'hurt', step: Math.min(g.mt * R, 2.99) }));
     case 'cast': {                     // heal, the fireball's throw, or the fizzle (its sparks from the "fiz" step)

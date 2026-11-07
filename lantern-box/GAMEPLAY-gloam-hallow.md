@@ -114,7 +114,7 @@ Phase 5 (PRD question 7; design round 2, Barney, 7 November 2026). After each of
 | Spell Surge | Your attack spell costs less mana. |
 | Lantern Ward | The first hit in each place is ignored. |
 
-Not decided yet; Claude Code sets starting values for Barney to tune: how much deeper, further, faster and less. At Full Launch only, an ad offers a second pick at the same moment, so nothing comes only from an ad.
+Not decided yet; Claude Code sets starting values for Barney to tune: how much deeper, further, faster and less. As built in step 5e-3 (*starting figures*): Keen Edge one sword bite level more (half a blow); Long Reach one reach level more (9 lines); Deep Well mana twice as fast; Iron Skin full armour at once and at the start of each place; Fleet Foot rolls 1.3 times quicker over the same ground; Kindled Heal 15% of health more; Spell Surge the attack spell at 70% of its mana; Lantern Ward the first hit in each place ignored. Weights: Keen Edge, Long Reach, Fleet Foot 3; Kindled Heal, Spell Surge 2; Deep Well, Iron Skin, Lantern Ward 1 (a common card is among the three about half the time, a rare one about a fifth). At Full Launch only, an ad offers a second pick at the same moment, so nothing comes only from an ad.
 
 ## Monsters
 

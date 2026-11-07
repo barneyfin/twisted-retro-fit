@@ -1,4 +1,4 @@
-/* Lantern Box 0.12 — runtime
+/* Lantern Box 0.13 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.12.0';
+  const VERSION = '0.13.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -5173,7 +5173,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     }
     function syncHud() {
       if (!hudNodes) return;
-      if (hudNodes.full) { HUD8.OPTS.rm = !!settings.reduceMotion; HUD8.OPTS.fxOff = !(settings.effects && pictureLevel() !== 'fastest'); HUD8.set(hudNodes.full, h8State()); return; }
+      if (hudNodes.full) { HUD8.OPTS.rm = !!settings.reduceMotion; HUD8.OPTS.fxOff = !(settings.effects && pictureLevel() !== 'fastest'); HUD8.set(hudNodes.full, h8State()); syncPick(); return; }
       const pc = (f) => Math.round(clamp(f, 0, 1) * 100);
       hudNodes.health.style.setProperty('--v', pc(state.health) + '%');
       if (hudNodes.mana) hudNodes.mana.style.setProperty('--v', pc(state.mana) + '%');
@@ -5216,6 +5216,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       }
       const c = h8.card;
       if (c) {
+        if (c.pick && !c.taken && T - c.t0 > CARD_HOLD) c.t0 = T - CARD_HOLD;   // kit 0.13.0: the card holds, play stopped, until one is taken
         const t = T - c.t0;
         if (t >= 0.9 && !c.called) { c.called = true; if (c.onBlack) c.onBlack(); }
         if (t >= 3) { h8.card = null; if (c.onDone) c.onDone(); }
@@ -5277,7 +5278,47 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     };
     function fade(a) { h8.fade = clamp(+a || 0, 0, 1); if (!h8.card) fadeEl.style.opacity = String(h8.fade); }   // black over the picture
     // the place card (3 s, play stopped: the game holds its play until onDone): onBlack once it is dark (0.9 s), to move the world to the next place
-    function placeCard(place, onBlack, onDone) { h8.card = { place: place, t0: state.time, onBlack: onBlack || null, onDone: onDone || null, called: false }; sfx('placeCard'); syncHud(); }   // with its low toll
+    // kit 0.13.0 (design system version 12, GracePick): placeCard(place, onBlack, onDone, { pick: { heading, options: [{ id, name, line, pic }],
+    // take(id) } }): the cards appear with the card's plaque, under it; the card holds, play stopped, once it is up (1.2 s) until one is
+    // taken (left and right choose, Enter takes; a click or a tap takes one at once), then runs on as usual
+    function placeCard(place, onBlack, onDone, o) { h8.card = { place: place, t0: state.time, onBlack: onBlack || null, onDone: onDone || null, called: false, pick: o && o.pick && Array.isArray(o.pick.options) && o.pick.options.length ? o.pick : null, sel: 0, taken: false }; sfx('placeCard'); syncHud(); }   // with its low toll
+    const CARD_HOLD = 1.2, CARD_UP = 0.9;
+    const picking = () => { const c = h8.card; return !!(c && c.pick && !c.taken && state.time - c.t0 >= CARD_UP); };
+    function pickSelect(i) { const c = h8.card; if (!picking() || !pickEl) return; c.sel = clamp(i, 0, c.pick.options.length - 1); [...pickEl.querySelectorAll('.lb-grace')].forEach((b, k) => { b.classList.toggle('is-selected', k === c.sel); b.setAttribute('aria-checked', k === c.sel ? 'true' : 'false'); }); sfx('select'); }
+    function pickTake(i) {
+      const c = h8.card;
+      if (!picking()) return;
+      if (i != null) c.sel = clamp(i, 0, c.pick.options.length - 1);
+      c.taken = true;
+      if (pickEl) [...pickEl.querySelectorAll('.lb-grace')].forEach((b, k) => { b.classList.toggle('is-selected', k === c.sel); b.setAttribute('aria-checked', k === c.sel ? 'true' : 'false'); });
+      sfx('confirm');
+      try { c.pick.take(c.pick.options[c.sel].id); } catch (e) { reportError(e); }
+    }
+    let pickEl = null;
+    function syncPick() {   // the pick's plaque parts, inside the place card, while it shows
+      const cardEl = hudNodes && hudNodes.full && hudNodes.full.querySelector('.lb-card');
+      const c = h8.card, want = !!(cardEl && c && c.pick);
+      if (!want) { if (pickEl) { pickEl.remove(); pickEl = null; } if (cardEl) cardEl.classList.remove('has-pick'); return; }
+      if (pickEl && pickEl.parentElement === cardEl) return;
+      const p = c.pick, phone = V.phone;
+      pickEl = el('div', 'lb-grace-pick');
+      pickEl.setAttribute('role', 'radiogroup');
+      pickEl.setAttribute('aria-labelledby', 'lb-gp-h');
+      const h = txt('p', 'lb-flag', p.heading || 'Choose one');
+      h.id = 'lb-gp-h';
+      const row = el('div', 'lb-graces' + (phone ? ' is-phone' : ''));
+      p.options.forEach((op, k) => {
+        const b = el('button', 'lb-grace' + (k === c.sel ? ' is-selected' : ''), '<svg class="pic" viewBox="0 0 30 30" aria-hidden="true">' + (op.pic || '') + '</svg><span class="nm"></span><span class="ln"></span>');
+        b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', k === c.sel ? 'true' : 'false');
+        b.querySelector('.nm').textContent = op.name; b.querySelector('.ln').textContent = op.line || '';
+        b.addEventListener('click', () => { b.blur(); pickTake(k); });
+        row.append(b);
+      });
+      pickEl.append(h, row);
+      if (!touch && !phone) { const hint = el('p', 'lb-hint', kbd('left') + ' ' + kbd('right') + ' choose \u00b7 ' + kbd('Enter') + ' take'); hint.style.textAlign = 'center'; pickEl.append(hint); }
+      cardEl.classList.add('has-pick');
+      cardEl.append(pickEl);
+    }
     const placing = () => !!h8.card;
     function resetH8() {   // a new run (or the title): three lives, no armour, no spells, no potions kept, nothing showing
       Object.assign(h8, { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0, potions: { health: 0, mana: 0 }, potCap: { health: 1, mana: 1 }, potFx: { health: null, mana: null } });
@@ -6421,6 +6462,14 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         if (GAME_CODES.has(e.code) || e.code.indexOf('Arrow') === 0) e.preventDefault();
         if (stale.has(e.code)) return;
         if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); if (!e.repeat) pause(); return; }
+        if (picking()) {   // kit 0.13.0: a pick under the place card takes the keys: left and right choose, Enter (or Space) takes
+          e.preventDefault();
+          if (e.repeat) return;
+          if (e.code === 'ArrowLeft' || e.code === 'KeyA') pickSelect(h8.card.sel - 1);
+          else if (e.code === 'ArrowRight' || e.code === 'KeyD') pickSelect(h8.card.sel + 1);
+          else if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') pickTake();
+          return;
+        }
         if (!e.repeat && !keys.has(e.code)) justKeys.add(e.code);
         keys.add(e.code);
         return;
@@ -6616,7 +6665,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
          lb.run is the run being played; lb.hud.potions(health, mana) takes counts and lb.hud.potCap(health, mana) the sockets bought (a pip
          under each socket once there are two); world.belt(name) chooses the wanderer's belt.
        Kit 0.12.0: world.bolt(x1, y1, x2, y2, { t, seed, fork }), world.acid(x, y, { facing, t }) and world.acidPatch(x0, x1, { y, t }): version 12's
-         lightning bolt and acid spray (play.js 1.2.0); world.LOOT has their scrolls ('bolt', 'acid'), and the HUD's spell socket takes them. */
+         lightning bolt and acid spray (play.js 1.2.0); world.LOOT has their scrolls ('bolt', 'acid'), and the HUD's spell socket takes them.
+       Kit 0.13.0: lb.placeCard(place, onBlack, onDone, { pick: { heading, options: [{ id, name, line, pic }], take(id) } }) shows a pick under
+         the card's plaque (GracePick), holding the card until one is taken. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
@@ -6676,6 +6727,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       showGameOver: showGameOver, openSettings: openSettings, openScores: openScores, openInitials: openInitials,
       openHowTo: openHowTo, showWin: showWin, h8: state.h8, snd: SND8, openTesting: openTesting,
       showRunEnd: showRunEnd, openCredits: openCredits, openClear: openClear, clearProgress: () => clearProgress(), layout: LAYOUT,   // kit 0.10.0
+      pickTake: (i) => pickTake(i), get card() { return h8.card; },   // kit 0.13.0
       setScores: (table) => { if (Array.isArray(table)) store.set(scoreKey(), table); else store.remove(scoreKey()); },   // kit 0.10.0: the test page's sample tables
       get runEnd() { return runEndInfo; }
     };

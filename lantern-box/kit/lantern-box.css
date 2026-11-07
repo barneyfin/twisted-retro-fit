@@ -801,6 +801,16 @@
 .lb-shrine-row.is-soon{min-height:0;padding-top:8px;padding-bottom:0}
 .lb-shrine-row.is-soon .lb-spell{width:36px;height:36px}
 
+/* kit 0.13.0: the Grace pick under the place card's plaque (GracePick, version 12): the card and the pick stacked and centred, the card's
+   plaque as the preview draws it beside the pick */
+.lb-card.has-pick{display:flex;flex-direction:column;align-items:center;gap:16px}
+.lb-card.has-pick>.lb-plaque{min-width:300px}
+.lb-card.has-pick>.lb-plaque>.lb-face{padding:14px 32px 12px;gap:8px}
+.lb-card .lb-grace-pick{width:700px;pointer-events:auto}
+.lb-hud.is-phone .lb-card.has-pick{gap:12px}
+.lb-hud.is-phone .lb-card.has-pick>.lb-plaque>.lb-face{padding:10px 26px 10px;gap:8px}
+.lb-hud.is-phone .lb-card .lb-grace-pick{width:760px}
+
 /* ---------- The shell: where the screens sit ---------- */
 html,body{margin:0;height:100%;background:var(--ink);overflow:hidden}
 .lb-root{position:fixed;inset:0;overflow:hidden;background:var(--ink);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
