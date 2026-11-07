@@ -42,7 +42,9 @@
    Step 5e-3 (kit 0.13.0): the Graces: after each of the first three bosses, the next place's card holds for "Bind a twisted Grace", three
    drawn from the deck by their weights, never one already held; each lasts the run.
    Step 5e-4 (kit 0.14.0): teaching in play on a first run, and again after Clear saved progress: walk, jump and attack as Night's card
-   lifts; cast, roll and drink the first time each matters; H or Hide hints hides them for good. */
+   lifts; cast, roll and drink the first time each matters; H or Hide hints hides them for good.
+   Step 5e-5 (kit 0.15.0): the win's three lines and the second loop: Go round again carries the run on at Night, harder, its hill sections
+   shuffled, echo doubled; the run's echo banks at Finish or at the run's end. */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
 const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
@@ -63,7 +65,11 @@ const CLIMB_MIN = 40, CLIMB_MAX = 135;   // the faces a climb takes: a jump clea
 const JUMP_CLIMB = 66;           // jump pressed at the foot of a face higher than this climbs it (a standing jump only just clears 67 to 73)
 const ROLL_T = 0.5;              // the roll: 6 puppet steps, 82 lines
 const LIVES = 3;
-const LIFE_BONUS = 10;           // echo for each life still lit at the win (the win's words below)
+const LIFE_BONUS = 10;
+// the second loop (step 5e-5; the gameplay note's How it gets harder): monsters take 1.5 times the hits and come 1.2 times faster, bosses have
+// 1.5 times the health, echo is doubled (all starting figures but the doubling)
+const HARD = { hits: 1.5, speed: 1.2, boss: 1.5, echo: 2 };
+const hard = (g, k) => (g.loop === 2 ? HARD[k] : 1);           // echo for each life still lit at the win (the win's words below)
 const RETURN_AT = 46;            // he forms again this far past the checkpoint that brought him back
 
 // Fighting (4d-2a; starting figures)
@@ -429,7 +435,9 @@ LanternBox.game({
   potions: true,   // kit 0.9.0: the potion sockets
   howTo: { goal: ['Cut your path through four blighted lands, felling the terror bound to each. Sever the roots of The Gaping Tree to break the night.',
     'Three chances to break the dark. Fall, and return to the glow of your last lit lantern.'] },
-  win: { heading: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.', lifeBonus: LIFE_BONUS },
+  // step 5e-5 (design system version 12, WinCard): the three lines, and Barney's line offering the second loop
+  win: { heading: 'A grim triumph.', lead: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.',
+    loop: 'Fell The Wandering Rot to begin anew\u2014walk the cursed path once more against darker terrors.', lifeBonus: LIFE_BONUS },
   music: [{ data: window.GLOAM_HALLOW_MUSIC_1 }, { data: window.GLOAM_HALLOW_MUSIC_2 }],
   place: 'night',
   // step 5d (kit 0.10.0): saved progress through the kit, its Clear's words, and Credits
@@ -445,6 +453,7 @@ LanternBox.game({
     { id: 'teach', name: 'Teaching in play', choices: [['saved', 'First run only'], ['always', 'Always']] },   // step 5e-4
     { id: 'spell', name: 'Attack spell', choices: [['shrine', 'As chosen'], ['fire', 'Fireball'], ['bolt', 'Lightning bolt'], ['acid', 'Acid spray']] },   // step 5e-2
     { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
+    { id: 'loop', name: 'Loop', choices: [['1', 'The first'], ['2', 'The second, harder']] },   // step 5e-5
     { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
     { id: 'mons', name: 'Monsters', choices: [['normal', 'Normal'], ['none', 'None'], ['crowd', 'A crowd']] },
     { id: 'safe', name: "Can't be hurt", toggle: true, note: 'Nothing takes health, armour or lives.' },
@@ -471,12 +480,14 @@ LanternBox.game({
     g.zaps = []; g.sprays = []; g.patches = [];   // step 5e-2: the bolts, the sprays and the patches on the ground
     g.graces = {}; g.warded = false;              // step 5e-3: the Graces held this run, and Lantern Ward used in this place
     g.teach = t.teach === 'always' || (!rec.played && !rec.hintsHidden); g.taught = {};   // step 5e-4: teaching in play on a first run
+    g.loop = t.loop === '2' ? 2 : 1;               // step 5e-5: the first loop, each place in its own order (Testing can start in the second)
+    g.orders = g.loop === 2 ? PLACES.map((p) => shuffledOrder(lb, lb.world.level(p).order)) : null;
     lb.world.belt(rec.belt);
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
     lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); hudSpells(g, lb); lb.hud.potCap(g.potCap.health, g.potCap.mana); lb.hud.potions(0, 0);
     lb.fade(1);   // black until the first place card lifts
-    lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; if (g.teach) startTeaching(g, lb); });
+    lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; if (g.teach) startTeaching(g, lb); if (g.loop === 2) lb.hud.line(null, 'Again, harder'); });
     return g;
   },
 
@@ -561,7 +572,7 @@ function moveUpdate(g, lb, dt) {
 /* ---------- places ---------- */
 function loadPlace(g, lb, p, ci) {   // the place's level and its checkpoints; ci: start at its first, second or third checkpoint (Testing)
   g.p = p;
-  g.L = lb.world.level(PLACES[p]);
+  g.L = g.orders ? lb.world.level(PLACES[p], g.orders[p]) : lb.world.level(PLACES[p]);   // step 5e-5: the second loop's shuffled sections
   g.pieces = g.L.pieces();
   g.cps = g.L.checkpoints.map((c, k) => ({ x: c.x, lit: k < ci || (ci > 0 && k === ci) ? true : null }));
   g.lastCp = ci;
@@ -570,6 +581,22 @@ function loadPlace(g, lb, p, ci) {   // the place's level and its checkpoints; c
   spawnMonsters(g, lb);
   placeLoot(g, lb);
   g.boss = newBoss(g);
+}
+// the second loop (step 5e-5): the same run carries on at Night, harder, each place's hill sections shuffled (never the same one twice running)
+function shuffledOrder(lb, order) {
+  const a = order.split('');
+  for (let tries = 0; tries < 200; tries++) {
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(lb.rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    if (a.every((c, i) => i === 0 || c !== a[i - 1])) return a.join('');
+  }
+  return order;
+}
+function startLoop(g, lb) {
+  g.loop = 2;
+  g.orders = PLACES.map((p) => shuffledOrder(lb, lb.world.level(p).order));
+  g.mode = 'card'; g.out = false; g.boss = null;
+  lb.placeCard(PLACES[0], () => { lb.fade(0); loadPlace(g, lb, 0, 0); enterPlace(g, lb); },
+    () => { g.mode = 'ground'; g.mt = 0; lb.hud.line(null, 'Again, harder'); });   // the second loop begins: its plaque line
 }
 function enterPlace(g, lb) {         // once the place card's black is down: the place's sound and track
   g.out = false;
@@ -580,9 +607,16 @@ function enterPlace(g, lb) {         // once the place card's black is down: the
 }
 function leavePlace(g, lb) {         // walking on out of the boss's arena: the next place's card, or after the Mist the win
   if (g.x < g.L.length + 30 || g.out) return;
-  if (g.p === PLACES.length - 1) { g.mode = 'over'; g.won = true; bankRun(g, lb, true, g.lives * LIFE_BONUS); lb.win(); return; }   // step 5d: banked
+  if (g.p === PLACES.length - 1) {   // the win (step 5e-5): after the first loop it offers the second, and Finish banks the run; after the second, banked now
+    g.mode = 'over'; g.won = true;
+    const o = { scored: g.run === 'bare', shrine: { bank: lb.progress.echo } };
+    if (g.loop === 1) Object.assign(o, { offer: true, again: () => startLoop(g, lb), finish: () => bankRun(g, lb, true) });
+    else bankRun(g, lb, true, g.lives * LIFE_BONUS);
+    lb.win(o);
+    return;
+  }
   g.out = true; g.mode = 'card';
-  const offer = drawGraces(g, lb);   // step 5e-3: after each of the first three bosses, a Grace, as the next place's card comes up
+  const offer = g.loop === 1 ? drawGraces(g, lb) : [];   // step 5e-3: after each of the first three bosses, a Grace (5e-5: not in the second loop), as the next place's card comes up
   lb.placeCard(PLACES[g.p + 1], () => { lb.fade(0); loadPlace(g, lb, g.p + 1, 0); enterPlace(g, lb); }, () => { g.mode = 'ground'; g.mt = 0; },
     offer.length ? { pick: { heading: 'Bind a twisted Grace', options: offer.map((x) => ({ id: x.id, name: x.name, line: x.line, pic: x.pic })), take: (id) => takeGrace(g, lb, id) } } : undefined);
 }
@@ -791,7 +825,7 @@ function damage(g, lb, m, n, dir) {    // a blow or a fireball: it flares and jo
 }
 function defeat(g, lb, m) {            // card pieces and its wisp rising to the score (the kit's, 1.6 s); the echo counts as it arrives
   m.st = 'defeat'; m.t = 0; m.atk = null; m.wdx = 0; m.ody = 0; m.beatenAt = lb.time;
-  const n = MON[m.kind].wisps;
+  const n = MON[m.kind].wisps * hard(g, 'echo');   // step 5e-5: doubled in the second loop
   lb.sfx('defeat', n);                 // step 5d: the card tearing, then its wisp's echo, louder the more echo it gives
   g.echoDue += n;
   lb.after(0.9, () => { if (g.banked) return; g.echoDue -= n; lb.addWisps(n); });
@@ -930,7 +964,7 @@ function drawPatches(g, lb, w) { for (const p of g.patches) if (p.t >= 0) w.acid
 const ease3 = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v)), lerp3 = (a, b, v) => a + (b - a) * v, win3 = (u, a, b) => (u >= a && u < b ? (u - a) / (b - a) : null);
 function newBoss(g) {
   const P = PLACES[g.p], B = BOSS[P];
-  return { st: 'wait', place: P, name: '', hp: B.hp, max: B.hp, bx: g.L.length - B.at, f: 1, move: null, rest: 1.2, t: 0, hitT: null,
+  return { st: 'wait', place: P, name: '', hp: B.hp * hard(g, 'boss'), max: B.hp * hard(g, 'boss'), bx: g.L.length - B.at, f: 1, move: null, rest: 1.2, t: 0, hitT: null,
     last: null, lock: false };
 }
 function bossUpdate(g, lb, dt) {
@@ -1099,8 +1133,9 @@ function bossDamage(g, lb, n) {
   // beaten: its card pieces and golden wisp, the bar goes, its sure drop, and its crawlers break up with it
   b.st = 'defeat'; b.t = 0; b.move = null;
   lb.sfx('bossDefeated'); lb.hud.boss(null);
-  g.echoDue += BOSS_WISPS;
-  lb.after(1.2, () => { if (g.banked) return; g.echoDue -= BOSS_WISPS; lb.addWisps(BOSS_WISPS); lb.sfx('echo', BOSS_WISPS); });   // step 5d: its golden wisp's echo
+  const bossEcho = BOSS_WISPS * hard(g, 'echo');   // step 5e-5: doubled in the second loop
+  g.echoDue += bossEcho;
+  lb.after(1.2, () => { if (g.banked) return; g.echoDue -= bossEcho; lb.addWisps(bossEcho); lb.sfx('echo', bossEcho); });   // step 5d: its golden wisp's echo
   g.mons.forEach((m) => { if (m.summoned && alive(m)) { m.st = 'defeat'; m.t = 0; m.atk = null; m.beatenAt = lb.time; } });
   const can = [];
   const atk = g.attack;   // step 5e-2: the run's attack spell
@@ -1352,7 +1387,7 @@ function makeMonster(g, kind, x0, n, near) {
   return m;
 }
 function resetMonster(g, m) {          // at its place, whole, waiting to be seen
-  Object.assign(m, { st: 'live', bx: m.sx, by: m.sy, f: -1, hp: MON[m.kind].hp, atk: null, cd: 0.6, hitT: null, awake: false, walkT: 0,
+  Object.assign(m, { st: 'live', bx: m.sx, by: m.sy, f: -1, hp: MON[m.kind].hp * hard(g, 'hits'), atk: null, cd: 0.6, hitT: null, awake: false, walkT: 0,
     moving: false, wdx: 0, ody: 0, beatenAt: null, rush: 0 });
   place(m, g, m.bx, 0);
 }
@@ -1406,7 +1441,8 @@ function monsterUpdate(m, g, lb, dt, busy) {
       return;
     }
     const goal = g.x - m.f * K.near[m.alt ? 1 : 0];      // the two heights hang at two distances, so flyers don't sit on each other
-    m.bx += Math.max(-K.speed * dt, Math.min(K.speed * dt, goal - m.bx));
+    const sp = K.speed * hard(g, 'speed');   // step 5e-5: faster in the second loop
+    m.bx += Math.max(-sp * dt, Math.min(sp * dt, goal - m.bx));
     place(m, g, m.bx, 0);
     return;
   }
@@ -1448,6 +1484,7 @@ function monsterUpdate(m, g, lb, dt, busy) {
   m.moving = want || (m.kind === 'hatmaw' && m.walkT > 0);
   if (m.patrol) v *= 0.6;              // walking its stretch, it goes slower than it comes at him
   if (m.rush > 0) { m.rush -= dt; if (want) v = Math.max(v, K.speed * (m.kind === 'hatmaw' ? 1.3 : 1.8)); }   // struck: it rushes in to strike back
+  v *= hard(g, 'speed');               // step 5e-5: faster in the second loop
   const s = Math.sign(goal - m.bx);
   let nx = m.bx + s * Math.min(Math.abs(goal - m.bx), v * dt);
   let bumped = false;

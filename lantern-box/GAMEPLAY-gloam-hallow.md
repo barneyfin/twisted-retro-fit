@@ -45,7 +45,7 @@ The modes screen's earlier mode, The Wandering Rot, gives way to these two runs;
 - **A lost life** refills health and mana. Spells learnt, sword upgrades and armour are kept (armour since Barney's play of step 5d, 7 November 2026).
 - **Game over** (phase 5): the run's end. The run's echo is banked as stolen echo, whatever happened; the score stays this run's echo, and spending never lowers a high score.
 - **The win**: beating The Gaping Tree. The win screen counts the lives bonus into the score.
-- **The second loop** (built before submission, PRD question 8): the win screen offers "Go round again". The same run carries on at Night, harder, with the score still counting; each place's hill sections are shuffled. It is the reward for finishing; it no longer unlocks Hysteria.
+- **The second loop** (built before submission, PRD question 8): the win screen offers "Go round again". The same run carries on at Night, harder, with the score still counting; each place's hill sections are shuffled. It is the reward for finishing; it no longer unlocks Hysteria. As built in step 5e-5: Go round again keeps the score (the lives' bonus counted in), the lives, armour, Graces, spells and potions, and banks nothing; Finish banks the run. The second loop offers no Graces, and its win offers no third loop: it banks at once, with the lives' bonus.
 - **No timer** in The Wandering Rot.
 
 ## Health, mana, armour
@@ -151,7 +151,7 @@ A defeated boss always drops a sword upgrade or a spell scroll, besides its gold
 | Blood Red Rain | More kinds, more at once |
 | Dawn | The walkers join |
 | Mist | The most at once: up to **8** on screen (the speed test's crowd) |
-| Second loop | Monsters take more hits and come faster; echo doubled; each place's hill sections shuffled |
+| Second loop | Monsters take more hits and come faster; echo doubled; each place's hill sections shuffled. As built in step 5e-5: monsters take 1.5 times the hits (a crawler 3, a Hat-maw 4.5) and walk and fly 1.2 times faster; bosses have 1.5 times the health; no section twice running |
 
 ## Loot
 

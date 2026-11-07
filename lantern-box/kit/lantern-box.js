@@ -1,4 +1,4 @@
-/* Lantern Box 0.14 — runtime
+/* Lantern Box 0.15 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.14.0';
+  const VERSION = '0.15.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -6001,18 +6001,125 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       if (c.n < lives) setTimeout(step, c.n ? 500 : 700);
       return { panel: panel, items: items, opts: opts };
     }
-    function showWin() {
+    /* kit 0.15.0 (design system version 12, WinCard): with win: { heading, lead, line, loop, lifeBonus } in the config, the three lines one at a
+       time with the win's three bells (0, 0.7 and 1.4 s, each instantly), the score at 2.1 s, each lit lantern counted in from 2.6 s, half a
+       second apart; then from 3.6 s, when the buttons take input, the second loop's offer (lb.win({ offer: true })): the loop line over Go
+       round again and Finish. Finish, or a win with no offer, goes on as game over does: Continue to the initials for a top-ten score,
+       otherwise the run's end's buttons (Play again, Echo Shrine, Menu). lb.win(o): o.scored (false: never on the high scores), o.shrine
+       (the Echo Shrine's button), o.offer, o.again(lb) (the run carries on, its score with the lives counted in: the game sets up the loop),
+       o.finish(lb, total) (the game banks the run). Without win.lead, the version 8 card as before. */
+    let winInfo = null;
+    function win12Dialog() {
+      const W = winInfo, phone = V.phone, bonus = winWords.lifeBonus == null ? 10 : winWords.lifeBonus;
+      const { panel, face } = plaque('lb-wn-t', 470, 700, phone ? 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;align-items:center;padding:18px 20px' : 'gap:9px;padding:20px 22px 16px', phone ? '' : 'is-centred');
+      const at = (e, t) => { e.dataset.at = String(t); return e; };
+      const h = at(heading('lb-wn-t', winWords.heading), 0); h.classList.add('is-win');
+      const lead = at(txt('p', 'lb-win-line is-lead', winWords.lead), 0.7);
+      const line = at(txt('p', 'lb-win-line', winWords.line || ''), 1.4);
+      const rule = at(el('div', '', RULE).firstChild, 2.1);
+      const result = at(el('div', 'lb-result'), 2.1);
+      if (W.newBest) result.append(txt('p', 'lb-flag', 'New best'));
+      const num = txt('p', 'lb-num lb-score-xl', String(W.base + W.n * bonus));
+      result.append(num, txt('p', 'lb-unit', 'echo'));
+      const lanterns = el('span', 'lanterns');
+      for (let i = 0; i < Math.max(3, W.lives); i++) { const l = el('span', '', HUD8.ICON.life()).firstChild; if (i >= W.lives) l.classList.add('is-out'); lanterns.append(l); }
+      const plus = txt('span', 'plus', '+' + W.n * bonus);
+      const bon = at(el('p', 'lb-bonus', 'Lives left '), 2.1);
+      bon.append(lanterns, plus);
+      // what follows the count: the offer, or the end's buttons
+      const items = [], tail = [], opts = {};
+      let hint = null;
+      const endAt = W.finished ? 0 : 3.6;
+      if (W.stage === 'offer') {
+        const loopLine = at(txt('p', 'lb-win-loop', winWords.loop || ''), 3.6);
+        const again = at(button('Go round again', true, true), 3.6), fin = at(button('Finish'), 3.6);
+        again.style.width = '100%'; fin.style.width = '100%';
+        items.push({ el: again, activate: winAgain }, { el: fin, activate: winFinish });
+        tail.push(loopLine, again, fin);
+        hint = kbd('Enter') + ' go round again';
+      } else if (W.qualifies) {
+        const cont = at(button('Continue', true), endAt);
+        cont.style.width = '100%';
+        items.push({ el: cont, activate: () => { sfx('confirm'); openInitials(); } });
+        tail.push(cont);
+        hint = kbd('Enter') + ' continue to your initials';
+      } else {
+        const again = at(button('Play again', true, true), endAt), btns = at(el('div', 'lb-btns'), endAt);
+        again.style.width = '100%';
+        items.push({ el: again, activate: startOver });
+        if (W.o.shrine) { const sh = button('Echo Shrine'); btns.append(sh); items.push({ el: sh, activate: () => goShrine(() => { sfx('back'); state.screen = 'over'; showDialog(win12Dialog); }, asObject(W.o.shrine).bank) }); }
+        const menu = button('Menu'); btns.append(menu); items.push({ el: menu, activate: toMenu });
+        tail.push(again, btns);
+        hint = kbd('Enter') + ' play again \u00b7 ' + kbd('Backspace') + ' menu';
+        opts.back = toMenu;
+      }
+      const hintEl = !touch && !phone && hint ? at(el('p', 'lb-hint', hint), W.stage === 'offer' ? 3.6 : endAt) : null;
+      if (hintEl) hintEl.style.textAlign = 'center';
+      if (phone) {
+        const a = el('div'); a.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center'; a.append(h, lead, line, rule);
+        const b = el('div'); b.style.cssText = 'display:flex;flex-direction:column;gap:9px'; b.append(result, bon, ...tail);
+        face.append(a, b);
+      } else { face.append(h, lead, line, rule, result, bon, ...tail); if (hintEl) face.append(hintEl); }
+      // the buttons wait until 3.6 s; each part shows at its moment, and the lanterns count in from 2.6 s
+      opts.until = W.finished ? 0 : W.t0 + 3600;
+      const back = opts.back;
+      if (back) opts.back = () => { if (performance.now() >= opts.until) back(); };
+      const lit = [...lanterns.children].slice(0, W.lives);
+      const paint = () => {   // the parts due by now, and the lanterns counted so far; carries on if the plaque is built again
+        const u = (performance.now() - W.t0) / 1000;
+        panel.querySelectorAll('[data-at]').forEach((e) => { const v = u >= +e.dataset.at ? '' : 'hidden'; if (e.style.visibility !== v) e.style.visibility = v; });
+        const want = u < 2.6 ? 0 : Math.min(W.lives, Math.floor((u - 2.6) / 0.5) + 1);
+        while (W.n < want) {
+          const l = lit[W.n]; W.n++;
+          num.textContent = String(W.base + W.n * bonus); plus.textContent = '+' + W.n * bonus; state.score = W.base + W.n * bonus; syncHud(); sfx('blip');
+          if (l) { l.style.filter = 'brightness(1.35)'; setTimeout(() => { l.style.filter = ''; }, 300); }   // as WinCard's preview: once, 0.3 s
+        }
+        return u;
+      };
+      clearTimeout(W.timer);
+      const step = () => { if (winInfo !== W || !panel.isConnected) return; if (paint() < 4) W.timer = setTimeout(step, 40); };
+      if (paint() < 4) W.timer = setTimeout(step, 40);   // painted now, before the plaque is on the page, so nothing shows early
+      return { panel: panel, items: items, opts: opts };
+    }
+    function winAgain() {   // Go round again: the run carries on, its score with the lives counted in
+      const W = winInfo;
+      if (!W) return;
+      sfx('confirm');
+      winInfo = null;
+      state.score = W.total;
+      closeDialog();
+      state.screen = 'play'; state.over = false; state.ending = false;
+      resetInput(); lastFrame = performance.now(); acc = 0; syncHud();
+      if (W.o.again) { try { W.o.again(api); } catch (e) { reportError(e); } }
+    }
+    function winFinish() {   // Finish: as game over goes on
+      const W = winInfo;
+      if (!W) return;
+      sfx('confirm');
+      state.score = W.total; W.n = W.lives; W.stage = 'end'; W.finished = true;
+      if (W.o.finish) { try { W.o.finish(api, W.total); } catch (e) { reportError(e); } }
+      showDialog(win12Dialog);
+    }
+    function showWin(o) {
       if (!state.inGame) return;
+      o = asObject(o);
       state.screen = 'over';
       state.over = true;
       state.ending = false;
       sfx('win');   // three bells
       const lives = h8.lives, base = state.score, total = base + lives * (winWords.lifeBonus == null ? 10 : winWords.lifeBonus);
-      const table = readScores(), prevBest = table.length ? table[0].s : 0;
+      const scored = o.scored !== false, table = readScores(), prevBest = table.length ? table[0].s : 0;
+      const newBest = scored && total > 0 && total > prevBest;
+      const qualifies = scored && total > 0 && (table.length < 10 || total > table[table.length - 1].s);
+      if (winWords.lead) {   // kit 0.15.0: version 12's win
+        winInfo = { o: o, base: base, lives: lives, total: total, newBest: newBest, qualifies: qualifies, n: 0, t0: performance.now(), stage: o.offer ? 'offer' : 'end', finished: false };
+        if (newBest) setTimeout(() => { if (winInfo) sfx('newBest'); }, 2250);
+        showDialog(win12Dialog);
+        return;
+      }
       winCount = null;
-      const newBest = total > 0 && total > prevBest;
       if (newBest) setTimeout(() => sfx('newBest'), 650);
-      showDialog(() => winDialog(base, lives, total, newBest, total > 0 && (table.length < 10 || total > table[table.length - 1].s)));
+      showDialog(() => winDialog(base, lives, total, newBest, qualifies));
     }
     /* kit 0.10.0 (design system version 12, RunEnd): the run's end, in place of game over, for a game with saved progress.
        lb.runEnd(info, delay): the run ends; play runs on for delay (the last life falling, with no fade to black; 0.8 s from the
@@ -6469,7 +6576,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       state.timers = [];
       state.ending = false;
       state.over = false;   // kit 0.10.0: true once the run's end, game over or the win shows
-      runEndInfo = null;
+      runEndInfo = null; winInfo = null;
       state.shakeAmt = 0;
       state.shakeT = 0;
       resetH8();
@@ -6749,7 +6856,9 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
        Kit 0.13.0: lb.placeCard(place, onBlack, onDone, { pick: { heading, options: [{ id, name, line, pic }], take(id) } }) shows a pick under
          the card's plaque (GracePick), holding the card until one is taken.
        Kit 0.14.0: lb.teach.show(id, { later }) (walk, jump, attack, cast, roll, drink) teaches a control in play as Teaching draws it; the kit
-         sees it used, dims it and drops it; lb.teach.hide() (or H, or Hide hints) hides them all, and onHintsHidden(lb) in the config hears it. */
+         sees it used, dims it and drops it; lb.teach.hide() (or H, or Hide hints) hides them all, and onHintsHidden(lb) in the config hears it.
+       Kit 0.15.0: win: { heading, lead, line, loop } in the config and lb.win({ offer, scored, shrine, again, finish }) show version 12's win
+         (WinCard): three lines with three bells, the lanterns counted in, the second loop's offer, Finish as game over. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
@@ -6765,7 +6874,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       get progress() { return progress; }, saveProgress: saveProgress, runEnd: runEnd, keyLetter: keyLetter,   // kit 0.10.0
       ui: ui, get run() { return state.run || null; },   // kit 0.11.0
       teach: { show: teachShow, hide: teachHide, get showing() { return teach.items.map((it) => it.id); } },   // kit 0.14.0
-      fade: fade, placeCard: placeCard, placing: placing, win: showWin, howTo: () => openHowTo('play'),   // version 8 (4c-6a)
+      fade: fade, placeCard: placeCard, placing: placing, win: (o) => showWin(o), howTo: () => openHowTo('play'),   // version 8 (4c-6a)
       get test() { return testCfg ? Object.assign({}, testValues) : null; },   // kit 0.8.1: Testing's values, or null when the game has none
       sounds: Object.keys(SND8.FX), ambient: ambient,   // version 8 (4c-7)
       music: (i) => { if (music && music.tracks[i]) music.want = i; },

@@ -416,6 +416,9 @@ function runEndScreen(D, k) {
   D.setWisps(score);
   D.showRunEnd(JSON.parse(JSON.stringify(o)));
 }
+function winOffer(lb) {   // kit 0.15.0: the win's offer of the second loop, as Gloam Hallow makes it
+  return { offer: true, shrine: { bank: 96 }, again: () => lb.hud.line(null, 'Again, harder'), finish: () => {} };
+}
 function screensPanel(g, lb) {
   const D = lb._debug;
   const over = (score) => () => { seedScores(); D.setWisps(score); D.showGameOver(); };
@@ -430,8 +433,11 @@ function screensPanel(g, lb) {
     ['How to play', () => lb.howTo()],
     ['Testing', () => { D.pause(); D.openSettings('paused'); D.openTesting('paused'); }],
     ['How to play: title', () => { D.quit(); D.openHowTo('title'); }],
-    ['The win: 3 lives', () => { seedScores(); D.setWisps(2580); lb.hud.lives(g.lives = 3); lb.win(); }],
-    ['The win: 1 life', () => { seedScores(); D.setWisps(400); lb.hud.lives(g.lives = 1); lb.win(); }],
+    // kit 0.15.0 (design system version 12, WinCard): as its preview draws it (296, two lanterns lit), the offer of the second loop; after
+    // the second loop, no offer (a new best); Go round again carries the run on with its plaque line, Finish goes on as game over does
+    ['The win: as drawn', () => { seedScores(); D.setWisps(296); lb.hud.lives(g.lives = 2); lb.win(winOffer(lb)); }],
+    ['The win: 1 life', () => { seedScores(); D.setWisps(400); lb.hud.lives(g.lives = 1); lb.win(winOffer(lb)); }],
+    ['The win: second loop', () => { seedScores(); D.setWisps(2580); lb.hud.lives(g.lives = 3); lb.win({ shrine: { bank: 96 } }); }],
     ['No scores yet', () => { D.setScores(null); D.openScores(-1, true); }],
     ['Rotate notice', () => { D.rotate(true); setTimeout(() => D.rotate(false), 4000); }],
     ['Title', () => { seedScores(); D.quit(); }],
@@ -600,7 +606,9 @@ LanternBox.game({
   potions: true,   // kit 0.9.0: the potion sockets
   howTo: { goal: ['Cut your path through four blighted lands, felling the terror bound to each. Sever the roots of The Gaping Tree to break the night.',
     'Three chances to break the dark. Fall, and return to the glow of your last lit lantern.'] },
-  win: { heading: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.', lifeBonus: 10 },
+  // kit 0.15.0 (design system version 12, WinCard): the three lines, and the line offering the second loop
+  win: { heading: 'A grim triumph.', lead: 'The flesh yields.', line: 'Gloam Hallow remembers not your suffering.',
+    loop: 'Fell The Wandering Rot to begin anew—walk the cursed path once more against darker terrors.', lifeBonus: 10 },
   // kit 0.10.0 (design system version 12): a saved record, so Settings shows Clear saved progress, and the Credits plaque's words
   save: { version: 1, fresh: () => ({ runs: 0 }),
     clear: 'Your stolen echo and everything bought at the Echo Shrine will be gone, and the next run starts as a first run, hints and all. High scores and settings stay.' },
