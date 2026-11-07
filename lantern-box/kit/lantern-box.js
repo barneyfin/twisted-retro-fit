@@ -1,4 +1,4 @@
-/* Lantern Box 0.10 — runtime
+/* Lantern Box 0.11 — runtime
    One file, no dependencies. Exposes window.LanternBox. Pair it with lantern-box.css.
    Copied from Retro Kit's shell and restyled to the design system (lantern-box/design-system/); the two soundtracks and
    the way settings are saved come from City Nights' copy of it. It owns everything every game shares: the picture
@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.10.2';
+  const VERSION = '0.11.0';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -3385,7 +3385,7 @@ function lvDress(c,P,cam,W,t,pass,rm){const lv=P.T.lv,G=P.G,st=pass!=="live",lp=
   else{if(v===5){if(lp)drawShrine(c,X,G(x)+2,t,!!rm);}else if(st)drawFerns(c,X,x,110+v*10,v,G);}}}
 
 /* ---------- the wanderer (4c-3): from wand.js, the lantern and the drawing helpers the posable figure uses ---------- */
-const W_INK="#060508",W_RED="#b3261e";
+const W_INK="#060508";let W_RED="#b3261e";   // version 12: let, so setBelt can change it
 function wTaper(x,s){const x1=s[0],y1=s[1],x2=s[2],y2=s[3],w1=s[4],w2=s[5],dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L;
   x.beginPath();x.moveTo(x1+nx*w1/2,y1+ny*w1/2);x.lineTo(x2+nx*w2/2,y2+ny*w2/2);x.lineTo(x2-nx*w2/2,y2-ny*w2/2);x.lineTo(x1-nx*w1/2,y1-ny*w1/2);x.closePath();x.fill();
   x.beginPath();x.arc(x2,y2,w2/2,0,Math.PI*2);x.fill();if(w1>3){x.beginPath();x.arc(x1,y1,w1/2,0,Math.PI*2);x.fill();}}
@@ -3412,7 +3412,13 @@ function wLantern(x,hx,hy,ang,fill){ // a lantern hanging from (hx,hy): bail, sh
      lan     the lantern's swing ; ball  when set, the tucked roll at that angle ; hand  a glow at the free hand (0..1)
    Everything that moves on its own (the hem's flutter, the tails' ripple) reads a stepped time, so the whole figure steps
    like the monsters' puppets; only where it stands glides. */
-const MV_INK="#060508",MV_RED="#b3261e",MV_GLASS="#ffd27a",MV_GOLD="#ffcf6a",MV_LAMP="#ffdf9a";
+const MV_INK="#060508",MV_GLASS="#ffd27a",MV_GOLD="#ffcf6a",MV_LAMP="#ffdf9a";let MV_RED="#b3261e";
+// version 12: the tie belt is red to start; night blue, mulberry and ash are bought at the Echo Shrine (lightened to the red's 3.1 : 1 on
+// black, checked on the Pixel by Barney, 7 November 2026), each kept off the colours that already mean something (ember, gold,
+// witch-green, wisp-pale). setBelt chooses the one worn; it colours the puppet (MV_RED) and the stand-in (W_RED). Tokens: wanderer-scarf
+// (the red), belt-night-blue, belt-mulberry, belt-ash.
+const BELTS={red:"#b3261e",nightBlue:"#3d5cab",mulberry:"#94407f",ash:"#8f877c"};
+function setBelt(k){MV_RED=W_RED=BELTS[k]||BELTS.red;return MV_RED;}
 const MV_BASE={hx:0,hy:-25,lean:0,ft:[[-2,-3,0],[2.2,-3,0]],sH:[17,-12.5],sb:0.4636,sbend:-1,fH:[4.5,-16.5],fl:[8.5,5.7],fbend:1,
   hem:1,lift:0,flare:0,bil:1,tip:2.5,nod:0,vx:0,vy:0,lan:0,ball:null,hand:0,flut:0,sword:true};
 function mvP(o){const P=Object.assign({},MV_BASE,o||{});P.ft=(o&&o.ft)||MV_BASE.ft;return P;}
@@ -3673,7 +3679,7 @@ let MV_RM=false;                                   // Reduce motion while a figu
 const MV_BOX=[-62,-122,98,14];                     // the figure's box in his own units, feet at (0, 0), with the sword at its longest
 const MVC=[];                                      // the painted figures, the most recent last
 function mvFigure(s,P,tq,k,edge,rm,f){ // painted facing its way, its feet on a whole pixel and its lit edge's offset painted in, so a blit is pixel for pixel
-  const key=s.toFixed(3)+"|"+k+"|"+f+"|"+edge+"|"+(rm?1:0)+"|"+tq.toFixed(4)+"|"+JSON.stringify(P);
+  const key=s.toFixed(3)+"|"+k+"|"+f+"|"+edge+"|"+(rm?1:0)+"|"+tq.toFixed(4)+"|"+MV_RED+"|"+JSON.stringify(P);   // kit 0.11.0: and the belt
   for(let i=MVC.length-1;i>=0;i--)if(MVC[i].key===key){const F=MVC[i];if(i!==MVC.length-1){MVC.splice(i,1);MVC.push(F);}return F;}
   const b=MV_BOX,R=k*s,x0=f>0?b[0]:-b[2],x1=f>0?b[2]:-b[0],ox=Math.ceil(-x0*R)+4,oy=Math.ceil(-b[1]*R)+4,w=ox+Math.ceil(x1*R)+4,h=oy+Math.ceil(b[3]*R)+2,e=1.3*k/1.32*s;
   let F=MVC.length>=8?MVC.shift():null;
@@ -4275,6 +4281,9 @@ function makeTools(env){
     moves:Object.keys(MOVES),
     stepRate:MV_RATE,
     move(name,step){const m=mvMove(name,step||0);return{tag:m.tag,steps:m.steps,done:m.done,dx:m.dx,dy:m.dy};},
+    // kit 0.11.0 (design system version 12): belt(name) chooses the belt the wanderer wears from here on: 'red' (or 'scarf', its token's
+    // name), 'nightBlue', 'mulberry' or 'ash'; the colours are the tokens', set in play.js's BELTS
+    belt(name){return setBelt(name==='scarf'?'red':name);},
     wanderer(x,o){ // version 8 (4c-3): the posable wanderer (Moves). o: y; move and step, or walking (true) or standing, in time; facing (1 or -1);
       // sword {reach, bite}: its upgrades; safe: seconds into the second of safety (his lit edge pulses slowly for 1 s); hurt {kind: "armour" or
       // "health", t: seconds since the blow}; shatter: seconds since he broke into his card pieces (1.1 s); pit [x0, x1]: falling into that pit,
@@ -4440,6 +4449,9 @@ const ICON={
   fire:`<circle class="solid" cx="16" cy="12" r="4.8"/><path class="solid" d="M13.8 8.2 L3.6 4.4 L11.2 10.6 Z M12.4 10.8 L0.8 12.4 L12.4 13.8 Z M13.8 15.8 L4.2 18.8 L11.2 13.6 Z"/>`,
   reach:`<path d="M19.2 4.8 L9.4 14.6 M6.8 12 L12 17.2 M9.4 14.6 L5.4 18.6"/><circle class="solid" cx="4.6" cy="19.4" r="1.5"/>`,
   rune:`<path d="M7.2 20 L5.6 11.2 L9.2 4.2 L16 3.6 L18.6 11.8 L16.4 20 Z"/><path class="solid" d="M12 7.4 L14.5 11.6 L12 15.8 L9.5 11.6 Z"/>`,
+  bolt:`<path d="M13.5 2.5 L5.5 13.5 H11.5 L9.5 21.5 L18.5 9.5 H12.5 Z"/>`,   /* kit 0.11.0: version 12's spells and Hysteria, as the Echo Shrine draws them */
+  acid:`<path d="M4 12 H9"/><path d="M9 12 L20 5.5 M9 12 H21 M9 12 L20 18.5"/><circle class="solid" cx="15" cy="9.4" r="1.3"/><circle class="solid" cx="17.6" cy="13.6" r="1.3"/><circle class="solid" cx="13.2" cy="14.6" r="1.1"/>`,
+  hysteria:`<path d="M7 3 H17 M7 21 H17 M8 3 C8 8 16 9 16 12 C16 15 8 16 8 21 M16 3 C16 8 8 9 8 12 C8 15 16 16 16 21"/>`,
   full:`<path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15"/>`,
   pause:`<path d="M9 5 V19 M15 5 V19"/>`,
   help:`<path d="M9.2 9.3 A2.85 2.85 0 1 1 13.4 11.8 C12.4 12.4 12 13 12 14.3"/><circle cx="12" cy="18" r="1.3" style="fill:var(--heading);stroke:none"/>`,
@@ -4470,7 +4482,7 @@ function vitals(phone,extra,pots){const iw=phone?13:14;
 function potion(k,phone,keys){const P=POT[k],kk=keyLetter(k==="health"?"Q":"E"),C=k==="health"?"H":"M";
   return `<span class="lb-potion-wrap${phone?" is-phone":""}"><button class="lb-potion is-${k}${phone?" is-phone":""}" type="button" data-k="${k}" aria-label="No ${k} potion"><span>
     <svg class="pot" viewBox="0 0 24 24" aria-hidden="true"><path class="glass-back" d="${P.glass}"/><g class="liq-g" clip-path="url(#lbPot${C})"><rect class="liq" x="3" y="${P.top}" width="18" height="12" fill="url(#lbLiq${C})"/><path class="shine" d="M${k==="health"?"8.4 13.4 Q8.6 11.4 10.2 10.4":"10.2 11.6 V18.4"}"/></g>
-      <path class="glass" d="${P.glass}"/><path class="mark" d="${P.mark}"/><path class="glint" d="M5 22 L9 22 L20 3 L16 3 Z"/></svg></span></button>${keys?`<span class="lb-pkey" aria-hidden="true">${kk}</span>`:""}</span>`;}
+      <path class="glass" d="${P.glass}"/><path class="mark" d="${P.mark}"/><path class="glint" d="M5 22 L9 22 L20 3 L16 3 Z"/></svg></span></button>${keys?`<span class="lb-pkey" aria-hidden="true">${kk}</span>`:""}<span class="lb-potion-pips" aria-hidden="true" hidden></span></span>`;}
 function potions(phone,beside,keys){return `<div class="lb-potions${beside?" is-beside":""}${phone?" is-phone":""}" role="group" aria-label="Potions kept">${potion("health",phone,keys)}${potion("mana",phone,keys)}</div>`;}
 function counter(phone,label,num){return `<div class="lb-plaque is-hud lb-counter${phone?" is-phone":""}" role="status" aria-label="${num} ${label.toLowerCase()}"><div class="lb-face"><span class="lb-counter-label" aria-hidden="true">${label}</span><span class="lb-counter-num" aria-hidden="true">${num}</span></div></div>`;}
 function build(el,phone,o){o=o||{};if(!defsDone){document.body.insertAdjacentHTML("afterbegin",defs);defsDone=true;}
@@ -4505,18 +4517,24 @@ function setCard(cd,card){const on=!!(card&&card.a>0);if(cd.hidden===on)cd.hidde
 // round 13: one socket. Kept: the flask grows in from 0.6 with one glint passing over it (0.4 s); Reduce motion fades it in, Effects off
 // leaves out the glint's light. Drunk: the liquid drains in 0.35 s, then the faint outline; Reduce motion fades the liquid out instead.
 const OPTS={rm:false,fxOff:false};
-function setPotion(b,st){const k=b.dataset.k,has=!!(st.potions&&st.potions[k]),topped=(k==="health"?st.hp:st.mp)>=0.999,fx=st.potFx?(st.potFx.k===k?st.potFx:st.potFx[k]||null):null, /* the kit: potFx may hold one for each kind */
+// version 12: st.potions[k] may be a count (0 to 3; true is 1) and st.potCap[k] the sockets bought (1 to 3): with more than one, a pip
+// under the socket for each, filled while a potion is in it. The socket shows the potion while any is kept; a drink drains it, and with one
+// left the flask shows again at once (the next potion's keep moment can play over it).
+function potCount(st,k){const v=st.potions&&st.potions[k];return typeof v==="number"?v:(v?1:0);}
+function setPotion(b,st){const k=b.dataset.k,n=potCount(st,k),cap=Math.max(1,(st.potCap&&st.potCap[k])||1),has=n>0,topped=(k==="health"?st.hp:st.mp)>=0.999,fx=st.potFx?(st.potFx.k===k?st.potFx:st.potFx[k]||null):null, /* the kit: potFx may hold one for each kind */
     svg=b.querySelector(".pot"),liq=b.querySelector(".liq"),gl=b.querySelector(".glint"),mk=b.querySelector(".mark"),top=POT[k].top,rm=OPTS.rm;
   const showFull=has||(fx&&fx.kind==="drink");b.classList.toggle("has-potion",showFull);b.classList.toggle("is-topped",has&&topped&&!fx);b.classList.toggle("fx-off",OPTS.fxOff);
   let sc=1,op=1,ly=top,la=1,ga=0,gx=0;
   if(fx&&fx.kind==="keep"){const u=Math.min(1,fx.u);if(rm){op=Math.min(1,u/0.75);}else{sc=0.6+0.4*ease(Math.min(1,u/0.7));op=Math.min(1,u/0.35);if(u>0.35){const g=(u-0.35)/0.65;ga=Math.sin(Math.min(1,g)*Math.PI)*0.85;gx=-14+28*g;}}}
-  if(fx&&fx.kind==="drink"){const u=Math.min(1,fx.u);if(rm){la=1-u;}else{ly=top+(22-top)*ease(u);}if(u>=1){b.classList.remove("has-potion");}}
+  if(fx&&fx.kind==="drink"){const u=Math.min(1,fx.u);if(rm){la=1-u;}else{ly=top+(22-top)*ease(u);}if(u>=1&&!has){b.classList.remove("has-potion");}}
   svg.style.transform=sc!==1?`scale(${sc.toFixed(3)})`:"";svg.style.opacity=op!==1?op.toFixed(3):"";
   liq.setAttribute("y",ly.toFixed(2));liq.style.opacity=la!==1?la.toFixed(3):"";mk.style.opacity=fx&&fx.kind==="drink"?String(rm?la:Math.max(0,1-fx.u*1.6)):"";
   gl.style.opacity=ga>0.01?ga.toFixed(3):"0";gl.setAttribute("transform",`translate(${gx.toFixed(2)} 0)`);
   const keyTxt=b.parentElement.querySelector(".lb-pkey");if(keyTxt)keyTxt.classList.toggle("is-on",!!(fx&&fx.kind==="drink"&&fx.u<0.5));
   const name=k==="health"?"Health potion":"Mana potion",how=keyTxt?keyLetter(k==="health"?"Q":"E")+" to drink":"Tap to drink"; /* kit 0.10.0: the player's own letter */ /* the kit: by the keycap, not the size */
-  setOnce(b,"lab",has?(topped?`${name}, kept. ${k==="health"?"Health":"Mana"} is full`:`${name}, kept. ${how}`):`No ${k} potion kept`,v=>b.setAttribute("aria-label",v));}
+  const pp=b.parentElement.querySelector(".lb-potion-pips");if(pp)setOnce(b,"pp",cap+":"+n,()=>{pp.hidden=cap<2;pp.innerHTML=cap<2?"":Array.from({length:cap},(_,i)=>`<i${i<n?' class="is-on"':""}></i>`).join("");});
+  const many=cap>1?`, ${n} of ${cap}`:"";
+  setOnce(b,"lab",has?(topped?`${name}${many} kept. ${k==="health"?"Health":"Mana"} is full`:`${name}${many} kept. ${how}`):`No ${k} potion kept${cap>1?`, ${cap} sockets`:""}`,v=>b.setAttribute("aria-label",v));}
 function set(hud,st){const q=s=>hud.querySelector(s);
   const hp=Math.round(st.hp*100),mp=Math.round(st.mp*100);
   setOnce(hud,"hp",hp,v=>q(".hp").style.setProperty("--v",v+"%"));setOnce(hud,"mp",mp,v=>q(".mp").style.setProperty("--v",v+"%"));
@@ -4551,7 +4569,8 @@ function stickShow(hud,x,y,dx,dy,a,thumb){const s=hud.querySelector(".lb-stick")
   const k=s.querySelector(".lb-knob");k.style.transform=`translate(${dx}px,${dy}px)`;const sv=s.querySelector(".chev");
   sv.querySelector(".l").classList.toggle("is-lit",dx<-12&&Math.abs(dx)>Math.abs(dy)*0.8);sv.querySelector(".r").classList.toggle("is-lit",dx>12&&Math.abs(dx)>Math.abs(dy)*0.8);sv.querySelector(".u").classList.toggle("is-lit",dy<-12&&-dy>Math.abs(dx)*0.8);
   const th=hud.querySelector(".lb-thumb");if(th){th.style.opacity=String(thumb||0);th.style.left=(x+dx)+"px";th.style.top=(y+dy)+"px";}}
-return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
+function ensureDefs(){if(!defsDone){document.body.insertAdjacentHTML("afterbegin",defs);defsDone=true;}}   /* kit 0.11.0: the potions' liquid, for pictures outside the HUD */
+return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
   })();
 
   function createGame(cfg) {
@@ -4706,7 +4725,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       shakeAmt: 0,
       shakeT: 0,
       errored: false,
-      h8: { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0, potions: { health: false, mana: false }, potFx: { health: null, mana: null } }
+      h8: { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0, potions: { health: 0, mana: 0 }, potCap: { health: 1, mana: 1 }, potFx: { health: null, mana: null } }
     };
     function after(seconds, fn) { state.timers.push({ at: state.time + seconds, fn: fn }); }
     function shake(amount, seconds) {   // the picture only, in its lines; the HUD never moves
@@ -5129,7 +5148,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       st.potions = {}; st.potFx = {};
       for (const k of ['health', 'mana']) {
         const p = h8.potFx[k], on = p && T >= p.t0 && T - p.t0 < p.len;
-        st.potions[k] = h8.potions[k] && !(p && p.kind === 'keep' && T < p.t0);
+        st.potions[k] = Math.max(0, (h8.potions[k] | 0) - (p && p.kind === 'keep' && T < p.t0 ? 1 : 0));   // kit 0.11.0: counts
+        st.potCap = h8.potCap;
         if (on) st.potFx[k] = { k: k, kind: p.kind, u: (T - p.t0) / p.len };
       }
       // the name and the lines share the top middle: a line waits while the boss's name shows
@@ -5191,18 +5211,21 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       },
       fade(a) { h8.hudA = clamp(+a, 0, 1); syncHud(); },                                // the HUD's own fade (a tap on the spell's socket presses input.pressed.switch)
       // kit 0.9.0 (design system version 11; potions: true in the config): one health and one mana potion kept, in two sockets under the plaque
-      potions(health, mana) { h8.potions = { health: !!health, mana: !!mana }; h8.potFx = { health: null, mana: null }; syncHud(); },   // which are kept, at once
+      // kit 0.11.0 (version 12): potions(health, mana) takes counts (true is 1); potCap(health, mana) the sockets bought, 1 to 3 (a pip for each
+      // once there are two); keep fills one more socket, drink empties one
+      potions(health, mana) { const n = (v, k) => clamp(v === true ? 1 : v | 0, 0, h8.potCap[k]); h8.potions = { health: n(health, 'health'), mana: n(mana, 'mana') }; h8.potFx = { health: null, mana: null }; syncHud(); },
+      potCap(health, mana) { h8.potCap = { health: clamp(health | 0, 1, 3), mana: clamp(mana | 0, 1, 3) }; ['health', 'mana'].forEach((k) => { h8.potions[k] = Math.min(h8.potions[k] | 0, h8.potCap[k]); }); syncHud(); },
       keep(kind, o) {   // a potion kept: its socket fills as world.loot's flight lands (0.45 s; at once under Reduce motion), in 0.4 s;
         // o.line: true the first time, for the plaque line saying how to drink it (tap on a touch device, Q or E on a computer)
         const k = kind === 'mana' ? 'mana' : 'health', d = settings.reduceMotion ? 0 : 0.45;
-        h8.potions[k] = true; h8.potFx[k] = { kind: 'keep', t0: state.time + d, len: 0.4 };
+        h8.potions[k] = Math.min(h8.potCap[k], (h8.potions[k] | 0) + 1); h8.potFx[k] = { kind: 'keep', t0: state.time + d, len: 0.4 };
         if (o && o.line) after(d + 0.35, () => hud.line(k === 'health' ? 'potH' : 'potM', 'Kept for later. ' + (touch ? 'Tap' : keyLetter(k === 'health' ? 'Q' : 'E')) + ' to drink'));
         syncHud();
       },
       drink(kind) {   // a potion drunk: its socket drains (0.35 s; its key lights on a computer) and the drink's sound plays. The game fills the bar
         // (0.4 s) and draws world.wanderer's drink (0.9 s)
         const k = kind === 'mana' ? 'mana' : 'health';
-        h8.potions[k] = false; h8.potFx[k] = { kind: 'drink', t0: state.time, len: 0.35 }; sfx(k === 'health' ? 'drinkHealth' : 'drinkMana'); syncHud();
+        h8.potions[k] = Math.max(0, (h8.potions[k] | 0) - 1); h8.potFx[k] = { kind: 'drink', t0: state.time, len: 0.35 }; sfx(k === 'health' ? 'drinkHealth' : 'drinkMana'); syncHud();
       }
     };
     function fade(a) { h8.fade = clamp(+a || 0, 0, 1); if (!h8.card) fadeEl.style.opacity = String(h8.fade); }   // black over the picture
@@ -5210,7 +5233,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     function placeCard(place, onBlack, onDone) { h8.card = { place: place, t0: state.time, onBlack: onBlack || null, onDone: onDone || null, called: false }; sfx('placeCard'); syncHud(); }   // with its low toll
     const placing = () => !!h8.card;
     function resetH8() {   // a new run (or the title): three lives, no armour, no spells, no potions kept, nothing showing
-      Object.assign(h8, { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0, potions: { health: false, mana: false }, potFx: { health: null, mana: null } });
+      Object.assign(h8, { pips: 0, lives: 3, spells: [], sel: 0, cost: 0, pipFx: null, lifeFx: null, flipFx: null, lines: [], line: null, name: null, boss: null, card: null, hudA: 1, fade: 0, potions: { health: 0, mana: 0 }, potCap: { health: 1, mana: 1 }, potFx: { health: null, mana: null } });
       fadeEl.style.opacity = '0';
     }
 
@@ -5628,7 +5651,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         const menu = button('Menu');
         if (phone) { spend.style.padding = '0 16px'; again.style.padding = '0 16px'; menu.style.padding = '0 16px'; }
         buttons = [spend, again, menu];
-        items = [{ el: spend, activate: () => openShrine(() => { sfx('back'); state.screen = 'scores'; showDialog(() => scoresDialog(highlight, true)); }, asObject(runEndInfo.o.shrine).bank) },
+        items = [{ el: spend, activate: () => goShrine(() => { sfx('back'); state.screen = 'scores'; showDialog(() => scoresDialog(highlight, true)); }, asObject(runEndInfo.o.shrine).bank) },
           { el: again, activate: startOver }, { el: menu, activate: toMenu }];
         opts = { back: toMenu };
       } else if (afterGame) {
@@ -5844,10 +5867,15 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
     };
     function unlockPic(kind) {
       if (kind === 'health' || kind === 'mana') {
+        HUD8.ensureDefs();
         const P = HUD8.POT[kind], C = kind === 'health' ? 'H' : 'M';
         return '<span class="lb-potion is-' + kind + ' has-potion" aria-hidden="true"><span><svg class="pot" viewBox="0 0 24 24"><path class="glass-back" d="' + P.glass + '"/>' +
           '<g class="liq-g" clip-path="url(#lbPot' + C + ')"><rect x="3" y="' + P.top + '" width="18" height="12" fill="url(#lbLiq' + C + ')"/></g>' +
           '<path class="glass" d="' + P.glass + '"/><path class="mark" d="' + P.mark + '"/></svg></span></span>';
+      }
+      if (typeof kind === 'string' && kind.indexOf('belt-') === 0) {   // kit 0.11.0: a belt, its band as the Echo Shrine draws it
+        const b = { 'belt-nightBlue': ' is-night-blue', 'belt-mulberry': ' is-mulberry', 'belt-ash': ' is-ash' }[kind] || '';
+        return '<span class="lb-belt" aria-hidden="true" style="flex:none;width:44px;padding:6px 4px;cursor:default"><span class="band' + b + '"></span></span>';
       }
       const pic = UNLOCK_PIC[kind] || HUD8.ICON[kind];
       return pic ? '<span class="lb-spell" aria-hidden="true"><span><svg class="pic" viewBox="0 0 24 24">' + pic + '</svg></span></span>' : '';
@@ -5862,6 +5890,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         let o;
         try { o = asObject(typeof info === 'function' ? info() : info); } catch (e) { reportError(e); o = {}; }
         showRunEnd(o);
+        if (typeof info === 'function') runEndInfo.src = info;   // kit 0.11.0: asked again when the Echo Shrine closes, for what is left
       });
     }
     function showRunEnd(o) {
@@ -5948,7 +5977,11 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       const items = [];
       const btns = el('div', 'lb-btns');
       let primary, hint = null, opts;
-      const fromShrine = () => { sfx('back'); state.screen = 'over'; showDialog(runEndDialog, items.findIndex((it) => it.shrine)); };
+      const fromShrine = () => {   // kit 0.11.0: back from the Echo Shrine, with its count done and the next unlock as it now stands
+        sfx('back'); state.screen = 'over';
+        if (R.src) { try { R.o = asObject(R.src()); } catch (e) { reportError(e); } R.t0 = performance.now() - 5000; R.chimed = true; }
+        showDialog(runEndDialog, items.findIndex((it) => it.shrine));
+      };
       if (R.qualifies) {
         primary = button('Continue', true);
         items.push({ el: primary, activate: () => { sfx('confirm'); openInitials(); } });
@@ -5956,7 +5989,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         opts = {};
       } else if (first) {
         primary = button('Spend your echo', true);
-        items.push({ el: primary, shrine: true, activate: () => openShrine(fromShrine, shrine.bank) });
+        items.push({ el: primary, shrine: true, activate: () => goShrine(fromShrine, shrine.bank) });
         const again = button('Play again'), menu = button('Menu');
         btns.append(again, menu);
         items.push({ el: again, activate: startOver }, { el: menu, activate: toMenu });
@@ -5965,7 +5998,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       } else {
         primary = button('Play again', true, true);
         items.push({ el: primary, activate: startOver });
-        if (shrine) { shrineBtn = button('Echo Shrine'); btns.append(shrineBtn); items.push({ el: shrineBtn, shrine: true, activate: () => openShrine(fromShrine, shrine.bank) }); }
+        if (shrine) { shrineBtn = button('Echo Shrine'); btns.append(shrineBtn); items.push({ el: shrineBtn, shrine: true, activate: () => goShrine(fromShrine, shrine.bank) }); }
         const menu = button('Menu');
         btns.append(menu);
         items.push({ el: menu, activate: toMenu });
@@ -6023,6 +6056,43 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       sfx('confirm');
       showDialog(() => shrineDialog(back, bank));
     }
+    // kit 0.11.0: the game's own Echo Shrine (shrine: { open(lb, back) }, built with lb.ui), else the kit's stand-in
+    function goShrine(back, bank) {
+      if (shrineCfg && typeof shrineCfg.open === 'function') {
+        state.screen = 'shrine';
+        sfx('confirm');
+        try { shrineCfg.open(api, back); } catch (e) { reportError(e); }
+      } else openShrine(back, bank);
+    }
+
+    /* kit 0.11.0 (design system version 12): lb.ui, so a game can open a plaque of its own (the Echo Shrine, the choice of run, the Grace
+       pick) built from the kit's parts, with the kit's menus and keys. lb.ui.open(build, start): build(ui) makes the plaque and returns
+       { panel, items, opts } as the kit's own do (an item is { el, activate, left, right, focus, menu, noClick }; opts { back, keys, start });
+       it is built again when the layout changes, and lb.ui.refresh() builds it again in place (after a purchase, say). lb.ui.close() closes
+       it, back to the title or to play. The parts: plaque(id, width, phoneWidth, faceStyle, faceClass) gives { panel, face }; heading(id,
+       text), button(label, primary, diamond), rule(), hint(html), kbd(key), el(tag, cls, html), txt(tag, cls, text); pictures: spell(kind,
+       dim), potion(kind, full, phone) and belt(id) (its name and band); select(i) moves the selection; phone and touch say which layout. */
+    const ui = {
+      open(build, start) { if (!state.inGame || state.screen !== 'over') state.screen = state.inGame ? state.screen : 'game'; showDialog(() => build(ui), start); },
+      refresh(start) { if (currentDialog) showDialog(currentDialog, start == null ? (nav ? nav.index : 0) : start); },
+      close() { closeDialog(); if (!state.inGame) state.screen = 'title'; },
+      select(i) { if (nav) nav.select(i); },
+      plaque: plaque, heading: heading, button: button, kbd: kbd, el: el, txt: txt,
+      rule: () => el('div', '', RULE).firstChild,
+      hint: (html) => el('p', 'lb-hint', html),
+      spell: (kind, dim) => '<span class="lb-spell' + (dim ? ' is-dim' : '') + '" aria-hidden="true"><span><svg class="pic" viewBox="0 0 24 24">' + (HUD8.ICON[kind] || '') + '</svg></span></span>',
+      potion: (kind, full, phone) => {
+        HUD8.ensureDefs();
+        const P = HUD8.POT[kind === 'mana' ? 'mana' : 'health'], C = kind === 'mana' ? 'M' : 'H';
+        return '<span class="lb-potion is-' + (kind === 'mana' ? 'mana' : 'health') + (phone ? ' is-phone' : '') + (full ? ' has-potion' : '') + '"><span><svg class="pot" viewBox="0 0 24 24">' +
+          (full ? '<path class="glass-back" d="' + P.glass + '"/><g class="liq-g" clip-path="url(#lbPot' + C + ')"><rect x="3" y="' + P.top + '" width="18" height="12" fill="url(#lbLiq' + C + ')"/></g>' : '') +
+          '<path class="glass" d="' + P.glass + '"/><path class="mark" d="' + P.mark + '"/></svg></span></span>';
+      },
+      // a belt's name and its band's class, as the Echo Shrine shows them ('scarf' or 'red', 'nightBlue', 'mulberry', 'ash')
+      belt: (id) => ({ red: { name: 'Red', band: '' }, scarf: { name: 'Red', band: '' }, nightBlue: { name: 'Night blue', band: ' is-night-blue' }, mulberry: { name: 'Mulberry', band: ' is-mulberry' }, ash: { name: 'Ash', band: ' is-ash' } })[id] || { name: String(id), band: '' },
+      get phone() { return V.phone; },
+      touch: touch
+    };
     function showGameOver() {
       state.screen = 'over';
       state.over = true;
@@ -6181,9 +6251,11 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
         return { el: b, menu: true, activate: activate };
       };
       const items = [
-        item('Start game', () => { sfx('confirm'); startGame(); }),
+        // kit 0.11.0: chooseRun(lb, start) in the config hears Start game first, and starts the run with start(id) (at once, or from its own
+        // choice of run, built with lb.ui); lb.run is the run being played, and Play again repeats it
+        item('Start game', () => { sfx('confirm'); if (typeof cfg.chooseRun === 'function') { try { cfg.chooseRun(api, (id) => { state.run = id == null ? null : String(id); startGame(); }); } catch (e) { reportError(e); } } else startGame(); }),
         howTo ? item('How to play', () => openHowTo('title')) : null,
-        shrineCfg ? item('Echo Shrine', () => openShrine(() => { sfx('back'); state.screen = 'title'; closeDialog(); }, shrineBank()))   // kit 0.10.2
+        shrineCfg ? item('Echo Shrine', () => goShrine(() => { sfx('back'); state.screen = 'title'; closeDialog(); }, shrineBank()))   // kit 0.10.2
           : item('High scores', () => { sfx('confirm'); openScores(-1, false); }),
         item('Settings', () => openSettings('title'))
       ].filter(Boolean);
@@ -6491,7 +6563,11 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
          note], sound: line } words the Credits plaque. Kit 0.10.2: shrine: { bank(lb) } puts the Echo Shrine on the title's arch in High
          scores' place (the kit's stand-in until it is built) and High scores on an arch tile beside sound. lb.sfx('defeat', echo) and lb.sfx('echo', 25): the wisp's echo, louder the more it
          gives. lb.keyLetter('A'): the letter on the player's own keyboard in that place, for a game's own hints. P pauses and resumes,
-         Backspace goes back; no hint shows Esc. */
+         Backspace goes back; no hint shows Esc.
+       Kit 0.11.0: lb.ui (see ui) opens a game's own plaques; shrine: { bank(lb), open(lb, back) } opens the game's Echo Shrine (from the
+         title and the run's end; back returns there, and the run's end asks its info again); chooseRun(lb, start) hears Start game first and
+         lb.run is the run being played; lb.hud.potions(health, mana) takes counts and lb.hud.potCap(health, mana) the sockets bought (a pip
+         under each socket once there are two); world.belt(name) chooses the wanderer's belt. */
     const api = {
       H: H, version: VERSION, touch: touch, input: input, hud: hud, sfx: sfx, world: world, color: colour,
       get W() { return V.W; },
@@ -6505,6 +6581,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct};
       get best() { return Math.max(bestScore(), state.score); },
       addWisps: addWisps, gameOver: gameOver, shake: shake, after: after,
       get progress() { return progress; }, saveProgress: saveProgress, runEnd: runEnd, keyLetter: keyLetter,   // kit 0.10.0
+      ui: ui, get run() { return state.run || null; },   // kit 0.11.0
       fade: fade, placeCard: placeCard, placing: placing, win: showWin, howTo: () => openHowTo('play'),   // version 8 (4c-6a)
       get test() { return testCfg ? Object.assign({}, testValues) : null; },   // kit 0.8.1: Testing's values, or null when the game has none
       sounds: Object.keys(SND8.FX), ambient: ambient,   // version 8 (4c-7)

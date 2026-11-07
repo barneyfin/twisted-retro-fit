@@ -80,7 +80,7 @@ The HUD counter shows four digits, so a run (and its second loop) must stay unde
 
 ## The Echo Shrine
 
-Phase 5 (PRD question 3; design round 1, Barney, 7 November 2026). From the title menu (in High scores' old place in the arch) and the run's end; only the very first run's end makes it the primary button, and nothing comes before a first run. Everything is bought for good; the spell and the belt can be changed there before any run. Anything affordable can be bought in any order; a third potion socket needs the second first. The run's end shows the cheapest thing not yet bought as "Next".
+Phase 5 (PRD question 3; design round 1, Barney, 7 November 2026). From the title menu (in High scores' old place in the arch) and the run's end; only the very first run's end makes it the primary button, and nothing comes before a first run. Everything is bought for good; the spell and the belt can be changed there before any run. A spell or belt bought is chosen or worn at once (step 5e-1, Claude's choice; one press chooses another bought one). Anything affordable can be bought in any order; a third potion socket needs the second first. The run's end shows the cheapest thing not yet bought as "Next".
 
 | Unlock | Starting price (echo; tuned at step 5f) |
 |---|---|

@@ -33,7 +33,10 @@
    echo, what has been bought, the spell and belt chosen, the first run, the hints, the furthest place and the day's doubled run;
    wisps are echo on screen, and each defeat's echo sounds louder the more it gives; the run's end in place of game over (the run's
    echo banked, doubled on the day's first Echo Infusion, a near-miss line, the next unlock), with the Echo Shrine's stand-in until
-   step 5e builds it; Credits; P pauses and Backspace goes back. */
+   step 5e builds it; Credits; P pauses and Backspace goes back.
+   Step 5e-1 (kit 0.11.0): the Echo Shrine (from the title and the run's end), the choice of run once anything is bought, and what each run
+   takes: The Bare Reckoning the chosen spell and belt and one potion of each, The Echo Infusion every socket bought; up to three potions of
+   each kind, and the belts. */
 
 const PLACES = ['night', 'storm', 'dawn', 'mist'];
 const TRACK = { night: 0, storm: 0, dawn: 1, mist: 1 };   // The Long Vigil, then Lantern in the Moor from Dawn's place card
@@ -178,10 +181,10 @@ const PLACE_NAMES = ['The Graveyard', 'The Old Town', 'The Open Moor', 'The Wind
 const UNLOCKS = [
   { id: 'health2', kind: 'health', name: 'A second health potion', towards: 'a second health potion', price: 25, has: (r) => r.sockets.health >= 2 },
   { id: 'bolt', kind: 'bolt', name: 'Lightning bolt', towards: 'the lightning bolt', price: 75, has: (r) => r.bolt },
-  { id: 'nightBlue', kind: 'belt', name: 'Night blue belt', towards: 'the night blue belt', price: 100, has: (r) => r.belts.nightBlue },
+  { id: 'nightBlue', kind: 'belt-nightBlue', name: 'Night blue belt', towards: 'the night blue belt', price: 100, has: (r) => r.belts.nightBlue },
   { id: 'mana2', kind: 'mana', name: 'A second mana potion', towards: 'a second mana potion', price: 175, has: (r) => r.sockets.mana >= 2 },
-  { id: 'mulberry', kind: 'belt', name: 'Mulberry belt', towards: 'the mulberry belt', price: 250, has: (r) => r.belts.mulberry },
-  { id: 'ash', kind: 'belt', name: 'Ash belt', towards: 'the ash belt', price: 250, has: (r) => r.belts.ash },
+  { id: 'mulberry', kind: 'belt-mulberry', name: 'Mulberry belt', towards: 'the mulberry belt', price: 250, has: (r) => r.belts.mulberry },
+  { id: 'ash', kind: 'belt-ash', name: 'Ash belt', towards: 'the ash belt', price: 250, has: (r) => r.belts.ash },
   { id: 'acid', kind: 'acid', name: 'Acid spray', towards: 'the acid spray', price: 300, has: (r) => r.acid },
   { id: 'health3', kind: 'health', name: 'A third health potion', towards: 'a third health potion', price: 350, has: (r) => r.sockets.health >= 3, needs: 'health2' },
   { id: 'mana3', kind: 'mana', name: 'A third mana potion', towards: 'a third mana potion', price: 400, has: (r) => r.sockets.mana >= 3, needs: 'mana2' },
@@ -213,10 +216,156 @@ function runEndInfo(g, lb) {
   let near = null;
   if (boss && boss.hp > 0 && boss.name && boss.st !== 'wait' && boss.st !== 'defeat' && boss.st !== 'done') near = { boss: boss.name, left: boss.hp / boss.max };
   else if (!b.first && g.p > b.furthest) near = { furthest: PLACE_NAMES[g.p] };   // not on the very first run: it has nothing to beat (Barney)
-  const u = nextUnlock(rec);
+  const u = nextUnlock(rec), now = Math.min(b.stolen, rec.echo);   // step 5e-1: asked again after the Echo Shrine, so as the bank now stands
   return { near, daily: b.daily, first: b.first, scored: g.run === 'bare', shrine: { bank: rec.echo },
-    next: u ? { kind: u.kind, name: u.name, towards: u.towards, price: u.price, was: b.was, now: b.stolen } : null };
+    next: u ? { kind: u.kind, name: u.name, towards: u.towards, price: u.price, was: rec.echo - now, now } : null };
 }
+
+/* ---------- the Echo Shrine (step 5e-1; design system version 12, EchoShrine), built with the kit's parts (lb.ui) ----------
+   Anything affordable can be bought, in any order; a third potion socket needs the second; a bought spell is chosen, and a bought belt worn,
+   with one press; buying one chooses or wears it too; every purchase is saved at once. */
+const SPELLS = [
+  { id: 'fire', name: 'Fireball', note: 'Flies, bursts' },
+  { id: 'bolt', name: 'Lightning bolt', note: 'Strikes, forks', unlock: 'bolt' },
+  { id: 'acid', name: 'Acid spray', note: 'Sprays, hisses', unlock: 'acid' },
+];
+const BELT_ROWS = [{ id: 'scarf' }, { id: 'nightBlue', unlock: 'nightBlue' }, { id: 'mulberry', unlock: 'mulberry' }, { id: 'ash', unlock: 'ash' }];   // names and bands from the kit (lb.ui.belt)
+const HYSTERIA = 'No breath wasted. No blood spared. Time will not wait for your terror.';
+const unlockOf = (id) => UNLOCKS.find((u) => u.id === id);
+const canBuy = (rec, u) => !!u && !u.has(rec) && (!u.needs || unlockOf(u.needs).has(rec)) && rec.echo >= u.price;
+function buyUnlock(lb, u) {
+  const rec = lb.progress;
+  if (!canBuy(rec, u)) return false;
+  rec.echo -= u.price;
+  if (u.id === 'health2' || u.id === 'health3') rec.sockets.health = u.id === 'health2' ? 2 : 3;
+  else if (u.id === 'mana2' || u.id === 'mana3') rec.sockets.mana = u.id === 'mana2' ? 2 : 3;
+  else if (u.id === 'bolt' || u.id === 'acid') { rec[u.id] = true; rec.spell = u.id; }
+  else if (BELTS.indexOf(u.id) >= 0) { rec.belts[u.id] = true; rec.belt = u.id; }
+  lb.saveProgress();
+  lb.sfx('confirm');
+  return true;
+}
+function openShrine(lb, back) { lb.ui.open((ui) => shrinePlaque(lb, ui, back)); }
+function shrinePlaque(lb, ui, back) {
+  const rec = lb.progress, phone = ui.phone, items = [], again = () => ui.refresh();
+  const { panel, face } = ui.plaque('gh-sh', 780, 804, phone ? 'gap:10px;padding:12px 14px 12px' : 'gap:10px;padding:16px 20px 14px');
+  const head = ui.el('div', 'lb-header');
+  const bank = ui.el('div', 'lb-bank', '<span class="lb-bank-label" aria-hidden="true">Stolen echo</span><span class="lb-bank-num" aria-hidden="true">' + rec.echo + '</span>');
+  bank.setAttribute('role', 'status'); bank.setAttribute('aria-label', rec.echo + ' stolen echo');
+  head.append(ui.heading('gh-sh', 'Echo Shrine'), bank);
+  const cols = ui.el('div', 'lb-shrine-cols');
+  const column = (id, title) => { const c = ui.el('div', 'lb-shrine-col'); c.setAttribute('role', 'group'); c.setAttribute('aria-labelledby', id); const t = ui.txt('p', 'lb-shrine-title', title); t.id = id; c.append(t); cols.append(c); return c; };
+  const priceButton = (u, what) => {   // ready (the brass band) when it can be bought now; dim when the bank is short
+    const ok = canBuy(rec, u), b = ui.txt('button', 'lb-buy' + (ok ? ' is-ready' : ''), ok ? 'Buy ' + u.price : String(u.price));
+    b.type = 'button';
+    b.setAttribute('aria-label', ok ? 'Buy ' + what + ' for ' + u.price + ' echo' : what.charAt(0).toUpperCase() + what.slice(1) + ', ' + u.price + ' echo, ' + (u.price - rec.echo) + ' more needed');
+    if (!ok) b.disabled = true;
+    return b;
+  };
+  // the spell for the next run
+  const c1 = column('gh-sh1', 'Spell for the next run');
+  SPELLS.forEach((sp) => {
+    const owned = !sp.unlock || unlockOf(sp.unlock).has(rec), chosen = rec.spell === sp.id;
+    const row = ui.el('div', 'lb-shrine-row' + (chosen ? ' is-chosen' : ''), ui.spell(sp.id) + '<span class="lb-shrine-text"><span class="lb-shrine-name"></span></span>');
+    row.querySelector('.lb-shrine-name').textContent = sp.name;
+    if (!phone) row.querySelector('.lb-shrine-text').append(ui.txt('span', 'lb-shrine-note', sp.note));
+    if (chosen) row.append(ui.txt('span', 'lb-shrine-state', 'Chosen'));
+    else if (owned) { const b = ui.txt('button', 'lb-buy', 'Choose'); b.type = 'button'; row.append(b); items.push({ el: b, activate: () => { rec.spell = sp.id; lb.saveProgress(); lb.sfx('confirm'); again(); } }); }
+    else { const u = unlockOf(sp.unlock), b = priceButton(u, sp.name.toLowerCase()); row.append(b); if (!b.disabled) items.push({ el: b, activate: () => { if (buyUnlock(lb, u)) again(); } }); }
+    c1.append(row);
+  });
+  // the potions you can keep
+  const c2 = column('gh-sh2', 'Potions you can keep');
+  [['health', 'Health potions', 'health'], ['mana', 'Mana potions', 'mana']].forEach(([k, name], i) => {
+    const n = rec.sockets[k], text = ui.el('span', 'lb-shrine-text', '<span class="lb-shrine-name"></span><span class="lb-shrine-note"></span>');
+    text.querySelector('.lb-shrine-name').textContent = name; text.querySelector('.lb-shrine-note').textContent = n + ' of 3 sockets';
+    if (i) text.style.marginTop = phone ? '2px' : '4px';
+    const pots = ui.el('div', 'lb-shrine-pots'), socks = ui.el('span', 'lb-socks', [0, 1, 2].map((j) => ui.potion(k, j < n, phone)).join(''));
+    socks.setAttribute('aria-hidden', 'true'); pots.append(socks);
+    if (n < 3) { const u = unlockOf(k + (n + 1)), b = priceButton(u, u.towards); pots.append(b); if (!b.disabled) items.push({ el: b, activate: () => { if (buyUnlock(lb, u)) again(); } }); }
+    c2.append(text, pots);
+  });
+  // the belt
+  const c3 = column('gh-sh3', 'Belt'), grid = ui.el('div', 'lb-belts');
+  BELT_ROWS.forEach((row0) => {
+    const bt = Object.assign({}, row0, ui.belt(row0.id)), u = bt.unlock ? unlockOf(bt.unlock) : null, owned = !u || u.has(rec), worn = rec.belt === bt.id;
+    const b = ui.el('button', 'lb-belt' + (worn ? ' is-worn' : ''), '<span class="band' + bt.band + '"></span><span class="row"><span class="nm"></span></span>');
+    b.type = 'button'; b.querySelector('.nm').textContent = bt.name;
+    const row = b.querySelector('.row');
+    if (owned) { b.setAttribute('aria-pressed', worn ? 'true' : 'false'); row.append(ui.txt('span', 'st' + (worn ? '' : ' is-wear'), worn ? 'Worn' : 'Wear')); items.push({ el: b, activate: () => { if (rec.belt !== bt.id) { rec.belt = bt.id; lb.saveProgress(); lb.sfx('confirm'); again(); } } }); }
+    else {
+      const ok = canBuy(rec, u);
+      row.append(ui.txt('span', 'pr' + (ok ? '' : ' is-short'), String(u.price)));
+      b.setAttribute('aria-label', ok ? 'Buy the ' + bt.name.toLowerCase() + ' belt for ' + u.price + ' echo' : 'The ' + bt.name.toLowerCase() + ' belt, ' + u.price + ' echo, ' + (u.price - rec.echo) + ' more needed');
+      if (ok) items.push({ el: b, activate: () => { if (buyUnlock(lb, u)) again(); } }); else b.setAttribute('aria-disabled', 'true');
+    }
+    grid.append(b);
+  });
+  c3.append(grid);
+  // Hysteria, locked until it is built (after submission); the foot
+  const backBtn = ui.button('Back');
+  items.push({ el: backBtn, activate: back });
+  const foot = ui.el('div', 'lb-shrine-foot');
+  if (phone) {
+    foot.style.paddingTop = '8px';
+    const soon = ui.el('p', 'lb-hint lb-shrine-soon', '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3 H17 M7 21 H17 M8 3 C8 8 16 9 16 12 C16 15 8 16 8 21 M16 3 C16 8 8 9 8 12 C8 15 16 16 16 21"/></svg><span><b>Hysteria</b> \u00b7 Coming soon \u00b7 500</span>');
+    soon.setAttribute('aria-disabled', 'true');
+    foot.append(soon, backBtn);
+    face.append(head, cols, foot);
+  } else {
+    const hy = ui.el('div', 'lb-shrine-row is-soon', ui.spell('hysteria', true) + '<span class="lb-shrine-text is-inline"><span class="lb-shrine-name">Hysteria</span><span class="lb-shrine-note"></span></span><span class="lb-shrine-state">Coming soon \u00b7 500</span>');
+    hy.setAttribute('aria-disabled', 'true'); hy.querySelector('.lb-shrine-note').textContent = HYSTERIA;
+    foot.append(ui.hint('Bought for good. The spell and belt can be changed here before any run.' + (ui.touch ? '' : ' ' + ui.kbd('Backspace') + ' back')), backBtn);
+    face.append(head, cols, hy, foot);
+  }
+  return { panel, items, opts: { back } };
+}
+
+/* ---------- the choice of run (step 5e-1; Modes): only once anything is bought; before that, Start game goes straight into The Bare
+   Reckoning. Play again repeats the run just played (lb.run). ---------- */
+const anyBought = (rec) => rec.sockets.health > 1 || rec.sockets.mana > 1 || rec.bolt || rec.acid || rec.hysteria || BELTS.some((k) => rec.belts[k]);
+const RUNS = [
+  { id: 'bare', name: 'The Bare Reckoning', note: 'Stripped of all favour, face the dark with naked steel alone. Your agony is etched into history.', terms: 'On the high scores \u00b7 your spell and belt, one potion of each' },
+  { id: 'infusion', name: 'The Echo Infusion', note: 'Gorged on stolen power. Unleash your full arsenal, but expect no immortalisation.', terms: "Everything you've bought \u00b7 not on the high scores" },
+];
+function chooseRun(lb, start) {
+  if (!anyBought(lb.progress)) return start('bare');
+  const pick = { id: lb.run === 'infusion' ? 'infusion' : 'bare' };
+  lb.ui.open((ui) => modesPlaque(lb, ui, start, pick), pick.id === 'infusion' ? 1 : 0);
+}
+function modesPlaque(lb, ui, start, pick) {
+  const phone = ui.phone, items = [];
+  const { panel, face } = ui.plaque('gh-md', 560, 804, phone ? 'gap:10px;padding:12px 14px 14px' : 'gap:12px;padding:20px 20px 16px');
+  const list = ui.el('div', 'lb-modes' + (phone ? ' is-row' : ''));
+  list.setAttribute('role', 'radiogroup'); list.setAttribute('aria-labelledby', 'gh-md');
+  const buttons = [];
+  RUNS.forEach((r, i) => {
+    const b = ui.el('button', 'lb-mode', '<span class="name"></span><span class="note"></span><span class="terms"></span>');
+    b.type = 'button'; b.setAttribute('role', 'radio');
+    b.querySelector('.name').textContent = r.name; b.querySelector('.note').textContent = r.note; b.querySelector('.terms').textContent = r.terms;
+    b.addEventListener('click', () => ui.select(i));   // a click or a tap chooses; Start (or Enter) starts
+    buttons.push(b); list.append(b);
+    items.push({ el: b, menu: true, noClick: true, focus: () => { pick.id = r.id; buttons.forEach((x, j) => x.setAttribute('aria-checked', j === i ? 'true' : 'false')); return b; }, activate: () => { lb.sfx('confirm'); ui.close(); start(r.id); } });
+  });
+  const locked = ui.el('button', 'lb-mode is-locked', '<span class="name"><svg viewBox="0 0 14 16" aria-hidden="true"><rect x="1.5" y="7" width="11" height="8" rx="1"/><path d="M4 7 V4.6 A3 3 0 0 1 10 4.6 V7"/></svg>Hysteria</span><span class="lock-note"></span><span class="terms">Coming soon \u00b7 500 echo at the Echo Shrine</span>');
+  locked.type = 'button'; locked.setAttribute('role', 'radio'); locked.setAttribute('aria-checked', 'false'); locked.setAttribute('aria-disabled', 'true');
+  locked.querySelector('.lock-note').textContent = HYSTERIA;
+  list.append(locked);
+  const go = ui.button('Start', true, true), back = ui.button('Back');
+  const leave = () => { lb.sfx('back'); ui.close(); };
+  items.push({ el: go, activate: () => { lb.sfx('confirm'); ui.close(); start(pick.id); } }, { el: back, activate: leave });
+  if (phone) {
+    go.style.padding = '0 22px'; back.style.padding = '0 18px';
+    const head = ui.el('div', 'lb-header'); head.append(ui.heading('gh-md', 'Choose a run'), go, back);
+    face.append(head, list);
+  } else {
+    const btns = ui.el('div', 'lb-btns'); btns.style.marginTop = '2px'; btns.append(go, back);
+    face.append(ui.heading('gh-md', 'Choose a run'), ui.rule(), list, btns);
+    if (!ui.touch) { const h = ui.hint(ui.kbd('up') + ' ' + ui.kbd('down') + ' choose \u00b7 ' + ui.kbd('Enter') + ' start \u00b7 ' + ui.kbd('Backspace') + ' back'); h.style.textAlign = 'center'; face.append(h); }
+  }
+  return { panel, items, opts: { back: leave } };
+}
+
 const BOSS_TOUCH = 0.15;         // its body hurts on touch too (not while he rolls through it), so it is struck from the sword's reach
 const HEAD_H = 100;              // his height to the top of his hat: a boss's attack that touches the hat hurts
 const DESIGN_FACING = { dawn: { sickle: -1, bolts: -1 } };   // the kit's: the moor mother's sickle and bolts are drawn turned round
@@ -238,10 +387,10 @@ LanternBox.game({
     clear: 'Your stolen echo and everything bought at the Echo Shrine will be gone, and the next run starts as a first run, hints and all. High scores and settings stay.' },
   credits: { music: ['Music made with Google Gemini', 'The Long Vigil \u00b7 Lantern in the Moor'], sound: 'Two sound effects from Pixabay; the rest made in code' },
   onLeave(g, lb) { bankRun(g, lb, false); },   // Restart or Quit to menu: the run's echo is banked all the same
-  shrine: { bank: (lb) => lb.progress.echo },   // kit 0.10.2: the Echo Shrine on the title's arch (High scores on an arch tile), the stand-in until 5e
+  shrine: { bank: (lb) => lb.progress.echo, open: openShrine },   // kit 0.10.2: on the title's arch; step 5e-1: the Echo Shrine itself
+  chooseRun,   // step 5e-1: the choice of run, once anything is bought
   // Testing (delete for the finished game): where a run starts, and help for trying it out
   test: { options: [
-    { id: 'run', name: 'Run', choices: [['bare', 'The Bare Reckoning'], ['infusion', 'The Echo Infusion']] },   // step 5d, until the choice of run (5e)
     { id: 'place', name: 'Start at', choices: [['night', 'Night'], ['storm', 'Blood Red Rain'], ['dawn', 'Dawn'], ['mist', 'Mist']] },
     { id: 'where', name: 'From', choices: [['start', 'The start'], ['half', 'Halfway'], ['boss', "The boss's door"]] },
     { id: 'mons', name: 'Monsters', choices: [['normal', 'Normal'], ['none', 'None'], ['crowd', 'A crowd']] },
@@ -258,11 +407,17 @@ LanternBox.game({
       safeT: 0, hurtT: 9, hurtKind: 'health', atkBuf: 0, swHit: false, mons: [], monsTest: t.mons || 'normal',
       spells: { heal: t.all ? 3 : 0, fire: t.all ? 3 : 0 }, spellList: t.all ? ['heal', 'fire'] : [], sel: 0, castBuf: 0, cast: null, healT: 9,
       manaShown: 1, loot: [], shots: [], chest: null, hand: null,
-      pots: { health: false, mana: false }, potLine: {}, drinkT: 9, drinkKind: 'health', fills: [],   // version 11: the potions kept
-      run: t.run === 'infusion' ? 'infusion' : 'bare', echoDue: 0, banked: null, won: false };   // step 5d: the run played, echo still rising, banked
+      pots: { health: 0, mana: 0 }, potLine: {}, drinkT: 9, drinkKind: 'health', fills: [],   // version 11: the potions kept (5e-1: how many)
+      run: lb.run === 'infusion' ? 'infusion' : 'bare', echoDue: 0, banked: null, won: false };   // step 5d: the run played, echo still rising, banked
+    // step 5e-1: what the run takes: The Bare Reckoning one potion socket of each, The Echo Infusion every socket bought; both the chosen
+    // spell (its scrolls teach it from step 5e-2; until then the fireball's) and the belt worn
+    const rec = lb.progress;
+    g.potCap = g.run === 'infusion' ? { health: rec.sockets.health, mana: rec.sockets.mana } : { health: 1, mana: 1 };
+    g.attack = rec.spell;
+    lb.world.belt(rec.belt);
     G = g;
     loadPlace(g, lb, g.p, { start: 0, half: 1, boss: 2 }[t.where] || 0);
-    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); hudSpells(g, lb); lb.hud.potions(false, false);
+    lb.hud.health(1); lb.hud.mana(1); lb.hud.armour(g.armour); lb.hud.lives(LIVES); hudSpells(g, lb); lb.hud.potCap(g.potCap.health, g.potCap.mana); lb.hud.potions(0, 0);
     lb.fade(1);   // black until the first place card lifts
     lb.placeCard(PLACES[g.p], () => { lb.fade(0); enterPlace(g, lb); }, () => { g.mode = 'ground'; });
     return g;
@@ -869,8 +1024,8 @@ function lootUpdate(g, lb, dt) {
   if (g.loot.some((it) => it.gone)) g.loot = g.loot.filter((it) => !it.gone);
 }
 function take(g, lb, it) {             // false: not needed now (health, mana or armour full), so it stays for later; 'keep': into its socket
-  if ((it.kind === 'health' || it.kind === 'mana') && !g.pots[it.kind]) {   // version 11: a potion with its socket empty is kept
-    g.pots[it.kind] = true; lb.hud.keep(it.kind, { line: !g.potLine[it.kind] }); g.potLine[it.kind] = true;   // the line once per kind each run
+  if ((it.kind === 'health' || it.kind === 'mana') && g.pots[it.kind] < g.potCap[it.kind]) {   // version 11: a potion kept while a socket is empty (5e-1: up to three)
+    g.pots[it.kind]++; lb.hud.keep(it.kind, { line: !g.potLine[it.kind] }); g.potLine[it.kind] = true;   // the line once per kind each run
     lb.sfx('pickup');
     return 'keep';
   }
@@ -896,8 +1051,8 @@ function take(g, lb, it) {             // false: not needed now (health, mana or
 // over 0.4 s (added a frame at a time, so a blow meanwhile still counts)
 function drink(g, lb, k) {
   const bar = k === 'health' ? g.health : g.mana;
-  if (!g.pots[k] || bar >= 0.999 || g.mode === 'lost' || g.mode === 'return' || g.mode === 'over') return;
-  g.pots[k] = false; lb.hud.drink(k);
+  if (g.pots[k] <= 0 || bar >= 0.999 || g.mode === 'lost' || g.mode === 'return' || g.mode === 'over') return;
+  g.pots[k]--; lb.hud.drink(k);
   g.drinkT = 0; g.drinkKind = k;
   g.fills.push({ k, t: 0, done: 0 });
 }
