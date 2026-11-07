@@ -48,14 +48,15 @@ Retro Kit's split between World (the playfield) and Interface (glass panels arou
 
 These are Barney's to decide. Raise them when they become relevant; don't settle them alone.
 
-None are open at the moment.
+- **The studio credit inside games** (raised 2026-11-07): every game goes out as Lantern Box Games, but these rules allow no image files and no hex colours in a game, so the logo in `brand/` can't be built in as it stands. Either each kit draws the credit with its own fonts and colours, or one exception lets every game carry the same outlined credit from `brand/`.
 
 ## Decided
 
 - **The arcade's name**: Twisted Retro Fit (Barney, 2026-10-25).
 - **Arcade front page**: a website in `site/` with a card for every game, published to GitHub Pages from this public repository by a GitHub Action on every push to `main` (Barney, 2026-10-25).
-- **Folder layout**: one repo, Retro Games, with each kit in its own place: Retro Kit in `kit/` and `games/`, City Nights in `city-nights/`, Lantern Box in `lantern-box/` (added 2026-11-01). The repo keeps its name for now (Barney, 2026-10-28).
+- **Folder layout**: one repo, Retro Games, with each kit in its own place: Retro Kit in `kit/` and `games/`, City Nights in `city-nights/`, Lantern Box in `lantern-box/` (added 2026-11-01), and the studio's logo in `brand/` (added 2026-11-07). The repo keeps its name for now (Barney, 2026-10-28).
 - **Shared core**: City Nights starts from a copy of Retro Kit's game shell and build, restyled, with its own drawing. A core shared by every kit is revisited when a third kit is planned (Barney, 2026-10-28).
 - **Shared core, third kit**: Lantern Box starts from a copy of Retro Kit's game shell and build, restyled, with its own drawing. A core shared by every kit is planned as its own job once Gloam Hallow is playable (Barney, 2026-11-01).
 - **Settings and high scores**: settings are shared across the whole arcade; high scores are kept per game, in Retro Kit's format, so the website shows every game's best (Barney, 2026-10-28).
 - **Soundtracks**: a City Nights game may have two soundtrack MP3s instead of one, switched as the street changes district. Each adds about 5.5 MB to the game's file (Barney, 2026-10-29). A Lantern Box game may also have two, switched as its gameplay decides (Barney, 2026-11-01).
+- **The studio**: every game in the arcade goes out as Lantern Box Games, whichever kit it's built on. Its logo and usage note are in `brand/` (Barney, 2026-11-07).
