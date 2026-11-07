@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.10.0';
+  const VERSION = '0.10.1';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -237,7 +237,9 @@ const FX={
   crack:()=>{ring({f:620,vol:0.12,wet:0.4,partials:[[1,1,0.5],[1.63,0.8,0.38],[2.37,0.7,0.3],[3.12,0.5,0.22],[4.05,0.4,0.16],[5.3,0.3,0.12]]});noise({ft:"bandpass",from:3200,q:1.5,dur:0.14,tear:90,vol:0.3,wet:0.25});noise({ft:"highpass",from:3000,dur:0.03,vol:0.3,wet:0.2});
     for(let i=0;i<3;i++)tone({type:"triangle",f:3000+R()*2000,dur:0.03,vol:0.05,at:0.08+i*0.07,wet:0.4});},
   // a monster defeated: the card tearing, then its wisp's echo (version 12: the rising note became a short echo; v is the echo it gives)
-  defeat:v=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});ECHO(v||1,0.18);},
+  // kit 0.10.1 (Barney, 7 November 2026): the echo at its own level (GAIN.echo), the tear at defeat's, so the echo can stand out over
+  // the tear as the old rising note did; the notes are play.js 1.2.0's, unchanged
+  defeat:v=>{noise({ft:"bandpass",from:2600,to:1800,q:1.3,dur:0.28,tear:70,vol:0.34,wet:0.2});const g=curGain;curGain=GAIN.echo;try{ECHO(v||1,0.18);}finally{curGain=g;}},
   // version 12: the echo alone, as a boss's golden wisp rises (25), after bossDefeated's bell
   echo:v=>ECHO(v||25,0),
   pickup:()=>{tone({f:1320,dur:0.12,vol:0.14,wet:0.5});tone({f:1760,dur:0.3,vol:0.12,wet:0.6,at:0.07});tone({f:2640,dur:0.25,vol:0.03,wet:0.7,at:0.12});},
@@ -267,7 +269,7 @@ const FX={
 };
 // each effect's level, set by measuring how loud it sounds (K-weighted, its loudest 0.4 s) against a target for its kind:
 // the big moments loudest, the main actions next, light touches and the menus quieter. GAIN is filled from that measure.
-const GAIN={echo: 5.22,swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 5.22, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */ /* kit 0.10.0 (step 5d, starting figures): defeat and echo measured as the rest, K-weighted over the loudest 0.4 s: a defeat giving 1 echo as loud as the old defeat (-29.6), echo the same gain, so 25 echo comes near the boss-defeated bell; tune by ear */
+const GAIN={echo: 5.86,swing: 5.24, hit: 3.07, jump: 8, land: 2.52, roll: 5.59, hurt: 0.78, crack: 1.97, defeat: 2.96, pickup: 1.96, heal: 1.56, fireball: 3.7, burst: 3.86, fizzle: 2.01, checkpoint: 2.13, line: 2.25, lifeLost: 2.89, bossArrives: 1.25, bossDefeated: 1.07, placeCard: 1.47, win: 1.36, select: 4.97, confirm: 1.87, back: 3.83, drinkHealth: 2.37, drinkMana: 2.36}; /* round 13: the drinks measured as the heal and the pick-up are (a light touch, -31) */ /* kit 0.10.1 (starting figures; Barney could hardly hear 0.10.0's echo under the tear): the tear back at the old defeat's level, and the echo, a defeat's and a boss's, at its own, measured K-weighted in 100 ms windows: its first note about 5 dB over the tear (-24 against -29), as the old rising note was; tune by ear */
 // ---- the places' background sound: wind, rain, thunder, bats, crows, creaking trees ----
 function loopNoise(ft,f,q,vol,lfoRate,lfoDepth){const s=ctx.createBufferSource();s.buffer=nb;s.loop=true;const fl=ctx.createBiquadFilter();fl.type=ft;fl.frequency.value=f;fl.Q.value=q;
   const g=ctx.createGain();g.gain.value=vol;s.connect(fl);fl.connect(g);g.connect(amb);s.start(0,R()*1.5);const nodes=[s];
