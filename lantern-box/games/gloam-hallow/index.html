@@ -135,7 +135,7 @@ const MIX = {
 const CROWD = ['crawler', 'bat2', 'hatmaw', 'ghoul2', 'walker', 'crawler', 'bat2', 'walker'];   // Testing: eight at once past the start
 
 // Spells, mana and loot (4d-3; starting figures, Barney's where he gave them)
-const MANA_RATE = 0.04;          // mana refills 4% a second on its own
+const MANA_RATE = 0.01;          // mana refills 1% a second on its own, empty to full in 100 s (Barney, 8 November 2026: 4% at first, far too quick)
 const SPELL = {                  // three levels each, from scrolls: heal 40% of health for 30% of mana, a fireball 2 blows for 25%
   heal: { cost: 0.30, amount: [0, 0.40, 0.55, 0.70] },
   fire: { cost: 0.25, dmg: [0, 2, 3, 4] },
@@ -216,6 +216,7 @@ const ACID_T = 0.35, ACID_HIT_AT = 0.15;                     // its 0.35 s, land
 const ACID_PATCH = [0.5 * BODY_LEN, 2 * BODY_LEN];           // the patch on the ground, from half a body-length ahead to two
 const ACID_PATCH_AT = 0.25, ACID_PATCH_T = 1.5, ACID_TICK = 0.25;   // from 0.25 s, hissing for 1.5 s, hurting what stands in it every 0.25 s
 const FIRE_SPEED = 420;          // the fireball, lines a second, straight at chest height until it hits a monster or leaves the screen
+const FIRE_LOW = 14;             // step 5e-6c: its flames reach this far under its middle (52 over his feet), so it bursts on a piece 38 high or more
 const CAST_BUF = 0.15;           // cast pressed this long before he is free still casts
 const POTION = { health: 0.35, mana: 0.5 };   // what a potion refills
 // a defeat's drop (the gameplay note): a health or a mana potion 1 in 6 each, armour 1 in 20; a walker first has 1 in 4 to drop a
@@ -415,7 +416,7 @@ function shrinePlaque(lb, ui, back) {
 }
 
 /* ---------- the choice of run (step 5e-1; Modes): only once anything is bought; before that, Start game goes straight into The Bare
-   Reckoning. Play again repeats the run just played (lb.run). ---------- */
+   Reckoning. It opens on The Echo Infusion. Play again repeats the run just played (lb.run). ---------- */
 const anyBought = (rec) => rec.sockets.health > 1 || rec.sockets.mana > 1 || rec.bolt || rec.acid || rec.hysteria || BELTS.some((k) => rec.belts[k]);
 const RUNS = [
   { id: 'bare', name: 'The Bare Reckoning', note: 'Stripped of all favour, face the dark with naked steel alone. Your agony is etched into history.', terms: 'On the high scores \u00b7 your spell and belt, one potion of each' },
@@ -423,8 +424,8 @@ const RUNS = [
 ];
 function chooseRun(lb, start) {
   if (!anyBought(lb.progress)) return start('bare');
-  const pick = { id: lb.run === 'infusion' ? 'infusion' : 'bare' };
-  lb.ui.open((ui) => modesPlaque(lb, ui, start, pick), pick.id === 'infusion' ? 1 : 0);
+  const pick = { id: 'infusion' };      // it opens on The Echo Infusion (Barney, 8 November 2026; it was the run last played, at first The Bare Reckoning)
+  lb.ui.open((ui) => modesPlaque(lb, ui, start, pick), 1);
 }
 function modesPlaque(lb, ui, start, pick) {
   const phone = ui.phone, items = [];
@@ -689,6 +690,23 @@ function surfaceAt(g, x) {           // where he stands at x: a piece's top or t
   return p ? p.y(x) : g.L.ground(x);
 }
 function bankRise(g, b) { return g.L.ground(b[0] - 1) - g.L.ground(b[1] + 1); }   // positive: the ground rises going right
+// step 5e-6c (Barney, 8 November 2026: spells went through crates and hills): the spells stop at the ground and the pieces. Solid at
+// (x, y): under the ground (a pit is open), or inside a piece, from its top down (skip: the piece he stands on, never in the way)
+function solidAt(g, x, y, skip) {
+  if (y > groundAt(g, x)) return true;
+  for (const p of g.pieces) if (p !== skip && x >= p.x0 && x <= p.x1 && y > p.y(x)) return true;
+  return false;
+}
+// the first solid point on the line from (x1, y1) to (x2, y2), every 4 lines, or null; the line ends where it enters box (its target)
+function lineBlock(g, x1, y1, x2, y2, box, skip) {
+  const n = Math.max(1, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 4));
+  for (let i = 1; i <= n; i++) {
+    const x = x1 + ((x2 - x1) * i) / n, y = y1 + ((y2 - y1) * i) / n;
+    if (box && x >= box[0] && x <= box[1] && y >= box[2] && y <= box[3]) return null;
+    if (solidAt(g, x, y, skip)) return { x, y };
+  }
+  return null;
+}
 // a face in front of him, within a few lines: a bank rising his way or a piece's side; h is how high it stands over his feet
 function faceAhead(g) {
   if (g.on) return null;
@@ -944,7 +962,7 @@ function throwSpell(g, lb, sp, from) {   // the attack spell leaves his hand (st
     lb.sfx('fireball');
   }
 }
-function shotsUpdate(g, lb, dt) {     // each fireball flies on until it hits a monster (and bursts there) or leaves the screen
+function shotsUpdate(g, lb, dt) {     // each fireball flies on until it hits a monster (and bursts there), the ground or a piece, or leaves the screen
   const camX = camAt(g, lb);
   for (const s of g.shots) {
     if (s.burst != null) { s.burst += dt; if (s.burst >= 0.4) s.gone = true; continue; }
@@ -953,6 +971,7 @@ function shotsUpdate(g, lb, dt) {     // each fireball flies on until it hits a 
     const bb = m ? null : bossBody(g);
     if (m) { s.burst = 0; lb.sfx('burst'); damage(g, lb, m, SPELL.fire.dmg[s.level], s.f); }
     else if (bb && !(bb[1] < s.x - 10 || bb[0] > s.x + 10 || bb[3] < s.y - 10 || bb[2] > s.y + 10)) { s.burst = 0; lb.sfx('burst'); bossDamage(g, lb, SPELL.fire.dmg[s.level]); }
+    else if (solidAt(g, s.x + s.f * 10, s.y + FIRE_LOW, null)) { s.burst = 0; lb.sfx('burst'); }   // step 5e-6c: it bursts on a hill or a piece
     else if (s.x < camX - 60 || s.x > camX + lb.W + 60) s.gone = true;
   }
   if (g.shots.some((s) => s.gone)) g.shots = g.shots.filter((s) => !s.gone);
@@ -989,12 +1008,20 @@ function boltHit(g, lb, q, dmg, f) {
 function castBolt(g, lb, from) {
   const gx = from.x, f = from.f, hx = gx + f * 28, hy = from.y - 52, dmg = SPELL.bolt.dmg[Math.max(1, g.spells.bolt)];
   const ahead = (q) => (f > 0 ? q.b[0] - gx : gx - q.b[1]), all = boltTargets(g);   // step 5e-6b: aimed again as it fires
-  const first = all.filter((q) => ahead(q) > -BODY_W && ahead(q) <= BOLT_RANGE).sort((a, b) => ahead(a) - ahead(b))[0] || null;
+  // step 5e-6c: only a target he can see, nothing solid between his hand and it; with none, it strikes towards the nearest hidden one
+  // (or the air) and stops where it meets a hill or a piece
+  const near = all.filter((q) => ahead(q) > -BODY_W && ahead(q) <= BOLT_RANGE).sort((a, b) => ahead(a) - ahead(b));
+  const first = near.find((q) => !lineBlock(g, hx, hy, q.x, q.y, q.b, from.on)) || null;
   g.zapN = (g.zapN || 0) + 1;
   const z = { t: 0, x1: hx, y1: hy, x2: hx + f * BOLT_RANGE * 0.5, y2: hy + 10, seed: 3 + g.zapN * 7, fork: null };
+  if (!first) {
+    if (near[0]) { z.x2 = near[0].x; z.y2 = near[0].y; }
+    const hit = lineBlock(g, hx, hy, z.x2, z.y2, null, from.on);
+    if (hit) { z.x2 = hit.x; z.y2 = hit.y; }
+  }
   if (first) {
     z.x2 = first.x; z.y2 = first.y; boltHit(g, lb, first, dmg, f);
-    const second = all.filter((q) => q !== first && Math.hypot(q.x - first.x, q.y - first.y) <= BOLT_FORK).sort((a, b) => Math.hypot(a.x - first.x, a.y - first.y) - Math.hypot(b.x - first.x, b.y - first.y))[0];
+    const second = all.filter((q) => q !== first && Math.hypot(q.x - first.x, q.y - first.y) <= BOLT_FORK && !lineBlock(g, first.x, first.y, q.x, q.y, q.b, null)).sort((a, b) => Math.hypot(a.x - first.x, a.y - first.y) - Math.hypot(b.x - first.x, b.y - first.y))[0];
     if (second) { z.fork = { x2: second.x, y2: second.y }; lb.after(BOLT_FORK_AT, () => boltHit(g, lb, second, dmg, f)); }
   }
   g.zaps.push(z);
@@ -1004,15 +1031,24 @@ function castBolt(g, lb, from) {
 // quarter second, to whatever stands in it
 function castAcid(g, lb, from) {
   const gx = from.x, f = from.f, dmg = SPELL.acid.dmg[Math.max(1, g.spells.acid)];
-  g.sprays.push({ x: gx + f * 28, y: from.y - 52, gx, gy: from.y, f, t: 0, hit: false, dmg });
-  const a = gx + f * ACID_PATCH[0], b = gx + f * ACID_PATCH[1], x0 = Math.min(a, b), x1 = Math.max(a, b);
+  g.sprays.push({ x: gx + f * 28, y: from.y - 52, gx, gy: from.y, f, t: 0, hit: false, dmg, on: from.on });
+  let a = gx + f * ACID_PATCH[0], b = gx + f * ACID_PATCH[1];
+  // step 5e-6c: the patch stops at a piece's side or a bank rising his way; on a piece, at the piece's edge
+  const nearer = (x) => (x - gx) * f > 0 && (x - gx) * f < (b - gx) * f;
+  if (from.on) { const e = f > 0 ? from.on.x1 : from.on.x0; if (nearer(e)) b = e; }
+  else {
+    for (const p of g.pieces) { const side = f > 0 ? p.x0 : p.x1; if (nearer(side)) b = side; }
+    for (const k of g.L.banks) { const foot = f > 0 ? k[0] : k[1]; if (bankRise(g, k) * f >= BANK_MIN && nearer(foot)) b = foot; }
+  }
+  const x0 = Math.min(a, b), x1 = Math.max(a, b);
   // step 5e-6a (version 13): on the ground the patch lies along it, slopes too (on a piece it lies flat on the piece's top)
-  g.patches.push({ x0, x1, y: from.on ? from.y : g.L.ground((x0 + x1) / 2), slope: !from.on, t: -ACID_PATCH_AT, tick: 0, dmg: dmg * 0.5 * ACID_TICK / ACID_PATCH_T, f });
+  if ((b - a) * f > 8) g.patches.push({ x0, x1, y: from.on ? from.y : g.L.ground((x0 + x1) / 2), slope: !from.on, t: -ACID_PATCH_AT, tick: 0, dmg: dmg * 0.5 * ACID_TICK / ACID_PATCH_T, f });
   lb.sfx('acid');                      // step 5e-6a: a wet hissing spray
 }
 function acidHit(g, lb, s) {
   const x0 = Math.min(s.gx, s.gx + s.f * ACID_CONE), x1 = Math.max(s.gx, s.gx + s.f * ACID_CONE), y0 = s.gy - ACID_UP, y1 = s.gy + 10;
-  const meets = (b) => b && !(b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1);
+  // step 5e-6c: and nothing solid between the spray's mouth and it
+  const meets = (b) => b && !(b[1] < x0 || b[0] > x1 || b[3] < y0 || b[2] > y1) && !lineBlock(g, s.x, s.y, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, b, s.on);
   let any = false;
   for (const m of g.mons) if (alive(m) && meets(monBox(m))) { any = true; damage(g, lb, m, s.dmg * 0.5, s.f); }
   if (meets(bossBody(g))) { any = true; bossDamage(g, lb, s.dmg * 0.5); }
