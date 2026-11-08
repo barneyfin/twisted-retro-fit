@@ -192,6 +192,8 @@ Drawing:
 
 Custom notes (use sparingly, keep them short): `rk.sfx.tone({ f: 440, to: 220, dur: 0.1, type: 'square', vol: 0.2, delay: 0 })` and `rk.sfx.noise({ dur: 0.3, from: 2400, to: 120, vol: 0.3 })`.
 
+A game does nothing about phones taking the sound away (kit 2.2.1): when a phone call or the system stops it mid-game, the kit pauses play once, and the next tap or key brings the sound and the music back.
+
 ## Music
 
 A game may have one soundtrack: an MP3 that Barney supplies (never a real game's music). The kit plays it; a game never touches audio itself. It takes three things:
