@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.12.0';
+  const VERSION = '0.12.1';
   const STEP = 1 / 60;
   const PICTURE_H = 540;            // picture-height: the street is drawn for a 540-line picture
   const ASPECT = [4 / 3, 2.4];      // the picture's width follows the window's shape between these; beyond, letterbox
@@ -143,15 +143,75 @@
 
   /* ---------- Sound (synthesised; no audio files). Retro Kit's set, unchanged. ---------- */
   function makeAudio(settings) {
-    const a = { ctx: null, master: null, noiseBuf: null };
+    const a = { ctx: null, master: null, noiseBuf: null, wasRunning: false, rebuiltAt: -1e9, beforeRebuild: null,
+      needsFresh: false, stalled: false, pausedForLoss: false, rebuilds: 0, lostPauses: 0 };
+    let clockT = -1, clockAt = 0, movingSince = 0;
+    function makeCtx() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      const c = new AC();
+      a.ctx = c;
+      a.wasRunning = c.state === 'running';
+      c.onstatechange = () => { if (c === a.ctx && c.state === 'running') a.wasRunning = true; };
+      a.master = c.createGain();
+      a.master.connect(c.destination);
+      a.noiseBuf = null;
+      clockT = -1; movingSince = 0; a.stalled = false;
+      a.apply();
+      return true;
+    }
+    /* City Nights kit 0.12.1 (from Lantern Box kits 0.17.2 and 0.17.3, proved on Barney's wife's iPhone, 8 November 2026): a phone call stops an
+       iPhone's sound without hiding the page, and afterwards the context can stay stopped however often it is told to resume.
+       lost(): the system has stopped the sound: the iPhone's audio session says it is interrupted (where Safari tells), or a
+       context that had played is stopped, or says it runs but its clock has stood still for 0.7 s (watch(), every frame). The
+       shell then pauses play, once until the sound is back. Until a context plays again with its clock moving, each tap or key
+       (at most every 1.5 s) wakes the sound afresh: on an iPhone a moment of silence through a media element first (it can end
+       the system's hold on the page's sound), then a fresh context with the music moved onto it. A context that has never
+       played is only resumed. */
+    const session = () => { try { const s = navigator.audioSession; return s && typeof s.state === 'string' ? s.state : ''; } catch (e) { return ''; } };
+    const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1);
+    let kickEl = null;
+    function silentWav() {   // 0.1 s of silence, 8-bit mono at 8 kHz
+      const n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+      const put = (o, t) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+      put(0, 'RIFF'); v.setUint32(4, 36 + n, true); put(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); put(36, 'data'); v.setUint32(40, n, true);
+      b.fill(128, 44);
+      let bin = '';
+      for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+      return 'data:audio/wav;base64,' + btoa(bin);
+    }
+    function kick() {
+      if (!iOS) return;
+      try {
+        if (!kickEl) { kickEl = document.createElement('audio'); kickEl.setAttribute('playsinline', ''); kickEl.src = silentWav(); }
+        kickEl.currentTime = 0;
+        const job = kickEl.play();
+        if (job && job.catch) job.catch(() => {});
+      } catch (e) { /* ignore */ }
+    }
+    a.lost = () => !!a.ctx && a.ctx.state !== 'closed' && (session() === 'interrupted' || (a.wasRunning && (a.ctx.state !== 'running' || a.stalled)));
+    a.watch = function () {
+      const c = a.ctx, now = Date.now();
+      if (!c || c.state !== 'running') { clockT = -1; movingSince = 0; a.stalled = false; }
+      else if (c.currentTime !== clockT) { if (clockT >= 0 && !movingSince) movingSince = now; clockT = c.currentTime; clockAt = now; a.stalled = false; }   // moving: seen to go on, not just read
+      else if (now - clockAt > 700) { a.stalled = true; movingSince = 0; }
+      if (a.lost()) a.needsFresh = true;
+      else if (a.needsFresh && movingSince && now - movingSince > 400) { a.needsFresh = false; a.pausedForLoss = false; }   // playing again
+    };
+    a.diag = () => ({ state: a.ctx ? a.ctx.state : 'not started', clock: !a.ctx || a.ctx.state !== 'running' ? '-' : a.stalled ? 'stopped' : 'moving',
+      session: session() || 'not told', fresh: a.rebuilds, pauses: a.lostPauses, waking: a.needsFresh });
     a.unlock = function () {
-      if (!a.ctx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return;
-        a.ctx = new AC();
-        a.master = a.ctx.createGain();
-        a.master.connect(a.ctx.destination);
-        a.apply();
+      if (!a.ctx && !makeCtx()) return;
+      if (a.lost()) a.needsFresh = true;
+      if (a.needsFresh && Date.now() - a.rebuiltAt > 1500) {
+        a.rebuiltAt = Date.now();
+        kick();
+        if (a.beforeRebuild) { try { a.beforeRebuild(); } catch (e) { /* ignore */ } }   // the music remembers its place
+        const old = a.ctx;
+        try { const job = old.close(); if (job && job.catch) job.catch(() => {}); } catch (e) { /* ignore */ }
+        makeCtx();
+        a.rebuilds++;
       }
       if (a.ctx.state !== 'running') {
         const job = a.ctx.resume();
@@ -301,6 +361,12 @@
       tr.voice = null;
     }
     m.stop = function (fade) { stop(tracks[m.cur], fade); };
+    // City Nights kit 0.12.1: before the sound moves to a fresh context each track remembers its place; the next sync starts it there
+    m.forget = function () {
+      tracks.forEach((tr) => { try { stop(tr, 0); } catch (e) { tr.src = null; tr.voice = null; } });
+      m.out = null;
+      m.level = -1;
+    };
     // A new game: back to the top of the first track.
     m.rewind = function () {
       tracks.forEach((tr) => { stop(tr, 0.08); tr.offset = 0; });
@@ -455,6 +521,13 @@
       const t = audio.ctx.currentTime;
       s.nodes.bed.gain.setTargetAtTime(0, t, 0.05);
       s.nodes.engine.gain.setTargetAtTime(0, t, 0.05);
+    };
+    // kit 0.12.1: before the sound moves to a fresh context (after an iPhone's call): drop the bed and engine, built again there
+    // on the next sync, and the far horns' clock, which starts again with the new context's
+    s.forget = function () {
+      if (s.nodes) { try { s.stop(); } catch (e) { /* ignore */ } }
+      s.nodes = null;
+      s.nextHorn = 0;
     };
     return s;
   }
@@ -4680,6 +4753,7 @@
     sfx.noise = (o) => audio.noise(o || {});
     const music = cfg.music ? makeMusic(audio, settings, cfg.music) : null;
     const ambience = makeAmbience(audio, settings);   // the city sound bed and the taxi's engine
+    audio.beforeRebuild = () => { if (music) music.forget(); ambience.forget(); };   // City Nights kit 0.12.1: both move to a fresh context
     const streetSounds = makeStreetSounds(audio);     // crashes and animals: the game's to play
     sfx.crash = (kind) => streetSounds.crash(kind);
     sfx.animal = (kind) => streetSounds.animal(kind);
@@ -5017,6 +5091,21 @@
     };
     stage.addEventListener('pointerup', pointerEnd);
     stage.addEventListener('pointercancel', pointerEnd);
+    /* City Nights kit 0.12.1 (from Lantern Box kit 0.17.2, proved on an iPhone): an iPhone opens its magnifier at a double tap even where nothing
+       can be selected. The playfield cancels the browser's own handling of its touches (it works by pointer events, which still
+       come), except on a button or control inside it, which keeps its click; elsewhere the second tap of a double tap is
+       cancelled, except on a button, so buttons keep their clicks. */
+    const CONTROLS = 'button, a, input, select, textarea, label, [role="button"], [role="radio"], [role="slider"], [role="switch"]';
+    const isControl = (t) => !!(t && t.closest && t.closest(CONTROLS));
+    const noLoupe = (e) => { if (e.cancelable && !isControl(e.target)) e.preventDefault(); };
+    stage.addEventListener('touchstart', noLoupe, { passive: false });
+    stage.addEventListener('touchend', noLoupe, { passive: false });
+    let lastTouchEnd = -1e9;
+    root.addEventListener('touchend', (e) => {
+      const now = Date.now(), twice = now - lastTouchEnd < 450;
+      lastTouchEnd = now;
+      if (twice && e.cancelable && !isControl(e.target)) e.preventDefault();
+    }, { passive: false });
     // Sound may only start from a key press or a tap (on some phones, only as the finger lifts). A phone
     // can also put sound to sleep (a call, switching apps): the next tap or key wakes it.
     ['pointerdown', 'touchend'].forEach((type) => window.addEventListener(type, () => audio.unlock(), true));
@@ -5793,6 +5882,8 @@
       timePicture(gap);
       state.t += dt;
       root.classList.toggle('cn-paused', state.inGame && state.screen !== 'play');
+      audio.watch();   // City Nights kit 0.12.1: the sound stopped by the system (an iPhone's call): pause once, so nothing plays on unheard
+      if (state.screen === 'play' && audio.lost() && !audio.pausedForLoss) { audio.pausedForLoss = true; audio.lostPauses++; pause(); }
       if (state.screen === 'play' && touch && mqPortrait.matches) pause();   // also checked here, in case the turn's event never came
       if (state.screen === 'play') {
         acc += dt;
@@ -5971,7 +6062,7 @@
       setFare: (hk) => { state.cents = toCents(hk); },
       pause: pause, resume: resume, quit: quitToTitle,
       showGameOver: showGameOver, openSettings: openSettings, openScores: openScores, openModes: openModes,
-      layout: layout, music: music, view: V, street: street, auto: auto,
+      layout: layout, music: music, audio: audio, view: V, street: street, auto: auto,
       get dirty() { return dirty; }, set dirty(v) { dirty = !!v; }
     };
     return api;

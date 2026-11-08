@@ -232,7 +232,7 @@
    and the play tiles sit on the stage; dialogs and the rotate notice cover the whole window. */
 html,body{margin:0;height:100%;background:var(--night-black);overflow:hidden}
 .cn-root{position:fixed;inset:0;overflow:hidden;background:var(--night-black);outline:none;
-  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
 .cn-root.cn-loading{visibility:hidden}
 .cn-ui [hidden]{display:none!important}
 .cn-stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:hidden}

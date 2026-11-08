@@ -248,6 +248,7 @@ In the app's own browser on Barney's computer (not Chrome; a rough guide only): 
 
 ## Sound (kit 0.10)
 
+- **When the phone takes the sound away** (kit 0.12.1, from Lantern Box's fixes proved on an iPhone): a phone call can stop an iPhone's sound without leaving the page, and the sound then stays stopped. The kit notices (the sound stopped, or its clock standing still), pauses play once, and the next tap or key starts the sound afresh, with the music, the city sound bed and the engine moved onto it. A double tap no longer opens an iPhone's magnifier: the street cancels the browser's own handling of its touches (buttons keep theirs), and elsewhere the second tap of a double tap is cancelled.
 - **The shell's sounds** are Retro Kit's set, made in code. A game's own sounds (Grunge City Rider's horn, the crash, a fare paid and so on) are made with `cn.sfx.tone` and `cn.sfx.noise`.
 - **The engine**: a steady note made in code that rises with the taxi's speed, during a run only.
 - **Crashes and animals**, made in code, for a game to play: `cn.sfx.crash('vehicle')` (a heavy thump, metal crunching and ringing, glass falling, bits landing), `cn.sfx.crash('obstacle')` (a hollow plastic thock and a crack, then barriers and cones bouncing away) and `cn.sfx.animal('boar')`, `'dog'`, `'cat'` or `'chickens'` as an animal bolts. Scene 4 plays the crashes, scene 9 the roadworks one, scene 6 the animals.
