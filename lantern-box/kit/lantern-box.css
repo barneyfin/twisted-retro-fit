@@ -849,7 +849,7 @@
 
 /* ---------- The shell: where the screens sit ---------- */
 html,body{margin:0;height:100%;background:var(--ink);overflow:hidden}
-.lb-root{position:fixed;inset:0;overflow:hidden;background:var(--ink);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.lb-root{position:fixed;inset:0;overflow:hidden;background:var(--ink);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
 .lb-root.lb-loading{visibility:hidden}
 .lb-ui [hidden]{display:none!important}
 .lb-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}

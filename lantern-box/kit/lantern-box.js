@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.17.1';
+  const VERSION = '0.17.2';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -99,15 +99,34 @@
 
   /* ---------- Sound: the audio context, its volume, and a plain tone and noise for a game's own (Lantern Box's named sounds are SND8's) ---------- */
   function makeAudio(settings) {
-    const a = { ctx: null, master: null, noiseBuf: null };
+    const a = { ctx: null, master: null, noiseBuf: null, wasRunning: false, rebuiltAt: -1e9, beforeRebuild: null };
+    function makeCtx() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      const c = new AC();
+      a.ctx = c;
+      a.wasRunning = c.state === 'running';
+      c.onstatechange = () => { if (c === a.ctx && c.state === 'running') a.wasRunning = true; };
+      a.master = c.createGain();
+      a.master.connect(c.destination);
+      a.noiseBuf = null;
+      a.apply();
+      return true;
+    }
+    /* kit 0.17.2 (Barney's wife's iPhone, 8 November 2026): a phone call stops an iPhone's sound without hiding the page, and
+       afterwards the context can stay stopped however often it is told to resume. lost(): it had played and the system has
+       stopped it (the shell then pauses play). The next tap or key after that starts a fresh context (at most every 2 s) and
+       moves the sounds, the background sound and the music onto it; a context that has never played is only resumed. */
+    a.lost = () => !!a.ctx && a.wasRunning && a.ctx.state !== 'running' && a.ctx.state !== 'closed';
     a.unlock = function () {
-      if (!a.ctx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return;
-        a.ctx = new AC();
-        a.master = a.ctx.createGain();
-        a.master.connect(a.ctx.destination);
-        a.apply();
+      if (!a.ctx && !makeCtx()) return;
+      if (a.lost() && performance.now() - a.rebuiltAt > 2000) {
+        a.rebuiltAt = performance.now();
+        if (a.beforeRebuild) { try { a.beforeRebuild(); } catch (e) { /* ignore */ } }   // the music remembers its place
+        SND8.reset();
+        const old = a.ctx;
+        try { const job = old.close(); if (job && job.catch) job.catch(() => {}); } catch (e) { /* ignore */ }
+        makeCtx();
       }
       if (a.ctx.state !== 'running') {
         const job = a.ctx.resume();
@@ -330,7 +349,9 @@ const AMB={
 function ambient(lv){stopAmb();if(!live()||!lv)return;amb=ctx.createGain();amb.gain.setValueAtTime(0.0001,ctx.currentTime);amb.gain.exponentialRampToValueAtTime(0.55,ctx.currentTime+1.2);amb.connect(out);ambLv=lv;amb._nodes=AMB[lv]();}
 function stopAmb(){timers.forEach(clearTimeout);timers=[];if(amb){const a=amb;try{a.gain.cancelScheduledValues(ctx.currentTime);a.gain.setValueAtTime(a.gain.value,ctx.currentTime);a.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.6);}catch(e){}
     setTimeout(()=>{(a._nodes||[]).forEach(n=>{try{n.stop();}catch(e){}});a.disconnect();},800);}amb=null;ambLv=null;}
-return {level:v=>{lvl=v;if(out)out.gain.setTargetAtTime(0.5*v,ctx.currentTime,0.03);},_buf:BUF,ready:()=>clipsP||Promise.resolve(),unlock,live,FX,GAIN,BED,EV,get _out(){return out;},_ev:{bats,caw,creak,thunder},play:(k,v)=>{if(live()&&FX[k]){curGain=GAIN[k]||1;try{FX[k](v);}finally{curGain=1;}}},ambient,stopAmb,get ambLv(){return ambLv;}};
+// kit 0.17.2: forget the context (a fresh one is coming, after an iPhone's call); the decoded clips play in any context
+function reset(){timers.forEach(clearTimeout);timers=[];if(amb){try{(amb._nodes||[]).forEach(n=>{try{n.stop();}catch(e){}});amb.disconnect();}catch(e){}}amb=null;ambLv=null;ctx=null;out=null;room=null;nb=null;}
+return {reset,level:v=>{lvl=v;if(out)out.gain.setTargetAtTime(0.5*v,ctx.currentTime,0.03);},_buf:BUF,ready:()=>clipsP||Promise.resolve(),unlock,live,FX,GAIN,BED,EV,get _out(){return out;},_ev:{bats,caw,creak,thunder},play:(k,v)=>{if(live()&&FX[k]){curGain=GAIN[k]||1;try{FX[k](v);}finally{curGain=1;}}},ambient,stopAmb,get ambLv(){return ambLv;}};
 })();
 
   /* ---------- Music (optional: a looping track, or two, given as MP3 text in the game's config) ----------
@@ -410,6 +431,12 @@ return {level:v=>{lvl=v;if(out)out.gain.setTargetAtTime(0.5*v,ctx.currentTime,0.
       tr.voice = null;
     }
     m.stop = function (fade) { stop(tracks[m.cur], fade); };
+    // kit 0.17.2: before the sound moves to a fresh context, each track remembers its place; the next sync starts it again there
+    m.forget = function () {
+      tracks.forEach((tr) => { try { stop(tr, 0); } catch (e) { tr.src = null; tr.voice = null; } });
+      m.out = null;
+      m.level = -1;
+    };
     // A new game: back to the top of the first track.
     m.rewind = function () {
       tracks.forEach((tr) => { stop(tr, 0.08); tr.offset = 0; });
@@ -4753,6 +4780,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     sfx.tone = (o) => audio.tone(o || {});
     sfx.noise = (o) => audio.noise(o || {});
     const music = cfg.music ? makeMusic(audio, settings, cfg.music) : null;
+    audio.beforeRebuild = () => { if (music) music.forget(); };   // kit 0.17.2
 
     /* High scores, per game: a top-ten array of { s: echo, i: initials, d: date }, in Retro Kit's format and under its
        key, where the arcade website looks. */
@@ -5076,6 +5104,19 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     };
     canvas.addEventListener('pointerup', pointerEnd);
     canvas.addEventListener('pointercancel', pointerEnd);
+    /* kit 0.17.2 (Barney's wife's iPhone, 8 November 2026): an iPhone opens its magnifier at a double tap even where nothing can be
+       selected. The picture and the touch buttons (which work by pointer events, which still come) cancel the browser's own
+       handling of their touches; elsewhere the second tap of a double tap is cancelled, except on a button, so buttons keep
+       their clicks. */
+    const noLoupe = (e) => { if (e.cancelable) e.preventDefault(); };
+    canvas.addEventListener('touchstart', noLoupe, { passive: false });
+    canvas.addEventListener('touchend', noLoupe, { passive: false });
+    let lastTouchEnd = -1e9;
+    root.addEventListener('touchend', (e) => {
+      const now = Date.now(), twice = now - lastTouchEnd < 450;
+      lastTouchEnd = now;
+      if (twice && e.cancelable && !(e.target.closest && e.target.closest('button, a, input, select, textarea, label, [role="button"], [role="radio"], [role="slider"], [role="switch"]'))) e.preventDefault();
+    }, { passive: false });
     // Sound may only start from a key press or a tap (on some phones, only as the finger lifts). A phone
     // can also put sound to sleep (a call, switching apps): the next tap or key wakes it.
     ['pointerdown', 'touchend'].forEach((type) => window.addEventListener(type, () => audio.unlock(), true));
@@ -5179,6 +5220,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
           const up = (e) => { if (b.__pid == null || e.pointerId !== b.__pid) return; b.__pid = null; b.classList.remove('is-pressed'); tc.held.delete(a); };
           ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => b.addEventListener(t, up));
           b.addEventListener('contextmenu', (e) => e.preventDefault());
+          b.addEventListener('touchstart', noLoupe, { passive: false });   // kit 0.17.2: no magnifier at a quick double tap
+          b.addEventListener('touchend', noLoupe, { passive: false });
         });
         hudNodes = { full: node };
         syncHud();
@@ -6834,6 +6877,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         if (!rotateEl.hidden) fitScreens();
       }
       if (state.screen === 'play' && upright()) pause();
+      if (state.screen === 'play' && audio.lost()) pause();   // kit 0.17.2: the sound stopped by the system (an iPhone's call): nothing plays on unheard
       if (state.screen === 'play') {
         acc += dt;
         while (acc >= STEP) { tick(); acc -= STEP; }
@@ -7019,6 +7063,7 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       view: V,
       auto: auto,
       music: music,
+      audio: audio,   // kit 0.17.2
       rotate: (on) => { forceRotate = !!on; },
       get nav() { return nav; },
       get game() { return state.game; },
