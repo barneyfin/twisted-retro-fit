@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.17.0';
+  const VERSION = '0.17.1';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -5085,6 +5085,11 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
     const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
     const fsAllowed = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
     const mqFilled = window.matchMedia('(display-mode: fullscreen)');   // an installed app (or F11) already fills the screen
+    // kit 0.17.1 (Barney, 8 November 2026): an iPhone never lets a page go full screen (only its videos), so there the tile opens a tip:
+    // add the game to the Home Screen, where it opens without Safari's bars (build.py gives every game the tags for it). Opened from the
+    // Home Screen (navigator.standalone) the game already fills the screen, so the tile isn't shown.
+    const iPhone = /iPhone|iPod/.test(navigator.userAgent || '');
+    const homeApp = navigator.standalone === true;
     let filled = false;
     function setFilled(on) {
       filled = on;
@@ -5099,17 +5104,18 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       if (filled) { setFilled(false); return; }
       const r = document.documentElement;
       const ask = r.requestFullscreen || r.webkitRequestFullscreen;
-      if (!ask || !fsAllowed()) { setFilled(true); return; }
+      const refused = () => { if (iPhone) openHomeTip(); else setFilled(true); };   // kit 0.17.1: an iPhone gets the tip
+      if (!ask || !fsAllowed()) { refused(); return; }
       let job;
-      try { job = ask.call(r, { navigationUI: 'hide' }); } catch (e) { setFilled(true); return; }
+      try { job = ask.call(r, { navigationUI: 'hide' }); } catch (e) { refused(); return; }
       Promise.resolve(job).then(() => {
         // Hold a phone's game sideways while it fills the screen (browsers allow this only in full screen)
         if (touch && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
-      }, () => setFilled(true));
+      }, refused);
     }
     function syncFullscreenTile(b) {
       const on = !!fsElement() || filled;
-      b.hidden = !on && mqFilled.matches;
+      b.hidden = !on && (mqFilled.matches || homeApp);
       const icon = on ? ICON.fullscreenExit : ICON.fullscreen;
       if (b.firstChild && b.firstChild.tagName === 'SPAN') b.firstChild.innerHTML = icon;
       else b.innerHTML = icon;
@@ -5781,6 +5787,29 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
       state.screen = 'clear';
       sfx('confirm');
       showDialog(() => clearDialog(() => backToSettings(from, 'clear'), () => { clearProgress(); backToSettings(from, 'clear'); }));
+    }
+    /* kit 0.17.1: the full-screen tile's tip on an iPhone (see toggleFullscreen), in the confirmation's plaque: its heading, the tip
+       and OK (focused). OK, Enter or Backspace go back to the title with the tile focused. */
+    const HOME_TIP = "An iPhone won't let a web page fill the screen. Add {name} to your Home Screen (Share, then Add to Home Screen) and play it from there: it opens without Safari's bars.";
+    function homeTipDialog(back) {
+      const { panel, face } = plaque('lb-ht-t', 400, 440, 'gap:12px;padding:22px 22px 18px', 'is-centred');
+      panel.setAttribute('aria-describedby', 'lb-ht-d');
+      const note = txt('p', 'lb-note', HOME_TIP.replace('{name}', titleText));
+      note.id = 'lb-ht-d';
+      note.style.textAlign = 'center';
+      const ok = button('OK', true, true);
+      ok.style.width = '100%';
+      face.append(heading('lb-ht-t', 'Full screen'), el('div', '', RULE).firstChild, note, ok);
+      return { panel: panel, items: [{ el: ok, activate: back }], opts: { back: back } };
+    }
+    function openHomeTip() {
+      if (state.inGame) return;   // the tile shows in play only on a computer
+      state.screen = 'hometip';
+      sfx('confirm');
+      showDialog(() => homeTipDialog(() => {
+        sfx('back'); state.screen = 'title'; closeDialog();
+        const t = titleScreen.querySelector('.lb-arch-tile[data-act="fullscreen"]'); if (t) t.focus();
+      }));
     }
     /* kit 0.8.1: Testing, for trying a game out; it shows only while the game's config has test: { options: [ ... ] }, each option either
        { id, name, choices: [[value, label], ...] } or { id, name, toggle: true, note }. The kit adds a frame-rate line (fps). The values are kept on

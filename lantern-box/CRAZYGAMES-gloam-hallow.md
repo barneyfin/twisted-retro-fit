@@ -87,6 +87,7 @@ These come first because the design and code depend on them. Each is a numbered 
 - [ ] A private window: the game plays and saves without errors.
 - [ ] A French (AZERTY) keyboard layout. The controls already use key positions, so they work; the labels should show Z, Q, A and E there (section 3).
 - [ ] In full screen, Escape leaves full screen without breaking anything, and P pauses.
+- [ ] On an iPhone, hide the full-screen tile in the CrazyGames build: kit 0.17.1's tip (add the game to the Home Screen) doesn't apply inside CrazyGames' page.
 - [ ] Time from tap to play on the Pixel over mobile data (top titles load in under 10 s). The file is 11.3 MB, 10.4 MB of it the two soundtracks.
 - [ ] CrazyGames' preview and QA tool in the developer portal, before every submission: developers who repeatedly submit games that break the rules may be restricted.
 - [ ] Three to five people who've never seen the game play it cold while you watch, and note where they stop. This is not a CrazyGames requirement, but it is the cheapest objective test there is.

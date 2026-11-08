@@ -348,6 +348,27 @@ def check_inlined(game_dir, html):
     return len(notes)
 
 
+VIEWPORT_RE = re.compile(r'<meta name="viewport"[^>]*>')
+TITLE_RE = re.compile(r"<title>([^<]*)</title>")
+
+
+def home_screen(html):
+    """Kit 0.17.1: the tags that let a phone open the game from its Home Screen on its own, without the browser's bars (an
+    iPhone never lets a page go full screen). They go after the viewport tag, named with the page's title."""
+    if "apple-mobile-web-app-capable" in html:
+        return html
+    if not VIEWPORT_RE.search(html):
+        fail("index.html has no <meta name=\"viewport\"> tag (see lantern-box/kit/template.html)")
+    title = TITLE_RE.search(html)
+    name = (title.group(1).strip() if title else "") or "Lantern Box"
+    name = name.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+    tags = ('\n<meta name="mobile-web-app-capable" content="yes">'
+            '\n<meta name="apple-mobile-web-app-capable" content="yes">'
+            '\n<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+            '\n<meta name="apple-mobile-web-app-title" content="' + name + '">')
+    return VIEWPORT_RE.sub(lambda m: m.group(0) + tags, html, count=1)
+
+
 def build(game_dir):
     """Build one game into dist/. Returns the number of warnings."""
     source = game_dir / "index.html"
@@ -377,6 +398,7 @@ def build(game_dir):
 
     html = LINK_RE.sub(swap_link, html)
     html = SCRIPT_RE.sub(swap_script, html)
+    html = home_screen(html)
     DIST.mkdir(exist_ok=True)
     out = DIST / (game_dir.name + ".html")
     out.write_text(html, encoding="utf-8", newline="\n")
