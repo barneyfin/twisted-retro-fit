@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '0.17.2';
+  const VERSION = '0.17.3';
   const H = 540;              // the picture's height in lines, whatever the window
   const STEP = 1 / 60;
   const PHONE_H = 520;        // a window shorter than this, or narrower than PHONE_W, gets the phone layouts
@@ -99,7 +99,9 @@
 
   /* ---------- Sound: the audio context, its volume, and a plain tone and noise for a game's own (Lantern Box's named sounds are SND8's) ---------- */
   function makeAudio(settings) {
-    const a = { ctx: null, master: null, noiseBuf: null, wasRunning: false, rebuiltAt: -1e9, beforeRebuild: null };
+    const a = { ctx: null, master: null, noiseBuf: null, wasRunning: false, rebuiltAt: -1e9, beforeRebuild: null,
+      needsFresh: false, stalled: false, pausedForLoss: false, rebuilds: 0, lostPauses: 0 };
+    let clockT = -1, clockAt = 0, movingSince = 0;
     function makeCtx() {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return false;
@@ -110,23 +112,62 @@
       a.master = c.createGain();
       a.master.connect(c.destination);
       a.noiseBuf = null;
+      clockT = -1; movingSince = 0; a.stalled = false;
       a.apply();
       return true;
     }
-    /* kit 0.17.2 (Barney's wife's iPhone, 8 November 2026): a phone call stops an iPhone's sound without hiding the page, and
-       afterwards the context can stay stopped however often it is told to resume. lost(): it had played and the system has
-       stopped it (the shell then pauses play). The next tap or key after that starts a fresh context (at most every 2 s) and
-       moves the sounds, the background sound and the music onto it; a context that has never played is only resumed. */
-    a.lost = () => !!a.ctx && a.wasRunning && a.ctx.state !== 'running' && a.ctx.state !== 'closed';
+    /* kit 0.17.2 and 0.17.3 (Barney's wife's iPhone, 8 November 2026): a phone call stops an iPhone's sound without hiding the page,
+       and afterwards the context can stay stopped however often it is told to resume. lost(): the system has stopped the sound:
+       the iPhone's audio session says it is interrupted (where Safari tells), or a context that had played is stopped, or says it
+       runs but its clock has stood still for 0.7 s (watch(), every frame). The shell then pauses play, once until the sound is
+       back. Until a context plays again with its clock moving, each tap or key (at most every 1.5 s) wakes the sound afresh: on an
+       iPhone a moment of silence through a media element first (it can end the system's hold on the page's sound), then a fresh
+       context with the sounds, the background sound and the music moved onto it. A context that has never played is only resumed. */
+    const session = () => { try { const s = navigator.audioSession; return s && typeof s.state === 'string' ? s.state : ''; } catch (e) { return ''; } };
+    const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1);
+    let kickEl = null;
+    function silentWav() {   // 0.1 s of silence, 8-bit mono at 8 kHz
+      const n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+      const put = (o, t) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+      put(0, 'RIFF'); v.setUint32(4, 36 + n, true); put(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); put(36, 'data'); v.setUint32(40, n, true);
+      b.fill(128, 44);
+      let bin = '';
+      for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+      return 'data:audio/wav;base64,' + btoa(bin);
+    }
+    function kick() {
+      if (!iOS) return;
+      try {
+        if (!kickEl) { kickEl = document.createElement('audio'); kickEl.setAttribute('playsinline', ''); kickEl.src = silentWav(); }
+        kickEl.currentTime = 0;
+        const job = kickEl.play();
+        if (job && job.catch) job.catch(() => {});
+      } catch (e) { /* ignore */ }
+    }
+    a.lost = () => !!a.ctx && a.ctx.state !== 'closed' && (session() === 'interrupted' || (a.wasRunning && (a.ctx.state !== 'running' || a.stalled)));
+    a.watch = function () {
+      const c = a.ctx, now = Date.now();
+      if (!c || c.state !== 'running') { clockT = -1; movingSince = 0; a.stalled = false; }
+      else if (c.currentTime !== clockT) { if (clockT >= 0 && !movingSince) movingSince = now; clockT = c.currentTime; clockAt = now; a.stalled = false; }   // moving: seen to go on, not just read
+      else if (now - clockAt > 700) { a.stalled = true; movingSince = 0; }
+      if (a.lost()) a.needsFresh = true;
+      else if (a.needsFresh && movingSince && now - movingSince > 400) { a.needsFresh = false; a.pausedForLoss = false; }   // playing again
+    };
+    a.diag = () => ({ state: a.ctx ? a.ctx.state : 'not started', clock: !a.ctx || a.ctx.state !== 'running' ? '-' : a.stalled ? 'stopped' : 'moving',
+      session: session() || 'not told', fresh: a.rebuilds, pauses: a.lostPauses, waking: a.needsFresh });
     a.unlock = function () {
       if (!a.ctx && !makeCtx()) return;
-      if (a.lost() && performance.now() - a.rebuiltAt > 2000) {
-        a.rebuiltAt = performance.now();
+      if (a.lost()) a.needsFresh = true;
+      if (a.needsFresh && Date.now() - a.rebuiltAt > 1500) {
+        a.rebuiltAt = Date.now();
+        kick();
         if (a.beforeRebuild) { try { a.beforeRebuild(); } catch (e) { /* ignore */ } }   // the music remembers its place
         SND8.reset();
         const old = a.ctx;
         try { const job = old.close(); if (job && job.catch) job.catch(() => {}); } catch (e) { /* ignore */ }
         makeCtx();
+        a.rebuilds++;
       }
       if (a.ctx.state !== 'running') {
         const job = a.ctx.resume();
@@ -6877,7 +6918,8 @@ return{build,set,setPotion,stickShow,ICON,POT,OPTS,oct,ensureDefs};
         if (!rotateEl.hidden) fitScreens();
       }
       if (state.screen === 'play' && upright()) pause();
-      if (state.screen === 'play' && audio.lost()) pause();   // kit 0.17.2: the sound stopped by the system (an iPhone's call): nothing plays on unheard
+      audio.watch();   // kit 0.17.3: the sound's clock
+      if (state.screen === 'play' && audio.lost() && !audio.pausedForLoss) { audio.pausedForLoss = true; audio.lostPauses++; pause(); }   // kit 0.17.2: the sound stopped by the system (an iPhone's call): nothing plays on unheard, once until it is back
       if (state.screen === 'play') {
         acc += dt;
         while (acc >= STEP) { tick(); acc -= STEP; }

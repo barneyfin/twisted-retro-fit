@@ -635,7 +635,7 @@ function buildPieces(g, lb) {
   showBar.hidden = true;
   readout = document.createElement('div');
   readout.className = 'lb-ui lb-plaque is-hud ls-readout';
-  readout.innerHTML = '<div class="lb-face"><div></div><div></div><div></div></div>';
+  readout.innerHTML = '<div class="lb-face"><div></div><div></div><div></div><div></div></div>';   // kit 0.17.3: a fourth line, the sound
   document.body.append(bar, readout, showBar);
 }
 
@@ -789,6 +789,10 @@ function drawScene(ctx, g, lb, t, x) {
 }
 function showReadout(g, lb) {
   const p = lb.picture, lines = readout.querySelectorAll('.lb-face>div');
+  // kit 0.17.3: the sound's state, for the phone-call test on an iPhone: the context, its clock, what the iPhone's audio session says,
+  // how many times the kit has woken the sound afresh and paused for it
+  const sd = lb._debug.audio && lb._debug.audio.diag ? lb._debug.audio.diag() : null;
+  if (lines[3]) lines[3].textContent = sd ? 'Sound: ' + sd.state + ' · clock ' + sd.clock + ' · iPhone session ' + sd.session + ' · woken ' + sd.fresh + ' · paused ' + sd.pauses + (sd.waking ? ' · waiting for a tap' : '') : '';
   lines[0].innerHTML = '<b>' + Math.round(g.fps) + ' fps</b> · processor ' + g.cpu.toFixed(1) + ' ms a frame';
   lines[1].textContent = p.width + ' × ' + p.height + ' · ' + p.sharpness.toFixed(2) + '× · ' + p.level + (lb.settings.picture === 'auto' ? ' (automatic)' : '') + ' · layers ' + Math.round(lb.world.stats.tileBytes / 1048576) + ' MB';
   lines[2].textContent = g.check
